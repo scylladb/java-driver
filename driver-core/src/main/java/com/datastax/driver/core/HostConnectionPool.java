@@ -692,7 +692,7 @@ class HostConnectionPool implements Connection.Owner {
   }
 
   void cleanupIdleConnections(long now) {
-    if (isClosed()) return;
+    if (isClosed() || phase.get() != Phase.READY) return;
 
     shrinkIfBelowCapacity();
     cleanupTrash(now);
