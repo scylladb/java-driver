@@ -28,6 +28,7 @@ import com.datastax.driver.core.policies.AddressTranslator;
 import com.datastax.driver.core.policies.IdentityTranslator;
 import com.datastax.driver.core.policies.LatencyAwarePolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
+import com.datastax.driver.core.policies.PagingOptimizingLoadBalancingPolicy;
 import com.datastax.driver.core.policies.Policies;
 import com.datastax.driver.core.policies.ReconnectionPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
@@ -1445,7 +1446,33 @@ public class Cluster implements Closeable {
         Configuration configuration,
         Collection<Host.StateListener> listeners) {
       this.clusterName = clusterName == null ? generateClusterName() : clusterName;
-      this.configuration = configuration;
+      if (configuration != null && configuration.getPolicies() != null) {
+        Policies policies = configuration.getPolicies();
+        this.configuration =
+            Configuration.builder()
+                .withPolicies(
+                    Policies.builder()
+                        .withLoadBalancingPolicy(
+                            new PagingOptimizingLoadBalancingPolicy(
+                                policies.getLoadBalancingPolicy()))
+                        .withReconnectionPolicy(policies.getReconnectionPolicy())
+                        .withRetryPolicy(policies.getRetryPolicy())
+                        .withAddressTranslator(policies.getAddressTranslator())
+                        .withTimestampGenerator(policies.getTimestampGenerator())
+                        .withSpeculativeExecutionPolicy(policies.getSpeculativeExecutionPolicy())
+                        .build())
+                .withProtocolOptions(configuration.getProtocolOptions())
+                .withPoolingOptions(configuration.getPoolingOptions())
+                .withSocketOptions(configuration.getSocketOptions())
+                .withMetricsOptions(configuration.getMetricsOptions())
+                .withQueryOptions(configuration.getQueryOptions())
+                .withThreadingOptions(configuration.getThreadingOptions())
+                .withNettyOptions(configuration.getNettyOptions())
+                .withCodecRegistry(configuration.getCodecRegistry())
+                .build();
+      } else {
+        this.configuration = configuration;
+      }
       this.contactPoints = contactPoints;
       this.listeners = new CopyOnWriteArraySet<Host.StateListener>(listeners);
     }
