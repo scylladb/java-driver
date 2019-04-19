@@ -35,10 +35,11 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Queue;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -57,12 +58,14 @@ class HostConnectionPool implements Connection.Owner {
   private static final Logger logger = LoggerFactory.getLogger(HostConnectionPool.class);
 
   private static final int MAX_SIMULTANEOUS_CREATION = 1;
+  private static final Random RAND = new Random();
 
   final Host host;
   volatile HostDistance hostDistance;
   protected final SessionManager manager;
 
-  final List<Connection> connections;
+  private int connectionsPerShard;
+  List<Connection>[] connections;
   private final AtomicInteger open;
   /** The total number of in-flight requests on all connections of this pool. */
   final AtomicInteger totalInFlight = new AtomicInteger();
@@ -72,14 +75,12 @@ class HostConnectionPool implements Connection.Owner {
    */
   private final AtomicInteger maxTotalInFlight = new AtomicInteger();
 
-  @VisibleForTesting final Set<Connection> trash = new CopyOnWriteArraySet<Connection>();
+  @VisibleForTesting Set<Connection>[] trash;
 
-  private final Queue<PendingBorrow> pendingBorrows = new ConcurrentLinkedQueue<PendingBorrow>();
+  private Queue<PendingBorrow>[] pendingBorrows;
   final AtomicInteger pendingBorrowCount = new AtomicInteger();
 
-  private final Runnable newConnectionTask;
-
-  private final AtomicInteger scheduledForCreation = new AtomicInteger();
+  private AtomicInteger[] scheduledForCreation;
 
   private final EventExecutor timeoutsExecutor;
 
@@ -94,6 +95,20 @@ class HostConnectionPool implements Connection.Owner {
 
   protected final AtomicReference<Phase> phase = new AtomicReference<Phase>(Phase.INITIALIZING);
 
+  private class ConnectionTask implements Runnable {
+    private final int shardId;
+
+    public ConnectionTask(int shardId) {
+      this.shardId = shardId;
+    }
+
+    @Override
+    public void run() {
+      addConnectionIfUnderMaximum(shardId);
+      scheduledForCreation[shardId].decrementAndGet();
+    }
+  }
+
   // When a request times out, we may never release its stream ID. So over time, a given connection
   // may get less an less available streams. When the number of available ones go below the
   // following threshold, we just replace the connection by a new one.
@@ -105,16 +120,6 @@ class HostConnectionPool implements Connection.Owner {
     this.hostDistance = hostDistance;
     this.manager = manager;
 
-    this.newConnectionTask =
-        new Runnable() {
-          @Override
-          public void run() {
-            addConnectionIfUnderMaximum();
-            scheduledForCreation.decrementAndGet();
-          }
-        };
-
-    this.connections = new CopyOnWriteArrayList<Connection>();
     this.open = new AtomicInteger();
 
     this.minAllowedStreams = options().getMaxRequestsPerConnection(hostDistance) * 3 / 4;
@@ -127,21 +132,48 @@ class HostConnectionPool implements Connection.Owner {
    *     reuse as part of this pool. Might be null or already used by another pool.
    */
   ListenableFuture<Void> initAsync(Connection reusedConnection) {
+    if (reusedConnection != null && reusedConnection.setOwner(this)) {
+      return initAsyncWithConnection(reusedConnection);
+    }
+    try {
+      return initAsyncWithConnection(manager.connectionFactory().open(this));
+    } catch (Exception e) {
+      phase.compareAndSet(Phase.INITIALIZING, Phase.INIT_FAILED);
+      SettableFuture<Void> future = SettableFuture.create();
+      future.setException(e);
+      return future;
+    }
+  }
+
+  ListenableFuture<Void> initAsyncWithConnection(Connection reusedConnection) {
     Executor initExecutor =
         manager.cluster.manager.configuration.getPoolingOptions().getInitializationExecutor();
 
     // Create initial core connections
     final int coreSize = options().getCoreConnectionsPerHost(hostDistance);
-    final List<Connection> connections = Lists.newArrayListWithCapacity(coreSize);
-    final List<ListenableFuture<Void>> connectionFutures = Lists.newArrayListWithCapacity(coreSize);
+    final int shardsCount =
+        host.getShardingInfo() == null ? 1 : host.getShardingInfo().getShardsCount();
 
-    int toCreate = coreSize;
+    connectionsPerShard = coreSize / shardsCount + (coreSize % shardsCount > 0 ? 1 : 0);
+    int toCreate = shardsCount * connectionsPerShard;
 
-    if (reusedConnection != null && toCreate > 0 && reusedConnection.setOwner(this)) {
-      toCreate -= 1;
-      connections.add(reusedConnection);
-      connectionFutures.add(MoreFutures.VOID_SUCCESS);
+    this.connections = new List[shardsCount];
+    scheduledForCreation = new AtomicInteger[shardsCount];
+    trash = new Set[shardsCount];
+    pendingBorrows = new Queue[shardsCount];
+    for (int i = 0; i < shardsCount; ++i) {
+      this.connections[i] = new CopyOnWriteArrayList<Connection>();
+      scheduledForCreation[i] = new AtomicInteger();
+      trash[i] = new CopyOnWriteArraySet<Connection>();
+      pendingBorrows[i] = new ConcurrentLinkedQueue<PendingBorrow>();
     }
+
+    final List<Connection> connections = Lists.newArrayListWithCapacity(toCreate);
+    final List<ListenableFuture<Void>> connectionFutures = Lists.newArrayListWithCapacity(toCreate);
+
+    toCreate -= 1;
+    connections.add(reusedConnection);
+    connectionFutures.add(MoreFutures.VOID_SUCCESS);
 
     List<Connection> newConnections = manager.connectionFactory().newConnections(this, toCreate);
     connections.addAll(newConnections);
@@ -150,22 +182,42 @@ class HostConnectionPool implements Connection.Owner {
       connectionFutures.add(handleErrors(connectionFuture, initExecutor));
     }
 
-    ListenableFuture<List<Void>> allConnectionsFuture = Futures.allAsList(connectionFutures);
-
     final SettableFuture<Void> initFuture = SettableFuture.create();
+
+    addCallback(connections, connectionFutures, initFuture, new ArrayList<Connection>());
+
+    return initFuture;
+  }
+
+  private void addCallback(
+      final List<Connection> connections,
+      final List<ListenableFuture<Void>> connectionFutures,
+      final SettableFuture<Void> initFuture,
+      final List<Connection> toClose) {
+
+    final Executor initExecutor =
+        manager.cluster.manager.configuration.getPoolingOptions().getInitializationExecutor();
+    final ListenableFuture<List<Void>> allConnectionsFuture = Futures.allAsList(connectionFutures);
+
     GuavaCompatibility.INSTANCE.addCallback(
         allConnectionsFuture,
         new FutureCallback<List<Void>>() {
           @Override
           public void onSuccess(List<Void> l) {
-            // Some of the connections might have failed, keep only the successful ones
-            ListIterator<Connection> it = connections.listIterator();
-            while (it.hasNext()) {
-              if (it.next().isClosed()) it.remove();
+            int added = 0;
+            for (final Connection c : connections) {
+              if (!c.isClosed()) {
+                if (HostConnectionPool.this.connections[c.shardId()].size()
+                    < HostConnectionPool.this.connectionsPerShard) {
+                  ++added;
+                  HostConnectionPool.this.connections[c.shardId()].add(c);
+                } else {
+                  toClose.add(c);
+                }
+              }
             }
 
-            HostConnectionPool.this.connections.addAll(connections);
-            open.set(connections.size());
+            open.addAndGet(added);
 
             if (isClosed()) {
               initFuture.setException(
@@ -173,14 +225,35 @@ class HostConnectionPool implements Connection.Owner {
                       host.getSocketAddress(), "Pool was closed during initialization"));
               // we're not sure if closeAsync() saw the connections, so ensure they get closed
               forceClose(connections);
+              forceClose(toClose);
+              for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
+                forceClose(shardConnections);
+              }
+              open.set(0);
             } else {
-              logger.debug(
-                  "Created connection pool to host {} ({} connections needed, {} successfully opened)",
-                  host,
-                  coreSize,
-                  connections.size());
-              phase.compareAndSet(Phase.INITIALIZING, Phase.READY);
-              initFuture.set(null);
+              int needed = 0;
+              for (final List<Connection> shardsConnections : HostConnectionPool.this.connections) {
+                needed +=
+                    Math.max(
+                        0, HostConnectionPool.this.connectionsPerShard - shardsConnections.size());
+              }
+              if (needed > 0) {
+                final List<Connection> connections =
+                    manager.connectionFactory().newConnections(HostConnectionPool.this, needed);
+                final List<ListenableFuture<Void>> connectionFutures =
+                    Lists.newArrayListWithCapacity(needed);
+                for (Connection connection : connections) {
+                  ListenableFuture<Void> connectionFuture = connection.initAsync();
+                  connectionFutures.add(handleErrors(connectionFuture, initExecutor));
+                }
+                addCallback(connections, connectionFutures, initFuture, toClose);
+              } else {
+                for (final Connection c : toClose) {
+                  c.closeAsync();
+                }
+                phase.compareAndSet(Phase.INITIALIZING, Phase.READY);
+                initFuture.set(null);
+              }
             }
           }
 
@@ -188,11 +261,15 @@ class HostConnectionPool implements Connection.Owner {
           public void onFailure(Throwable t) {
             phase.compareAndSet(Phase.INITIALIZING, Phase.INIT_FAILED);
             forceClose(connections);
+            forceClose(toClose);
+            for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
+              forceClose(shardConnections);
+            }
+            open.set(0);
             initFuture.setException(t);
           }
         },
         initExecutor);
-    return initFuture;
   }
 
   private ListenableFuture<Void> handleErrors(
@@ -234,31 +311,42 @@ class HostConnectionPool implements Connection.Owner {
     return manager.configuration().getPoolingOptions();
   }
 
-  ListenableFuture<Connection> borrowConnection(long timeout, TimeUnit unit, int maxQueueSize) {
+  ListenableFuture<Connection> borrowConnection(
+      long timeout, TimeUnit unit, int maxQueueSize, ByteBuffer routingKey) {
     Phase phase = this.phase.get();
     if (phase != Phase.READY)
       return Futures.immediateFailedFuture(
           new ConnectionException(host.getSocketAddress(), "Pool is " + phase));
 
-    if (connections.isEmpty()) {
+    int shardId = 0;
+    if (host.getShardingInfo() != null) {
+      if (routingKey != null) {
+        Metadata metadata = manager.cluster.getMetadata();
+        Token t = metadata.newToken(routingKey);
+        shardId = host.getShardingInfo().shardId(t);
+      } else {
+        shardId = RAND.nextInt(host.getShardingInfo().getShardsCount());
+      }
+    }
+
+    if (connections[shardId].isEmpty()) {
       if (host.convictionPolicy.canReconnectNow()) {
-        int coreSize = options().getCoreConnectionsPerHost(hostDistance);
-        if (coreSize == 0) {
-          maybeSpawnNewConnection();
-        } else if (scheduledForCreation.compareAndSet(0, coreSize)) {
-          for (int i = 0; i < coreSize; i++) {
+        if (connectionsPerShard == 0) {
+          maybeSpawnNewConnection(shardId);
+        } else if (scheduledForCreation[shardId].compareAndSet(0, connectionsPerShard)) {
+          for (int i = 0; i < connectionsPerShard; i++) {
             // We don't respect MAX_SIMULTANEOUS_CREATION here because it's  only to
             // protect against creating connection in excess of core too quickly
-            manager.blockingExecutor().submit(newConnectionTask);
+            manager.blockingExecutor().submit(new ConnectionTask(shardId));
           }
         }
-        return enqueue(timeout, unit, maxQueueSize);
+        return enqueue(timeout, unit, maxQueueSize, shardId);
       }
     }
 
     int minInFlight = Integer.MAX_VALUE;
     Connection leastBusy = null;
-    for (Connection connection : connections) {
+    for (Connection connection : connections[shardId]) {
       int inFlight = connection.inFlight.get();
       if (inFlight < minInFlight) {
         minInFlight = inFlight;
@@ -276,7 +364,7 @@ class HostConnectionPool implements Connection.Owner {
       // the previous check to connections and now. But in that case, the line above will have
       // trigger the creation of
       // a new connection, so just wait that connection and move on
-      return enqueue(timeout, unit, maxQueueSize);
+      return enqueue(timeout, unit, maxQueueSize, shardId);
     } else {
       while (true) {
         int inFlight = leastBusy.inFlight.get();
@@ -285,7 +373,7 @@ class HostConnectionPool implements Connection.Owner {
             >= Math.min(
                 leastBusy.maxAvailableStreams(),
                 options().getMaxRequestsPerConnection(hostDistance))) {
-          return enqueue(timeout, unit, maxQueueSize);
+          return enqueue(timeout, unit, maxQueueSize, shardId);
         }
 
         if (leastBusy.inFlight.compareAndSet(inFlight, inFlight + 1)) break;
@@ -300,21 +388,22 @@ class HostConnectionPool implements Connection.Owner {
           || maxTotalInFlight.compareAndSet(oldMax, totalInFlightCount)) break;
     }
 
-    int connectionCount = open.get() + scheduledForCreation.get();
-    if (connectionCount < options().getCoreConnectionsPerHost(hostDistance)) {
-      maybeSpawnNewConnection();
+    int connectionCount = connections[shardId].size() + scheduledForCreation[shardId].get();
+    if (connectionCount < connectionsPerShard) {
+      maybeSpawnNewConnection(shardId);
     } else if (connectionCount < options().getMaxConnectionsPerHost(hostDistance)) {
       // Add a connection if we fill the first n-1 connections and almost fill the last one
       int currentCapacity =
           (connectionCount - 1) * options().getMaxRequestsPerConnection(hostDistance)
               + options().getNewConnectionThreshold(hostDistance);
-      if (totalInFlightCount > currentCapacity) maybeSpawnNewConnection();
+      if (totalInFlightCount > currentCapacity) maybeSpawnNewConnection(shardId);
     }
 
     return leastBusy.setKeyspaceAsync(manager.poolsState.keyspace);
   }
 
-  private ListenableFuture<Connection> enqueue(long timeout, TimeUnit unit, int maxQueueSize) {
+  private ListenableFuture<Connection> enqueue(
+      long timeout, TimeUnit unit, int maxQueueSize, int shardId) {
     if (timeout == 0 || maxQueueSize == 0) {
       return Futures.immediateFailedFuture(new BusyPoolException(host.getSocketAddress(), 0));
     }
@@ -331,7 +420,7 @@ class HostConnectionPool implements Connection.Owner {
     }
 
     PendingBorrow pendingBorrow = new PendingBorrow(timeout, unit, timeoutsExecutor);
-    pendingBorrows.add(pendingBorrow);
+    pendingBorrows[shardId].add(pendingBorrow);
 
     // If we raced with shutdown, make sure the future will be completed. This has no effect if it
     // was properly
@@ -371,7 +460,7 @@ class HostConnectionPool implements Connection.Owner {
   // When a connection gets returned to the pool, check if there are pending borrows that can be
   // completed with it.
   private void dequeue(final Connection connection) {
-    while (!pendingBorrows.isEmpty()) {
+    while (!pendingBorrows[connection.shardId()].isEmpty()) {
 
       // We can only reuse the connection if it's under its maximum number of inFlight requests.
       // Do this atomically, as we could be competing with other borrowConnection or dequeue calls.
@@ -390,7 +479,7 @@ class HostConnectionPool implements Connection.Owner {
         }
       }
 
-      final PendingBorrow pendingBorrow = pendingBorrows.poll();
+      final PendingBorrow pendingBorrow = pendingBorrows[connection.shardId()].poll();
       if (pendingBorrow == null) {
         // Another thread has emptied the queue since our last check, restore the count
         connection.inFlight.decrementAndGet();
@@ -445,7 +534,7 @@ class HostConnectionPool implements Connection.Owner {
   private void replaceConnection(Connection connection) {
     if (!connection.state.compareAndSet(OPEN, TRASHED)) return;
     open.decrementAndGet();
-    maybeSpawnNewConnection();
+    maybeSpawnNewConnection(connection.shardId());
     connection.maxIdleTime = Long.MIN_VALUE;
     doTrashConnection(connection);
   }
@@ -470,11 +559,11 @@ class HostConnectionPool implements Connection.Owner {
   }
 
   private void doTrashConnection(Connection connection) {
-    connections.remove(connection);
-    trash.add(connection);
+    connections[connection.shardId()].remove(connection);
+    trash[connection.shardId()].add(connection);
   }
 
-  private boolean addConnectionIfUnderMaximum() {
+  private boolean addConnectionIfUnderMaximum(int shardId) {
 
     // First, make sure we don't cross the allowed limit of open connections
     for (; ; ) {
@@ -491,17 +580,30 @@ class HostConnectionPool implements Connection.Owner {
 
     // Now really open the connection
     try {
-      Connection newConnection = tryResurrectFromTrash();
+      Connection newConnection = tryResurrectFromTrash(shardId);
       if (newConnection == null) {
         if (!host.convictionPolicy.canReconnectNow()) {
           open.decrementAndGet();
           return false;
         }
         logger.debug("Creating new connection on busy pool to {}", host);
-        newConnection = manager.connectionFactory().open(this);
-        newConnection.setKeyspace(manager.poolsState.keyspace);
+        List<Connection> toClose = new ArrayList<Connection>();
+        try {
+          while (true) {
+            newConnection = manager.connectionFactory().open(this);
+            if (newConnection.shardId() == shardId) {
+              newConnection.setKeyspace(manager.poolsState.keyspace);
+              break;
+            }
+            toClose.add(newConnection);
+          }
+        } finally {
+          for (Connection c : toClose) {
+            c.closeAsync();
+          }
+        }
       }
-      connections.add(newConnection);
+      connections[newConnection.shardId()].add(newConnection);
 
       newConnection.state.compareAndSet(RESURRECTING, OPEN); // no-op if it was already OPEN
 
@@ -547,12 +649,12 @@ class HostConnectionPool implements Connection.Owner {
     }
   }
 
-  private Connection tryResurrectFromTrash() {
+  private Connection tryResurrectFromTrash(int shardId) {
     long highestMaxIdleTime = System.currentTimeMillis();
     Connection chosen = null;
 
     while (true) {
-      for (Connection connection : trash)
+      for (Connection connection : trash[shardId])
         if (connection.maxIdleTime > highestMaxIdleTime
             && connection.maxAvailableStreams() > minAllowedStreams) {
           chosen = connection;
@@ -563,26 +665,26 @@ class HostConnectionPool implements Connection.Owner {
       else if (chosen.state.compareAndSet(TRASHED, RESURRECTING)) break;
     }
     logger.trace("Resurrecting {}", chosen);
-    trash.remove(chosen);
+    trash[shardId].remove(chosen);
     return chosen;
   }
 
-  private void maybeSpawnNewConnection() {
+  private void maybeSpawnNewConnection(int shardId) {
     if (isClosed() || !host.convictionPolicy.canReconnectNow()) return;
 
     while (true) {
-      int inCreation = scheduledForCreation.get();
+      int inCreation = scheduledForCreation[shardId].get();
       if (inCreation >= MAX_SIMULTANEOUS_CREATION) return;
-      if (scheduledForCreation.compareAndSet(inCreation, inCreation + 1)) break;
+      if (scheduledForCreation[shardId].compareAndSet(inCreation, inCreation + 1)) break;
     }
 
-    manager.blockingExecutor().submit(newConnectionTask);
+    manager.blockingExecutor().submit(new ConnectionTask(shardId));
   }
 
   @Override
   public void onConnectionDefunct(final Connection connection) {
     if (connection.state.compareAndSet(OPEN, GONE)) open.decrementAndGet();
-    connections.remove(connection);
+    connections[connection.shardId()].remove(connection);
 
     // Don't try to replace the connection now. Connection.defunct already signaled the failure,
     // and either the host will be marked DOWN (which destroys all pools), or we want to prevent
@@ -617,26 +719,36 @@ class HostConnectionPool implements Connection.Owner {
 
     if (toTrash <= 0) return;
 
-    for (Connection connection : connections)
-      if (trashConnection(connection)) {
-        toTrash -= 1;
-        if (toTrash == 0) return;
+    for (final List<Connection> shardsConnections : connections) {
+      if (shardsConnections.size() > connectionsPerShard) {
+        for (Connection connection : shardsConnections) {
+          if (trashConnection(connection)) {
+            toTrash -= 1;
+            if (toTrash == 0) return;
+            if (shardsConnections.size() <= connectionsPerShard) {
+              break;
+            }
+          }
+        }
       }
+    }
   }
 
   /** Close connections that have been sitting in the trash for too long */
   private void cleanupTrash(long now) {
-    for (Connection connection : trash) {
-      if (connection.maxIdleTime < now && connection.state.compareAndSet(TRASHED, GONE)) {
-        if (connection.inFlight.get() == 0) {
-          logger.trace("Cleaning up {}", connection);
-          trash.remove(connection);
-          close(connection);
-        } else {
-          // Given that idleTimeout >> request timeout, all outstanding requests should
-          // have finished by now, so we should not get here.
-          // Restore the status so that it's retried on the next cleanup.
-          connection.state.set(TRASHED);
+    for (Set<Connection> shardConnections : trash) {
+      for (Connection connection : shardConnections) {
+        if (connection.maxIdleTime < now && connection.state.compareAndSet(TRASHED, GONE)) {
+          if (connection.inFlight.get() == 0) {
+            logger.trace("Cleaning up {}", connection);
+            shardConnections.remove(connection);
+            close(connection);
+          } else {
+            // Given that idleTimeout >> request timeout, all outstanding requests should
+            // have finished by now, so we should not get here.
+            // Restore the status so that it's retried on the next cleanup.
+            connection.state.set(TRASHED);
+          }
         }
       }
     }
@@ -657,9 +769,11 @@ class HostConnectionPool implements Connection.Owner {
 
     phase.set(Phase.CLOSING);
 
-    for (PendingBorrow pendingBorrow : pendingBorrows) {
-      pendingBorrow.setException(
-          new ConnectionException(host.getSocketAddress(), "Pool is shutdown"));
+    for (Queue<PendingBorrow> queue : pendingBorrows) {
+      for (PendingBorrow pendingBorrow : queue) {
+        pendingBorrow.setException(
+            new ConnectionException(host.getSocketAddress(), "Pool is shutdown"));
+      }
     }
 
     future = new CloseFuture.Forwarding(discardAvailableConnections());
@@ -674,7 +788,11 @@ class HostConnectionPool implements Connection.Owner {
   }
 
   int trashed() {
-    return trash.size();
+    int size = 0;
+    for (final Set<Connection> shardConnections : trash) {
+      size += shardConnections.size();
+    }
+    return size;
   }
 
   private List<CloseFuture> discardAvailableConnections() {
@@ -682,23 +800,36 @@ class HostConnectionPool implements Connection.Owner {
     // will be empty,
     // so this will return an empty list
 
-    List<CloseFuture> futures = new ArrayList<CloseFuture>(connections.size() + trash.size());
+    int size = 0;
+    for (final Set<Connection> shardConnections : trash) {
+      size += shardConnections.size();
+    }
+    for (final List<Connection> shardConnections : connections) {
+      size += shardConnections.size();
+    }
+    List<CloseFuture> futures = new ArrayList<CloseFuture>(size);
 
-    for (final Connection connection : connections) {
-      CloseFuture future = connection.closeAsync();
-      future.addListener(
-          new Runnable() {
-            @Override
-            public void run() {
-              if (connection.state.compareAndSet(OPEN, GONE)) open.decrementAndGet();
-            }
-          },
-          GuavaCompatibility.INSTANCE.sameThreadExecutor());
-      futures.add(future);
+    for (final List<Connection> shardConnections : connections) {
+      for (final Connection connection : shardConnections) {
+        CloseFuture future = connection.closeAsync();
+        future.addListener(
+            new Runnable() {
+              @Override
+              public void run() {
+                if (connection.state.compareAndSet(OPEN, GONE)) open.decrementAndGet();
+              }
+            },
+            GuavaCompatibility.INSTANCE.sameThreadExecutor());
+        futures.add(future);
+      }
     }
 
     // Some connections in the trash might still be open if they hadn't reached their idle timeout
-    for (Connection connection : trash) futures.add(connection.closeAsync());
+    for (final Set<Connection> shardConnections : trash) {
+      for (final Connection connection : shardConnections) {
+        futures.add(connection.closeAsync());
+      }
+    }
 
     return futures;
   }
@@ -715,12 +846,14 @@ class HostConnectionPool implements Connection.Owner {
     // more connection than maximum (and if we create more than core connection due to a race but
     // this isn't
     // justified by the load, the connection in excess will be quickly trashed anyway)
-    int opened = open.get();
-    for (int i = opened; i < options().getCoreConnectionsPerHost(hostDistance); i++) {
-      // We don't respect MAX_SIMULTANEOUS_CREATION here because it's only to
-      // protect against creating connection in excess of core too quickly
-      scheduledForCreation.incrementAndGet();
-      manager.blockingExecutor().submit(newConnectionTask);
+    for (int shardId = 0; shardId < connections.length; ++shardId) {
+      final List<Connection> shardConnections = connections[shardId];
+      for (int i = shardConnections.size(); i < connectionsPerShard; ++i) {
+        // We don't respect MAX_SIMULTANEOUS_CREATION here because it's only to
+        // protect against creating connection in excess of core too quickly
+        scheduledForCreation[shardId].incrementAndGet();
+        manager.blockingExecutor().submit(new ConnectionTask(shardId));
+      }
     }
   }
 

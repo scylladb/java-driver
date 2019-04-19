@@ -91,6 +91,6 @@ public class RequestHandlerTest {
 
   private Connection getSingleConnection(Session session) {
     HostConnectionPool pool = ((SessionManager) session).pools.values().iterator().next();
-    return pool.connections.get(0);
+    return pool.connections[0].get(0);
   }
 }

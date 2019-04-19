@@ -179,7 +179,7 @@ public class HeartbeatTest extends ScassandraTestBase {
       // Find the connection in the connection pool.
       SessionManager session = (SessionManager) cluster.connect();
       Host host = TestUtils.findHost(cluster, 1);
-      Connection connection = session.pools.get(host).connections.get(0);
+      Connection connection = session.pools.get(host).connections[0].get(0);
 
       // Extract connection name from toString implementation.
       String connectionName =
