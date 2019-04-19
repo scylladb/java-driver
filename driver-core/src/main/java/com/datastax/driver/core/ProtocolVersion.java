@@ -63,6 +63,10 @@ public enum ProtocolVersion {
     return asInt;
   }
 
+  public boolean isShardingSupported() {
+    return this != V1 && this != V2 && this != V3;
+  }
+
   /**
    * Returns the highest supported version that is lower than this version. Returns {@code null} if
    * there isn't such a version.
