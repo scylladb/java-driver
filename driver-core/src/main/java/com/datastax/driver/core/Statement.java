@@ -74,6 +74,7 @@ public abstract class Statement {
   protected volatile Boolean idempotent;
   private volatile Map<String, ByteBuffer> outgoingPayload;
   private volatile Host host;
+  private volatile Host lastHost;
 
   // We don't want to expose the constructor, because the code relies on this being only sub-classed
   // by RegularStatement, BoundStatement and BatchStatement
@@ -647,5 +648,13 @@ public abstract class Statement {
   public Statement setHost(Host host) {
     this.host = host;
     return this;
+  }
+
+  public Host getLastHost() {
+    return lastHost;
+  }
+
+  public void setLastHost(Host host) {
+    lastHost = host;
   }
 }
