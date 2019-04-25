@@ -36,7 +36,9 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
@@ -184,7 +186,7 @@ class HostConnectionPool implements Connection.Owner {
 
     final SettableFuture<Void> initFuture = SettableFuture.create();
 
-    addCallback(connections, connectionFutures, initFuture, new ArrayList<Connection>());
+    addCallback(connections, connectionFutures, initFuture, new ArrayDeque<Connection>());
 
     return initFuture;
   }
@@ -193,7 +195,7 @@ class HostConnectionPool implements Connection.Owner {
       final List<Connection> connections,
       final List<ListenableFuture<Void>> connectionFutures,
       final SettableFuture<Void> initFuture,
-      final List<Connection> toClose) {
+      final Queue<Connection> toClose) {
 
     final Executor initExecutor =
         manager.cluster.manager.configuration.getPoolingOptions().getInitializationExecutor();
@@ -238,10 +240,16 @@ class HostConnectionPool implements Connection.Owner {
                         0, HostConnectionPool.this.connectionsPerShard - shardsConnections.size());
               }
               if (needed > 0) {
+                int factor = (hostDistance == HostDistance.LOCAL) ? 2 : 1;
+                int limit =
+                    HostConnectionPool.this.connections.length * connectionsPerShard * factor;
+                final List<ListenableFuture<Void>> connectionFutures =
+                    Lists.newArrayListWithCapacity(needed + Math.max(0, toClose.size() - limit));
+                while (toClose.size() > limit) {
+                  connectionFutures.add(toClose.poll().closeAsync());
+                }
                 final List<Connection> connections =
                     manager.connectionFactory().newConnections(HostConnectionPool.this, needed);
-                final List<ListenableFuture<Void>> connectionFutures =
-                    Lists.newArrayListWithCapacity(needed);
                 for (Connection connection : connections) {
                   ListenableFuture<Void> connectionFuture = connection.initAsync();
                   connectionFutures.add(handleErrors(connectionFuture, initExecutor));
@@ -301,7 +309,7 @@ class HostConnectionPool implements Connection.Owner {
 
   // Clean up if we got a fatal error at construction time but still created part of the core
   // connections
-  private void forceClose(List<Connection> connections) {
+  private void forceClose(Collection<Connection> connections) {
     for (Connection connection : connections) {
       connection.closeAsync().force();
     }
