@@ -22,7 +22,10 @@ import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -126,8 +129,9 @@ public class Metrics {
   private final Gauge<Integer> blockingExecutorQueueDepth;
   private final Gauge<Integer> reconnectionSchedulerQueueSize;
   private final Gauge<Integer> taskSchedulerQueueSize;
+  private final Gauge<Map<Host, Integer>> shardAwarenessInfo;
 
-  Metrics(Cluster.Manager manager) {
+  Metrics(final Cluster.Manager manager) {
     this.manager = manager;
     this.executorQueueDepth =
         registry.register("executor-queue-depth", buildQueueSizeGauge(manager.executorQueue));
@@ -148,6 +152,21 @@ public class Metrics {
     } else {
       this.jmxReporter = null;
     }
+    shardAwarenessInfo =
+        registry.register(
+            "shard-awareness-info",
+            new Gauge<Map<Host, Integer>>() {
+              @Override
+              public Map<Host, Integer> getValue() {
+                Collection<Host> hosts = manager.metadata.allHosts();
+                Map<Host, Integer> result = new HashMap<Host, Integer>(hosts.size());
+                for (Host h : manager.metadata.allHosts()) {
+                  result.put(
+                      h, h.getShardingInfo() == null ? null : h.getShardingInfo().getShardsCount());
+                }
+                return result;
+              }
+            });
   }
 
   /**
@@ -343,6 +362,10 @@ public class Metrics {
    */
   public Gauge<Integer> getTaskSchedulerQueueSize() {
     return taskSchedulerQueueSize;
+  }
+
+  public Gauge<Map<Host, Integer>> getShardAwarenessInfo() {
+    return shardAwarenessInfo;
   }
 
   /**
