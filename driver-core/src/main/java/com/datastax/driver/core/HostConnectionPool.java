@@ -27,18 +27,14 @@ import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import io.netty.util.concurrent.EventExecutor;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
@@ -69,6 +65,7 @@ class HostConnectionPool implements Connection.Owner {
   private int connectionsPerShard;
   List<Connection>[] connections;
   private final AtomicInteger open;
+  private final AtomicInteger failed;
   /** The total number of in-flight requests on all connections of this pool. */
   final AtomicInteger totalInFlight = new AtomicInteger();
   /**
@@ -123,6 +120,7 @@ class HostConnectionPool implements Connection.Owner {
     this.manager = manager;
 
     this.open = new AtomicInteger();
+    this.failed = new AtomicInteger();
 
     this.minAllowedStreams = options().getMaxRequestsPerConnection(hostDistance) * 3 / 4;
 
@@ -168,117 +166,79 @@ class HostConnectionPool implements Connection.Owner {
       scheduledForCreation[i] = new AtomicInteger();
       trash[i] = new CopyOnWriteArraySet<Connection>();
       pendingBorrows[i] = new ConcurrentLinkedQueue<PendingBorrow>();
+      scheduledForCreation[i].set(connectionsPerShard);
     }
 
-    final List<Connection> connections = Lists.newArrayListWithCapacity(toCreate);
-    final List<ListenableFuture<Void>> connectionFutures = Lists.newArrayListWithCapacity(toCreate);
-
+    connections[reusedConnection.shardId()].add(reusedConnection);
+	scheduledForCreation[reusedConnection.shardId()].decrementAndGet();
     toCreate -= 1;
-    connections.add(reusedConnection);
-    connectionFutures.add(MoreFutures.VOID_SUCCESS);
-
+    
     List<Connection> newConnections = manager.connectionFactory().newConnections(this, toCreate);
-    connections.addAll(newConnections);
-    for (Connection connection : newConnections) {
-      ListenableFuture<Void> connectionFuture = connection.initAsync();
-      connectionFutures.add(handleErrors(connectionFuture, initExecutor));
-    }
-
     final SettableFuture<Void> initFuture = SettableFuture.create();
-
-    addCallback(connections, connectionFutures, initFuture, new ArrayDeque<Connection>());
+    for (Connection connection : newConnections) {
+      addCallback(connection,
+    		  handleErrors(connection.initAsync(), initExecutor),
+    		  initFuture,
+    		  toCreate);
+    }
 
     return initFuture;
   }
 
   private void addCallback(
-      final List<Connection> connections,
-      final List<ListenableFuture<Void>> connectionFutures,
-      final SettableFuture<Void> initFuture,
-      final Queue<Connection> toClose) {
+		final Connection connection,
+		final ListenableFuture<Void> connectionFuture,
+		final SettableFuture<Void> initFuture,
+		final int count) {
 
-    final Executor initExecutor =
-        manager.cluster.manager.configuration.getPoolingOptions().getInitializationExecutor();
-    final ListenableFuture<List<Void>> allConnectionsFuture = Futures.allAsList(connectionFutures);
+		final Executor initExecutor = manager.cluster.manager.configuration.getPoolingOptions()
+				.getInitializationExecutor();
+	
+		GuavaCompatibility.INSTANCE.addCallback(connectionFuture, new FutureCallback<Void>() {
+			@Override
+			public void onSuccess(Void l) {
+				int shardId = connection.shardId();
+				if (isClosed()) {
+					initFuture.setException(new ConnectionException(host.getSocketAddress(),
+							"Pool was closed during initialization"));
+					// we're not sure if closeAsync() saw the connections, so ensure they get closed
+					connection.closeAsync().force();
+					scheduledForCreation[shardId].decrementAndGet();
+				} else {
+					if (!connection.isClosed()) {
+						synchronized(connections[shardId]) {
+							if (connections[shardId].size() < connectionsPerShard) {
+								scheduledForCreation[shardId].decrementAndGet();
+								open.incrementAndGet();
+								HostConnectionPool.this.connections[shardId].add(connection);
+								if (phase.compareAndSet(Phase.INITIALIZING, Phase.READY)) {
+									initFuture.set(null);
+								}
+								return;
+							} else {
+								connection.closeAsync();
+							}
+						}
+					}
+					// Re-attempt to establish this connection
+					Connection newConnection = manager.connectionFactory().newConnections(HostConnectionPool.this,1).get(0);
+					addCallback(newConnection,
+							handleErrors(newConnection.initAsync(), initExecutor),
+							initFuture,
+							count);
+				}
+			}
 
-    GuavaCompatibility.INSTANCE.addCallback(
-        allConnectionsFuture,
-        new FutureCallback<List<Void>>() {
-          @Override
-          public void onSuccess(List<Void> l) {
-            int added = 0;
-            for (final Connection c : connections) {
-              if (!c.isClosed()) {
-                if (HostConnectionPool.this.connections[c.shardId()].size()
-                    < HostConnectionPool.this.connectionsPerShard) {
-                  ++added;
-                  HostConnectionPool.this.connections[c.shardId()].add(c);
-                } else {
-                  toClose.add(c);
-                }
-              }
-            }
-
-            open.addAndGet(added);
-
-            if (isClosed()) {
-              initFuture.setException(
-                  new ConnectionException(
-                      host.getSocketAddress(), "Pool was closed during initialization"));
-              // we're not sure if closeAsync() saw the connections, so ensure they get closed
-              forceClose(connections);
-              forceClose(toClose);
-              for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
-                forceClose(shardConnections);
-              }
-              open.set(0);
-            } else {
-              int needed = 0;
-              for (final List<Connection> shardsConnections : HostConnectionPool.this.connections) {
-                needed +=
-                    Math.max(
-                        0, HostConnectionPool.this.connectionsPerShard - shardsConnections.size());
-              }
-              if (needed > 0) {
-                int factor = (hostDistance == HostDistance.LOCAL) ? 2 : 1;
-                int limit =
-                    HostConnectionPool.this.connections.length * connectionsPerShard * factor;
-                final List<ListenableFuture<Void>> connectionFutures =
-                    Lists.newArrayListWithCapacity(needed + Math.max(0, toClose.size() - limit));
-                while (toClose.size() > limit) {
-                  connectionFutures.add(toClose.poll().closeAsync());
-                }
-                final List<Connection> connections =
-                    manager.connectionFactory().newConnections(HostConnectionPool.this, needed);
-                for (Connection connection : connections) {
-                  ListenableFuture<Void> connectionFuture = connection.initAsync();
-                  connectionFutures.add(handleErrors(connectionFuture, initExecutor));
-                }
-                addCallback(connections, connectionFutures, initFuture, toClose);
-              } else {
-                for (final Connection c : toClose) {
-                  c.closeAsync();
-                }
-                phase.compareAndSet(Phase.INITIALIZING, Phase.READY);
-                initFuture.set(null);
-              }
-            }
-          }
-
-          @Override
-          public void onFailure(Throwable t) {
-            phase.compareAndSet(Phase.INITIALIZING, Phase.INIT_FAILED);
-            forceClose(connections);
-            forceClose(toClose);
-            for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
-              forceClose(shardConnections);
-            }
-            open.set(0);
-            initFuture.setException(t);
-          }
-        },
-        initExecutor);
-  }
+			@Override
+			public void onFailure(Throwable t) {
+				int f = failed.incrementAndGet();
+				if (f >= count) {
+					phase.compareAndSet(Phase.INITIALIZING, Phase.INIT_FAILED);
+					initFuture.setException(t);
+				}
+			}
+		}, initExecutor);
+	}
 
   private ListenableFuture<Void> handleErrors(
       ListenableFuture<Void> connectionInitFuture, Executor executor) {
@@ -307,14 +267,6 @@ class HostConnectionPool implements Connection.Owner {
         executor);
   }
 
-  // Clean up if we got a fatal error at construction time but still created part of the core
-  // connections
-  private void forceClose(Collection<Connection> connections) {
-    for (Connection connection : connections) {
-      connection.closeAsync().force();
-    }
-  }
-
   private PoolingOptions options() {
     return manager.configuration().getPoolingOptions();
   }
@@ -337,30 +289,49 @@ class HostConnectionPool implements Connection.Owner {
       }
     }
 
-    if (connections[shardId].isEmpty()) {
-      if (host.convictionPolicy.canReconnectNow()) {
-        if (connectionsPerShard == 0) {
-          maybeSpawnNewConnection(shardId);
-        } else if (scheduledForCreation[shardId].compareAndSet(0, connectionsPerShard)) {
-          for (int i = 0; i < connectionsPerShard; i++) {
-            // We don't respect MAX_SIMULTANEOUS_CREATION here because it's  only to
-            // protect against creating connection in excess of core too quickly
-            manager.blockingExecutor().submit(new ConnectionTask(shardId));
-          }
-        }
-        return enqueue(timeout, unit, maxQueueSize, shardId);
-      }
+    int index = 0;
+    int shId = shardId;
+    do {
+    	synchronized(connections[shId]) {
+    		if ((connections[shId].isEmpty()) && (index < connections.length)) {
+    	    	shId = index++;
+    		} else {
+    			break;
+    		}
+    	}
+    } while(true);
+    if ((shId != shardId) && (!connections[shId].isEmpty())) {
+    	shardId = shId;
     }
 
-    int minInFlight = Integer.MAX_VALUE;
     Connection leastBusy = null;
-    for (Connection connection : connections[shardId]) {
-      int inFlight = connection.inFlight.get();
-      if (inFlight < minInFlight) {
-        minInFlight = inFlight;
-        leastBusy = connection;
-      }
-    }
+    int connectionCount = 0;
+	synchronized(connections[shardId]) {
+	    if (connections[shardId].isEmpty()) {
+	      if (host.convictionPolicy.canReconnectNow()) {
+	        if (connectionsPerShard == 0) {
+	          maybeSpawnNewConnection(shardId);
+	        } else if (scheduledForCreation[shardId].compareAndSet(0, connectionsPerShard)) {
+	          for (int i = 0; i < connectionsPerShard; i++) {
+	            // We don't respect MAX_SIMULTANEOUS_CREATION here because it's  only to
+	            // protect against creating connection in excess of core too quickly
+	            manager.blockingExecutor().submit(new ConnectionTask(shardId));
+	          }
+	        }
+	        return enqueue(timeout, unit, maxQueueSize, shardId);
+	      }
+	    }
+
+	    connectionCount = connections[shardId].size();
+	    int minInFlight = Integer.MAX_VALUE;
+	    for (Connection connection : connections[shardId]) {
+	      int inFlight = connection.inFlight.get();
+	      if (inFlight < minInFlight) {
+	        minInFlight = inFlight;
+	        leastBusy = connection;
+	      }
+	    }
+	}
 
     if (leastBusy == null) {
       // We could have raced with a shutdown since the last check
@@ -396,7 +367,8 @@ class HostConnectionPool implements Connection.Owner {
           || maxTotalInFlight.compareAndSet(oldMax, totalInFlightCount)) break;
     }
 
-    int connectionCount = connections[shardId].size() + scheduledForCreation[shardId].get();
+    connectionCount += scheduledForCreation[shardId].get();
+
     if (connectionCount < connectionsPerShard) {
       maybeSpawnNewConnection(shardId);
     } else if (connectionCount < options().getMaxConnectionsPerHost(hostDistance)) {
