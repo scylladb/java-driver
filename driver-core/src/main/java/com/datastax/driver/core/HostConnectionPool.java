@@ -290,7 +290,7 @@ class HostConnectionPool implements Connection.Owner {
     do {
       synchronized(connections[shId]) {
         if ((connections[shId].isEmpty()) && (index < connections.length)) {
-          shId = (shId + ++index) % connections.length;
+          shId = (shardId + ++index) % connections.length;
         } else {
           break;
         }
