@@ -67,8 +67,9 @@ class HostConnectionPool implements Connection.Owner {
   protected final SessionManager manager;
 
   private int connectionsPerShard;
+  private int maxConnectionsPerShard;
   List<Connection>[] connections;
-  private final AtomicInteger open;
+  private AtomicInteger[] open;
   /** The total number of in-flight requests on all connections of this pool. */
   final AtomicInteger totalInFlight = new AtomicInteger();
   /**
@@ -122,8 +123,6 @@ class HostConnectionPool implements Connection.Owner {
     this.hostDistance = hostDistance;
     this.manager = manager;
 
-    this.open = new AtomicInteger();
-
     this.minAllowedStreams = options().getMaxRequestsPerConnection(hostDistance) * 3 / 4;
 
     this.timeoutsExecutor = manager.getCluster().manager.connectionFactory.eventLoopGroup.next();
@@ -153,19 +152,24 @@ class HostConnectionPool implements Connection.Owner {
 
     // Create initial core connections
     final int coreSize = options().getCoreConnectionsPerHost(hostDistance);
+    final int maxConnections = options().getMaxConnectionsPerHost(hostDistance);
     final int shardsCount =
         host.getShardingInfo() == null ? 1 : host.getShardingInfo().getShardsCount();
 
     connectionsPerShard = coreSize / shardsCount + (coreSize % shardsCount > 0 ? 1 : 0);
+    maxConnectionsPerShard =
+        maxConnections / shardsCount + (maxConnections % shardsCount > 0 ? 1 : 0);
     int toCreate = shardsCount * connectionsPerShard;
 
     this.connections = new List[shardsCount];
     scheduledForCreation = new AtomicInteger[shardsCount];
+    open = new AtomicInteger[shardsCount];
     trash = new Set[shardsCount];
     pendingBorrows = new Queue[shardsCount];
     for (int i = 0; i < shardsCount; ++i) {
       this.connections[i] = new CopyOnWriteArrayList<Connection>();
       scheduledForCreation[i] = new AtomicInteger();
+      open[i] = new AtomicInteger();
       trash[i] = new CopyOnWriteArraySet<Connection>();
       pendingBorrows[i] = new ConcurrentLinkedQueue<PendingBorrow>();
     }
@@ -206,20 +210,17 @@ class HostConnectionPool implements Connection.Owner {
         new FutureCallback<List<Void>>() {
           @Override
           public void onSuccess(List<Void> l) {
-            int added = 0;
             for (final Connection c : connections) {
               if (!c.isClosed()) {
                 if (HostConnectionPool.this.connections[c.shardId()].size()
                     < HostConnectionPool.this.connectionsPerShard) {
-                  ++added;
                   HostConnectionPool.this.connections[c.shardId()].add(c);
+                  open[c.shardId()].addAndGet(1);
                 } else {
                   toClose.add(c);
                 }
               }
             }
-
-            open.addAndGet(added);
 
             if (isClosed()) {
               initFuture.setException(
@@ -231,7 +232,9 @@ class HostConnectionPool implements Connection.Owner {
               for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
                 forceClose(shardConnections);
               }
-              open.set(0);
+              for (AtomicInteger o : open) {
+                o.set(0);
+              }
             } else {
               int needed = 0;
               for (final List<Connection> shardsConnections : HostConnectionPool.this.connections) {
@@ -273,7 +276,9 @@ class HostConnectionPool implements Connection.Owner {
             for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
               forceClose(shardConnections);
             }
-            open.set(0);
+            for (AtomicInteger o : open) {
+              o.set(0);
+            }
             initFuture.setException(t);
           }
         },
@@ -399,7 +404,7 @@ class HostConnectionPool implements Connection.Owner {
     int connectionCount = connections[shardId].size() + scheduledForCreation[shardId].get();
     if (connectionCount < connectionsPerShard) {
       maybeSpawnNewConnection(shardId);
-    } else if (connectionCount < options().getMaxConnectionsPerHost(hostDistance)) {
+    } else if (connectionCount < maxConnectionsPerShard) {
       // Add a connection if we fill the first n-1 connections and almost fill the last one
       int currentCapacity =
           (connectionCount - 1) * options().getMaxRequestsPerConnection(hostDistance)
@@ -541,7 +546,7 @@ class HostConnectionPool implements Connection.Owner {
   // directly because we want to make sure the connection is always trashed.
   private void replaceConnection(Connection connection) {
     if (!connection.state.compareAndSet(OPEN, TRASHED)) return;
-    open.decrementAndGet();
+    open[connection.shardId()].decrementAndGet();
     maybeSpawnNewConnection(connection.shardId());
     connection.maxIdleTime = Long.MIN_VALUE;
     doTrashConnection(connection);
@@ -552,13 +557,13 @@ class HostConnectionPool implements Connection.Owner {
 
     // First, make sure we don't go below core connections
     for (; ; ) {
-      int opened = open.get();
+      int opened = open[connection.shardId()].get();
       if (opened <= options().getCoreConnectionsPerHost(hostDistance)) {
         connection.state.set(OPEN);
         return false;
       }
 
-      if (open.compareAndSet(opened, opened - 1)) break;
+      if (open[connection.shardId()].compareAndSet(opened, opened - 1)) break;
     }
     logger.trace("Trashing {}", connection);
     connection.maxIdleTime = System.currentTimeMillis() + options().getIdleTimeoutSeconds() * 1000;
@@ -575,14 +580,14 @@ class HostConnectionPool implements Connection.Owner {
 
     // First, make sure we don't cross the allowed limit of open connections
     for (; ; ) {
-      int opened = open.get();
-      if (opened >= options().getMaxConnectionsPerHost(hostDistance)) return false;
+      int opened = open[shardId].get();
+      if (opened >= maxConnectionsPerShard) return false;
 
-      if (open.compareAndSet(opened, opened + 1)) break;
+      if (open[shardId].compareAndSet(opened, opened + 1)) break;
     }
 
     if (phase.get() != Phase.READY) {
-      open.decrementAndGet();
+      open[shardId].decrementAndGet();
       return false;
     }
 
@@ -591,7 +596,7 @@ class HostConnectionPool implements Connection.Owner {
       Connection newConnection = tryResurrectFromTrash(shardId);
       if (newConnection == null) {
         if (!host.convictionPolicy.canReconnectNow()) {
-          open.decrementAndGet();
+          open[shardId].decrementAndGet();
           return false;
         }
         logger.debug("Creating new connection on busy pool to {}", host);
@@ -619,7 +624,7 @@ class HostConnectionPool implements Connection.Owner {
       // closed in case the pool did not do it.
       if (isClosed() && !newConnection.isClosed()) {
         close(newConnection);
-        open.decrementAndGet();
+        open[shardId].decrementAndGet();
         return false;
       }
 
@@ -628,28 +633,28 @@ class HostConnectionPool implements Connection.Owner {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       // Skip the open but ignore otherwise
-      open.decrementAndGet();
+      open[shardId].decrementAndGet();
       return false;
     } catch (ConnectionException e) {
-      open.decrementAndGet();
+      open[shardId].decrementAndGet();
       logger.debug("Connection error to {} while creating additional connection", host);
       return false;
     } catch (AuthenticationException e) {
       // This shouldn't really happen in theory
-      open.decrementAndGet();
+      open[shardId].decrementAndGet();
       logger.error(
           "Authentication error while creating additional connection (error is: {})",
           e.getMessage());
       return false;
     } catch (UnsupportedProtocolVersionException e) {
       // This shouldn't happen since we shouldn't have been able to connect in the first place
-      open.decrementAndGet();
+      open[shardId].decrementAndGet();
       logger.error(
           "UnsupportedProtocolVersionException error while creating additional connection (error is: {})",
           e.getMessage());
       return false;
     } catch (ClusterNameMismatchException e) {
-      open.decrementAndGet();
+      open[shardId].decrementAndGet();
       logger.error(
           "ClusterNameMismatchException error while creating additional connection (error is: {})",
           e.getMessage());
@@ -691,7 +696,7 @@ class HostConnectionPool implements Connection.Owner {
 
   @Override
   public void onConnectionDefunct(final Connection connection) {
-    if (connection.state.compareAndSet(OPEN, GONE)) open.decrementAndGet();
+    if (connection.state.compareAndSet(OPEN, GONE)) open[connection.shardId()].decrementAndGet();
     connections[connection.shardId()].remove(connection);
 
     // Don't try to replace the connection now. Connection.defunct already signaled the failure,
@@ -715,27 +720,15 @@ class HostConnectionPool implements Connection.Owner {
     if (currentLoad % maxRequestsPerConnection > options().getNewConnectionThreshold(hostDistance))
       needed += 1;
     needed = Math.max(needed, options().getCoreConnectionsPerHost(hostDistance));
-    int actual = open.get();
-    int toTrash = Math.max(0, actual - needed);
-
-    logger.trace(
-        "Current inFlight = {}, {} connections needed, {} connections available, trashing {}",
-        currentLoad,
-        needed,
-        actual,
-        toTrash);
-
-    if (toTrash <= 0) return;
+    int neededPerShard = needed / connections.length + (needed % connections.length > 0 ? 1 : 0);
 
     for (final List<Connection> shardsConnections : connections) {
-      if (shardsConnections.size() > connectionsPerShard) {
+      if (shardsConnections.size() > neededPerShard) {
+        int toTrash = shardsConnections.size() - neededPerShard;
         for (Connection connection : shardsConnections) {
           if (trashConnection(connection)) {
             toTrash -= 1;
-            if (toTrash == 0) return;
-            if (shardsConnections.size() <= connectionsPerShard) {
-              break;
-            }
+            if (toTrash == 0) break;
           }
         }
       }
@@ -792,7 +785,11 @@ class HostConnectionPool implements Connection.Owner {
   }
 
   int opened() {
-    return open.get();
+    int result = 0;
+    for (AtomicInteger o : open) {
+      result += o.get();
+    }
+    return result;
   }
 
   int trashed() {
@@ -824,7 +821,9 @@ class HostConnectionPool implements Connection.Owner {
             new Runnable() {
               @Override
               public void run() {
-                if (connection.state.compareAndSet(OPEN, GONE)) open.decrementAndGet();
+                if (connection.state.compareAndSet(OPEN, GONE)) {
+                  open[connection.shardId()].decrementAndGet();
+                }
               }
             },
             GuavaCompatibility.INSTANCE.sameThreadExecutor());
