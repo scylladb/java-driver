@@ -319,6 +319,19 @@ class HostConnectionPool implements Connection.Owner {
     return manager.configuration().getPoolingOptions();
   }
 
+  private Connection findLeastBusyForShard(int shardId) {
+    int minInFlight = Integer.MAX_VALUE;
+    Connection result = null;
+    for (Connection connection : connections[shardId]) {
+      int inFlight = connection.inFlight.get();
+      if (inFlight < minInFlight) {
+        minInFlight = inFlight;
+        result = connection;
+      }
+    }
+    return result;
+  }
+
   ListenableFuture<Connection> borrowConnection(
       long timeout, TimeUnit unit, int maxQueueSize, ByteBuffer routingKey) {
     Phase phase = this.phase.get();
@@ -337,29 +350,31 @@ class HostConnectionPool implements Connection.Owner {
       }
     }
 
+    Connection leastBusy = null;
+
     if (connections[shardId].isEmpty()) {
       if (host.convictionPolicy.canReconnectNow()) {
         if (connectionsPerShard == 0) {
           maybeSpawnNewConnection(shardId);
+          return enqueue(timeout, unit, maxQueueSize, shardId);
         } else if (scheduledForCreation[shardId].compareAndSet(0, connectionsPerShard)) {
           for (int i = 0; i < connectionsPerShard; i++) {
             // We don't respect MAX_SIMULTANEOUS_CREATION here because it's  only to
             // protect against creating connection in excess of core too quickly
             manager.blockingExecutor().submit(new ConnectionTask(shardId));
           }
+          return enqueue(timeout, unit, maxQueueSize, shardId);
         }
-        return enqueue(timeout, unit, maxQueueSize, shardId);
       }
-    }
-
-    int minInFlight = Integer.MAX_VALUE;
-    Connection leastBusy = null;
-    for (Connection connection : connections[shardId]) {
-      int inFlight = connection.inFlight.get();
-      if (inFlight < minInFlight) {
-        minInFlight = inFlight;
-        leastBusy = connection;
-      }
+      // connections for this shard are still being initialized so pick connection for any shard
+      int firstShardToCheck = RAND.nextInt(connections.length);
+      int shardToCheck = firstShardToCheck;
+      do {
+        leastBusy = findLeastBusyForShard(shardToCheck);
+        shardToCheck = (shardToCheck + 1) % connections.length;
+      } while (leastBusy == null && shardToCheck != firstShardToCheck);
+    } else {
+      leastBusy = findLeastBusyForShard(shardId);
     }
 
     if (leastBusy == null) {
