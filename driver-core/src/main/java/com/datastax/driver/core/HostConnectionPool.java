@@ -36,7 +36,6 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -174,14 +173,16 @@ class HostConnectionPool implements Connection.Owner {
       pendingBorrows[i] = new ConcurrentLinkedQueue<PendingBorrow>();
     }
 
-    final List<Connection> connections = Lists.newArrayListWithCapacity(toCreate);
-    final List<ListenableFuture<Void>> connectionFutures = Lists.newArrayListWithCapacity(toCreate);
+    final List<Connection> connections = Lists.newArrayListWithCapacity(2 * toCreate);
+    final List<ListenableFuture<Void>> connectionFutures =
+        Lists.newArrayListWithCapacity(2 * toCreate);
 
     toCreate -= 1;
     connections.add(reusedConnection);
     connectionFutures.add(MoreFutures.VOID_SUCCESS);
 
-    List<Connection> newConnections = manager.connectionFactory().newConnections(this, toCreate);
+    List<Connection> newConnections =
+        manager.connectionFactory().newConnections(this, 2 * toCreate);
     connections.addAll(newConnections);
     for (Connection connection : newConnections) {
       ListenableFuture<Void> connectionFuture = connection.initAsync();
@@ -190,7 +191,7 @@ class HostConnectionPool implements Connection.Owner {
 
     final SettableFuture<Void> initFuture = SettableFuture.create();
 
-    addCallback(connections, connectionFutures, initFuture, new ArrayDeque<Connection>());
+    addCallback(connections, connectionFutures, initFuture);
 
     return initFuture;
   }
@@ -198,8 +199,7 @@ class HostConnectionPool implements Connection.Owner {
   private void addCallback(
       final List<Connection> connections,
       final List<ListenableFuture<Void>> connectionFutures,
-      final SettableFuture<Void> initFuture,
-      final Queue<Connection> toClose) {
+      final SettableFuture<Void> initFuture) {
 
     final Executor initExecutor =
         manager.cluster.manager.configuration.getPoolingOptions().getInitializationExecutor();
@@ -217,7 +217,7 @@ class HostConnectionPool implements Connection.Owner {
                   HostConnectionPool.this.connections[c.shardId()].add(c);
                   open[c.shardId()].addAndGet(1);
                 } else {
-                  toClose.add(c);
+                  c.closeAsync();
                 }
               }
             }
@@ -228,7 +228,6 @@ class HostConnectionPool implements Connection.Owner {
                       host.getSocketAddress(), "Pool was closed during initialization"));
               // we're not sure if closeAsync() saw the connections, so ensure they get closed
               forceClose(connections);
-              forceClose(toClose);
               for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
                 forceClose(shardConnections);
               }
@@ -236,35 +235,32 @@ class HostConnectionPool implements Connection.Owner {
                 o.set(0);
               }
             } else {
-              int needed = 0;
+              int shardId = 0;
+              int[] needed = new int[HostConnectionPool.this.connections.length];
               for (final List<Connection> shardsConnections : HostConnectionPool.this.connections) {
-                needed +=
+                needed[shardId] =
                     Math.max(
                         0, HostConnectionPool.this.connectionsPerShard - shardsConnections.size());
+                ++shardId;
               }
-              if (needed > 0) {
-                int factor = (hostDistance == HostDistance.LOCAL) ? 2 : 1;
-                int limit =
-                    HostConnectionPool.this.connections.length * connectionsPerShard * factor;
-                final List<ListenableFuture<Void>> connectionFutures =
-                    Lists.newArrayListWithCapacity(needed + Math.max(0, toClose.size() - limit));
-                while (toClose.size() > limit) {
-                  connectionFutures.add(toClose.poll().closeAsync());
+              // First take permits for connection creation to make sure nothing else starts
+              // connecting
+              for (shardId = 0; shardId < HostConnectionPool.this.connections.length; ++shardId) {
+                if (needed[shardId] > 0) {
+                  if (!scheduledForCreation[shardId].compareAndSet(0, needed[shardId])) {
+                    needed[shardId] = 0;
+                  }
                 }
-                final List<Connection> connections =
-                    manager.connectionFactory().newConnections(HostConnectionPool.this, needed);
-                for (Connection connection : connections) {
-                  ListenableFuture<Void> connectionFuture = connection.initAsync();
-                  connectionFutures.add(handleErrors(connectionFuture, initExecutor));
-                }
-                addCallback(connections, connectionFutures, initFuture, toClose);
-              } else {
-                for (final Connection c : toClose) {
-                  c.closeAsync();
-                }
-                phase.compareAndSet(Phase.INITIALIZING, Phase.READY);
-                initFuture.set(null);
               }
+              // Then mark pool as ready
+              phase.compareAndSet(Phase.INITIALIZING, Phase.READY);
+              // Schedule connection tasks for missing connections
+              for (shardId = 0; shardId < HostConnectionPool.this.connections.length; ++shardId) {
+                while (needed[shardId]-- > 0) {
+                  manager.blockingExecutor().submit(new ConnectionTask(shardId));
+                }
+              }
+              initFuture.set(null);
             }
           }
 
@@ -272,7 +268,6 @@ class HostConnectionPool implements Connection.Owner {
           public void onFailure(Throwable t) {
             phase.compareAndSet(Phase.INITIALIZING, Phase.INIT_FAILED);
             forceClose(connections);
-            forceClose(toClose);
             for (List<Connection> shardConnections : HostConnectionPool.this.connections) {
               forceClose(shardConnections);
             }
@@ -608,7 +603,11 @@ class HostConnectionPool implements Connection.Owner {
               newConnection.setKeyspace(manager.poolsState.keyspace);
               break;
             }
-            toClose.add(newConnection);
+            if (toClose.size() < connections.length) {
+              toClose.add(newConnection);
+            } else {
+              newConnection.closeAsync();
+            }
           }
         } finally {
           for (Connection c : toClose) {
