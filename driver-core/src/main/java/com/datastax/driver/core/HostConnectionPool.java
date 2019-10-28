@@ -38,7 +38,9 @@ import io.netty.util.concurrent.EventExecutor;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
@@ -97,7 +99,60 @@ class HostConnectionPool implements Connection.Owner {
 
   protected final AtomicReference<Phase> phase = new AtomicReference<Phase>(Phase.INITIALIZING);
 
+  public static class ConnectionTasksSharedState {
+    private final Object lock = new Object();
+    private int tasksInFlight = 0;
+    private Map<Integer, Connection> connectionsToClose = new HashMap<Integer, Connection>();
+
+    public Connection registerTask(int shardId) {
+      Connection c = null;
+      synchronized (lock) {
+        c = connectionsToClose.remove(shardId);
+        if (c == null) {
+          ++tasksInFlight;
+        }
+      }
+      return c;
+    }
+
+    public void unregisterTask() {
+      Map<Integer, Connection> toClose = null;
+      synchronized (lock) {
+        --tasksInFlight;
+        if (tasksInFlight == 0) {
+          toClose = connectionsToClose;
+          connectionsToClose = new HashMap<Integer, Connection>();
+        }
+      }
+      if (toClose != null) {
+        for (Connection c : toClose.values()) {
+          c.closeAsync();
+        }
+      }
+    }
+
+    public Connection addConnectionToClose(int shardId, Connection c) {
+      Connection res = null;
+      boolean close = false;
+      synchronized (lock) {
+        res = connectionsToClose.remove(shardId);
+        close = connectionsToClose.get(c.shardId()) != null;
+        if (!close) {
+          connectionsToClose.put(c.shardId(), c);
+        }
+      }
+      if (close) {
+        c.closeAsync();
+      }
+      return res;
+    }
+  }
+
+  private final ConnectionTasksSharedState connectionTasksSharedState =
+      new ConnectionTasksSharedState();
+
   private class ConnectionTask implements Runnable {
+
     private final int shardId;
 
     public ConnectionTask(int shardId) {
@@ -106,7 +161,7 @@ class HostConnectionPool implements Connection.Owner {
 
     @Override
     public void run() {
-      addConnectionIfUnderMaximum(shardId);
+      addConnectionIfUnderMaximum(shardId, connectionTasksSharedState);
       scheduledForCreation[shardId].decrementAndGet();
     }
   }
@@ -586,7 +641,7 @@ class HostConnectionPool implements Connection.Owner {
     trash[connection.shardId()].add(connection);
   }
 
-  private boolean addConnectionIfUnderMaximum(int shardId) {
+  private boolean addConnectionIfUnderMaximum(int shardId, ConnectionTasksSharedState sharedState) {
 
     // First, make sure we don't cross the allowed limit of open connections
     for (; ; ) {
@@ -610,23 +665,19 @@ class HostConnectionPool implements Connection.Owner {
           return false;
         }
         logger.debug("Creating new connection on busy pool to {}", host);
-        List<Connection> toClose = new ArrayList<Connection>();
-        try {
-          while (true) {
-            newConnection = manager.connectionFactory().open(this);
-            if (newConnection.shardId() == shardId) {
-              newConnection.setKeyspace(manager.poolsState.keyspace);
-              break;
-            }
-            if (toClose.size() < connections.length) {
-              toClose.add(newConnection);
-            } else {
-              newConnection.closeAsync();
-            }
-          }
-        } finally {
-          for (Connection c : toClose) {
-            c.closeAsync();
+        newConnection = sharedState.registerTask(shardId);
+        if (newConnection == null) {
+          try {
+            do {
+              newConnection = manager.connectionFactory().open(this);
+              if (newConnection.shardId() == shardId) {
+                newConnection.setKeyspace(manager.poolsState.keyspace);
+              } else {
+                newConnection = sharedState.addConnectionToClose(shardId, newConnection);
+              }
+            } while (newConnection == null);
+          } finally {
+            sharedState.unregisterTask();
           }
         }
       }
