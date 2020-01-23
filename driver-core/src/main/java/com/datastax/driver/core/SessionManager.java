@@ -719,9 +719,7 @@ class SessionManager extends AbstractSession {
         // execute
         // the prepared query. So don't wait if no connection is available, simply abort.
         ListenableFuture<Connection> connectionFuture =
-            entry
-                .getValue()
-                .borrowConnection(0, TimeUnit.MILLISECONDS, 0, statement.getRoutingKey());
+            entry.getValue().borrowConnection(0, TimeUnit.MILLISECONDS, 0, null);
         ListenableFuture<Response> prepareFuture =
             GuavaCompatibility.INSTANCE.transformAsync(
                 connectionFuture,

@@ -403,7 +403,7 @@ class RequestHandler {
               poolingOptions.getPoolTimeoutMillis(),
               TimeUnit.MILLISECONDS,
               poolingOptions.getMaxQueueSize(),
-              routingKey);
+              statement);
       GuavaCompatibility.INSTANCE.addCallback(
           connectionFuture,
           new FutureCallback<Connection>() {

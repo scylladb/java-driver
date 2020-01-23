@@ -15,6 +15,7 @@
  */
 package com.datastax.driver.core.policies;
 
+import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.CodecRegistry;
 import com.datastax.driver.core.Host;
@@ -22,6 +23,8 @@ import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.Token;
+import com.datastax.driver.core.TokenRange;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.Lists;
 import java.nio.ByteBuffer;
@@ -31,6 +34,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.StringTokenizer;
 
 /**
  * A wrapper load balancing policy that adds token awareness to a child policy.
@@ -57,6 +61,82 @@ import java.util.Set;
  * the local data center.
  */
 public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
+
+  public static String getTokenRange(Statement statement) {
+    if (statement == null) return null;
+    String query = null;
+    if (statement instanceof BoundStatement) {
+      query = ((BoundStatement) statement).preparedStatement().getQueryString();
+    } else {
+      query = statement.toString();
+    }
+    StringTokenizer st = new StringTokenizer(query);
+    try {
+      if (st.nextToken().equalsIgnoreCase("select")) {
+        while (st.hasMoreElements() && !st.nextToken().equalsIgnoreCase("where")) ;
+        int valueCounter = 0;
+        boolean hasToken = false;
+        boolean appending = false;
+        List<String> tokens = new ArrayList<>();
+        while (st.hasMoreElements()) {
+          String term = st.nextToken().toLowerCase();
+          hasToken |= term.startsWith("token(") || term.equals("token");
+          if (hasToken) {
+            if (term.equals("and") || term.equals("or")) {
+              hasToken = false;
+              appending = false;
+              valueCounter++;
+            }
+            if (appending) {
+              if (term.equals("?")) {
+                term = ((BoundStatement) statement).getObject(valueCounter).toString();
+              }
+              tokens.add(term);
+            } else if (term.contains("<=")) {
+              if (term.length() > 2) {
+                tokens.add(term.substring(term.indexOf("<=") + 2));
+              }
+              appending = true;
+            } else if (term.contains(">=")) {
+              if (term.length() > 2) {
+                tokens.add(term.substring(term.indexOf(">=") + 2));
+              }
+              appending = true;
+            } else if (term.contains("=")) {
+              if (term.length() > 1) {
+                tokens.add(term.substring(term.indexOf('=') + 1));
+              }
+              appending = true;
+            } else if (term.contains("<")) {
+              if (term.length() > 1) {
+                tokens.add(term.substring(term.indexOf('<') + 1));
+              }
+              appending = true;
+            } else if (term.contains(">")) {
+              if (term.length() > 1) {
+                tokens.add(term.substring(term.indexOf('>') + 1));
+              }
+              appending = true;
+            }
+            if (tokens.size() == 2) {
+              long token1 = Long.parseLong(tokens.get(0));
+              long token2 = Long.parseLong(tokens.get(1));
+              if (token1 > token2) {
+                long tmp = token1;
+                token1 = token2;
+                token2 = tmp;
+              }
+              return String.format("%d,%d", token1, token2);
+            }
+          }
+        }
+      }
+    } catch (Exception e) {
+      // unable to extract token range
+    }
+
+    return null;
+  }
 
   /** Strategies for replica ordering. */
   public enum ReplicaOrdering {
@@ -176,10 +256,24 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     String keyspace = statement.getKeyspace();
     if (keyspace == null) keyspace = loggedKeyspace;
 
-    if (partitionKey == null || keyspace == null)
-      return childPolicy.newQueryPlan(keyspace, statement);
+    final Set<Host> replicas;
+    if (partitionKey == null) {
+      String csTokens = getTokenRange(statement);
+      if (csTokens != null) {
+        String[] strTokens = csTokens.split(",");
+        Token start = clusterMetadata.newToken(strTokens[0]);
+        Token end = clusterMetadata.newToken(strTokens[1]);
+        TokenRange range = clusterMetadata.newTokenRange(start, end);
+        replicas = clusterMetadata.getReplicas(Metadata.quote(keyspace), range);
+      } else {
+        return childPolicy.newQueryPlan(keyspace, statement);
+      }
+    } else {
+      if (keyspace == null) return childPolicy.newQueryPlan(keyspace, statement);
 
-    final Set<Host> replicas = clusterMetadata.getReplicas(Metadata.quote(keyspace), partitionKey);
+      replicas = clusterMetadata.getReplicas(Metadata.quote(keyspace), partitionKey);
+    }
+
     if (replicas.isEmpty()) return childPolicy.newQueryPlan(loggedKeyspace, statement);
 
     if (replicaOrdering == ReplicaOrdering.NEUTRAL) {
