@@ -45,7 +45,7 @@ The driver contains the following modules:
 
 - JIRA (bug tracking): https://datastax-oss.atlassian.net/browse/JAVA
 - MAILING LIST: https://groups.google.com/a/lists.datastax.com/forum/#!forum/java-driver-user
-- DATASTAX ACADEMY SLACK: #datastax-drivers on https://academy.datastax.com/slack 
+- SCYLLA UNIVERSITY (training): https://university.scylladb.com 
 - TWITTER: [@dsJavaDriver](https://twitter.com/dsJavaDriver) tweets Java
   driver releases and important announcements (low frequency).
   [@DataStaxEng](https://twitter.com/datastaxeng) has more news including
