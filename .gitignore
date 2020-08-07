@@ -4,8 +4,9 @@ testing/
 .settings
 .classpath
 .project
-doc
-docs
+docs/_build
+html
+latex
 notes
 .DS_Store
 
