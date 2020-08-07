@@ -238,7 +238,7 @@ rst_epilog = """
 
 # -- Options for multiversion --------------------------------------------
 # Whitelist pattern for tags (set to None to ignore all tags)
-smv_tag_whitelist = r'None'
+smv_tag_whitelist = 'None'
 # Whitelist pattern for branches (set to None to ignore all branches)
 smv_branch_whitelist = r"^latest$"
 
