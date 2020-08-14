@@ -55,7 +55,7 @@ LZ4-java has three internal implementations (from fastest to slowest):
 
 It will pick the best implementation depending on what's possible on
 your platform. To find out which one was chosen, [enable INFO
-logs](../logging/) on the category
+logs](../logging/index) on the category
 `com.datastax.driver.core.LZ4Compressor` and look for a log similar to
 this:
 
