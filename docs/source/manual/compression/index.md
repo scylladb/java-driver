@@ -55,12 +55,12 @@ LZ4-java has three internal implementations (from fastest to slowest):
 
 It will pick the best implementation depending on what's possible on
 your platform. To find out which one was chosen, [enable INFO
-logs](../logging/index) on the category
-`com.datastax.driver.core.FrameCompressor` and look for a log similar to
+logs](../logging/) on the category
+`com.datastax.driver.core.LZ4Compressor` and look for a log similar to
 this:
 
 ```
-INFO  com.datastax.driver.core.FrameCompressor  - Using LZ4Factory:JNI
+INFO  com.datastax.driver.core.LZ4Compressor  - Using LZ4Factory:JNI
 ```
 
 ### Snappy
@@ -88,4 +88,4 @@ cluster = Cluster.builder()
     .build();
 ```
 
-[pom]: https://repo1.maven.org/maven2/com/datastax/cassandra/scylla-driver-parent/3.7.1/scylla-driver-parent-3.7.1.pom
+[pom]: https://repo1.maven.org/maven2/com/datastax/cassandra/scylla-driver-parent/3.10.1/scylla-driver-parent-3.10.1.pom

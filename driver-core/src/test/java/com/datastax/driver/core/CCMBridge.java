@@ -110,7 +110,6 @@ public class CCMBridge implements CCMAccess {
    */
   private static final Map<String, String> dseToCassandraVersions =
       ImmutableMap.<String, String>builder()
-          .put("6.0", "4.0")
           .put("5.1", "3.11")
           .put("5.0.4", "3.0.10")
           .put("5.0.3", "3.0.9")
@@ -173,12 +172,6 @@ public class CCMBridge implements CCMAccess {
     String installDirectory = System.getProperty("cassandra.directory");
     String branch = System.getProperty("cassandra.branch");
 
-    String dseProperty = System.getProperty("dse");
-    // If -Ddse, if the value is empty interpret it as enabled,
-    // otherwise if there is a value, parse as boolean.
-    boolean isDse =
-        dseProperty != null && (dseProperty.isEmpty() || Boolean.parseBoolean(dseProperty));
-
     ImmutableSet.Builder<String> installArgs = ImmutableSet.builder();
     if (installDirectory != null && !installDirectory.trim().isEmpty()) {
       installArgs.add("--install-dir=" + new File(installDirectory).getAbsolutePath());
@@ -188,7 +181,7 @@ public class CCMBridge implements CCMAccess {
       installArgs.add("-v " + inputCassandraVersion);
     }
 
-    if (isDse) {
+    if (isDse()) {
       installArgs.add("--dse");
     }
 
@@ -219,7 +212,7 @@ public class CCMBridge implements CCMAccess {
     }
     ENVIRONMENT_MAP = ImmutableMap.copyOf(envMap);
 
-    if (isDse) {
+    if (isDse()) {
       GLOBAL_DSE_VERSION_NUMBER = VersionNumber.parse(inputCassandraVersion);
       GLOBAL_CASSANDRA_VERSION_NUMBER = CCMBridge.getCassandraVersion(GLOBAL_DSE_VERSION_NUMBER);
       logger.info(
@@ -245,6 +238,11 @@ public class CCMBridge implements CCMAccess {
   /** @return {@link VersionNumber} configured for DSE based on system properties. */
   public static VersionNumber getGlobalDSEVersion() {
     return GLOBAL_DSE_VERSION_NUMBER;
+  }
+
+  public static boolean isDse() {
+    // System property "dse" must be present and evaluate to TRUE to indicate DSE is enabled.
+    return Boolean.getBoolean("dse");
   }
 
   /**
@@ -274,6 +272,12 @@ public class CCMBridge implements CCMAccess {
         return VersionNumber.parse("3.0");
       } else {
         return VersionNumber.parse("3.11");
+      }
+    } else if (dseVersion.getMajor() == 6) {
+      if (dseVersion.getMinor() < 8) {
+        return VersionNumber.parse("3.11");
+      } else {
+        return VersionNumber.parse("4.0");
       }
     } else {
       // Fallback on 4.0 by default.
@@ -862,13 +866,13 @@ public class CCMBridge implements CCMAccess {
     int[] nodes = {1};
     private int[] jmxPorts = {};
     private boolean start = true;
-    private boolean dse = false;
+    private boolean dse = isDse();
     private VersionNumber version = null;
-    private Set<String> createOptions = new LinkedHashSet<String>();
-    private Set<String> jvmArgs = new LinkedHashSet<String>();
+    private final Set<String> createOptions = new LinkedHashSet<String>();
+    private final Set<String> jvmArgs = new LinkedHashSet<String>();
     private final Map<String, Object> cassandraConfiguration = Maps.newLinkedHashMap();
     private final Map<String, Object> dseConfiguration = Maps.newLinkedHashMap();
-    private Map<Integer, Workload[]> workloads = new HashMap<Integer, Workload[]>();
+    private final Map<Integer, Workload[]> workloads = new HashMap<Integer, Workload[]>();
 
     private Builder() {
       cassandraConfiguration.put("start_rpc", false);
@@ -1041,11 +1045,21 @@ public class CCMBridge implements CCMAccess {
         }
       }
 
-      if (!isThriftSupported(cassandraVersion)) {
+      if (!isThriftSupported(cassandraVersion, dseVersion)) {
         // remove thrift configuration
         cassandraConfiguration.remove("start_rpc");
         cassandraConfiguration.remove("rpc_port");
         cassandraConfiguration.remove("thrift_prepared_statements_cache_size_mb");
+      }
+      if (!dse) {
+        if (isMaterializedViewsDisabledByDefault(cassandraVersion)) {
+          // enable materialized views
+          cassandraConfiguration.put("enable_materialized_views", true);
+        }
+        if (isSasiConfigEnablementRequired(cassandraVersion)) {
+          // enable SASI indexing in config (disabled by default in C* 4.0)
+          cassandraConfiguration.put("enable_sasi_indexes", true);
+        }
       }
       final CCMBridge ccm =
           new CCMBridge(
@@ -1088,8 +1102,22 @@ public class CCMBridge implements CCMAccess {
       return ccm;
     }
 
-    private static boolean isThriftSupported(VersionNumber cassandraVersion) {
-      return cassandraVersion.compareTo(VersionNumber.parse("4.0")) < 0;
+    private static boolean isThriftSupported(
+        VersionNumber cassandraVersion, VersionNumber dseVersion) {
+      if (dseVersion == null) {
+        // Thrift is removed from some pre-release 4.x versions, make the comparison work for those
+        return cassandraVersion.nextStable().compareTo(VersionNumber.parse("4.0")) < 0;
+      } else {
+        return dseVersion.nextStable().compareTo(VersionNumber.parse("6.0")) < 0;
+      }
+    }
+
+    private static boolean isMaterializedViewsDisabledByDefault(VersionNumber cassandraVersion) {
+      return cassandraVersion.nextStable().compareTo(VersionNumber.parse("4.0")) >= 0;
+    }
+
+    private static boolean isSasiConfigEnablementRequired(VersionNumber cassandraVersion) {
+      return cassandraVersion.nextStable().compareTo(VersionNumber.parse("4.0")) >= 0;
     }
 
     public int weight() {

@@ -54,14 +54,21 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.net.UnknownHostException;
+import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -142,8 +149,7 @@ public class Cluster implements Closeable {
    * @param contactPoints the list of contact points to use for the new cluster.
    * @param configuration the configuration for the new cluster.
    */
-  protected Cluster(
-      String name, List<InetSocketAddress> contactPoints, Configuration configuration) {
+  protected Cluster(String name, List<EndPoint> contactPoints, Configuration configuration) {
     this(name, contactPoints, configuration, Collections.<Host.StateListener>emptySet());
   }
 
@@ -165,7 +171,7 @@ public class Cluster implements Closeable {
         initializer.getInitialListeners());
   }
 
-  private static List<InetSocketAddress> checkNotEmpty(List<InetSocketAddress> contactPoints) {
+  private static List<EndPoint> checkNotEmpty(List<EndPoint> contactPoints) {
     if (contactPoints.isEmpty())
       throw new IllegalArgumentException("Cannot build a cluster without contact points");
     return contactPoints;
@@ -173,10 +179,11 @@ public class Cluster implements Closeable {
 
   private Cluster(
       String name,
-      List<InetSocketAddress> contactPoints,
+      List<EndPoint> contactPoints,
       Configuration configuration,
       Collection<Host.StateListener> listeners) {
     System.out.println("===== Using optimized driver!!! =====");
+    logger.info("===== Using optimized driver!!! =====");
     this.manager = new Manager(name, contactPoints, configuration, listeners);
   }
 
@@ -345,6 +352,10 @@ public class Cluster implements Closeable {
    * happens synchronously on the thread that called this method. Therefore it is recommended to
    * initialize the cluster at application startup, and not rely on this method to do it.
    *
+   * <p>Note that if a {@linkplain Configuration#getDefaultKeyspace() default keyspace} has been
+   * configured for use with a DBaaS cluster, this method will attempt to set the session keyspace
+   * to that keyspace, effectively behaving like {@link #connect(String)}.
+   *
    * @return a future that will complete when the session is fully initialized.
    * @throws NoHostAvailableException if the Cluster has not been initialized yet ({@link #init} has
    *     not been called and this is the first connect call) and no host amongst the contact points
@@ -355,7 +366,8 @@ public class Cluster implements Closeable {
    * @see #connect()
    */
   public ListenableFuture<Session> connectAsync() {
-    return connectAsync(null);
+    String defaultKeyspace = getConfiguration().getDefaultKeyspace();
+    return connectAsync(defaultKeyspace);
   }
 
   /**
@@ -405,7 +417,7 @@ public class Cluster implements Closeable {
                     SyntaxError e = (SyntaxError) t;
                     t =
                         new SyntaxError(
-                            e.getAddress(),
+                            e.getEndPoint(),
                             String.format(
                                 "Error executing \"%s\" (%s). Check that your keyspace name is valid",
                                 useQuery, e.getMessage()));
@@ -674,7 +686,7 @@ public class Cluster implements Closeable {
      * @return the initial Cassandra contact points. See {@link Builder#addContactPoint} for more
      *     details on contact points.
      */
-    public List<InetSocketAddress> getContactPoints();
+    public List<EndPoint> getContactPoints();
 
     /**
      * The configuration to use for the new cluster.
@@ -710,8 +722,10 @@ public class Cluster implements Closeable {
   public static class Builder implements Initializer {
 
     private String clusterName;
-    private final List<InetSocketAddress> addresses = new ArrayList<InetSocketAddress>();
-    private final List<InetAddress> rawAddresses = new ArrayList<InetAddress>();
+    private final List<InetSocketAddress> rawHostAndPortContactPoints =
+        new ArrayList<InetSocketAddress>();
+    private final List<InetAddress> rawHostContactPoints = new ArrayList<InetAddress>();
+    private final List<EndPoint> contactPoints = new ArrayList<EndPoint>();
     private int port = ProtocolOptions.DEFAULT_PORT;
     private int maxSchemaAgreementWaitSeconds =
         ProtocolOptions.DEFAULT_MAX_SCHEMA_AGREEMENT_WAIT_SECONDS;
@@ -727,6 +741,7 @@ public class Cluster implements Closeable {
     private boolean jmxEnabled = true;
     private boolean allowBetaProtocolVersion = false;
     private boolean noCompact = false;
+    private boolean isCloud = false;
 
     private Collection<Host.StateListener> listeners;
 
@@ -736,13 +751,18 @@ public class Cluster implements Closeable {
     }
 
     @Override
-    public List<InetSocketAddress> getContactPoints() {
-      if (rawAddresses.isEmpty()) return addresses;
-
-      List<InetSocketAddress> allAddresses = new ArrayList<InetSocketAddress>(addresses);
-      for (InetAddress address : rawAddresses)
-        allAddresses.add(new InetSocketAddress(address, port));
-      return allAddresses;
+    public List<EndPoint> getContactPoints() {
+      // Use a set to remove duplicate endpoints
+      Set<EndPoint> allContactPoints = new LinkedHashSet<EndPoint>(contactPoints);
+      // If contact points were provided as InetAddress/InetSocketAddress, assume the default
+      // endpoint factory is used.
+      for (InetAddress address : rawHostContactPoints) {
+        allContactPoints.add(new TranslatedAddressEndPoint(new InetSocketAddress(address, port)));
+      }
+      for (InetSocketAddress socketAddress : rawHostAndPortContactPoints) {
+        allContactPoints.add(new TranslatedAddressEndPoint(socketAddress));
+      }
+      return new ArrayList<EndPoint>(allContactPoints);
     }
 
     /**
@@ -916,14 +936,29 @@ public class Cluster implements Closeable {
       // We explicitly check for nulls because InetAdress.getByName() will happily
       // accept it and use localhost (while a null here almost likely mean a user error,
       // not "connect to localhost")
+      failIfCloud();
       if (address == null) throw new NullPointerException();
 
       try {
-        addContactPoints(InetAddress.getAllByName(address));
+        InetAddress[] allByName = InetAddress.getAllByName(address);
+        Collections.addAll(this.rawHostContactPoints, allByName);
         return this;
       } catch (UnknownHostException e) {
         throw new IllegalArgumentException("Failed to add contact point: " + address, e);
       }
+    }
+
+    /**
+     * Adds a contact point using the given connection information.
+     *
+     * <p>You only need this method if you use a custom connection mechanism and have configured a
+     * custom {@link EndPointFactory}; otherwise, you can safely ignore it and use the higher level,
+     * host-and-port-based variants such as {@link #addContactPoint(String)}.
+     */
+    public Builder addContactPoint(EndPoint contactPoint) {
+      failIfCloud();
+      contactPoints.add(contactPoint);
+      return this;
     }
 
     /**
@@ -962,7 +997,8 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPoints(InetAddress... addresses) {
-      Collections.addAll(this.rawAddresses, addresses);
+      failIfCloud();
+      Collections.addAll(this.rawHostContactPoints, addresses);
       return this;
     }
 
@@ -976,7 +1012,8 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPoints(Collection<InetAddress> addresses) {
-      this.rawAddresses.addAll(addresses);
+      failIfCloud();
+      this.rawHostContactPoints.addAll(addresses);
       return this;
     }
 
@@ -999,7 +1036,8 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPointsWithPorts(InetSocketAddress... addresses) {
-      Collections.addAll(this.addresses, addresses);
+      failIfCloud();
+      Collections.addAll(this.rawHostAndPortContactPoints, addresses);
       return this;
     }
 
@@ -1022,7 +1060,8 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPointsWithPorts(Collection<InetSocketAddress> addresses) {
-      this.addresses.addAll(addresses);
+      failIfCloud();
+      this.rawHostAndPortContactPoints.addAll(addresses);
       return this;
     }
 
@@ -1112,6 +1151,18 @@ public class Cluster implements Closeable {
      */
     public Builder withSpeculativeExecutionPolicy(SpeculativeExecutionPolicy policy) {
       policiesBuilder.withSpeculativeExecutionPolicy(policy);
+      return this;
+    }
+
+    /**
+     * Configures the endpoint factory to use for the new cluster.
+     *
+     * <p>This is a low-level component for advanced scenarios where connecting to a node requires
+     * more than its socket address. If you're simply using host+port, the default factory is
+     * sufficient.
+     */
+    public Builder withEndPointFactory(EndPointFactory endPointFactory) {
+      policiesBuilder.withEndPointFactory(endPointFactory);
       return this;
     }
 
@@ -1329,6 +1380,122 @@ public class Cluster implements Closeable {
     }
 
     /**
+     * Configures this Builder for Cloud deployments by retrieving connection information from the
+     * provided {@link String}.
+     *
+     * <p>To connect to a Cloud database, you must first download the secure database bundle from
+     * the DataStax Constellation console that contains the connection information, then instruct
+     * the driver to read its contents using either this method or one if its variants.
+     *
+     * <p>For more information, please refer to the DataStax Constellation documentation.
+     *
+     * <p>Note that the provided stream will be consumed <em>and closed</em> when this method will
+     * return; attempting to reuse it afterwards will result in an error being thrown.
+     *
+     * @param cloudConfigFile File that contains secure connect bundle zip file.
+     * @see #withCloudSecureConnectBundle(URL)
+     * @see #withCloudSecureConnectBundle(InputStream)
+     */
+    public Builder withCloudSecureConnectBundle(File cloudConfigFile) {
+      try {
+        return withCloudSecureConnectBundle(cloudConfigFile.toURI().toURL());
+      } catch (MalformedURLException e) {
+        throw new IllegalArgumentException(
+            "The cloudConfigFile URL " + cloudConfigFile + " is in the wrong format.", e);
+      }
+    }
+
+    /**
+     * Configures this Builder for Cloud deployments by retrieving connection information from the
+     * provided {@link URL}.
+     *
+     * <p>To connect to a Cloud database, you must first download the secure database bundle from
+     * the DataStax Constellation console that contains the connection information, then instruct
+     * the driver to read its contents using either this method or one if its variants.
+     *
+     * <p>For more information, please refer to the DataStax Constellation documentation.
+     *
+     * <p>Note that the provided stream will be consumed <em>and closed</em> when this method will
+     * return; attempting to reuse it afterwards will result in an error being thrown.
+     *
+     * @param cloudConfigUrl URL to the secure connect bundle zip file.
+     * @see #withCloudSecureConnectBundle(File)
+     * @see #withCloudSecureConnectBundle(InputStream)
+     */
+    public Builder withCloudSecureConnectBundle(URL cloudConfigUrl) {
+      CloudConfig cloudConfig;
+      try {
+        cloudConfig = new CloudConfigFactory().createCloudConfig(cloudConfigUrl.openStream());
+      } catch (GeneralSecurityException e) {
+        throw new IllegalStateException(
+            "Cannot construct cloud config from the cloudConfigUrl: " + cloudConfigUrl, e);
+      } catch (IOException e) {
+        throw new IllegalStateException(
+            "Cannot construct cloud config from the cloudConfigUrl: " + cloudConfigUrl, e);
+      }
+
+      return addCloudConfigToBuilder(cloudConfig);
+    }
+
+    /**
+     * Configures this Builder for Cloud deployments by retrieving connection information from the
+     * provided {@link InputStream}.
+     *
+     * <p>To connect to a Cloud database, you must first download the secure database bundle from
+     * the DataStax Constellation console that contains the connection information, then instruct
+     * the driver to read its contents using either this method or one if its variants.
+     *
+     * <p>For more information, please refer to the DataStax Constellation documentation.
+     *
+     * <p>Note that the provided stream will be consumed <em>and closed</em> when this method will
+     * return; attempting to reuse it afterwards will result in an error being thrown.
+     *
+     * @param cloudConfigInputStream A stream containing the secure connect bundle zip file.
+     * @see #withCloudSecureConnectBundle(File)
+     * @see #withCloudSecureConnectBundle(URL)
+     */
+    public Builder withCloudSecureConnectBundle(InputStream cloudConfigInputStream) {
+      CloudConfig cloudConfig;
+      try {
+        cloudConfig = new CloudConfigFactory().createCloudConfig(cloudConfigInputStream);
+      } catch (GeneralSecurityException e) {
+        throw new IllegalStateException("Cannot construct cloud config from the InputStream.", e);
+      } catch (IOException e) {
+        throw new IllegalStateException("Cannot construct cloud config from the InputStream.", e);
+      }
+
+      return addCloudConfigToBuilder(cloudConfig);
+    }
+
+    private Builder addCloudConfigToBuilder(CloudConfig cloudConfig) {
+      Builder builder =
+          withEndPointFactory(new SniEndPointFactory(cloudConfig.getProxyAddress()))
+              .withSSL(cloudConfig.getSslOptions());
+
+      if (cloudConfig.getAuthProvider() != null) {
+        builder = builder.withAuthProvider(cloudConfig.getAuthProvider());
+      }
+      if (builder.rawHostContactPoints.size() > 0
+          || builder.rawHostAndPortContactPoints.size() > 0
+          || builder.contactPoints.size() > 0) {
+        throw new IllegalStateException(
+            "Can't use withCloudSecureConnectBundle if you've already called addContactPoint(s)");
+      }
+      for (EndPoint endPoint : cloudConfig.getEndPoints()) {
+        builder.addContactPoint(endPoint);
+      }
+      isCloud = true;
+      return builder;
+    }
+
+    private void failIfCloud() {
+      if (isCloud) {
+        throw new IllegalStateException(
+            "Can't use addContactPoint(s) if you've already called withCloudSecureConnectBundle");
+      }
+    }
+
+    /**
      * The configuration that will be used for the new cluster.
      *
      * <p>You <b>should not</b> modify this object directly because changes made to the returned
@@ -1397,7 +1564,7 @@ public class Cluster implements Closeable {
     private volatile boolean isFullyInit;
     private Exception initException;
     // Initial contacts point
-    final List<InetSocketAddress> contactPoints;
+    final List<EndPoint> contactPoints;
     final Set<SessionManager> sessions = new CopyOnWriteArraySet<SessionManager>();
 
     Metadata metadata;
@@ -1443,7 +1610,7 @@ public class Cluster implements Closeable {
 
     private Manager(
         String clusterName,
-        List<InetSocketAddress> contactPoints,
+        List<EndPoint> contactPoints,
         Configuration configuration,
         Collection<Host.StateListener> listeners) {
       this.clusterName = clusterName == null ? generateClusterName() : clusterName;
@@ -1582,39 +1749,34 @@ public class Cluster implements Closeable {
         this.scheduledTasksExecutor.scheduleWithFixedDelay(
             new CleanupIdleConnectionsTask(), 10, 10, TimeUnit.SECONDS);
 
-        for (InetSocketAddress address : contactPoints) {
-          // We don't want to signal -- call onAdd() -- because nothing is ready
-          // yet (loadbalancing policy, control connection, ...). All we want is
-          // create the Host object so we can initialize the control connection.
-          metadata.addIfAbsent(metadata.newHost(address));
+        for (EndPoint contactPoint : contactPoints) {
+          metadata.addContactPoint(contactPoint);
         }
-
-        Collection<Host> allHosts = metadata.allHosts();
-
-        // At this stage, metadata.allHosts() only contains the contact points, that's what we want
-        // to
-        // pass to LBP.init().
-        // But the control connection will initialize first and discover more hosts, so make a copy.
-        Set<Host> contactPointHosts = Sets.newHashSet(allHosts);
-
+        // Initialize the control connection:
         negotiateProtocolVersionAndConnect();
-
-        // The control connection can mark hosts down if it failed to connect to them, or remove
-        // them if they weren't found
-        // in the control host's system.peers. Separate them:
+        if (controlConnection.isCloud() && !configuration.getQueryOptions().isConsistencySet()) {
+          configuration.getQueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM);
+        }
+        // The control connection:
+        // - marked contact points down if they couldn't be reached
+        // - triggered an initial full refresh of metadata.allHosts. If any contact points weren't
+        //   valid, they won't appear in it.
         Set<Host> downContactPointHosts = Sets.newHashSet();
         Set<Host> removedContactPointHosts = Sets.newHashSet();
-        for (Host host : contactPointHosts) {
-          if (!allHosts.contains(host)) removedContactPointHosts.add(host);
-          else if (host.state == Host.State.DOWN) downContactPointHosts.add(host);
+        for (Host contactPoint : metadata.getContactPoints()) {
+          if (!metadata.allHosts().contains(contactPoint)) {
+            removedContactPointHosts.add(contactPoint);
+          } else if (contactPoint.state == Host.State.DOWN) {
+            downContactPointHosts.add(contactPoint);
+          }
         }
-        contactPointHosts.removeAll(removedContactPointHosts);
-        contactPointHosts.removeAll(downContactPointHosts);
 
         // Now that the control connection is ready, we have all the information we need about the
-        // nodes (datacenter,
-        // rack...) to initialize the load balancing policy
-        loadBalancingPolicy().init(Cluster.this, contactPointHosts);
+        // nodes (datacenter, rack...) to initialize the load balancing policy
+        Set<Host> lbpContactPoints = Sets.newHashSet(metadata.getContactPoints());
+        lbpContactPoints.removeAll(removedContactPointHosts);
+        lbpContactPoints.removeAll(downContactPointHosts);
+        loadBalancingPolicy().init(Cluster.this, lbpContactPoints);
 
         speculativeExecutionPolicy().init(Cluster.this);
         configuration.getPolicies().getRetryPolicy().init(Cluster.this);
@@ -1635,7 +1797,7 @@ public class Cluster implements Closeable {
 
         configuration.getPoolingOptions().setProtocolVersion(protocolVersion());
 
-        for (Host host : allHosts) {
+        for (Host host : metadata.allHosts()) {
           // If the host is down at this stage, it's a contact point that the control connection
           // failed to reach.
           // Reconnection attempts are already scheduled, and the LBP and listeners have been
@@ -1654,7 +1816,7 @@ public class Cluster implements Closeable {
             continue;
           }
 
-          if (!contactPointHosts.contains(host)) loadBalancingPolicy().onAdd(host);
+          if (!lbpContactPoints.contains(host)) loadBalancingPolicy().onAdd(host);
 
           host.setUp();
 
@@ -1746,8 +1908,20 @@ public class Cluster implements Closeable {
 
     void reportQuery(Host host, Statement statement, Exception exception, long latencyNanos) {
       for (LatencyTracker tracker : latencyTrackers) {
-        tracker.update(host, statement, exception, latencyNanos);
+        try {
+          tracker.update(host, statement, exception, latencyNanos);
+        } catch (Exception e) {
+          logger.error("Call to latency tracker failed", e);
+        }
       }
+    }
+
+    ControlConnection getControlConnection() {
+      return controlConnection;
+    }
+
+    List<EndPoint> getContactPoints() {
+      return contactPoints;
     }
 
     boolean isClosed() {
@@ -2594,30 +2768,31 @@ public class Cluster implements Closeable {
       switch (event.type) {
         case TOPOLOGY_CHANGE:
           ProtocolEvent.TopologyChange tpc = (ProtocolEvent.TopologyChange) event;
-          InetSocketAddress tpAddr = translateAddress(tpc.node.getAddress());
-          Host.statesLogger.debug("[{}] received event {}", tpAddr, tpc.change);
+          Host.statesLogger.debug("[{}] received event {}", tpc.node, tpc.change);
+          // Do NOT translate the address, it will be matched against Host.getBroadcastRpcAddress()
+          // to find the target host.
           switch (tpc.change) {
-            case NEW_NODE:
-              submitNodeRefresh(tpAddr, HostEvent.ADDED);
-              break;
             case REMOVED_NODE:
-              submitNodeRefresh(tpAddr, HostEvent.REMOVED);
+              submitNodeRefresh(tpc.node, HostEvent.REMOVED);
               break;
-            case MOVED_NODE:
+            default:
+              // If a node was added, we don't have enough information to create a new Host (we are
+              // missing it's ID) so trigger a full refresh
               submitNodeListRefresh();
               break;
           }
           break;
         case STATUS_CHANGE:
           ProtocolEvent.StatusChange stc = (ProtocolEvent.StatusChange) event;
-          InetSocketAddress stAddr = translateAddress(stc.node.getAddress());
-          Host.statesLogger.debug("[{}] received event {}", stAddr, stc.status);
+          Host.statesLogger.debug("[{}] received event {}", stc.node, stc.status);
+          // Do NOT translate the address, it will be matched against Host.getBroadcastRpcAddress()
+          // to find the target host.
           switch (stc.status) {
             case UP:
-              submitNodeRefresh(stAddr, HostEvent.UP);
+              submitNodeRefresh(stc.node, HostEvent.UP);
               break;
             case DOWN:
-              submitNodeRefresh(stAddr, HostEvent.DOWN);
+              submitNodeRefresh(stc.node, HostEvent.DOWN);
               break;
           }
           break;
@@ -2949,25 +3124,11 @@ public class Cluster implements Closeable {
             case UP:
               Host upHost = metadata.getHost(address);
               if (upHost == null) {
-                upHost = metadata.newHost(address);
-                Host previous = metadata.addIfAbsent(upHost);
-                if (previous != null) {
-                  // We got beat by another thread at adding the host. Let it win and ignore the
-                  // notification here.
-                  continue;
-                }
-                futures.add(schedule(hostAdded(upHost)));
+                // We don't have enough information to create a new Host (we are missing it's ID)
+                // so trigger a full node refresh
+                submitNodeListRefresh();
               } else {
                 futures.add(schedule(hostUp(upHost)));
-              }
-              break;
-            case ADDED:
-              Host newHost = metadata.newHost(address);
-              Host previous = metadata.addIfAbsent(newHost);
-              if (previous == null) {
-                futures.add(schedule(hostAdded(newHost)));
-              } else if (!previous.isUp()) {
-                futures.add(schedule(hostUp(previous)));
               }
               break;
             case DOWN:
@@ -3040,28 +3201,13 @@ public class Cluster implements Closeable {
         }
       }
 
-      // Make sure we  call controlConnection.refreshNodeInfo(host)
-      // so that we have up-to-date infos on that host before adding it (so we typically
-      // catch that an upgraded node uses a new cassandra version).
-
-      private ExceptionCatchingRunnable hostAdded(final Host host) {
-        return new ExceptionCatchingRunnable() {
-          @Override
-          public void runMayThrow() throws Exception {
-            if (controlConnection.refreshNodeInfo(host)) {
-              onAdd(host, null);
-              submitNodeListRefresh();
-            } else {
-              logger.debug("Not enough info for {}, ignoring host", host);
-            }
-          }
-        };
-      }
-
       private ExceptionCatchingRunnable hostUp(final Host host) {
         return new ExceptionCatchingRunnable() {
           @Override
           public void runMayThrow() throws Exception {
+            // Make sure we  call controlConnection.refreshNodeInfo(host)
+            // so that we have up-to-date infos on that host before recreating the pools (so we
+            // typically catch that an upgraded node uses a new cassandra version).
             if (controlConnection.refreshNodeInfo(host)) {
               onUp(host, null);
             } else {
@@ -3122,7 +3268,6 @@ public class Cluster implements Closeable {
   private enum HostEvent {
     UP,
     DOWN,
-    ADDED,
     REMOVED
   }
 

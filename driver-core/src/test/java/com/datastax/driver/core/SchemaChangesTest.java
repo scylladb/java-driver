@@ -35,6 +35,7 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.AfterClass;
@@ -80,13 +81,18 @@ public class SchemaChangesTest extends CCMTestsSupport {
 
   @BeforeClass(groups = "short")
   public void setup() throws InterruptedException {
-    Cluster.Builder builder =
+    cluster1 =
         Cluster.builder()
             .addContactPoints(getContactPoints())
             .withPort(ccm().getBinaryPort())
-            .withQueryOptions(nonDebouncingQueryOptions());
-    cluster1 = builder.build();
-    cluster2 = builder.build();
+            .withQueryOptions(nonDebouncingQueryOptions())
+            .build();
+    cluster2 =
+        Cluster.builder()
+            .addContactPoints(getContactPoints())
+            .withPort(ccm().getBinaryPort())
+            .withQueryOptions(nonDebouncingQueryOptions())
+            .build();
     schemaDisabledCluster =
         spy(
             Cluster.builder()
@@ -193,6 +199,40 @@ public class SchemaChangesTest extends CCMTestsSupport {
   }
 
   /**
+   * JAVA-2204: Make sure we don't accidentally store new table instances in an old keyspace
+   * instance, otherwise this will create a memory leak if a client holds onto a stale table
+   * instance (in particular, the object mapper does).
+   */
+  @Test(groups = "short")
+  public void should_not_update_tables_on_stale_keyspace_instance() throws InterruptedException {
+    final Cluster cluster1 = session1.getCluster();
+    final String keyspaceName = "lowercase";
+    execute(CREATE_TABLE, keyspaceName);
+    final KeyspaceMetadata oldKeyspace = cluster1.getMetadata().getKeyspace(keyspaceName);
+    TableMetadata oldTable = oldKeyspace.getTable("table1");
+
+    // Force a full refresh
+    cluster1.getConfiguration().getQueryOptions().setMetadataEnabled(false);
+    cluster1.getConfiguration().getQueryOptions().setMetadataEnabled(true);
+    ConditionChecker.check()
+        .that(
+            new Callable<Boolean>() {
+              @Override
+              public Boolean call() {
+                return cluster1.getMetadata().getKeyspace(keyspaceName) == oldKeyspace;
+              }
+            })
+        .becomesFalse();
+
+    // Before the fix, the schema parser updated the old keyspace's tables during a full refresh:
+    //   oldTable -> oldKeyspace -> newTable
+    // If the client held onto the initial table instance, successive refreshes would grow the chain
+    // over time:
+    //   table1 -> keyspace1 -> table2 -> keyspace2 -> ...
+    assertThat(oldKeyspace.getTable("table1")).isSameAs(oldTable);
+  }
+
+  /**
    * Verifies that when a table is updated that its associated views remain accessible from the
    * table via {@link TableMetadata#getView(String)}.
    *
@@ -217,7 +257,7 @@ public class SchemaChangesTest extends CCMTestsSupport {
     // Create view and ensure event is received and metadata is updated
     session1.execute(
         String.format(
-            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT c FROM %s.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)",
+            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT pk, c FROM %s.table1 WHERE c IS NOT NULL AND pk IS NOT NULL PRIMARY KEY (pk, c)",
             keyspace, keyspace));
     for (SchemaChangeListener listener : listeners) {
       ArgumentCaptor<MaterializedViewMetadata> viewAdded =
@@ -466,7 +506,7 @@ public class SchemaChangesTest extends CCMTestsSupport {
     session1.execute(String.format("CREATE TABLE %s.table1 (pk int PRIMARY KEY, c int)", keyspace));
     session1.execute(
         String.format(
-            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT c FROM %s.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)",
+            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT pk, c FROM %s.table1 WHERE c IS NOT NULL AND pk IS NOT NULL PRIMARY KEY (pk, c)",
             keyspace, keyspace));
     for (SchemaChangeListener listener : listeners) {
       ArgumentCaptor<MaterializedViewMetadata> removed =
@@ -485,7 +525,7 @@ public class SchemaChangesTest extends CCMTestsSupport {
     session1.execute(String.format("CREATE TABLE %s.table1 (pk int PRIMARY KEY, c int)", keyspace));
     session1.execute(
         String.format(
-            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT c FROM %s.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c) WITH compaction = { 'class' : 'SizeTieredCompactionStrategy' }",
+            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT pk, c FROM %s.table1 WHERE c IS NOT NULL AND pk IS NOT NULL PRIMARY KEY (pk, c) WITH compaction = { 'class' : 'SizeTieredCompactionStrategy' }",
             keyspace, keyspace));
     for (SchemaChangeListener listener : listeners) {
       ArgumentCaptor<MaterializedViewMetadata> removed =
@@ -536,7 +576,7 @@ public class SchemaChangesTest extends CCMTestsSupport {
     session1.execute(String.format("CREATE TABLE %s.table1 (pk int PRIMARY KEY, c int)", keyspace));
     session1.execute(
         String.format(
-            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT c FROM %s.table1 WHERE c IS NOT NULL PRIMARY KEY (pk, c)",
+            "CREATE MATERIALIZED VIEW %s.mv1 AS SELECT pk, c FROM %s.table1 WHERE c IS NOT NULL AND pk IS NOT NULL PRIMARY KEY (pk, c)",
             keyspace, keyspace));
     session1.execute(String.format("DROP MATERIALIZED VIEW %s.mv1", keyspace));
     for (SchemaChangeListener listener : listeners) {

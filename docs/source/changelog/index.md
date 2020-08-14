@@ -1,5 +1,48 @@
 ## Changelog
 
+<!--
+  Note: the 4.x branch's changelog include a copy of this one, please copy over the changes if new
+  3.x versions get published.
+-->
+
+## 3.10.1
+
+- [bug] JAVA-2857: Fix NPE when built statements without parameters are logged at TRACE level.
+- [bug] JAVA-2843: Successfully parse DSE table schema in OSS driver.
+
+## 3.10.0
+
+- [improvement] JAVA-2676: Don't reschedule flusher after empty runs
+- [new feature] JAVA-2772: Support new protocol v5 message format
+
+## 3.9.0
+
+- [bug] JAVA-2627: Avoid logging error message including stack trace in request handler.
+- [new feature] JAVA-2706: Add now_in_seconds to protocol v5 query messages.
+- [improvement] JAVA-2730: Add support for Cassandra® 4.0 table options
+- [improvement] JAVA-2702: Transient Replication Support for Cassandra® 4.0
+
+
+## 3.8.0
+
+- [new feature] JAVA-2356: Support for DataStax Cloud API.
+- [improvement] JAVA-2483: Allow to provide secure bundle via URL.
+- [improvement] JAVA-2499: Allow to read the secure bundle from an InputStream.
+- [improvement] JAVA-2457: Detect CaaS and change default consistency.
+- [improvement] JAVA-2485: Add errors for Cloud misconfiguration.
+- [documentation] JAVA-2504: Migrate Cloud "getting started" page to driver manual.
+- [improvement] JAVA-2516: Enable hostname validation with Cloud
+- [bug] JAVA-2515: NEW_NODE and REMOVED_NODE events should trigger ADDED and REMOVED.
+
+
+### 3.7.2
+
+- [bug] JAVA-2249: Stop stripping trailing zeros in ByteOrderedTokens.
+- [bug] JAVA-1492: Don't immediately reuse busy connections for another request.
+- [bug] JAVA-2198: Handle UDTs with names that clash with collection types.
+- [bug] JAVA-2204: Avoid memory leak when client holds onto a stale TableMetadata instance.
+
+
 ### 3.7.1
 
 - ``[bug]`` JAVA-2174: Metadata.needsQuote should accept empty strings.

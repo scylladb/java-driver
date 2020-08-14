@@ -6,10 +6,7 @@ not yet have been released. You can find the documentation for the latest
 version through the [Java driver
 docs](http://docs.datastax.com/en/developer/java-driver/latest/index.html) or via the release tags,
 [e.g.
-3.7.1](https://github.com/datastax/java-driver/tree/3.7.1).*
-
-_**Feeback requested!** Help us focus our efforts, provide your input on 
-the [Platform and Runtime Survey](http://goo.gl/forms/qwUE6qnL7U) (we kept it short)._
+3.10.0](https://github.com/datastax/java-driver/tree/3.10.0).*
 
 A modern, [feature-rich](manual/) and highly tunable Java client
 library for Apache Cassandra (2.1+) and using exclusively Cassandra's binary protocol 
@@ -53,12 +50,12 @@ The driver contains the following modules:
   driver releases and important announcements (low frequency).
   [@DataStaxEng](https://twitter.com/datastaxeng) has more news including
   other drivers, Cassandra, and DSE.
-- DOCS: the [manual](http://docs.datastax.com/en/developer/java-driver/3.7/manual/) has quick
+- DOCS: the [manual](http://docs.datastax.com/en/developer/java-driver/3.10/manual/) has quick
   start material and technical details about the driver and its features.
-- API: http://www.datastax.com/drivers/java/3.7
+- API: https://docs.datastax.com/en/drivers/java/3.10
 - GITHUB REPOSITORY: https://github.com/datastax/java-driver
 - [changelog](changelog/)
-- [binary tarball](http://downloads.datastax.com/java-driver/cassandra-java-driver-3.7.1.tar.gz)
+- [binary tarball](http://downloads.datastax.com/java-driver/cassandra-java-driver-3.10.0.tar.gz)
 
 ## Getting the driver
 
@@ -70,7 +67,7 @@ using DataStax Enterprise, install the [DataStax Enterprise Java driver][dse-dri
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-core</artifactId>
-  <version>3.7.1-scylla-0-SNAPSHOT</version>
+  <version>3.10.1-scylla-0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -80,7 +77,7 @@ Note that the object mapper is published as a separate artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-mapping</artifactId>
-  <version>3.7.1-scylla-0-SNAPSHOT</version>
+  <version>3.10.1-scylla-0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -90,7 +87,7 @@ The 'extras' module is also published as a separate artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-extras</artifactId>
-  <version>3.7.1-scylla-0-SNAPSHOT</version>
+  <version>3.10.1-scylla-0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -99,12 +96,12 @@ We also provide a [shaded JAR](manual/shaded_jar/)
 to avoid the explicit dependency to Netty.
 
 If you can't use a dependency management tool, a
-[binary tarball](http://downloads.datastax.com/java-driver/cassandra-java-driver-3.7.1.tar.gz)
+[binary tarball](http://downloads.datastax.com/java-driver/cassandra-java-driver-3.10.0.tar.gz)
 is available for download.
 
 ## Compatibility
 
-The Java client driver 3.7.1 ([branch 3.x](https://github.com/datastax/java-driver/tree/3.x)) is compatible with Apache
+The Java client driver 3.10.0 ([branch 3.x](https://github.com/datastax/java-driver/tree/3.x)) is compatible with Apache
 Cassandra 2.1, 2.2 and 3.0+ (see [this page](http://docs.datastax.com/en/developer/java-driver/latest/manual/native_protocol/) for
 the most up-to-date compatibility information).
 
@@ -134,7 +131,7 @@ If you are upgrading to _DataStax Enterprise_, use the [DataStax Enterprise Java
 features and better compatibility.
 
 ## License
-Copyright 2012-2018, DataStax
+&copy; DataStax, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -148,4 +145,4 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-[dse-driver]: http://docs.datastax.com/en/developer/java-driver-dse/latest
+[dse-driver]: http://docs.datastax.com/en/developer/java-driver-dse/latest/

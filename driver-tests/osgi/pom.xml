@@ -22,11 +22,7 @@
     <parent>
         <groupId>com.scylladb</groupId>
         <artifactId>scylla-driver-tests-parent</artifactId>
-        <version>3.7.1-scylla-3-SNAPSHOT</version>
-    </parent>
-
     <artifactId>scylla-driver-tests-osgi</artifactId>
-    <name>Java Driver for Scylla and Apache Cassandra Tests - OSGi</name>
     <description>A test for the Java Driver in an OSGi container.</description>
 
     <dependencies>
@@ -177,6 +173,8 @@
                         <metrics.version>${metrics.version}</metrics.version>
                         <testng.version>${testng.version}</testng.version>
                         <jsr353-api.version>${jsr353-api.version}</jsr353-api.version>
+                        <jackson.version>${jackson.version}</jackson.version>
+                        <jackson-databind.version>${jackson-databind.version}</jackson-databind.version>
                         <ipprefix>${ipprefix}</ipprefix>
                     </systemPropertyVariables>
                 </configuration>

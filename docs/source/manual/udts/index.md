@@ -61,7 +61,7 @@ various ways to get it:
 * from the driver's [schema metadata](../metadata/index#schema-metadata):
 
     ```java
-    UserType udt = session.getMetadata().getKeyspace("ks").getUserType("type1");
+    UserType udt = session.getCluster().getMetadata().getKeyspace("ks").getUserType("type1");
     ```
 
 * from another UDT value:
@@ -95,5 +95,5 @@ session.execute(bs);
 
 [cql_doc]: https://docs.datastax.com/en/cql/3.3/cql/cql_reference/cqlRefUDType.html
 
-[UDTValue]: https://docs.datastax.com/en/drivers/java/3.7/com/datastax/driver/core/UDTValue.html
-[UserType]: https://docs.datastax.com/en/drivers/java/3.7/com/datastax/driver/core/UserType.html
+[UDTValue]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/UDTValue.html
+[UserType]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/UserType.html
