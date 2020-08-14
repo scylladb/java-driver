@@ -22,10 +22,10 @@
     <parent>
         <groupId>com.scylladb</groupId>
         <artifactId>scylla-driver-tests-parent</artifactId>
-        <version>3.10.1-scylla-1-SNAPSHOT</version>	
+        <version>3.10.1-scylla-1-SNAPSHOT</version>
     </parent>
     <artifactId>scylla-driver-tests-osgi</artifactId>
-    <name>Java Driver for Scylla and Apache Cassandra Tests - OSGi</name>	
+    <name>Java Driver for Scylla and Apache Cassandra Tests - OSGi</name>
     <description>A test for the Java Driver in an OSGi container.</description>
 
     <dependencies>

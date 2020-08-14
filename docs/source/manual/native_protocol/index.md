@@ -5,7 +5,7 @@ between the driver and Cassandra over TCP. As a driver user, you don't
 need to know the fine details (although the protocol spec is [in the
 Cassandra codebase][native_spec] if you're curious); the most visible
 aspect is that some features are only available with specific protocol
-versions.f
+versions.
 
 [native_spec]: https://github.com/apache/cassandra/tree/trunk/doc
 

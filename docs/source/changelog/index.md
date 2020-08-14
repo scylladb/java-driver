@@ -5,17 +5,17 @@
   3.x versions get published.
 -->
 
-## 3.10.1
+### 3.10.1
 
 - [bug] JAVA-2857: Fix NPE when built statements without parameters are logged at TRACE level.
 - [bug] JAVA-2843: Successfully parse DSE table schema in OSS driver.
 
-## 3.10.0
+### 3.10.0
 
 - [improvement] JAVA-2676: Don't reschedule flusher after empty runs
 - [new feature] JAVA-2772: Support new protocol v5 message format
 
-## 3.9.0
+### 3.9.0
 
 - [bug] JAVA-2627: Avoid logging error message including stack trace in request handler.
 - [new feature] JAVA-2706: Add now_in_seconds to protocol v5 query messages.
@@ -23,7 +23,7 @@
 - [improvement] JAVA-2702: Transient Replication Support for Cassandra® 4.0
 
 
-## 3.8.0
+### 3.8.0
 
 - [new feature] JAVA-2356: Support for DataStax Cloud API.
 - [improvement] JAVA-2483: Allow to provide secure bundle via URL.
