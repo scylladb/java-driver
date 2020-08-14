@@ -15,7 +15,7 @@ as a *Table*, the **Table Rows** get a **fixed and finite number of named column
 *Thrift*’s columns inside the *Rows* get distributed in a tabular way through the
 _Table Rows_. See the following figure:
 
-```console
+```ditaa
                                                      Thrift
              /-                                                                                          -\
              |                                                                                            |

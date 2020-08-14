@@ -61,7 +61,7 @@ executing a schema-altering query. This is to ensure that subsequent
 requests (which might get routed to different nodes) see an up-to-date
 version of the schema.
 
-```console
+```ditaa
  Application             Driver           Cassandra
 ------+--------------------+------------------+-----
       |                    |                  |

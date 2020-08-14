@@ -236,6 +236,14 @@ rst_epilog = """
 .. |mon_root| replace::  :doc:`Scylla Monitoring Stack </operating-scylla/monitoring/index>`
 """
 
+# Custom lexer
+from pygments.lexers.shell import BashLexer
+from sphinx.highlighting import lexers
+
+class DitaaLexer(BashLexer):
+    pass
+lexers['ditaa'] = DitaaLexer(startinline=True)
+
 # -- Options for multiversion --------------------------------------------
 # Whitelist pattern for tags (set to None to ignore all tags)
 smv_tag_whitelist = 'None'

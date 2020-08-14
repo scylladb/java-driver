@@ -31,7 +31,7 @@ described in the next section).  The number of stream ids depends on the
 * protocol v2 or below: 128 stream ids per connection.
 * protocol v3 or above: up to 32768 stream ids per connection.
 
-```console
+```ditaa
 +-------+1   n+-------+1   n+----+1   n+----------+1   128/32K+-------+
 |Cluster+-----+Session+-----+Pool+-----+Connection+-----------+Request+
 +-------+     +-------+     +----+     +----------+           +-------+

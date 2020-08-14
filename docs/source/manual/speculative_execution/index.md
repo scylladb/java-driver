@@ -12,7 +12,7 @@ note that "cancelling" in this context simply means discarding the response
 when it arrives later, Cassandra does not support cancellation of in flight
 requests at this stage):
 
-```console
+```ditaa
 client           driver          exec1  exec2
 --+----------------+--------------+------+---
   | execute(query) |
@@ -37,7 +37,7 @@ Or the first node could reply just after the second execution was
 started. In this case, we cancel the second execution. In other words,
 whichever node replies faster "wins" and completes the client query:
 
-```console
+```ditaa
 client           driver          exec1  exec2
 --+----------------+--------------+------+---
   | execute(query) |
@@ -176,7 +176,7 @@ As with all policies, you are free to provide your own by implementing
 Turning speculative executions on doesn't change the driver's [retry](../retries/index) behavior. Each
 parallel execution will trigger retries independently:
 
-```console
+```ditaa
 client           driver          exec1  exec2
 --+----------------+--------------+------+---
   | execute(query) |

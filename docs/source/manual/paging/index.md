@@ -42,7 +42,7 @@ The fetch size limits the number of results that are returned in one
 page; if you iterate past that, the driver will run background queries
 to fetch subsequent pages. Here's an example with a fetch size of 20:
 
-```console
+```ditaa
     client         Session                          Cassandra
     --+--------------+---------------------------------+-----
       |execute(query)|                                 |

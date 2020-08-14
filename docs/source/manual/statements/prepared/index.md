@@ -15,7 +15,7 @@ session.execute(prepared.bind("987274", "Keyboard"));
 When you prepare the statement, Cassandra will parse the query string, cache the result and return a unique identifier
 (the `PreparedStatement` object keeps an internal reference to that identifier):
 
-```console
+```ditaa
 client                   driver           Cassandra
 --+------------------------+----------------+------
   |                        |                |
@@ -38,7 +38,7 @@ client                   driver           Cassandra
 When you bind and execute a prepared statement, the driver will only send the identifier, which allows Cassandra to
 skip the parsing phase:
 
-```console
+```ditaa
 client                            driver                Cassandra
 --+---------------------------------+---------------------+------
   |                                 |                     |
@@ -167,7 +167,7 @@ date. It uses a number of strategies to achieve this:
     the query string is wrong). Once that node replies successfully, the
     driver re-prepares on all remaining nodes:
 
-    ```console
+    ```ditaa
     client                   driver           node1          node2  node3
     --+------------------------+----------------+--------------+------+---
       |                        |                |              |      |
@@ -201,7 +201,7 @@ date. It uses a number of strategies to achieve this:
     statement on the fly (this is transparent for the client, but will cost
     two extra roundtrips):
 
-    ```console
+    ```ditaa
     client                          driver                         node1
     --+-------------------------------+------------------------------+--
       |                               |                              |

@@ -17,7 +17,7 @@ session.execute("SELECT value FROM application_params WHERE name = 'greeting_mes
 Each time you execute a simple statement, Cassandra will parse the query string again; nothing is cached (neither on the
 client nor on the server):
 
-```console
+```ditaa
 client                             driver                Cassandra
 --+----------------------------------+---------------------+------
   |                                  |                     |
