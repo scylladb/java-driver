@@ -104,15 +104,10 @@ class HostConnectionPool implements Connection.Owner {
     private int tasksInFlight = 0;
     private Map<Integer, Connection> connectionsToClose = new HashMap<Integer, Connection>();
 
-    public Connection registerTask(int shardId) {
-      Connection c = null;
+    public void registerTask() {
       synchronized (lock) {
-        c = connectionsToClose.remove(shardId);
-        if (c == null) {
-          ++tasksInFlight;
-        }
+        ++tasksInFlight;
       }
-      return c;
     }
 
     public void unregisterTask() {
@@ -128,6 +123,12 @@ class HostConnectionPool implements Connection.Owner {
         for (Connection c : toClose.values()) {
           c.closeAsync();
         }
+      }
+    }
+
+    public Connection getConnection(int shardId) {
+      synchronized (lock) {
+        return connectionsToClose.remove(shardId);
       }
     }
 
@@ -151,18 +152,34 @@ class HostConnectionPool implements Connection.Owner {
   private final ConnectionTasksSharedState connectionTasksSharedState =
       new ConnectionTasksSharedState();
 
+  private void scheduleConnectionTask(final ConnectionTask task) {
+    timeoutsExecutor.schedule(
+        new Runnable() {
+          public void run() {
+            manager.blockingExecutor().submit(task);
+          }
+        },
+        100,
+        TimeUnit.MILLISECONDS);
+  }
+
   private class ConnectionTask implements Runnable {
 
     private final int shardId;
 
     public ConnectionTask(int shardId) {
       this.shardId = shardId;
+      connectionTasksSharedState.registerTask();
     }
 
     @Override
     public void run() {
-      addConnectionIfUnderMaximum(shardId, connectionTasksSharedState);
-      scheduledForCreation[shardId].decrementAndGet();
+      if (addConnectionIfUnderMaximum(shardId, connectionTasksSharedState)) {
+        connectionTasksSharedState.unregisterTask();
+        scheduledForCreation[shardId].decrementAndGet();
+      } else {
+        scheduleConnectionTask(this);
+      }
     }
   }
 
@@ -662,19 +679,17 @@ class HostConnectionPool implements Connection.Owner {
           return false;
         }
         logger.debug("Creating new connection on busy pool to {}", host);
-        newConnection = sharedState.registerTask(shardId);
+        newConnection = sharedState.getConnection(shardId);
         if (newConnection == null) {
-          try {
-            do {
-              newConnection = manager.connectionFactory().open(this);
-              if (newConnection.shardId() == shardId) {
-                newConnection.setKeyspace(manager.poolsState.keyspace);
-              } else {
-                newConnection = sharedState.addConnectionToClose(shardId, newConnection);
-              }
-            } while (newConnection == null);
-          } finally {
-            sharedState.unregisterTask();
+          newConnection = manager.connectionFactory().open(this);
+          if (newConnection.shardId() == shardId) {
+            newConnection.setKeyspace(manager.poolsState.keyspace);
+          } else {
+            newConnection = sharedState.addConnectionToClose(shardId, newConnection);
+            if (newConnection == null) {
+              open[shardId].decrementAndGet();
+              return false;
+            }
           }
         }
       }
@@ -753,7 +768,7 @@ class HostConnectionPool implements Connection.Owner {
       if (scheduledForCreation[shardId].compareAndSet(inCreation, inCreation + 1)) break;
     }
 
-    manager.blockingExecutor().submit(new ConnectionTask(shardId));
+    scheduleConnectionTask(new ConnectionTask(shardId));
   }
 
   @Override
@@ -920,7 +935,7 @@ class HostConnectionPool implements Connection.Owner {
         // We don't respect MAX_SIMULTANEOUS_CREATION here because it's only to
         // protect against creating connection in excess of core too quickly
         scheduledForCreation[shardId].incrementAndGet();
-        manager.blockingExecutor().submit(new ConnectionTask(shardId));
+        scheduleConnectionTask(new ConnectionTask(shardId));
       }
     }
   }
