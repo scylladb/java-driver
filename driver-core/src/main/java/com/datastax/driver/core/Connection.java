@@ -67,6 +67,7 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import java.lang.ref.WeakReference;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -165,6 +166,10 @@ class Connection {
   }
 
   ListenableFuture<Void> initAsync() {
+    return initAsync(0);
+  }
+
+  ListenableFuture<Void> initAsync(int localPort) {
     if (factory.isShutdown)
       return Futures.immediateFailedFuture(
           new ConnectionException(endPoint, "Connection factory is shut down"));
@@ -191,7 +196,8 @@ class Connection {
                   ? factory.manager.metrics
                   : null));
 
-      ChannelFuture future = bootstrap.connect(endPoint.resolve());
+      ChannelFuture future =
+          bootstrap.connect(endPoint.resolve(), new InetSocketAddress(localPort));
 
       writer.incrementAndGet();
       future.addListener(
@@ -1101,10 +1107,16 @@ class Connection {
     Connection open(HostConnectionPool pool)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
+      return open(pool, 0);
+    }
+
+    Connection open(HostConnectionPool pool, int localPort)
+        throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
+            ClusterNameMismatchException {
       pool.host.convictionPolicy.signalConnectionsOpening(1);
       Connection connection = new Connection(buildConnectionName(pool.host), pool.host, this, pool);
       try {
-        connection.initAsync().get();
+        connection.initAsync(localPort).get();
         return connection;
       } catch (ExecutionException e) {
         throw launderAsyncInitException(e);
