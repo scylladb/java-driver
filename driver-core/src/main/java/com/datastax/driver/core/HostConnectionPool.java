@@ -25,6 +25,7 @@ import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
+import com.datastax.driver.core.utils.SocketUtils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Lists;
@@ -35,6 +36,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -678,10 +680,27 @@ class HostConnectionPool implements Connection.Owner {
           open[shardId].decrementAndGet();
           return false;
         }
-        logger.debug("Creating new connection on busy pool to {}", host);
         newConnection = sharedState.getConnection(shardId);
         if (newConnection == null) {
-          newConnection = manager.connectionFactory().open(this);
+          int shardCount = 1;
+          int localPort = 0;
+          InetSocketAddress serverAddress = host.getEndPoint().resolve();
+          int serverPort = serverAddress.getPort();
+          ShardingInfo shardingInfo = host.getShardingInfo();
+          if (shardingInfo != null) {
+            shardCount = shardingInfo.getShardsCount();
+            if (shardingInfo.getShardAwarePort() != 0) {
+              serverPort = shardingInfo.getShardAwarePort();
+              localPort = getAvailablePortForShard(shardCount, shardId, 100);
+            }
+          }
+          logger.debug(
+              "Creating new connection to {}:{} for shard {} with local port {}",
+              serverAddress.getAddress().getHostAddress(),
+              serverPort,
+              shardId,
+              localPort);
+          newConnection = manager.connectionFactory().open(this, localPort, serverPort);
           if (newConnection.shardId() == shardId) {
             newConnection.setKeyspace(manager.poolsState.keyspace);
           } else {
@@ -737,6 +756,25 @@ class HostConnectionPool implements Connection.Owner {
           e.getMessage());
       return false;
     }
+  }
+
+  private int getAvailablePortForShard(int shardCount, int shardId, int maxAttempts) {
+    for (int i = 0; i < maxAttempts; i++) {
+      int port = 10000 + RAND.nextInt(50000 - shardCount);
+      port = port - port % shardCount + shardId;
+      if (port < 10000) {
+        port += shardCount;
+      }
+      if (SocketUtils.isTcpPortAvailable(port)) {
+        return port;
+      }
+    }
+    logger.error(
+        "Cannot find an available port for shard {}/{} in {} attempts",
+        shardId,
+        shardCount,
+        maxAttempts);
+    return 0;
   }
 
   private Connection tryResurrectFromTrash(int shardId) {
