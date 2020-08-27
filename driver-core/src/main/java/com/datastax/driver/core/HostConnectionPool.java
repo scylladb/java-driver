@@ -110,15 +110,10 @@ class HostConnectionPool implements Connection.Owner {
     private int tasksInFlight = 0;
     private Map<Integer, Connection> connectionsToClose = new HashMap<Integer, Connection>();
 
-    public Connection registerTask(int shardId) {
-      Connection c = null;
+    public void registerTask() {
       synchronized (lock) {
-        c = connectionsToClose.remove(shardId);
-        if (c == null) {
-          ++tasksInFlight;
-        }
+        ++tasksInFlight;
       }
-      return c;
     }
 
     public void unregisterTask() {
@@ -134,6 +129,12 @@ class HostConnectionPool implements Connection.Owner {
         for (Connection c : toClose.values()) {
           c.closeAsync();
         }
+      }
+    }
+
+    public Connection getConnection(int shardId) {
+      synchronized (lock) {
+        return connectionsToClose.remove(shardId);
       }
     }
 
@@ -157,18 +158,44 @@ class HostConnectionPool implements Connection.Owner {
   private final ConnectionTasksSharedState connectionTasksSharedState =
       new ConnectionTasksSharedState();
 
+  private void scheduleConnectionTask(final ConnectionTask task) {
+    timeoutsExecutor.schedule(
+        new Runnable() {
+          public void run() {
+            manager.blockingExecutor().submit(task);
+          }
+        },
+        100,
+        TimeUnit.MILLISECONDS);
+  }
+
+  private enum ConnectionResult {
+    SUCCESS,
+    SHOULD_RETRY,
+    FAILED,
+  }
+
   private class ConnectionTask implements Runnable {
 
     private final int shardId;
 
     public ConnectionTask(int shardId) {
       this.shardId = shardId;
+      connectionTasksSharedState.registerTask();
     }
 
     @Override
     public void run() {
-      addConnectionIfUnderMaximum(shardId, connectionTasksSharedState);
-      scheduledForCreation[shardId].decrementAndGet();
+      switch (addConnectionIfUnderMaximum(shardId, connectionTasksSharedState)) {
+        case SUCCESS:
+        case FAILED:
+          connectionTasksSharedState.unregisterTask();
+          scheduledForCreation[shardId].decrementAndGet();
+          break;
+        case SHOULD_RETRY:
+          scheduleConnectionTask(this);
+          break;
+      }
     }
   }
 
@@ -648,19 +675,20 @@ class HostConnectionPool implements Connection.Owner {
     trash[connection.shardId()].add(connection);
   }
 
-  private boolean addConnectionIfUnderMaximum(int shardId, ConnectionTasksSharedState sharedState) {
+  private ConnectionResult addConnectionIfUnderMaximum(
+      int shardId, ConnectionTasksSharedState sharedState) {
 
     // First, make sure we don't cross the allowed limit of open connections
     for (; ; ) {
       int opened = open[shardId].get();
-      if (opened >= maxConnectionsPerShard) return false;
+      if (opened >= maxConnectionsPerShard) return ConnectionResult.FAILED;
 
       if (open[shardId].compareAndSet(opened, opened + 1)) break;
     }
 
     if (phase.get() != Phase.READY) {
       open[shardId].decrementAndGet();
-      return false;
+      return ConnectionResult.FAILED;
     }
 
     // Now really open the connection
@@ -669,22 +697,20 @@ class HostConnectionPool implements Connection.Owner {
       if (newConnection == null) {
         if (!host.convictionPolicy.canReconnectNow()) {
           open[shardId].decrementAndGet();
-          return false;
+          return ConnectionResult.SHOULD_RETRY;
         }
         logger.debug("Creating new connection on busy pool to {}", host);
-        newConnection = sharedState.registerTask(shardId);
+        newConnection = sharedState.getConnection(shardId);
         if (newConnection == null) {
-          try {
-            do {
-              newConnection = manager.connectionFactory().open(this);
-              if (newConnection.shardId() == shardId) {
-                newConnection.setKeyspace(manager.poolsState.keyspace);
-              } else {
-                newConnection = sharedState.addConnectionToClose(shardId, newConnection);
-              }
-            } while (newConnection == null);
-          } finally {
-            sharedState.unregisterTask();
+          newConnection = manager.connectionFactory().open(this);
+          if (newConnection.shardId() == shardId) {
+            newConnection.setKeyspace(manager.poolsState.keyspace);
+          } else {
+            newConnection = sharedState.addConnectionToClose(shardId, newConnection);
+            if (newConnection == null) {
+              open[shardId].decrementAndGet();
+              return ConnectionResult.SHOULD_RETRY;
+            }
           }
         }
       }
@@ -697,40 +723,40 @@ class HostConnectionPool implements Connection.Owner {
       if (isClosed() && !newConnection.isClosed()) {
         close(newConnection);
         open[shardId].decrementAndGet();
-        return false;
+        return ConnectionResult.FAILED;
       }
 
       dequeue(newConnection);
-      return true;
+      return ConnectionResult.SUCCESS;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       // Skip the open but ignore otherwise
       open[shardId].decrementAndGet();
-      return false;
+      return ConnectionResult.FAILED;
     } catch (ConnectionException e) {
       open[shardId].decrementAndGet();
       logger.debug("Connection error to {} while creating additional connection", host);
-      return false;
+      return ConnectionResult.FAILED;
     } catch (AuthenticationException e) {
       // This shouldn't really happen in theory
       open[shardId].decrementAndGet();
       logger.error(
           "Authentication error while creating additional connection (error is: {})",
           e.getMessage());
-      return false;
+      return ConnectionResult.FAILED;
     } catch (UnsupportedProtocolVersionException e) {
       // This shouldn't happen since we shouldn't have been able to connect in the first place
       open[shardId].decrementAndGet();
       logger.error(
           "UnsupportedProtocolVersionException error while creating additional connection (error is: {})",
           e.getMessage());
-      return false;
+      return ConnectionResult.FAILED;
     } catch (ClusterNameMismatchException e) {
       open[shardId].decrementAndGet();
       logger.error(
           "ClusterNameMismatchException error while creating additional connection (error is: {})",
           e.getMessage());
-      return false;
+      return ConnectionResult.FAILED;
     }
   }
 
@@ -763,7 +789,7 @@ class HostConnectionPool implements Connection.Owner {
       if (scheduledForCreation[shardId].compareAndSet(inCreation, inCreation + 1)) break;
     }
 
-    manager.blockingExecutor().submit(new ConnectionTask(shardId));
+    scheduleConnectionTask(new ConnectionTask(shardId));
   }
 
   @Override
@@ -930,7 +956,7 @@ class HostConnectionPool implements Connection.Owner {
         // We don't respect MAX_SIMULTANEOUS_CREATION here because it's only to
         // protect against creating connection in excess of core too quickly
         scheduledForCreation[shardId].incrementAndGet();
-        manager.blockingExecutor().submit(new ConnectionTask(shardId));
+        scheduleConnectionTask(new ConnectionTask(shardId));
       }
     }
   }

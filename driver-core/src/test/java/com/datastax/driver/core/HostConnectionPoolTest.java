@@ -1197,16 +1197,11 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
 
       Uninterruptibles.sleepUninterruptibly(reconnectInterval, TimeUnit.MILLISECONDS);
 
-      // Should open up to core connections, however it will only spawn up to 1 connection
-      // per request, so we need to make enough requests to make up the deficit.  Additionally
-      // we need to wait for connections to be established between requests for the pool
-      // to spawn new connections (since it only allows one simultaneous creation).
-      for (int i = 5; i <= 8; i++) {
-        allRequests.add(MockRequest.send(pool));
-        verify(factory, timeout(readTimeout)).open(any(HostConnectionPool.class));
-        reset(factory);
-        assertPoolSize(pool, i);
-      }
+      // Reconnection mechanism should fill missing connections by now.
+      verify(factory, timeout(readTimeout).times(4))
+          .open(any(HostConnectionPool.class));
+      reset(factory);
+      assertPoolSize(pool, 8);
     } finally {
       MockRequest.completeAll(allRequests);
       cluster.close();
