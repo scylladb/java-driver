@@ -421,14 +421,12 @@ class HostConnectionPool implements Connection.Owner {
       if (host.convictionPolicy.canReconnectNow()) {
         if (connectionsPerShard == 0) {
           maybeSpawnNewConnection(shardId);
-          return enqueue(timeout, unit, maxQueueSize, shardId);
         } else if (scheduledForCreation[shardId].compareAndSet(0, connectionsPerShard)) {
           for (int i = 0; i < connectionsPerShard; i++) {
             // We don't respect MAX_SIMULTANEOUS_CREATION here because it's  only to
             // protect against creating connection in excess of core too quickly
             manager.blockingExecutor().submit(new ConnectionTask(shardId));
           }
-          return enqueue(timeout, unit, maxQueueSize, shardId);
         }
       }
       // connections for this shard are still being initialized so pick connection for any shard
