@@ -98,6 +98,11 @@ public class BoundStatement extends Statement
     }
   }
 
+  @Override
+  public boolean isLWT() {
+    return statement.isLWT();
+  }
+
   /**
    * Returns the prepared statement on which this BoundStatement is based.
    *
