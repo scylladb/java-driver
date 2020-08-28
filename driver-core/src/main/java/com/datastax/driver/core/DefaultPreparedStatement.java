@@ -58,7 +58,11 @@ public class DefaultPreparedStatement implements PreparedStatement {
   }
 
   static DefaultPreparedStatement fromMessage(
-      Responses.Result.Prepared msg, Cluster cluster, String query, String queryKeyspace) {
+      Responses.Result.Prepared msg,
+      Cluster cluster,
+      String query,
+      String queryKeyspace,
+      LwtInfo lwtInfo) {
     assert msg.metadata.columns != null;
 
     ColumnDefinitions defs = msg.metadata.columns;
@@ -81,7 +85,12 @@ public class DefaultPreparedStatement implements PreparedStatement {
     PreparedId preparedId =
         new PreparedId(boundValuesMetadata, resultSetMetadata, pkIndices, protocolVersion);
     return new DefaultPreparedStatement(
-        preparedId, query, queryKeyspace, msg.getCustomPayload(), cluster, false);
+        preparedId,
+        query,
+        queryKeyspace,
+        msg.getCustomPayload(),
+        cluster,
+        lwtInfo != null && lwtInfo.isLwt(msg.metadata.flags));
   }
 
   private static int[] computePkIndices(Metadata clusterMetadata, ColumnDefinitions boundColumns) {

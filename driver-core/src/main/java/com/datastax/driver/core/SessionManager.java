@@ -227,7 +227,7 @@ class SessionManager extends AbstractSession {
                     Responses.Result.Prepared pmsg = (Responses.Result.Prepared) rm;
                     PreparedStatement stmt =
                         DefaultPreparedStatement.fromMessage(
-                            pmsg, cluster, query, poolsState.keyspace);
+                            pmsg, cluster, query, poolsState.keyspace, future.getLwtInfo());
                     stmt = cluster.manager.addPrepared(stmt);
                     if (cluster.getConfiguration().getQueryOptions().isPrepareOnAllHosts()) {
                       // All Sessions are connected to the same nodes so it's enough to prepare only
