@@ -58,6 +58,9 @@ public class Host {
   // Can be set concurrently but the value should always be the same.
   private volatile ShardingInfo shardingInfo = null;
 
+  // Can be set concurrently but the value should always be the same.
+  private volatile LwtInfo lwtInfo = null;
+
   enum State {
     ADDED,
     DOWN,
@@ -405,6 +408,14 @@ public class Host {
 
   public void setShardingInfo(ShardingInfo shardingInfo) {
     this.shardingInfo = shardingInfo;
+  }
+
+  public LwtInfo getLwtInfo() {
+    return lwtInfo;
+  }
+
+  public void setLwtInfo(LwtInfo lwtInfo) {
+    this.lwtInfo = lwtInfo;
   }
 
   /**
