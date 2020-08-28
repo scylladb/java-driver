@@ -344,4 +344,7 @@ public interface PreparedStatement {
    *     QueryOptions#getDefaultIdempotence()}.
    */
   public Boolean isIdempotent();
+
+  /** Whether a prepared statement is LWT statement */
+  public boolean isLWT();
 }

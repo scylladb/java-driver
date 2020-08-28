@@ -12,6 +12,12 @@
   @formatter:off
 -->
 <differences>
+    <difference>
+        <differenceType>7012</differenceType> <!-- method added to interface -->
+        <className>com/datastax/driver/core/PreparedStatement</className>
+        <method>boolean isLWT()</method>
+        <justification>New method to distinguish LWT statements from non-LWT statements</justification>
+    </difference>
 
     <difference>
         <differenceType>8001</differenceType> <!-- class removed -->
