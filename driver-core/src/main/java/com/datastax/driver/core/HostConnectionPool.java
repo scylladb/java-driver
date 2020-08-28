@@ -703,9 +703,9 @@ class HostConnectionPool implements Connection.Owner {
           ShardingInfo shardingInfo = host.getShardingInfo();
           if (shardingInfo != null) {
             shardCount = shardingInfo.getShardsCount();
-            localPort = getAvailablePortForShard(shardCount, shardId, 100);
             if (shardingInfo.getShardAwarePort() != 0) {
               serverPort = shardingInfo.getShardAwarePort();
+              localPort = getAvailablePortForShard(shardCount, shardId, 100);
             }
           }
           logger.debug(
