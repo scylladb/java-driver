@@ -117,7 +117,7 @@ Some options don't apply to all operations:
 </table>
 
 Note that `Option.consistencyLevel` is redundant with the consistency
-level defined by [@Table](../creating/index#creating-a-table-entity).
+level defined by [@Table](../creating/#creating-a-table-entity).
 If both are defined, the option will take precedence over the
 annotation.
 
@@ -233,7 +233,7 @@ ResultSet insert(@Param("u") UUID userId, @Param("n") String name);
 
 If a method argument is a Java enumeration, it must be annotated with
 `@Enumerated` to indicate how to convert it to a CQL type (the rules are
-the same as in [mapping definition](../creating/index#enumerations)):
+the same as in [mapping definition](../creating/#enumerations)):
 
 ```java
 @Query("insert into user (key, gender) values (?,?)")

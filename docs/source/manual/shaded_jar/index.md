@@ -1,6 +1,6 @@
 ## Using the shaded JAR
 
-The default driver JAR depends on [Netty](http://netty.io/index), which is
+The default driver JAR depends on [Netty](http://netty.io/), which is
 used internally for networking.
 
 This explicit dependency can be a problem if your application already

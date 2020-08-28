@@ -95,7 +95,7 @@ for (Row row : rs) {
 
 If you use paging with the async API, you'll also want to use those
 methods to avoid triggering synchronous fetches unintentionally; see
-[async paging](../async/index#async-paging).
+[async paging](../async/#async-paging).
 
 
 ### Saving and reusing the paging state
@@ -181,7 +181,7 @@ if (nextPage != null) {
 
 
 Due to internal implementation details, `PagingState` instances are not
-portable across [native protocol](../native_protocol/index) versions. This
+portable across [native protocol](../native_protocol/) versions. This
 could become a problem in the following scenario:
 
 * you're using the driver 2.0.x and Cassandra 2.0.x, and therefore

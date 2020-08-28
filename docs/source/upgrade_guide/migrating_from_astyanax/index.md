@@ -5,9 +5,9 @@ migrating to the *DataStax Java driver*.
 
 See the child pages for more information:
 
-* [Changes at the language level](language_level_changes/index)
-* [Migrating Astyanax configurations to DataStax Java driver configurations](configuration/index)
-* [Querying and retrieving results comparisons.](queries_and_results/index)
+* [Changes at the language level](language_level_changes/)
+* [Migrating Astyanax configurations to DataStax Java driver configurations](configuration/)
+* [Querying and retrieving results comparisons.](queries_and_results/)
 
 ```eval_rst
 .. toctree::

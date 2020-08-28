@@ -12,7 +12,7 @@ Practical use cases that justify such a feature are numerous:
 * etc.
 
 This page explains the implementation and how to write your own custom codecs. Note that the driver also provides a set
-of [optional codecs](extras/index) that might fit your needs.
+of [optional codecs](extras/) that might fit your needs.
 
 ### Overview of the serialization mechanism
 
@@ -203,7 +203,7 @@ make sure that you use preferably the `get()` and `set()` methods: they
 avoid any ambiguity by requiring the user to explicitly specify the desired Java type,
 thus forcing the driver to pick the right codec for the right task.
 
-Custom codecs also work with the driver's [object mapper](../object_mapper/custom_codecs/index).
+Custom codecs also work with the driver's [object mapper](../object_mapper/custom_codecs/).
 
 ### On-the-fly codec generation
 
@@ -364,7 +364,7 @@ serializing and deserializing. It's possible to bypass this step with a
 lower-level implementation that manipulates the binary stream directly.
 That's also how the object mapper handles UDTs, and you can rely on the
 mapper to generate UDT codecs for you; see
-[this page](../object_mapper/custom_codecs/index#implicit-udt-codecs) for more
+[this page](../object_mapper/custom_codecs/#implicit-udt-codecs) for more
 information.
 
 ### Support for generic (parameterized) types

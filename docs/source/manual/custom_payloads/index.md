@@ -1,6 +1,6 @@
 ## Custom Payloads
 
-The [native protocol](../native_protocol/index) version 4 introduces a new feature called [Custom Payloads][CASSANDRA-8553].
+The [native protocol](../native_protocol/) version 4 introduces a new feature called [Custom Payloads][CASSANDRA-8553].
 
 According to the [protocol V4 specification][v4spec], custom payloads are generic key-value maps
 where keys are strings and each value is an arbitrary sequence of bytes. Currently payloads 

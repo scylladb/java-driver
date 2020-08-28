@@ -32,7 +32,7 @@ of Guava's packages, e.g. for 19.0:
 
 ### How to enable compression?
 
-First, read our [manual page on compression](../../manual/compression/index)
+First, read our [manual page on compression](../../manual/compression/)
 to understand how to enable compression for the Java driver.
             
 OSGi projects can use both Snappy or LZ4 compression algorithms. 
@@ -99,14 +99,14 @@ _not_ its Maven artifact id.
     
 ### How to use the driver shaded jar?
 
-The driver [shaded jar](../../manual/shaded_jar/index) can be used 
+The driver [shaded jar](../../manual/shaded_jar/) can be used 
 in any OSGi application, although the same limitations explained in
 the manual apply.
 
 
 ### How to get proper logs?
 
-The driver uses [SLF4j] for [logging](../../manual/logging/index).
+The driver uses [SLF4j] for [logging](../../manual/logging/).
 
 You OSGi runtime should therefore include the SLF4J API bundle, and
 one valid implementation bundle, such as [Logback].
@@ -135,7 +135,7 @@ Please consult their documentation for further details.
 
 The driver is able to perform native system calls through JNR in some cases,
 for example to achieve microsecond resolution when 
-[generating timestamps](../../manual/query_timestamps/index).
+[generating timestamps](../../manual/query_timestamps/).
 
 Unfortunately, some of the JNR artifacts available from Maven 
 are not valid OSGi bundles and cannot be used in OSGi applications.

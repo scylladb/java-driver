@@ -10,10 +10,10 @@ The *Java driver* executes CQL queries through the `Session`.
 The queries can either be simple *CQL* Strings or represented in the form of 
 `Statement`s. The driver offers 4 kinds of statements, `SimpleStatement`, 
 `Prepared/BoundStatement`, `BuiltStatement`, and `BatchStatement`. All necessary
-information can be [found here](../../../manual/statements/index) about the nature of the different
+information can be [found here](../../../manual/statements/) about the nature of the different
 `Statement`s.
 
-As explained in [the running section](../../../manual/index#running-queries),
+As explained in [the running section](../../../manual/#running-queries),
 results of a *CQL* query will be in the form of *Rows* from *Tables*, composed 
 of fixed set of columns, each with a type and a name. The driver exposes the 
 set of *Rows* returned from a query as a ResultSet, thus containing *Rows* on 
@@ -101,8 +101,8 @@ for (Row row : rs) {
 
 ## Async
 The *Java driver* provides native support for asynchronous programming since it 
-is built on top of an [asynchronous protocol](../../../manual/native_protocol/index),
-please see [this page](../../../manual/async/index) for best practices regarding asynchronous programming
+is built on top of an [asynchronous protocol](../../../manual/native_protocol/),
+please see [this page](../../../manual/async/) for best practices regarding asynchronous programming
 with the *Java driver*.
 
 

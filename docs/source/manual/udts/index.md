@@ -58,7 +58,7 @@ various ways to get it:
     UserType udt = (UserType) ps.getVariables().getType("v");
     ```
 
-* from the driver's [schema metadata](../metadata/index#schema-metadata):
+* from the driver's [schema metadata](../metadata/#schema-metadata):
 
     ```java
     UserType udt = session.getCluster().getMetadata().getKeyspace("ks").getUserType("type1");

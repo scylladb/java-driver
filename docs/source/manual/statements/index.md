@@ -3,15 +3,15 @@
 To execute a query, you  create a [Statement] instance and pass it to [Session#execute()][execute] or
 [Session#executeAsync][executeAsync]. The driver provides various implementations:
 
-* [SimpleStatement](simple/index): a simple implementation built directly from a
+* [SimpleStatement](simple/): a simple implementation built directly from a
   character string. Typically used for queries that are executed only
   once or a few times.
-* [BoundStatement](prepared/index): obtained by binding values to a prepared
+* [BoundStatement](prepared/): obtained by binding values to a prepared
   statement. Typically used for queries that are executed
   often, with different values.
-* [BuiltStatement](built/index): a statement built with the [QueryBuilder] DSL. It
+* [BuiltStatement](built/): a statement built with the [QueryBuilder] DSL. It
   can be executed directly like a simple statement, or prepared.
-* [BatchStatement](batch/index): a statement that groups multiple statements to be
+* [BatchStatement](batch/): a statement that groups multiple statements to be
   executed as a batch.
 
 

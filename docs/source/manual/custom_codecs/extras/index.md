@@ -4,7 +4,7 @@
 
 ## Optional codecs
 
-The driver's "extras" module provides additional [codec](../index) implementations: these codecs are not required by core
+The driver's "extras" module provides additional [codec](../) implementations: these codecs are not required by core
 driver features, but will probably prove useful in a lot of client applications. You can also study their source code as
 a reference to write your own.
 
@@ -189,10 +189,10 @@ session.execute("insert into ordinal_example (id, state) values (1, ?)", State.I
 // state saved as 0
 ```
 
-Note that if you registered an `EnumNameCodec` and an `EnumOrdinalCodec` _for the same enum_ at the same time, there could be a problem when executing [simple statements](../../statements/simple/index), because in a simple statement, the target CQL type of a given query parameter is not known in advance, so the driver, on a best-effort attempt, will pick one or the other, whichever was registered first. If the chosen codec proves to be the wrong one, the request would fail on the server side.
+Note that if you registered an `EnumNameCodec` and an `EnumOrdinalCodec` _for the same enum_ at the same time, there could be a problem when executing [simple statements](../../statements/simple/), because in a simple statement, the target CQL type of a given query parameter is not known in advance, so the driver, on a best-effort attempt, will pick one or the other, whichever was registered first. If the chosen codec proves to be the wrong one, the request would fail on the server side.
 
 In practice, this is unlikely to happen, because you'll probably stick to a single CQL type for a given enum type;
-however, if you ever run into that issue, the workaround is to use [prepared statements](../../statements/prepared/index), for which the driver knows the CQL type and can pick the exact codec.
+however, if you ever run into that issue, the workaround is to use [prepared statements](../../statements/prepared/), for which the driver knows the CQL type and can pick the exact codec.
 
 [EnumNameCodec]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/extras/codecs/enums/EnumNameCodec.html
 [EnumOrdinalCodec]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/extras/codecs/enums/EnumOrdinalCodec.html

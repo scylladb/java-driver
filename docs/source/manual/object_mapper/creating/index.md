@@ -244,8 +244,8 @@ int f;
 ```
 
 Finally, computed properties are only supported with [basic read
-operations](../using/index#basic-crud-operations) at this time.
-Support in [accessors](../using/index#accessors) is planned for a future
+operations](../using/#basic-crud-operations) at this time.
+Support in [accessors](../using/#accessors) is planned for a future
 version (see
 [JAVA-832](https://datastax-oss.atlassian.net/browse/JAVA-832)).
 

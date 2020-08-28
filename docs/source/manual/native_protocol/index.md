@@ -97,17 +97,17 @@ To avoid this issue, you can use one the following workarounds:
 * bound variables in simple statements
   ([Session#execute(String, Object...)](https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Session.html#execute-java.lang.String-java.lang.Object...-))
 * [batch statements](https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/BatchStatement.html)
-* [query paging](../paging/index)
+* [query paging](../paging/)
 
 #### v2 to v3
 
 * the number of stream ids per connection goes from 128 to 32768 (see
-  [Connection pooling](../pooling/index))
+  [Connection pooling](../pooling/))
 * [serial consistency on batch statements](https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/BatchStatement.html#setSerialConsistencyLevel-com.datastax.driver.core.ConsistencyLevel-)
-* [client-side timestamps](../query_timestamps/index)
+* [client-side timestamps](../query_timestamps/)
 
 #### v3 to v4
 
 * [query warnings](https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/ExecutionInfo.html#getWarnings--)
 * allowed unset values in bound statements
-* [Custom payloads](../custom_payloads/index)
+* [Custom payloads](../custom_payloads/)

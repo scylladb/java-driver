@@ -21,7 +21,7 @@ try {
 ```
 
 1. the [Cluster] object is the main entry point of the driver. It holds the known state of the actual Cassandra cluster
-   (notably the [Metadata](metadata/index)). This class is thread-safe, you should create a single instance (per target
+   (notably the [Metadata](metadata/)). This class is thread-safe, you should create a single instance (per target
    Cassandra cluster), and share it throughout your application;
 2. the [Session] is what you use to execute queries. Likewise, it is thread-safe and should be reused;
 3. we use `execute` to send a query to Cassandra. This returns a [ResultSet], which is essentially a collection of [Row]
@@ -31,7 +31,7 @@ try {
    cluster. This step is important because it frees underlying resources (TCP connections, thread pools...). In a real
    application, you would typically do this at shutdown (for example, when undeploying your webapp).
 
-Note: this example uses the synchronous API. Most methods have [asynchronous](async/index) equivalents.
+Note: this example uses the synchronous API. Most methods have [asynchronous](async/) equivalents.
 
 
 ### Setting up the driver
@@ -65,19 +65,19 @@ that the driver can fallback if the first one is down.
 
 The other aspects that you can configure on the `Cluster` are:
 
-* [address translation](address_resolution/index);
-* [authentication](auth/index);
-* [compression](compression/index);
-* [load balancing](load_balancing/index);
-* [metrics](metrics/index);
+* [address translation](address_resolution/);
+* [authentication](auth/);
+* [compression](compression/);
+* [load balancing](load_balancing/);
+* [metrics](metrics/);
 * low-level [Netty configuration][NettyOptions];
 * [query options][QueryOptions];
-* [reconnections](reconnection/index);
-* [retries](retries/index);
-* [socket options](socket_options/index);
-* [SSL](ssl/index);
-* [speculative executions](speculative_execution/index);
-* [query timestamps](query_timestamps/index).
+* [reconnections](reconnection/);
+* [retries](retries/);
+* [socket options](socket_options/);
+* [SSL](ssl/);
+* [speculative executions](speculative_execution/);
+* [query timestamps](query_timestamps/).
 
 In addition, you can register various types of listeners to be notified of cluster events; see [Host.StateListener],
 [LatencyTracker], and [SchemaChangeListener].
@@ -98,8 +98,8 @@ The initialization sequence is the following:
 * try to connect to each of the contact points in sequence. The order is not deterministic (in fact, the driver shuffles
   the list to avoid hotspots if a large number of clients share the same contact points). If no contact point replies,
   a [NoHostAvailableException] is thrown and the process stops here;
-* otherwise, the successful contact point is elected as the [control host](control_connection/index). The driver negotiates
-  the [native protocol version](native_protocol/index) with it, and queries its system tables to discover the addresses of
+* otherwise, the successful contact point is elected as the [control host](control_connection/). The driver negotiates
+  the [native protocol version](native_protocol/) with it, and queries its system tables to discover the addresses of
   the other hosts.
 
 Note that, at this stage, only the control connection has been established. Connections to other hosts will only be
@@ -124,7 +124,7 @@ session.execute("select * from otherKeyspace.otherTable where id = 1");
 ```
 
 You might be tempted to open a separate session for each keyspace used in your application; however, note that
-[connection pools](pooling/index) are created at the session level, so each new session will consume additional system
+[connection pools](pooling/) are created at the session level, so each new session will consume additional system
 resources:
 
 ```java
@@ -133,7 +133,7 @@ Session session1 = cluster.connect("ks1");
 Session session2 = cluster.connect("ks2");
 ```
 
-Also, there is currently a [known limitation](async/index#known-limitations) with named sessions, that causes the driver to
+Also, there is currently a [known limitation](async/#known-limitations) with named sessions, that causes the driver to
 unexpectedly block the calling thread in certain circumstances; if you use a fully asynchronous model, you should use a
 session with no keyspace.
 
@@ -164,7 +164,7 @@ ResultSet rs = session.execute("select release_version from system.local");
 ```
 
 As shown here, the simplest form is to pass a query string directly. You can also pass an instance of
-[Statement](statements/index).
+[Statement](statements/).
 
 #### Processing rows
 
@@ -179,7 +179,7 @@ for (Row row : rs) {
 
 Note that this will return **all results** without limit (even though the driver might use multiple queries in the
 background). To handle large result sets, you might want to use a `LIMIT` clause in your CQL query, or use one of the
-techniques described in the [paging](paging/index) documentation.
+techniques described in the [paging](paging/) documentation.
 
 When you know that there is only one row (or are only interested in the first one), the driver provides a convenience
 method:
@@ -231,7 +231,7 @@ String firstName = row.getString("first_name");
     <tr> <td>varint</td> <td>getVarint</td> <td>java.math.BigInteger</td> </tr>
 </table>
 
-In addition to these default mappings, you can register your own types with [custom codecs](custom_codecs/index).
+In addition to these default mappings, you can register your own types with [custom codecs](custom_codecs/).
 
 ##### Primitive types
 
@@ -280,7 +280,7 @@ for (ColumnDefinitions.Definition definition : row.getColumnDefinitions()) {
 ### Object mapping
 
 Besides explicit work with queries and rows, you can also use
-[Object Mapper](object_mapper/index) to simplify retrieval & store of your data.
+[Object Mapper](object_mapper/) to simplify retrieval & store of your data.
 
 
 ### More information

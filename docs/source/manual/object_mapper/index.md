@@ -17,9 +17,9 @@ The mapper is published as a separate Maven artifact:
 
 See the child pages for more information:
 
-* [definition of mapped classes](creating/index)
-* [using the mapper](using/index)
-* [using custom codecs](custom_codecs/index)
+* [definition of mapped classes](creating/)
+* [using the mapper](using/)
+* [using custom codecs](custom_codecs/)
 
 ```eval_rst
 .. toctree::

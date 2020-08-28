@@ -2,10 +2,10 @@
 
 ### How do I implement paging?
 
-When using [native protocol](../manual/native_protocol/index) version 2 or
+When using [native protocol](../manual/native_protocol/) version 2 or
 higher, the driver automatically pages large result sets under the hood.
 You can also save the paging state to resume iteration later. See [this
-page](../manual/paging/index) for more information.
+page](../manual/paging/) for more information.
 
 Native protocol v1 does not support paging, but you can emulate it in
 CQL with `LIMIT` and the `token()` function. See
@@ -49,7 +49,7 @@ session.execute( "INSERT INTO contacts (email, firstname, lastname)
       VALUES (?, ?, ?)", "clint.barton@hawkeye.com", "Barney", "Barton");
 ```
 
-See [Simple statements](../manual/statements/simple/index) for more information.
+See [Simple statements](../manual/statements/simple/) for more information.
 
 
 ### Does a parameterized statement escape parameters?
@@ -69,7 +69,7 @@ the way that the parameters are sent. The difference is that a prepared statemen
 * sends only the statement id and its parameters (thus reducing the amount of data sent
   to the cluster)
 
-See [Prepared statements](../manual/statements/prepared/index) for more information.
+See [Prepared statements](../manual/statements/prepared/) for more information.
 
 
 ### Can I combine `PreparedStatements` and normal statements in a batch?
@@ -96,7 +96,7 @@ is currently no mechanism for Cassandra to invalidate the existing metadata.  Be
 the driver is not able to properly react to these changes and will improperly read rows after
 a schema change is made.
 
-See [Prepared statements](../manual/statements/prepared/index) for more information.
+See [Prepared statements](../manual/statements/prepared/) for more information.
 
 
 ### Can I get the raw bytes of a text column?
@@ -135,7 +135,7 @@ Keep in mind that if your code iterates the `ResultSet` entirely, the driver may
 run additional background queries to fetch the rest of the data. The fetch size
 only affects what is retrieved at a time, not the overall number of rows.
 
-See [Paging](../manual/paging/index) for more information.
+See [Paging](../manual/paging/) for more information.
 
 
 ### What's the difference between using `setFetchSize()` and `LIMIT`?
@@ -147,7 +147,7 @@ For example, if you limit is 30 and your fetch size is 10, the `ResultSet` will 
 30 rows, but under the hood the driver will perform 3 requests that will transfer 10
 rows each.
 
-See [Paging](../manual/paging/index) for more information.
+See [Paging](../manual/paging/) for more information.
 
 
 ### I'm reading a BLOB column and the driver returns incorrect data.
@@ -162,7 +162,7 @@ See [Blobs.java] in the `driver-examples` module for some examples and explanati
 
 ### How do I use the driver in an OSGi application?
 
-Read our [OSGi-specific FAQ section](osgi/index) to find out.
+Read our [OSGi-specific FAQ section](osgi/) to find out.
 
 
 ### Why am I seeing messages about `tombstone_warn_threshold` or `tombstone_fail_threshold` being exceeded in my Cassandra logs?
@@ -291,9 +291,9 @@ an update with compatibility to this driver version.
 
 [Blobs.java]: https://github.com/datastax/java-driver/tree/3.10.0/driver-examples/src/main/java/com/datastax/driver/examples/datatypes/Blobs.java
 [CASSANDRA-7304]: https://issues.apache.org/jira/browse/CASSANDRA-7304
-[Parameters and Binding]: ../manual/statements/prepared/index#parameters-and-binding
-[Mapper options]: ../manual/object_mapper/using/index#mapper-options
-[Acquisition queue]: ../manual/pooling/index#acquisition-queue
+[Parameters and Binding]: ../manual/statements/prepared/#parameters-and-binding
+[Mapper options]: ../manual/object_mapper/using/#mapper-options
+[Acquisition queue]: ../manual/pooling/#acquisition-queue
 [Semaphore]: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Semaphore.html
 [Futures.allAsList]: https://google.github.io/guava/releases/19.0/api/docs/com/google/common/util/concurrent/Futures.html#allAsList(java.lang.Iterable)
 [DynaTrace]: https://www.dynatrace.com/

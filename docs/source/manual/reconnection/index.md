@@ -3,9 +3,9 @@
 If the driver loses a connection to a node, it tries to re-establish it according to a configurable
 policy. This is used in two places:
 
-* [connection pools](../pooling/index): for each node, a session has a fixed-size pool of connections to
+* [connection pools](../pooling/): for each node, a session has a fixed-size pool of connections to
   execute user requests. If a node is detected as down, a reconnection is started.
-* [control connection](../control_connection/index): a session uses a single connection to an arbitrary
+* [control connection](../control_connection/): a session uses a single connection to an arbitrary
   node for administrative requests. If that connection goes down, a reconnection gets started; each
   attempt iterates through all active nodes until one of them accepts a connection. This goes on
   until we have a control node again.

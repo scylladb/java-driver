@@ -74,6 +74,6 @@ composing the *Clustering Column*, but there can be others if the Thrift's Colum
 is a CompositeType).
 
 Here is the basic architectural concept of *CQL*, a detailed explanation and *CQL*
-examples can be found in this article : [http://www.planetcassandra.org/making-the-change-from-thrift-to-cql/](http://www.planetcassandra.org/making-the-change-from-thrift-to-cql/index).
+examples can be found in this article : [http://www.planetcassandra.org/making-the-change-from-thrift-to-cql/](http://www.planetcassandra.org/making-the-change-from-thrift-to-cql/).
 Understanding the *CQL* abstraction plays a key role in developing performing
 and scaling applications.

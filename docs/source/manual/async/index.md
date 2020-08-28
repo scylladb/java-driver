@@ -48,7 +48,7 @@ If you consume a `ResultSet` in a callback, be aware that iterating the
 rows will trigger synchronous queries as you page through the results.
 To avoid this, use [getAvailableWithoutFetching] to limit the iteration
 to the current page, and [fetchMoreResults] to get a future to the next
-page (see also the section on [paging](../paging/index)).
+page (see also the section on [paging](../paging/)).
 Here is a full example:
 
 [getAvailableWithoutFetching]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/ResultSet.html#getAvailableWithoutFetching--

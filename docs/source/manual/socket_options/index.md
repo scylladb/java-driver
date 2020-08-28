@@ -71,8 +71,8 @@ session.execute(
 Do not set the read timeout too low, or the driver might give up on requests that had a chance of succeeding.
 
 If the timeout is reached, the driver will receive an [OperationTimedOutException], and invoke [onRequestError] on the
-[retry policy](../retries/index) to decide what to do (the default is to retry on the next node in the
-[query plan](../load_balancing/index#query-plan)).
+[retry policy](../retries/) to decide what to do (the default is to retry on the next node in the
+[query plan](../load_balancing/#query-plan)).
 
 #### Limiting overall query time
 
@@ -97,22 +97,22 @@ ResultSet execute(Statement statement, long timeout, TimeUnit unit)
 }
 ```
 
-A complementary approach is to enable [speculative executions](../speculative_execution/index), to have the driver query
+A complementary approach is to enable [speculative executions](../speculative_execution/), to have the driver query
 multiple nodes in parallel. This way you won't have to wait for the full timeout if the first node is unresponsive.
 
 #### Driver read timeout vs. server read timeout
 
 Unfortunately, the term "read timeout" clashes with another concept that is not directly related: a Cassandra node may
-reply with a [READ_TIMEOUT](../retries/index#on-read-timeout) error when it didn't hear back from enough replicas during a
+reply with a [READ_TIMEOUT](../retries/#on-read-timeout) error when it didn't hear back from enough replicas during a
 read query.
 
 To clarify:
 
 * **driver read timeout:** the driver did not receive any response from the current coordinator within
-  `SocketOptions.setReadTimeoutMillis`. It invokes [onRequestError] on the [retry policy](../retries/index) with an
+  `SocketOptions.setReadTimeoutMillis`. It invokes [onRequestError] on the [retry policy](../retries/) with an
   [OperationTimedOutException] to decide what to do.
 * **server read timeout:** the driver *did* receive a response, but that response indicates that the coordinator timed
-  out while waiting for other replicas. It invokes [onReadTimeout] on the [retry policy](../retries/index) to decide what to
+  out while waiting for other replicas. It invokes [onReadTimeout] on the [retry policy](../retries/) to decide what to
   do.
 
 We might rename `SocketOptions.setReadTimeoutMillis` in a future version to clear up any confusion.

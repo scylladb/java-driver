@@ -17,7 +17,7 @@ session.execute("INSERT INTO my_table(c1, c2) values (1, 1) " +
 ### Client-side generation
 
 This is enabled by default if you're using the driver 3.0+ and a version
-of Cassandra that supports [native protocol](../native_protocol/index) v3 or
+of Cassandra that supports [native protocol](../native_protocol/) v3 or
 above.
 
 The driver will use a [TimestampGenerator] to generate a timestamp for each query, and send it
@@ -60,7 +60,7 @@ property `com.datastax.driver.USE_NATIVE_CLOCK` is explicitly set to `false`.
 To check what's available on your system:
 
 * make sure your `Cluster` uses a `TimestampGenerator`;
-* [configure your logging framework](../logging/index) to use level `INFO` for the category
+* [configure your logging framework](../logging/) to use level `INFO` for the category
   `com.datastax.driver.core.ClockFactory`;
 * look for one of the following messages at startup:
 

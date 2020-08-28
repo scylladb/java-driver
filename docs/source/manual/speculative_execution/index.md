@@ -63,7 +63,7 @@ sections cover the practical details and how to enable them.
 
 ### Query idempotence
 
-If a query is [not idempotent](../idempotence/index), the driver will never schedule speculative executions for it, because
+If a query is [not idempotent](../idempotence/), the driver will never schedule speculative executions for it, because
 there is no way to guarantee that only one node will apply the mutation.
 
 ### Enabling speculative executions
@@ -157,7 +157,7 @@ Cluster cluster = Cluster.builder()
 ```
 
 Note that `PercentileTracker` may also be used with a slow query
-logger (see the [Logging](../logging/index) section). In that case, you would
+logger (see the [Logging](../logging/) section). In that case, you would
 create a single tracker object and share it with both components.
 
 [PercentileSpeculativeExecutionPolicy]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/PercentileSpeculativeExecutionPolicy.html
@@ -173,7 +173,7 @@ As with all policies, you are free to provide your own by implementing
 
 ### How speculative executions affect retries
 
-Turning speculative executions on doesn't change the driver's [retry](../retries/index) behavior. Each
+Turning speculative executions on doesn't change the driver's [retry](../retries/) behavior. Each
 parallel execution will trigger retries independently:
 
 ```ditaa
@@ -286,5 +286,5 @@ The workaround is to use a timestamp with your queries:
     insert into my_table (k, v) values (1, 1) USING TIMESTAMP 1432764000;
 
 If you're using native protocol v3, you can also enable [client-side
-timestamps](../query_timestamps/index#client-side-generation) to have this done
+timestamps](../query_timestamps/#client-side-generation) to have this done
 automatically.

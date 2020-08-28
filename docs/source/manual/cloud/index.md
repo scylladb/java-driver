@@ -103,4 +103,4 @@ interacting with any other Cassandra cluster. The exceptions being:
 [Access an Apollo database - AWS]: https://helpdocs.datastax.com/aws/dscloud/apollo/dscloudShareClusterDetails.html
 [Download the secure connect bundle - GCP]: https://helpdocs.datastax.com/gcp/dscloud/apollo/dscloudObtainingCredentials.html
 [Download the secure connect bundle - AWS]: https://helpdocs.datastax.com/aws/dscloud/apollo/dscloudObtainingCredentials.html
-[pom.xml dependency]: ../../index#getting-the-driver
+[pom.xml dependency]: ../../#getting-the-driver

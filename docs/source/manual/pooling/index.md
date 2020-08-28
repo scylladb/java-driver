@@ -22,11 +22,11 @@ connection to handle multiple simultaneous requests:
 You don't need to manage connections yourself. You simply interact with a `Session` object, which takes care of it.
 
 **For each `Session`, there is one connection pool per connected host** (a host is connected when it is up and
-not ignored by the [load balancing policy](../load_balancing/index)).
+not ignored by the [load balancing policy](../load_balancing/)).
 
 The number of connections per pool is configurable (this will be
 described in the next section).  The number of stream ids depends on the
-[native protocol version](../native_protocol/index):
+[native protocol version](../native_protocol/):
 
 * protocol v2 or below: 128 stream ids per connection.
 * protocol v3 or above: up to 32768 stream ids per connection.
@@ -198,7 +198,7 @@ Two options control that queue: a maximum size ([PoolingOptions.setMaxQueueSize]
 * otherwise, the attempt is enqueued; if a connection becomes available before `poolTimeoutMillis` has elapsed,
   then the attempt succeeds, otherwise it is rejected.
 
-If the attempt is rejected, the driver will move to the next host in the [query plan](../load_balancing/index#query-plan),
+If the attempt is rejected, the driver will move to the next host in the [query plan](../load_balancing/#query-plan),
 and try to acquire a connection again.
 
 If all hosts are busy with a full queue, the request will fail with a

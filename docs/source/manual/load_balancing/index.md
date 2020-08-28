@@ -38,8 +38,8 @@ For each host, the policy computes a **[distance][HostDistance]** that determine
 to it:
 
 * `LOCAL` and `REMOTE` are "active" distances, meaning that the driver will keep open connections to the host. They
-  differ in the number of connections opened, depending on your [pooling options](../pooling/index). Also, the
-  [control connection](../control_connection/index) will  favor local nodes if possible.
+  differ in the number of connections opened, depending on your [pooling options](../pooling/). Also, the
+  [control connection](../control_connection/) will  favor local nodes if possible.
 * `IGNORED`, as the name suggests, means that the driver will not attempt to connect.
 
 Typically, the distance will reflect network topology (e.g. local vs. remote datacenter), although that is entirely up
@@ -57,8 +57,8 @@ cluster.getConfiguration().getPoolingOptions().refreshConnectedHost(host);
 #### Query plan
 
 Each time the driver executes a query, it asks the policy to compute a **query plan**, which is a list of hosts. The
-driver will then try each host in sequence, according to the [retry policy](../retries/index) and
-[speculative execution policy](../speculative_execution/index).
+driver will then try each host in sequence, according to the [retry policy](../retries/) and
+[speculative execution policy](../speculative_execution/).
 
 The contents and order of query plans are entirely up to your policy, but implementations typically return plans that:
 
@@ -108,7 +108,7 @@ Cluster cluster = Cluster.builder()
 This policy queries nodes of the local data-center in a round-robin fashion.
 
 Call `withLocalDc` to specify the name of your local datacenter. You can also leave it out, and the driver will use the
-datacenter of the first contact point that was reached [at initialization](../index#cluster-initialization). However,
+datacenter of the first contact point that was reached [at initialization](../#cluster-initialization). However,
 remember that the driver shuffles the initial list of contact points, so this assumes that all contact points are in the
 local datacenter. In general, providing the datacenter name explicitly is a safer option.
 
@@ -144,7 +144,7 @@ CREATE TABLE testKs.sensor_data(id int, year int, ts timestamp, data double,
                                 PRIMARY KEY ((id, year), ts));
 ```
 
-For [simple statements](../statements/simple/index), routing information can never be computed automatically:
+For [simple statements](../statements/simple/), routing information can never be computed automatically:
 
 ```java
 SimpleStatement statement = new SimpleStatement(
@@ -166,7 +166,7 @@ statement.setRoutingKey(
 session.execute(statement);
 ```
 
-For [built statements](../statements/built/index), the keyspace is available if it was provided while building the query; the
+For [built statements](../statements/built/), the keyspace is available if it was provided while building the query; the
 routing key is available only if the statement was built using the table metadata, and all components of the partition
 key appear in the query:
 
@@ -192,7 +192,7 @@ assert statement2.getKeyspace() != null;
 assert statement2.getRoutingKey() == null;
 ```
 
-For [bound statements](../statements/prepared/index), the keyspace is always available; the routing key is only available if
+For [bound statements](../statements/prepared/), the keyspace is always available; the routing key is only available if
 all components of the partition key are bound as variables:
 
 ```java
@@ -211,7 +211,7 @@ assert statement2.getKeyspace() != null;
 assert statement2.getRoutingKey() == null;
 ```
 
-For [batch statements](../statements/batch/index), the routing information of each child statement is inspected; the first
+For [batch statements](../statements/batch/), the routing information of each child statement is inspected; the first
 non-null keyspace is used as the keyspace of the batch, and the first non-null routing key as its routing key (the idea
 is that all childs should have the same routing information, since batches are supposed to operate on a single
 partition). All children might have null information, in which case you need to provide the information manually as

@@ -1,6 +1,6 @@
 # Using custom codecs
 
-The mapper can take advantage of [custom codecs](../../custom_codecs/index)
+The mapper can take advantage of [custom codecs](../../custom_codecs/)
 to apply custom conversions to mapped columns and fields.
 
 ## Declaring codecs
@@ -106,9 +106,9 @@ This also works with [@Field][field] and [@Param][param] annotations.
 ## Implicit UDT codecs
 
 The mapper uses custom codecs internally to handle UDT conversions: when
-you register an [entity](../using/index#entity-mappers), the mapper inspects
+you register an [entity](../using/#entity-mappers), the mapper inspects
 the type of all fields to find classes annotated with
-[@UDT](../creating/index#mapping-user-types) (this works recursively with
+[@UDT](../creating/#mapping-user-types) (this works recursively with
 nested UDTs and collections). For each class, the mapper creates a codec
 and registers it with the underlying `Cluster`.
 

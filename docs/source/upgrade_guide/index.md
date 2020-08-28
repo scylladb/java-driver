@@ -125,7 +125,7 @@ queries that were retried before).
 
 In 3.1.0, the default is now to **not retry** after a write timeout or request error if the statement is not idempotent.
 This is handled internally, the retry policy methods are not even invoked in those cases (and therefore
-`IdempotenceAwareRetryPolicy` has been deprecated). See the manual section about [retries](../manual/retries/index) for more
+`IdempotenceAwareRetryPolicy` has been deprecated). See the manual section about [retries](../manual/retries/) for more
 information.
 
 In practice, here's what upgrading to 3.1.0 means for you:
@@ -135,7 +135,7 @@ In practice, here's what upgrading to 3.1.0 means for you:
 * otherwise, you might want to review how your code positions the `setIdempotent` flag on statements. In most cases the
   driver can't compute in automatically (because it doesn't parse query strings), so it takes a conservative approach
   and sets it to `false` by default. If you know the query is idempotent, you should set it to `true` manually. See the
-  [query idempotence](../manual/idempotence/index) section of the manual.
+  [query idempotence](../manual/idempotence/) section of the manual.
 
 The driver logs a warning the first time it ignores a non-idempotent request; this warning will be removed in version
 3.2.0.
@@ -166,7 +166,7 @@ The main changes were introduced by the custom codecs feature (see below).
 We've also seized the opportunity to remove code that was deprecated in 2.1.
 
 1.  The default consistency level in `QueryOptions` is now `LOCAL_ONE`.
-2.  [Custom codecs](../manual/custom_codecs/index)
+2.  [Custom codecs](../manual/custom_codecs/)
     ([JAVA-721](https://datastax-oss.atlassian.net/browse/JAVA-721))
     introduce several breaking changes and also modify a few runtime behaviors.
 
@@ -230,7 +230,7 @@ We've also seized the opportunity to remove code that was deprecated in 2.1.
     corresponding method `MappingManager#udtMapper`.
 
     The mapper now uses custom codecs to convert UDTs. See more
-    explanations [here](../manual/object_mapper/custom_codecs/index#implicit-udt-codecs).
+    explanations [here](../manual/object_mapper/custom_codecs/#implicit-udt-codecs).
 
 5.  All methods that took the protocol version as an `int` or assumed a
     default version have been removed (they were already deprecated in
@@ -289,9 +289,9 @@ We've also seized the opportunity to remove code that was deprecated in 2.1.
     callback methods (`onUp`, `onDown`, etc.) have been duplicated. This
     is unlikely to affect clients.
 
-12. [Client-side timestamp generation](../manual/query_timestamps/index) is
+12. [Client-side timestamp generation](../manual/query_timestamps/) is
     now the default (provided that [native
-    protocol](../manual/native_protocol/index) v3 or higher is in use). The
+    protocol](../manual/native_protocol/) v3 or higher is in use). The
     generator used is `AtomicMonotonicTimestampGenerator`.
 
 13. If a DNS name resolves to multiple A-records,
@@ -300,7 +300,7 @@ We've also seized the opportunity to remove code that was deprecated in 2.1.
     maintaining contact points in DNS configuration, and having a single,
     static contact point in your Java code.
 
-14. The following methods were added for [Custom payloads](../manual/custom_payloads/index):
+14. The following methods were added for [Custom payloads](../manual/custom_payloads/):
     * in `PreparedStatement`: `getIncomingPayload()`,
       `getOutgoingPayload()` and
       `setOutgoingPayload(Map<String,ByteBuffer>)`
@@ -425,7 +425,7 @@ We've also seized the opportunity to remove code that was deprecated in 2.1.
 
 29. `SSLOptions` has been refactored to allow the option to choose between JDK and Netty-based
     SSL implementations.  See [JAVA-841](https://datastax-oss.atlassian.net/browse/JAVA-841) and
-    the [SSL documentation](../manual/ssl/index) for more details.
+    the [SSL documentation](../manual/ssl/) for more details.
 
 
 ### 2.1.8
@@ -463,7 +463,7 @@ binary compatibility.
     ones.
 
     Also, note that the connection pool for protocol v3 can now be configured to
-    use multiple connections. See [this page](../manual/pooling/index) for more
+    use multiple connections. See [this page](../manual/pooling/) for more
     information.
 
 3. `MappingManager(Session)` will now force the initialization of the `Session`
@@ -632,7 +632,7 @@ The following might also be of interest:
    default like in previous versions.
 
 3. Netty is not shaded anymore in the default Maven artifact. However we publish a
-   [shaded artifact](../manual/shaded_jar/index) under a different classifier.
+   [shaded artifact](../manual/shaded_jar/) under a different classifier.
 
 4. The internal initialization sequence of the Cluster object has been slightly changed:
    some fields that were previously initialized in the constructor are now set when
@@ -687,7 +687,7 @@ you have trouble compiling your application after an upgrade.
 
 5. The `Metrics` class now uses the Codahale metrics library version 3 (version 2 was
    used previously). This new major version of the library has many API changes
-   compared to its version 2 (see the [release notes](https://dropwizard.github.io/metrics/3.1.0/about/release-notes/index) for details),
+   compared to its version 2 (see the [release notes](https://dropwizard.github.io/metrics/3.1.0/about/release-notes/) for details),
    which can thus impact consumers of the Metrics class.
    Furthermore, the default `JmxReporter` now includes a name specific to the
    cluster instance (to avoid conflicts when multiple Cluster instances are created

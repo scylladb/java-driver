@@ -10,7 +10,7 @@ invalid queries.
 Queries built with `QueryBuilder` are executed the same way as other queries--via
 `execute` or `executeAsync`.  When a query is built with inlined values, then it doesn't
 differ much from a statement specified as a string.  But it's also possible to build
-the query with bind markers inside it, and then convert it into a [prepared statement](../prepared/index).
+the query with bind markers inside it, and then convert it into a [prepared statement](../prepared/).
 
 ### Basics
 
@@ -24,7 +24,7 @@ a [TableMetadata] object.
 
 Note: The `QueryBuilder` doesn't provide support for the full set of CQL.  For
 most of DDL operations (`CREATE TABLE`, etc.) you can use the [SchemaBuilder].  To perform other
-operations, for example, for role management, you still need to use [simple statements](../simple/index).
+operations, for example, for role management, you still need to use [simple statements](../simple/).
 
 ### Selecting data
 
@@ -238,7 +238,7 @@ conditional deletes with `ifExists` & `onlyIf`.
 ### Prepared statements
 
 If you're repeating the same operation very often, the more effective way will be to
-create a [prepared statement](../prepared/index) from the `BuiltStatement`. To do this, instead
+create a [prepared statement](../prepared/) from the `BuiltStatement`. To do this, instead
 of the real values, use bind markers created either by calling `bindMarker` (which generates
 a positional placeholder), or by calling `bindMarker("name")` (which creates a named
 placeholder).  After the statement is generated, just prepare it as usual, then bind, and

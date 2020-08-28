@@ -73,7 +73,17 @@ extensions = [
 source_suffix = ['.rst', '.md']
 autosectionlabel_prefix_document = True
 
+def replace_relative_links(app, docname, source):
+    result = source[0]
+    for key in app.config.replacements:
+        result = result.replace(key, app.config.replacements[key])
+    source[0] = result
+
 def setup(app):
+    replacements = {"/)" : "/index)", "/#": "/index#"}
+    app.add_config_value('replacements', replacements, True)
+    app.connect('source-read', replace_relative_links)
+
     app.add_config_value('recommonmark_config', {
         'enable_eval_rst': True,
         'enable_auto_toc_tree': False,

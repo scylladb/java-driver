@@ -5,7 +5,7 @@ connections.
 
 * for contact points, these are provided as part of configuring the `Cluster` object;
 * for other nodes, addresses will be discovered dynamically, either by inspecting `system.peers` on already connected
-  nodes, or via push notifications received from the [control host](../control_connection/index) when new nodes are discovered
+  nodes, or via push notifications received from the [control host](../control_connection/) when new nodes are discovered
   by gossip.
 
 

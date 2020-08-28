@@ -20,7 +20,7 @@ environment; please refer to our [OSGi examples repository].
 
 ## Troubleshooting OSGi applications
 
-Please read our [OSGi-specific FAQ section](../../faq/osgi/index) to find tips
+Please read our [OSGi-specific FAQ section](../../faq/osgi/) to find tips
 for troubleshooting OSGi applications.
 
 [OSGi]:https://www.osgi.org

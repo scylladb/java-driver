@@ -33,7 +33,7 @@ that the *Java driver* has categorized in multiple *Option* and *Policy* kinds.
 
 ### Connections pools internals
 Everything concerning the internal pools of connections to the *Cassandra nodes*
-will be gathered in the Java driver in the [`PoolingOptions`](../../../manual/pooling/index):
+will be gathered in the Java driver in the [`PoolingOptions`](../../../manual/pooling/):
 
 *Astyanax*:
 
@@ -55,11 +55,11 @@ The first number is the initial number of connections, the second is the maximum
 of connections the driver is allowed to create for each host.
 
 Note that the *Java driver* allows multiple simultaneous requests on one single
-connection, as it is based upon the [*Native protocol*](../../../manual/native_protocol/index),
+connection, as it is based upon the [*Native protocol*](../../../manual/native_protocol/),
 an asynchronous binary protocol that can handle up to 32768 simultaneous requests on a 
 single connection. The Java driver is able to manage and distribute simultaneous requests
 by itself even under high contention, and changing the default `PoolingOptions` is not
-necessary most of the time except for very [specific use cases](../../../manual/pooling/index#tuning-protocol-v3-for-very-high-throughputs).
+necessary most of the time except for very [specific use cases](../../../manual/pooling/#tuning-protocol-v3-for-very-high-throughputs).
 
 ### Timeouts
 
@@ -136,12 +136,12 @@ query needs to have the *Row key* specified explicitly on a `Statement` in order
 to benefit from the *TokenAware* routing (the *Row key* in the *Java driver* is 
 referenced as *Routing Key*), unlike the *Astyanax* driver. 
 Some differences occur related to the different kinds of `Statements` the *Java
-driver* provides. Please see [this link](../../../manual/load_balancing/index#token-aware-policy) 
+driver* provides. Please see [this link](../../../manual/load_balancing/#token-aware-policy) 
 for specific information.
 
 Custom load balancing policies can easily be implemented by users, and supplied to 
 the *Java driver* for specific use cases. All information necessary is available
-in the [Load balaning policies docs](../../../manual/load_balancing/index).
+in the [Load balaning policies docs](../../../manual/load_balancing/).
 
 ## Consistency levels
 Consistency levels can be set per-statement, or globally through the `QueryOptions`.
@@ -169,7 +169,7 @@ Level can be set per-statement, you can either set it on every statement, or use
 this case, setting the CL on the `PreparedStatement`, causes the `BoundStatements` to 
 inherit the CL from the prepared statements they were prepared from. More
 informations about how `Statement`s work in the *Java driver* are detailed
-in the [“Queries and Results” section](../queries_and_results/index).
+in the [“Queries and Results” section](../queries_and_results/).
 
 
 ## Authentication
@@ -193,7 +193,7 @@ AuthProvider authProvider = new PlainTextAuthProvider("username", "password");
 ```
 
 The class `AuthProvider` can be easily implemented to suit the user’s needs,
-documentation about the classes needed is [available there](../../../manual/auth/index).
+documentation about the classes needed is [available there](../../../manual/auth/).
 
 ## Hosts and ports
 
@@ -247,8 +247,8 @@ A few best practices are summed up in [this blog post](http://www.datastax.com/d
 Concerning connection pools, the Java driver’s default settings should allow 
 most of the users to get the best out of the driver in terms of throughput, 
 they have been thoroughly tested and tweaked to accommodate the users’ needs. 
-If one still wishes to change those, first [Monitoring the pools](../../../manual/pooling/index#monitoring-and-tuning-the-pool) is
-advised, then a [deep dive in the Pools management mechanism](../../../manual/pooling/index) should
+If one still wishes to change those, first [Monitoring the pools](../../../manual/pooling/#monitoring-and-tuning-the-pool) is
+advised, then a [deep dive in the Pools management mechanism](../../../manual/pooling/) should
 provide enough insight.
 
 A lot more options are available in the different `XxxxOption`s classes, policies are

@@ -8,7 +8,7 @@ example:
 * `update my_table set list_col = [1] + list_col where pk = 1` is not idempotent: if `list_col` was initially empty,
   it will contain `[1]` after the first execution, `[1, 1]` after the second, etc.
 
-Idempotence matters for [retries](../retries/index) and [speculative query executions](../speculative_execution/index). The driver
+Idempotence matters for [retries](../retries/) and [speculative query executions](../speculative_execution/). The driver
 will bypass those features if the [Statement#isIdempotent()][isIdempotent] flag is set to `false`, to ensure that the
 statement does not get executed more than once.
 

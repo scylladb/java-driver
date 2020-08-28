@@ -37,7 +37,7 @@ client                             driver                Cassandra
 ```
 
 If you execute the same query often (or a similar query with different column values), consider a
-[prepared statement](../prepared/index) instead.
+[prepared statement](../prepared/) instead.
 
 
 ### Using values
@@ -85,7 +85,7 @@ session.execute(
 ### Value type inference
 
 Another consequence of not parsing query strings is that the driver has to make a guess on how to serialize values,
-based on their Java type (see the [default type mappings](../../index#cql-to-java-type-mapping)). This can be tricky, in
+based on their Java type (see the [default type mappings](../../#cql-to-java-type-mapping)). This can be tricky, in
 particular for numeric types:
 
 ```java

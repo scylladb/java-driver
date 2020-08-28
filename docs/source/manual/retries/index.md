@@ -174,9 +174,9 @@ implementations to handle idempotence (the new behavior is equivalent to what yo
 [AlreadyExistsException]:               https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/AlreadyExistsException.html
 [TruncateException]:                    https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/TruncateException.html
 
-[query plan]: ../load_balancing/index#query-plan
+[query plan]: ../load_balancing/#query-plan
 [connection pool]: ../pooling/index
-[prepared]: ../statements/prepared/index#preparing-on-multiple-nodes/index
-[driver read timeout]: ../socket_options/index#driver-read-timeout/index
+[prepared]: ../statements/prepared/#preparing-on-multiple-nodes/index
+[driver read timeout]: ../socket_options/#driver-read-timeout/index
 [hinted handoffs]: https://docs.datastax.com/en/cassandra/2.1/cassandra/dml/dml_about_hh_c.html?scroll=concept_ds_ifg_jqx_zj__performance
 [idempotence]: ../idempotence/index
