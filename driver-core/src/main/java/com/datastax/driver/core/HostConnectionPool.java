@@ -36,6 +36,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -696,14 +697,24 @@ class HostConnectionPool implements Connection.Owner {
         newConnection = sharedState.getConnection(shardId);
         if (newConnection == null) {
           int shardCount = 1;
-          int port = 0;
-          if (host.getShardingInfo() != null) {
-            shardCount = host.getShardingInfo().getShardsCount();
-            port = getAvailablePortForShard(shardCount, shardId, 100);
+          int localPort = 0;
+          InetSocketAddress serverAddress = host.getEndPoint().resolve();
+          int serverPort = serverAddress.getPort();
+          ShardingInfo shardingInfo = host.getShardingInfo();
+          if (shardingInfo != null) {
+            shardCount = shardingInfo.getShardsCount();
+            localPort = getAvailablePortForShard(shardCount, shardId, 100);
+            if (shardingInfo.getShardAwarePort() != 0) {
+              serverPort = shardingInfo.getShardAwarePort();
+            }
           }
           logger.debug(
-              "Creating new connection to {} for shard {} with local port {}", host, shardId, port);
-          newConnection = manager.connectionFactory().open(this, port);
+              "Creating new connection to {}:{} for shard {} with local port {}",
+              serverAddress.getAddress().getHostAddress(),
+              serverPort,
+              shardId,
+              localPort);
+          newConnection = manager.connectionFactory().open(this, localPort, serverPort);
           if (newConnection.shardId() == shardId) {
             newConnection.setKeyspace(manager.poolsState.keyspace);
           } else {

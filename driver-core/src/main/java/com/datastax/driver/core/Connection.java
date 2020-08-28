@@ -164,10 +164,10 @@ class Connection {
   }
 
   ListenableFuture<Void> initAsync() {
-    return initAsync(0);
+    return initAsync(0, 0);
   }
 
-  ListenableFuture<Void> initAsync(int localPort) {
+  ListenableFuture<Void> initAsync(int localPort, int serverPort) {
     if (factory.isShutdown)
       return Futures.immediateFailedFuture(
           new ConnectionException(endPoint, "Connection factory is shut down"));
@@ -194,8 +194,12 @@ class Connection {
                   ? factory.manager.metrics
                   : null));
 
-      ChannelFuture future =
-          bootstrap.connect(endPoint.resolve(), new InetSocketAddress(localPort));
+      InetSocketAddress serverAddress =
+          (serverPort == 0)
+              ? endPoint.resolve()
+              : new InetSocketAddress(endPoint.resolve().getAddress(), serverPort);
+
+      ChannelFuture future = bootstrap.connect(serverAddress, new InetSocketAddress(localPort));
 
       writer.incrementAndGet();
       future.addListener(
@@ -1097,16 +1101,16 @@ class Connection {
     Connection open(HostConnectionPool pool)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
-      return open(pool, 0);
+      return open(pool, 0, 0);
     }
 
-    Connection open(HostConnectionPool pool, int localPort)
+    Connection open(HostConnectionPool pool, int localPort, int serverPort)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
       pool.host.convictionPolicy.signalConnectionsOpening(1);
       Connection connection = new Connection(buildConnectionName(pool.host), pool.host, this, pool);
       try {
-        connection.initAsync(localPort).get();
+        connection.initAsync(localPort, serverPort).get();
         return connection;
       } catch (ExecutionException e) {
         throw launderAsyncInitException(e);
