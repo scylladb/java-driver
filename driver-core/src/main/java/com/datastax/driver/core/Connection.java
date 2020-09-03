@@ -67,9 +67,11 @@ import io.netty.util.TimerTask;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -246,20 +248,18 @@ class Connection {
     Executor initExecutor =
         factory.manager.configuration.getPoolingOptions().getInitializationExecutor();
 
-    ListenableFuture<Void> initializeTransportFuture =
+    ListenableFuture<Void> queryOptionsFuture =
         GuavaCompatibility.INSTANCE.transformAsync(
             channelReadyFuture, onChannelReady(protocolVersion, initExecutor), initExecutor);
 
-    ListenableFuture<Void> getShardingInfoFuture =
-        protocolVersion.isShardingSupported()
-            ? GuavaCompatibility.INSTANCE.transformAsync(
-                initializeTransportFuture, onTransportInitialized(initExecutor), initExecutor)
-            : initializeTransportFuture;
+    ListenableFuture<Void> initializeTransportFuture =
+        GuavaCompatibility.INSTANCE.transformAsync(
+            queryOptionsFuture, onOptionsReady(protocolVersion, initExecutor), initExecutor);
 
     // Fallback on initializeTransportFuture so we can properly propagate specific exceptions.
     ListenableFuture<Void> initFuture =
         GuavaCompatibility.INSTANCE.withFallback(
-            getShardingInfoFuture,
+            initializeTransportFuture,
             new AsyncFunction<Throwable, Void>() {
               @Override
               public ListenableFuture<Void> apply(Throwable t) throws Exception {
@@ -317,11 +317,60 @@ class Connection {
     return new AsyncFunction<Void, Void>() {
       @Override
       public ListenableFuture<Void> apply(Void input) throws Exception {
+        Future startupOptionsFuture = write(new Requests.Options());
+        return GuavaCompatibility.INSTANCE.transformAsync(
+            startupOptionsFuture, onOptionsResponse(initExecutor), initExecutor);
+      }
+    };
+  }
+
+  private AsyncFunction<Message.Response, Void> onOptionsResponse(final Executor initExecutor) {
+    return new AsyncFunction<Message.Response, Void>() {
+      @Override
+      public ListenableFuture<Void> apply(Message.Response response) throws Exception {
+        switch (response.type) {
+          case SUPPORTED:
+            Responses.Supported msg = (Supported) response;
+            ShardingInfo.ConnectionShardingInfo sharding =
+                ShardingInfo.parseShardingInfo(msg.supported);
+            if (sharding != null) {
+              host.setShardingInfo(sharding.shardingInfo);
+              Connection.this.shardId = sharding.shardId;
+            } else {
+              host.setShardingInfo(null);
+              Connection.this.shardId = 0;
+            }
+            LwtInfo lwt = LwtInfo.parseLwtInfo(msg.supported);
+            if (lwt != null) {
+              host.setLwtInfo(lwt);
+            }
+            return MoreFutures.VOID_SUCCESS;
+          default:
+            throw new TransportException(
+                address,
+                String.format(
+                    "Unexpected %s response message from server to a OPTIONS message",
+                    response.type));
+        }
+      }
+    };
+  }
+
+  private AsyncFunction<Void, Void> onOptionsReady(
+      final ProtocolVersion protocolVersion, final Executor initExecutor) {
+    return new AsyncFunction<Void, Void>() {
+      @Override
+      public ListenableFuture<Void> apply(Void input) throws Exception {
         ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
+        Map<String, String> extraOptions = new HashMap<String, String>();
+        LwtInfo lwtInfo = host.getLwtInfo();
+        if (lwtInfo != null) {
+          lwtInfo.addOption(extraOptions);
+        }
         Future startupResponseFuture =
             write(
                 new Requests.Startup(
-                    protocolOptions.getCompression(), protocolOptions.isNoCompact()));
+                    protocolOptions.getCompression(), protocolOptions.isNoCompact(), extraOptions));
         return GuavaCompatibility.INSTANCE.transformAsync(
             startupResponseFuture, onStartupResponse(protocolVersion, initExecutor), initExecutor);
       }
@@ -373,50 +422,6 @@ class Connection {
                 address,
                 String.format(
                     "Unexpected %s response message from server to a STARTUP message",
-                    response.type));
-        }
-      }
-    };
-  }
-
-  private AsyncFunction<Void, Void> onTransportInitialized(final Executor initExecutor) {
-    return new AsyncFunction<Void, Void>() {
-      @Override
-      public ListenableFuture<Void> apply(Void input) throws Exception {
-        Future shardingInfoResponseFuture = write(new Requests.Options());
-        return GuavaCompatibility.INSTANCE.transformAsync(
-            shardingInfoResponseFuture, onShardingInfoResponse(initExecutor), initExecutor);
-      }
-    };
-  }
-
-  private AsyncFunction<Message.Response, Void> onShardingInfoResponse(
-      final Executor initExecutor) {
-    return new AsyncFunction<Message.Response, Void>() {
-      @Override
-      public ListenableFuture<Void> apply(Message.Response response) throws Exception {
-        switch (response.type) {
-          case SUPPORTED:
-            Responses.Supported msg = (Supported) response;
-            ShardingInfo.ConnectionShardingInfo sharding =
-                ShardingInfo.parseShardingInfo(msg.supported);
-            if (sharding != null) {
-              host.setShardingInfo(sharding.shardingInfo);
-              Connection.this.shardId = sharding.shardId;
-            } else {
-              host.setShardingInfo(null);
-              Connection.this.shardId = 0;
-            }
-            LwtInfo lwt = LwtInfo.parseLwtInfo(msg.supported);
-            if (lwt != null) {
-              host.setLwtInfo(lwt);
-            }
-            return MoreFutures.VOID_SUCCESS;
-          default:
-            throw new TransportException(
-                address,
-                String.format(
-                    "Unexpected %s response message from server to a OPTIONS message",
                     response.type));
         }
       }
@@ -1506,14 +1511,14 @@ class Connection {
 
     private final Message.Request request;
     private volatile InetSocketAddress address;
-    private volatile LwtInfo lwtInfo;
+    private volatile Host host;
 
     Future(Message.Request request) {
       this.request = request;
     }
 
-    public LwtInfo getLwtInfo() {
-      return lwtInfo;
+    public Host getHost() {
+      return host;
     }
 
     @Override
@@ -1546,10 +1551,7 @@ class Connection {
     public void onSet(
         Connection connection, Message.Response response, long latency, int retryCount) {
       this.address = connection.address;
-      LwtInfo lwtInfo = connection.host.getLwtInfo();
-      if (lwtInfo != null) {
-        this.lwtInfo = lwtInfo;
-      }
+      host = connection.host;
       super.set(response);
     }
 
