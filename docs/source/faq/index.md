@@ -69,7 +69,7 @@ the way that the parameters are sent. The difference is that a prepared statemen
 * sends only the statement id and its parameters (thus reducing the amount of data sent
   to the cluster)
 
-See [Prepared statements](../manual/statements/prepared) for more information.
+See [Prepared statements](../manual/statements/prepared/) for more information.
 
 
 ### Can I combine `PreparedStatements` and normal statements in a batch?
@@ -96,7 +96,7 @@ is currently no mechanism for Cassandra to invalidate the existing metadata.  Be
 the driver is not able to properly react to these changes and will improperly read rows after
 a schema change is made.
 
-See [Prepared statements](../manual/statements/prepared/) for more information.
+See [Prepared statements](../manual/statements/prepared) for more information.
 
 
 ### Can I get the raw bytes of a text column?
