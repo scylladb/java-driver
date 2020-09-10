@@ -286,7 +286,7 @@ Besides explicit work with queries and rows, you can also use
 ### More information
 
 If you're reading this from the [generated HTML documentation on
-github.io](http://datastax.github.io/java-driver), use the "Contents"
+github.io](http://datastax.github.io/java-driver/), use the "Contents"
 menu on the left hand side to navigate sub-sections. If you're [browsing the source files on
 github.com](https://github.com/datastax/java-driver/tree/3.x/manual),
 simply navigate to each sub-directory.

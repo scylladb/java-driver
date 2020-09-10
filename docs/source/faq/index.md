@@ -69,7 +69,7 @@ the way that the parameters are sent. The difference is that a prepared statemen
 * sends only the statement id and its parameters (thus reducing the amount of data sent
   to the cluster)
 
-See [Prepared statements](../manual/statements/prepared/) for more information.
+See [Prepared statements](../manual/statements/prepared) for more information.
 
 
 ### Can I combine `PreparedStatements` and normal statements in a batch?
@@ -298,4 +298,4 @@ an update with compatibility to this driver version.
 [Futures.allAsList]: https://google.github.io/guava/releases/19.0/api/docs/com/google/common/util/concurrent/Futures.html#allAsList(java.lang.Iterable)
 [DynaTrace]: https://www.dynatrace.com/
 [packaging data]: https://logback.qos.ch/reasonsToSwitch.html#packagingData
-[Using the shaded JAR]: ../manual/shaded_jar/index
+[Using the shaded JAR]: ../manual/shaded_jar

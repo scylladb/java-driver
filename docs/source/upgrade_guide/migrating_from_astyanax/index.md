@@ -16,5 +16,4 @@ See the child pages for more information:
    configuration/index
    language_level_changes/index
    queries_and_results/index
-
 ```

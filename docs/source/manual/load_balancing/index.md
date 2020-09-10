@@ -58,7 +58,7 @@ cluster.getConfiguration().getPoolingOptions().refreshConnectedHost(host);
 
 Each time the driver executes a query, it asks the policy to compute a **query plan**, which is a list of hosts. The
 driver will then try each host in sequence, according to the [retry policy](../retries/) and
-[speculative execution policy](../speculative_execution/).
+[speculative execution policy](../speculative_execution).
 
 The contents and order of query plans are entirely up to your policy, but implementations typically return plans that:
 

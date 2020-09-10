@@ -291,7 +291,7 @@ We've also seized the opportunity to remove code that was deprecated in 2.1.
 
 12. [Client-side timestamp generation](../manual/query_timestamps/) is
     now the default (provided that [native
-    protocol](../manual/native_protocol/) v3 or higher is in use). The
+    protocol](../manual/native_protocol) v3 or higher is in use). The
     generator used is `AtomicMonotonicTimestampGenerator`.
 
 13. If a DNS name resolves to multiple A-records,
@@ -300,7 +300,7 @@ We've also seized the opportunity to remove code that was deprecated in 2.1.
     maintaining contact points in DNS configuration, and having a single,
     static contact point in your Java code.
 
-14. The following methods were added for [Custom payloads](../manual/custom_payloads/):
+14. The following methods were added for [Custom payloads](../manual/custom_payloads):
     * in `PreparedStatement`: `getIncomingPayload()`,
       `getOutgoingPayload()` and
       `setOutgoingPayload(Map<String,ByteBuffer>)`
@@ -425,7 +425,7 @@ We've also seized the opportunity to remove code that was deprecated in 2.1.
 
 29. `SSLOptions` has been refactored to allow the option to choose between JDK and Netty-based
     SSL implementations.  See [JAVA-841](https://datastax-oss.atlassian.net/browse/JAVA-841) and
-    the [SSL documentation](../manual/ssl/) for more details.
+    the [SSL documentation](../manual/ssl) for more details.
 
 
 ### 2.1.8
@@ -463,7 +463,7 @@ binary compatibility.
     ones.
 
     Also, note that the connection pool for protocol v3 can now be configured to
-    use multiple connections. See [this page](../manual/pooling/) for more
+    use multiple connections. See [this page](../manual/pooling) for more
     information.
 
 3. `MappingManager(Session)` will now force the initialization of the `Session`

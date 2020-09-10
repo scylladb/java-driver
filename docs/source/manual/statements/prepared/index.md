@@ -67,7 +67,7 @@ If you execute a query only once, a prepared statement is inefficient because it
 ### Parameters and binding
 
 Parameters can be either anonymous or named (named parameters are only
-available with [native protocol](../../native_protocol/) v2 or above):
+available with [native protocol](../../native_protocol) v2 or above):
 
 ```java
 ps1 = session.prepare("insert into product (sku, description) values (?, ?)");

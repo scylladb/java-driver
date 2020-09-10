@@ -15,7 +15,7 @@ by the same policy as regular connections and tries the nodes according to a que
 
 The control connection is managed independently from [regular pooled connections](../pooling/), and
 used exclusively for administrative requests. It is included in [Session.State.getOpenConnections],
-as well as the `open-connections` [metric](../metrics/); for example, if you've configured a pool
+as well as the `open-connections` [metric](../metrics); for example, if you've configured a pool
 size of 2, the control node will have 3 connections.
 
 [Session.State.getOpenConnections]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Session.State.html#getOpenConnections-com.datastax.driver.core.Host-

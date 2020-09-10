@@ -22,8 +22,8 @@ import yaml
 import re
 from docutils import nodes
 from sphinx.util import logging
-import recommonmark
 from recommonmark.transform import AutoStructify
+from recommonmark.parser import CommonMarkParser, splitext, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -66,24 +66,42 @@ extensions = [
     'sphinx.ext.autosectionlabel',
     'sphinx_scylladb_theme',
     'sphinx_multiversion',
-    'recommonmark'
 ]
 
 # Add Markdown support
-source_suffix = ['.rst', '.md']
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.md': 'markdown',
+}
 autosectionlabel_prefix_document = True
 
-def replace_relative_links(app, docname, source):
-    result = source[0]
-    for key in app.config.replacements:
-        result = result.replace(key, app.config.replacements[key])
-    source[0] = result
+class CustomCommonMarkParser(CommonMarkParser):
+    
+    def visit_document(self, node):
+        pass
+    
+    def visit_link(self, mdnode):
+        # Override to avoid checking if relative links exists
+        ref_node = nodes.reference()
+        destination = mdnode.destination
+        _, ext = splitext(destination)
+
+        url_check = urlparse(destination)
+        scheme_known = bool(url_check.scheme)
+
+        if not scheme_known and ext.replace('.', '') in self.supported:
+            destination = destination.replace(ext, '')
+        ref_node['refuri'] = destination
+        ref_node.line = self._get_line(mdnode)
+        if mdnode.title:
+            ref_node['title'] = mdnode.title
+        next_node = ref_node
+
+        self.current_node.append(next_node)
+        self.current_node = ref_node
 
 def setup(app):
-    replacements = {"/)" : "/index)", "/#": "/index#"}
-    app.add_config_value('replacements', replacements, True)
-    app.connect('source-read', replace_relative_links)
-
+    app.add_source_parser(CustomCommonMarkParser)
     app.add_config_value('recommonmark_config', {
         'enable_eval_rst': True,
         'enable_auto_toc_tree': False,
@@ -238,7 +256,7 @@ extlinks = {
     'monitor_lst': ('/operating-scylla/monitoring/3.1/%s/','')
 }
 
-#Adds version variables for monitoring and manager versions when used in inline text
+# Adds version variables for monitoring and manager versions when used in inline text
 
 rst_epilog = """
 .. |mon_version| replace:: 3.1

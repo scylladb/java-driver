@@ -22,7 +22,7 @@ connection to handle multiple simultaneous requests:
 You don't need to manage connections yourself. You simply interact with a `Session` object, which takes care of it.
 
 **For each `Session`, there is one connection pool per connected host** (a host is connected when it is up and
-not ignored by the [load balancing policy](../load_balancing/)).
+not ignored by the [load balancing policy](../load_balancing)).
 
 The number of connections per pool is configurable (this will be
 described in the next section).  The number of stream ids depends on the

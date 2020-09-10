@@ -33,7 +33,7 @@ that the *Java driver* has categorized in multiple *Option* and *Policy* kinds.
 
 ### Connections pools internals
 Everything concerning the internal pools of connections to the *Cassandra nodes*
-will be gathered in the Java driver in the [`PoolingOptions`](../../../manual/pooling/):
+will be gathered in the Java driver in the [`PoolingOptions`](../../../manual/pooling):
 
 *Astyanax*:
 
@@ -55,7 +55,7 @@ The first number is the initial number of connections, the second is the maximum
 of connections the driver is allowed to create for each host.
 
 Note that the *Java driver* allows multiple simultaneous requests on one single
-connection, as it is based upon the [*Native protocol*](../../../manual/native_protocol/),
+connection, as it is based upon the [*Native protocol*](../../../manual/native_protocol),
 an asynchronous binary protocol that can handle up to 32768 simultaneous requests on a 
 single connection. The Java driver is able to manage and distribute simultaneous requests
 by itself even under high contention, and changing the default `PoolingOptions` is not
@@ -141,7 +141,7 @@ for specific information.
 
 Custom load balancing policies can easily be implemented by users, and supplied to 
 the *Java driver* for specific use cases. All information necessary is available
-in the [Load balaning policies docs](../../../manual/load_balancing/).
+in the [Load balaning policies docs](../../../manual/load_balancing).
 
 ## Consistency levels
 Consistency levels can be set per-statement, or globally through the `QueryOptions`.
