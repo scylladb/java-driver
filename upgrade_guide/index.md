@@ -830,6 +830,7 @@ exhaustive list of new features in 2.0.
 ```eval_rst
 .. toctree::
    :hidden:
+   :glob:
    
-   migrating_from_astyanax/index
+   migrating_from_astyanax/*
 ```

@@ -89,11 +89,12 @@ limitations under the License.
 
 .. toctree::
    :hidden:
-   
+   :glob:
+
    api
    installation
-   manual/index
-   upgrade_guide/index
-   faq/index
-   changelog/index
+   manual/*
+   upgrade_guide/*
+   faq/*
+   changelog/*
 

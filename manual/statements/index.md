@@ -44,9 +44,10 @@ wrap your statements in a custom [StatementWrapper] implementation.
 ```eval_rst
 .. toctree::
    :hidden:
+   :glob:
    
-   simple/index
-   prepared/index
-   built/index
-   batch/index
+   simple/*
+   prepared/*
+   built/*
+   batch/*
 ```

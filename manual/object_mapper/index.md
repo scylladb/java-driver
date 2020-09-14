@@ -24,8 +24,9 @@ See the child pages for more information:
 ```eval_rst
 .. toctree::
    :hidden:
+   :glob:
       
-   creating/index
-   custom_codecs/index
-   using/index
+   creating/*
+   custom_codecs/*
+   using/*
 ```

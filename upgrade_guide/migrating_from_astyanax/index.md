@@ -12,8 +12,9 @@ See the child pages for more information:
 ```eval_rst
 .. toctree::
    :hidden:
+   :glob:
    
-   configuration/index
-   language_level_changes/index
-   queries_and_results/index
+   configuration/*
+   language_level_changes/*
+   queries_and_results/*
 ```
