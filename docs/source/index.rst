@@ -52,17 +52,17 @@ The driver contains the following modules:
 -  `changelog`_
 -  `binary tarball`_
 
-.. _feature-rich: manual/index
-.. _Sync: manual/index
-.. _Async: manual/async/index
-.. _Simple: manual/statements/simple/index
-.. _Prepared: manual/statements/prepared/index
-.. _Batch: manual/statements/batch/index
-.. _Connection pooling: manual/pooling/index
-.. _load balancing: manual/load_balancing/index
-.. _retry policies: manual/retries/index
-.. _Query builder: manual/statements/built/index
-.. _Object mapper: manual/object_mapper/index
+.. _feature-rich: ../../manual/index
+.. _Sync: ../../manual/index
+.. _Async: ../../manual/async/index
+.. _Simple: ../../manual/statements/simple/index
+.. _Prepared: ../../manual/statements/prepared/index
+.. _Batch: ../../manual/statements/batch/index
+.. _Connection pooling: ../../manual/pooling/index
+.. _load balancing: ../../manual/load_balancing/index
+.. _retry policies: ../../manual/retries/index
+.. _Query builder: ../../manual/statements/built/index
+.. _Object mapper: ../../manual/object_mapper/index
 .. _@dsJavaDriver: https://twitter.com/dsJavaDriver
 .. _@DataStaxEng: https://twitter.com/datastaxeng
 .. _manual: http://docs.datastax.com/en/developer/java-driver/3.7/manual/
@@ -91,9 +91,9 @@ limitations under the License.
    :hidden:
    
    api
-   installation/index
-   manual/index
-   upgrade_guide/index
-   faq/index
-   changelog/index
+   installation
+   manual/README
+   ../../upgrade_guide/README
+   ../../faq/README
+   ../../changelog/README
 
