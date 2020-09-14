@@ -52,21 +52,21 @@ The driver contains the following modules:
 -  `changelog`_
 -  `binary tarball`_
 
-.. _feature-rich: ../../manual/index
-.. _Sync: ../../manual/index
-.. _Async: ../../manual/async/index
-.. _Simple: ../../manual/statements/simple/index
-.. _Prepared: ../../manual/statements/prepared/index
-.. _Batch: ../../manual/statements/batch/index
-.. _Connection pooling: ../../manual/pooling/index
-.. _load balancing: ../../manual/load_balancing/index
-.. _retry policies: ../../manual/retries/index
-.. _Query builder: ../../manual/statements/built/index
-.. _Object mapper: ../../manual/object_mapper/index
+.. _feature-rich: manual
+.. _Sync: manual
+.. _Async: manual/async
+.. _Simple: manual/statements/simple
+.. _Prepared: manual/statements/prepared
+.. _Batch: manual/statements/batch
+.. _Connection pooling: manual/pooling
+.. _load balancing: manual/load_balancing
+.. _retry policies: manual/retries
+.. _Query builder: manual/statements/built
+.. _Object mapper: manual/object_mapper
 .. _@dsJavaDriver: https://twitter.com/dsJavaDriver
 .. _@DataStaxEng: https://twitter.com/datastaxeng
 .. _manual: http://docs.datastax.com/en/developer/java-driver/3.7/manual/
-.. _changelog: changelog/index
+.. _changelog: changelog
 .. _binary tarball: http://downloads.datastax.com/java-driver/cassandra-java-driver-3.7.1.tar.gz
 
 
@@ -92,8 +92,8 @@ limitations under the License.
    
    api
    installation
-   manual/README
-   ../../upgrade_guide/README
-   ../../faq/README
-   ../../changelog/README
+   manual/index
+   upgrade_guide/index
+   faq/index
+   changelog/index
 

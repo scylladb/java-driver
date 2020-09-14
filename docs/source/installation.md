@@ -35,7 +35,7 @@ The 'extras' module is also published as a separate artifact:
 ```
 
 
-We also provide a [shaded JAR](../../manual/shaded_jar/)
+We also provide a [shaded JAR](manual/shaded_jar/)
 to avoid the explicit dependency to Netty.
 
 If you can't use a dependency management tool, a
@@ -68,7 +68,7 @@ big-endian systems, but _DataStax_ does not officially support these systems.
 ### Upgrading from previous versions
 
 If you are upgrading from a previous version of the driver, be sure to have a look at
-the [upgrade guide](../../upgrade_guide/).
+the [upgrade guide](upgrade_guide/).
 
 If you are upgrading to _DataStax Enterprise_, use the [DataStax Enterprise Java driver][dse-driver] for more
 features and better compatibility.
