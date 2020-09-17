@@ -83,7 +83,7 @@ public class TokenAwarePolicyTest {
     when(configuration.getProtocolOptions()).thenReturn(protocolOptions);
     when(protocolOptions.getProtocolVersion()).thenReturn(ProtocolVersion.NEWEST_SUPPORTED);
     when(cluster.getMetadata()).thenReturn(metadata);
-    when(metadata.getReplicas(Metadata.quote("keyspace"), routingKey))
+    when(metadata.getReplicas(Metadata.quote("keyspace"), null, routingKey))
         .thenReturn(Sets.newLinkedHashSet(host1, host2));
     when(childPolicy.newQueryPlan("keyspace", statement))
         .thenReturn(Sets.newLinkedHashSet(host4, host3, host2, host1).iterator());
@@ -177,7 +177,7 @@ public class TokenAwarePolicyTest {
 
       // then: The replicas resolved from the cluster metadata must match node 6 and its replicas.
       List<Host> replicas =
-          Lists.newArrayList(cluster.getMetadata().getReplicas("keyspace", routingKey));
+          Lists.newArrayList(cluster.getMetadata().getReplicas("keyspace", null, routingKey));
       assertThat(replicas)
           .containsExactly(
               sCluster.host(cluster, 1, 6),

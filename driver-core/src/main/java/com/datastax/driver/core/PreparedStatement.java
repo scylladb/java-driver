@@ -239,6 +239,14 @@ public interface PreparedStatement {
   public RetryPolicy getRetryPolicy();
 
   /**
+   * The partitioner for this prepared statement.
+   *
+   * @return the partitioner for this query, or {@code null} if no partitioner has been specified.
+   *     In the latter case, the cluster-wide partitioner will be used.
+   */
+  public Token.Factory getPartitioner();
+
+  /**
    * Returns the prepared Id for this statement.
    *
    * @return the PreparedId corresponding to this statement.

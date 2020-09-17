@@ -100,6 +100,7 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
     Set<Host> replicas =
         metadata.getReplicas(
             ks1,
+            null,
             TypeCodec.cint()
                 .serialize(
                     testKey,
@@ -409,7 +410,7 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
 
     ProtocolVersion protocolVersion =
         cluster().getConfiguration().getProtocolOptions().getProtocolVersion();
-    assertThat(metadata.newToken(TypeCodec.cint().serialize(1, protocolVersion)))
+    assertThat(metadata.newToken(null, TypeCodec.cint().serialize(1, protocolVersion)))
         .isEqualTo(expected);
   }
 

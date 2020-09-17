@@ -1593,7 +1593,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       ByteBuffer routingKey = ByteBuffer.allocate(4);
       routingKey.putInt(0, 0);
       this.connectionFuture =
-          pool.borrowConnection(timeoutMillis, MILLISECONDS, maxQueueSize, routingKey);
+          pool.borrowConnection(timeoutMillis, MILLISECONDS, maxQueueSize, null, routingKey);
       requestInitialized =
           GuavaCompatibility.INSTANCE.transform(
               this.connectionFuture,

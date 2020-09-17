@@ -725,7 +725,7 @@ class SessionManager extends AbstractSession {
         ListenableFuture<Connection> connectionFuture =
             entry
                 .getValue()
-                .borrowConnection(0, TimeUnit.MILLISECONDS, 0, statement.getRoutingKey());
+                .borrowConnection(0, TimeUnit.MILLISECONDS, 0, null, statement.getRoutingKey());
         ListenableFuture<Response> prepareFuture =
             GuavaCompatibility.INSTANCE.transformAsync(
                 connectionFuture,

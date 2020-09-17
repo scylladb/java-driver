@@ -13,6 +13,27 @@
 -->
 <differences>
     <difference>
+        <differenceType>7004</differenceType> <!-- the number of arguments has changed -->
+        <className>com/datastax/driver/core/Metadata</className>
+        <method>java.util.Set getReplicas(java.lang.String, java.nio.ByteBuffer)</method>
+        <justification>Add partitioner that should be used to obtain replicas</justification>
+    </difference>
+
+    <difference>
+        <differenceType>7004</differenceType> <!-- the number of arguments has changed -->
+        <className>com/datastax/driver/core/Metadata</className>
+        <method>com.datastax.driver.core.Token newToken(java.nio.ByteBuffer[])</method>
+        <justification>Add partitioner that should be used to create a token</justification>
+    </difference>
+
+    <difference>
+        <differenceType>7012</differenceType> <!-- method added to interface -->
+        <className>com/datastax/driver/core/PreparedStatement</className>
+        <method>com.datastax.driver.core.Token$Factory getPartitioner()</method>
+        <justification>New method to get the partitioner used by a table targeted by a statement</justification>
+    </difference>
+
+    <difference>
         <differenceType>7012</differenceType> <!-- method added to interface -->
         <className>com/datastax/driver/core/PreparedStatement</className>
         <method>boolean isLWT()</method>

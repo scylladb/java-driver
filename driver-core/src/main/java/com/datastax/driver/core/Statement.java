@@ -222,6 +222,16 @@ public abstract class Statement {
   public abstract String getKeyspace();
 
   /**
+   * The partitioner for this query.
+   *
+   * @return the partitioner for this query, or {@code null} if no partitioner has been specified.
+   *     In the latter case, the cluster-wide partitioner will be used.
+   */
+  public Token.Factory getPartitioner() {
+    return null;
+  }
+
+  /**
    * Sets the retry policy to use for this query.
    *
    * <p>The default retry policy, if this method is not called, is the one returned by {@link

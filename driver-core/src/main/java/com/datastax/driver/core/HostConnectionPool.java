@@ -388,7 +388,11 @@ class HostConnectionPool implements Connection.Owner {
   }
 
   ListenableFuture<Connection> borrowConnection(
-      long timeout, TimeUnit unit, int maxQueueSize, ByteBuffer routingKey) {
+      long timeout,
+      TimeUnit unit,
+      int maxQueueSize,
+      Token.Factory partitioner,
+      ByteBuffer routingKey) {
     Phase phase = this.phase.get();
     if (phase != Phase.READY)
       return Futures.immediateFailedFuture(
@@ -398,7 +402,7 @@ class HostConnectionPool implements Connection.Owner {
     if (host.getShardingInfo() != null) {
       if (routingKey != null) {
         Metadata metadata = manager.cluster.getMetadata();
-        Token t = metadata.newToken(routingKey);
+        Token t = metadata.newToken(partitioner, routingKey);
         shardId = host.getShardingInfo().shardId(t);
       } else {
         shardId = RAND.nextInt(host.getShardingInfo().getShardsCount());

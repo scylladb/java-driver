@@ -179,7 +179,9 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     if (partitionKey == null || keyspace == null)
       return childPolicy.newQueryPlan(keyspace, statement);
 
-    final Set<Host> replicas = clusterMetadata.getReplicas(Metadata.quote(keyspace), partitionKey);
+    final Set<Host> replicas =
+        clusterMetadata.getReplicas(
+            Metadata.quote(keyspace), statement.getPartitioner(), partitionKey);
     if (replicas.isEmpty()) return childPolicy.newQueryPlan(loggedKeyspace, statement);
 
     if (replicaOrdering == ReplicaOrdering.NEUTRAL) {

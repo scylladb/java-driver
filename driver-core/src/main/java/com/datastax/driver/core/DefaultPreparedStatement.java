@@ -25,6 +25,8 @@ import java.util.Map;
 
 public class DefaultPreparedStatement implements PreparedStatement {
 
+  private static final String SCYLLA_CDC_LOG_SUFFIX = "_scylla_cdc_log";
+
   final PreparedId preparedId;
 
   final String query;
@@ -32,6 +34,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   final Map<String, ByteBuffer> incomingPayload;
   final Cluster cluster;
   final boolean isLWT;
+  final Token.Factory partitioner;
 
   volatile ByteBuffer routingKey;
 
@@ -48,13 +51,15 @@ public class DefaultPreparedStatement implements PreparedStatement {
       String queryKeyspace,
       Map<String, ByteBuffer> incomingPayload,
       Cluster cluster,
-      boolean isLWT) {
+      boolean isLWT,
+      Token.Factory partitioner) {
     this.preparedId = id;
     this.query = query;
     this.queryKeyspace = queryKeyspace;
     this.incomingPayload = incomingPayload;
     this.cluster = cluster;
     this.isLWT = isLWT;
+    this.partitioner = partitioner;
   }
 
   static DefaultPreparedStatement fromMessage(
@@ -84,13 +89,17 @@ public class DefaultPreparedStatement implements PreparedStatement {
 
     PreparedId preparedId =
         new PreparedId(boundValuesMetadata, resultSetMetadata, pkIndices, protocolVersion);
+
+    Token.Factory partitoner = partitioner(defs, cluster);
+
     return new DefaultPreparedStatement(
         preparedId,
         query,
         queryKeyspace,
         msg.getCustomPayload(),
         cluster,
-        lwtInfo != null && lwtInfo.isLwt(msg.metadata.flags));
+        lwtInfo != null && lwtInfo.isLwt(msg.metadata.flags),
+        partitoner);
   }
 
   private static int[] computePkIndices(Metadata clusterMetadata, ColumnDefinitions boundColumns) {
@@ -133,6 +142,28 @@ public class DefaultPreparedStatement implements PreparedStatement {
     for (int i = 0; i < pkColumns.length; ++i) if (pkColumns[i] < 0) return false;
 
     return true;
+  }
+
+  private static Token.Factory partitioner(ColumnDefinitions defs, Cluster cluster) {
+    if (defs == null || defs.size() == 0) {
+      return null;
+    }
+
+    String keyspace = defs.getKeyspace(0);
+    String table = defs.getTable(0);
+    if (table.endsWith(SCYLLA_CDC_LOG_SUFFIX)) {
+      String baseTableName = table.substring(0, table.length() - SCYLLA_CDC_LOG_SUFFIX.length());
+      KeyspaceMetadata keyspaceMetadata = cluster.getMetadata().getKeyspace(keyspace);
+      if (keyspaceMetadata == null) {
+        return null;
+      }
+      TableMetadata tableMetadata = keyspaceMetadata.getTable(baseTableName);
+      if (tableMetadata != null && tableMetadata.options.isScyllaCDC()) {
+        return Token.CDCToken.FACTORY;
+      }
+    }
+
+    return null;
   }
 
   @Override
@@ -227,6 +258,11 @@ public class DefaultPreparedStatement implements PreparedStatement {
   @Override
   public RetryPolicy getRetryPolicy() {
     return retryPolicy;
+  }
+
+  @Override
+  public Token.Factory getPartitioner() {
+    return partitioner;
   }
 
   @Override

@@ -45,6 +45,7 @@ public class TableOptionsMetadata {
   private static final String CRC_CHECK_CHANCE = "crc_check_chance";
   private static final String EXTENSIONS = "extensions";
   private static final String CDC = "cdc";
+  private static final String SCYLLA_CDC_EXTENSION = "cdc";
 
   private static final boolean DEFAULT_REPLICATE_ON_WRITE = true;
   private static final double DEFAULT_BF_FP_CHANCE = 0.01;
@@ -79,6 +80,7 @@ public class TableOptionsMetadata {
   private final Double crcCheckChance;
   private final Map<String, ByteBuffer> extensions;
   private final boolean cdc;
+  private final boolean scyllaCDC;
 
   TableOptionsMetadata(Row row, boolean isCompactStorage, VersionNumber version) {
 
@@ -176,6 +178,8 @@ public class TableOptionsMetadata {
 
     if (is380OrHigher) this.cdc = isNullOrAbsent(row, CDC) ? DEFAULT_CDC : row.getBool(CDC);
     else this.cdc = DEFAULT_CDC;
+
+    this.scyllaCDC = this.extensions.containsKey(SCYLLA_CDC_EXTENSION);
   }
 
   private static boolean isNullOrAbsent(Row row, String name) {
@@ -394,6 +398,15 @@ public class TableOptionsMetadata {
    */
   public boolean isCDC() {
     return cdc;
+  }
+
+  /**
+   * Returns whether or not Scylla change data capture is enabled for this table.
+   *
+   * @return whether or not Scylla change data capture is enabled for this table.
+   */
+  public boolean isScyllaCDC() {
+    return scyllaCDC;
   }
 
   @Override

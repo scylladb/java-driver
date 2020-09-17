@@ -104,8 +104,12 @@ class RequestHandler {
       return fallback;
     }
 
+    Token.Factory partitioner = statement.getPartitioner();
     final Set<Host> replicas =
-        manager.cluster.getMetadata().getReplicas(Metadata.quote(keyspace), partitionKey);
+        manager
+            .cluster
+            .getMetadata()
+            .getReplicas(Metadata.quote(keyspace), partitioner, partitionKey);
 
     // replicas are stored in the right order starting with the primary replica
     return replicas.iterator();
@@ -433,6 +437,7 @@ class RequestHandler {
               poolingOptions.getPoolTimeoutMillis(),
               TimeUnit.MILLISECONDS,
               poolingOptions.getMaxQueueSize(),
+              statement.getPartitioner(),
               routingKey);
       GuavaCompatibility.INSTANCE.addCallback(
           connectionFuture,

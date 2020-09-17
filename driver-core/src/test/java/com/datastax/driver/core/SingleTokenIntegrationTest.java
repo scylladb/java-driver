@@ -48,7 +48,7 @@ public class SingleTokenIntegrationTest extends CCMTestsSupport {
     assertThat(hostsForRange).containsOnly(host1);
 
     ByteBuffer randomPartitionKey = Bytes.fromHexString("0xCAFEBABE");
-    Set<Host> hostsForKey = metadata.getReplicas(keyspace, randomPartitionKey);
+    Set<Host> hostsForKey = metadata.getReplicas(keyspace, null, randomPartitionKey);
     assertThat(hostsForKey).containsOnly(host1);
 
     Set<TokenRange> rangesForHost = metadata.getTokenRanges(keyspace, host1);

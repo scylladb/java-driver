@@ -633,7 +633,7 @@ public class SchemaChangesTest extends CCMTestsSupport {
       assertThat(added.getValue()).hasName(handleId(keyspace));
     }
     for (Metadata m : metadatas())
-      assertThat(m.getReplicas(keyspace, Bytes.fromHexString("0xCAFEBABE"))).isNotEmpty();
+      assertThat(m.getReplicas(keyspace, null, Bytes.fromHexString("0xCAFEBABE"))).isNotEmpty();
     execute(CREATE_TABLE, keyspace); // to test table drop notifications
     execute(DROP_KEYSPACE, keyspace);
     for (SchemaChangeListener listener : listeners) {
@@ -646,7 +646,7 @@ public class SchemaChangesTest extends CCMTestsSupport {
     }
     for (Metadata m : metadatas()) {
       assertThat(m.getKeyspace(keyspace)).isNull();
-      assertThat(m.getReplicas(keyspace, Bytes.fromHexString("0xCAFEBABE"))).isEmpty();
+      assertThat(m.getReplicas(keyspace, null, Bytes.fromHexString("0xCAFEBABE"))).isEmpty();
     }
   }
 

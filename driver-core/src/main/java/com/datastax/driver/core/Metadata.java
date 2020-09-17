@@ -446,24 +446,30 @@ public class Metadata {
   }
 
   /**
-   * Returns the set of hosts that are replica for a given partition key.
+   * Returns the set of hosts that are replica for a given partition key. Partitioner can be {@code
+   * null} and then a cluster-wide partitioner will be invoked.
    *
    * <p>Note that this information is refreshed asynchronously by the control connection, when
    * schema or ring topology changes. It might occasionally be stale (or even empty).
    *
    * @param keyspace the name of the keyspace to get replicas for.
+   * @param partitioner the partitioner to use or @{code null} for cluster-wide partitioner.
    * @param partitionKey the partition key for which to find the set of replica.
    * @return the (immutable) set of replicas for {@code partitionKey} as known by the driver. Note
    *     that the result might be stale or empty if metadata was explicitly disabled with {@link
    *     QueryOptions#setMetadataEnabled(boolean)}.
    */
-  public Set<Host> getReplicas(String keyspace, ByteBuffer partitionKey) {
+  public Set<Host> getReplicas(
+      String keyspace, Token.Factory partitioner, ByteBuffer partitionKey) {
     keyspace = handleId(keyspace);
     TokenMap current = tokenMap;
     if (current == null) {
       return Collections.emptySet();
     } else {
-      Set<Host> hosts = current.getReplicas(keyspace, current.factory.hash(partitionKey));
+      if (partitioner == null) {
+        partitioner = current.factory;
+      }
+      Set<Host> hosts = current.getReplicas(keyspace, partitioner.hash(partitionKey));
       return hosts == null ? Collections.<Host>emptySet() : hosts;
     }
   }
@@ -631,8 +637,10 @@ public class Metadata {
   }
 
   /**
-   * Builds a new {@link Token} from a partition key.
+   * Builds a new {@link Token} from a partition key. Partitioner can be {@code null} and then a
+   * cluster-wide partitioner will be invoked.
    *
+   * @param partitioner the partitioner to use or @{code null} for cluster-wide partitioner.
    * @param components the components of the partition key, in their serialized form (obtained with
    *     {@link TypeCodec#serialize(Object, ProtocolVersion)}).
    * @return the token.
@@ -640,12 +648,15 @@ public class Metadata {
    *     happen if metadata was explicitly disabled with {@link
    *     QueryOptions#setMetadataEnabled(boolean)} before startup.
    */
-  public Token newToken(ByteBuffer... components) {
+  public Token newToken(Token.Factory partitioner, ByteBuffer... components) {
     TokenMap current = tokenMap;
     if (current == null)
       throw new IllegalStateException(
           "Token factory not set. This should only happen if metadata was explicitly disabled");
-    return current.factory.hash(SimpleStatement.compose(components));
+    if (partitioner == null) {
+      partitioner = current.factory;
+    }
+    return partitioner.hash(SimpleStatement.compose(components));
   }
 
   /**

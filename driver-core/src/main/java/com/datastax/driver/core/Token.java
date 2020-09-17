@@ -24,6 +24,8 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** A token on the Cassandra ring. */
 public abstract class Token implements Comparable<Token> {
@@ -53,6 +55,7 @@ public abstract class Token implements Comparable<Token> {
 
   static Token.Factory getFactory(String partitionerName) {
     if (partitionerName.endsWith("Murmur3Partitioner")) return M3PToken.FACTORY;
+    else if (partitionerName.endsWith("CDCPartitioner")) return CDCToken.FACTORY;
     else if (partitionerName.endsWith("RandomPartitioner")) return RPToken.FACTORY;
     else if (partitionerName.endsWith("OrderedPartitioner")) return OPPToken.FACTORY;
     else return null;
@@ -103,8 +106,28 @@ public abstract class Token implements Comparable<Token> {
     }
   }
 
+  // Tokens represented by a 64-bit integer.
+  // (getValue() returning Long)
+  abstract static class TokenLong64 extends Token {
+    @Override
+    public int compareTo(Token other) {
+      assert other instanceof TokenLong64;
+      Long value = (Long) getValue();
+      Long otherValue = (Long) other.getValue();
+      return value.compareTo(otherValue);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) return true;
+      if (!(obj instanceof TokenLong64)) return false;
+
+      return getValue().equals(((TokenLong64) obj).getValue());
+    }
+  }
+
   // Murmur3Partitioner tokens
-  static class M3PToken extends Token {
+  static class M3PToken extends TokenLong64 {
     private final long value;
 
     public static final Factory FACTORY = new M3PTokenFactory();
@@ -312,21 +335,6 @@ public abstract class Token implements Comparable<Token> {
     @Override
     public ByteBuffer serialize(ProtocolVersion protocolVersion) {
       return TypeCodec.bigint().serialize(value, protocolVersion);
-    }
-
-    @Override
-    public int compareTo(Token other) {
-      assert other instanceof M3PToken;
-      long otherValue = ((M3PToken) other).value;
-      return value < otherValue ? -1 : (value == otherValue) ? 0 : 1;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj) return true;
-      if (obj == null || this.getClass() != obj.getClass()) return false;
-
-      return value == ((M3PToken) obj).value;
     }
 
     @Override
@@ -669,6 +677,125 @@ public abstract class Token implements Comparable<Token> {
     @Override
     public String toString() {
       return value.toString();
+    }
+  }
+
+  // CDCPartitioner tokens
+  // https://github.com/scylladb/scylla/blob/master/cdc/cdc_partitioner.cc
+  static class CDCToken extends TokenLong64 {
+    private final long value;
+
+    public static final Factory FACTORY = new CDCTokenFactory();
+
+    private static final int CDC_PARTITION_KEY_LENGTH = 16;
+    private static final long VERSION_MASK = 0xF;
+    private static final int MIN_SUPPORTED_VERSION = 1;
+    private static final int MAX_SUPPORTED_VERSION = 1;
+
+    private static class CDCTokenFactory extends Factory {
+      private static final Logger logger = LoggerFactory.getLogger(CDCTokenFactory.class);
+
+      private static final BigInteger RING_END = BigInteger.valueOf(Long.MAX_VALUE);
+      private static final BigInteger RING_LENGTH =
+          RING_END.subtract(BigInteger.valueOf(Long.MIN_VALUE));
+      static final CDCToken MIN_TOKEN = new CDCToken(Long.MIN_VALUE);
+      static final CDCToken MAX_TOKEN = new CDCToken(Long.MAX_VALUE);
+
+      @Override
+      CDCToken fromString(String tokenStr) {
+        return new CDCToken(Long.parseLong(tokenStr));
+      }
+
+      @Override
+      DataType getTokenType() {
+        return DataType.bigint();
+      }
+
+      @Override
+      Token deserialize(ByteBuffer buffer, ProtocolVersion protocolVersion) {
+        return new CDCToken(TypeCodec.bigint().deserialize(buffer, protocolVersion));
+      }
+
+      @Override
+      Token minToken() {
+        return MIN_TOKEN;
+      }
+
+      @Override
+      CDCToken hash(ByteBuffer partitionKey) {
+        int offset = partitionKey.position();
+        int length = partitionKey.remaining();
+
+        if (length != CDC_PARTITION_KEY_LENGTH) {
+          logger.warn(
+              "CDC partition key has invalid length: expected {} bytes, but got {} bytes",
+              CDC_PARTITION_KEY_LENGTH,
+              length);
+        }
+        if (length < 8) {
+          return MIN_TOKEN;
+        }
+
+        long upperDword = partitionKey.getLong(offset + 0);
+        if (length != CDC_PARTITION_KEY_LENGTH) {
+          // Use first 8 bytes as token and skip checking the version
+          return new CDCToken(upperDword);
+        }
+
+        long lowerDword = partitionKey.getLong(offset + 8);
+        long version = lowerDword & VERSION_MASK;
+        if (version < MIN_SUPPORTED_VERSION || version > MAX_SUPPORTED_VERSION) {
+          logger.warn("CDC partition key version {} is not supported", version);
+        }
+
+        return new CDCToken(upperDword);
+      }
+
+      @Override
+      List<Token> split(Token startToken, Token endToken, int numberOfSplits) {
+        // edge case: ]min, min] means the whole ring
+        if (startToken.equals(endToken) && startToken.equals(MIN_TOKEN)) endToken = MAX_TOKEN;
+
+        BigInteger start = BigInteger.valueOf(((CDCToken) startToken).value);
+        BigInteger end = BigInteger.valueOf(((CDCToken) endToken).value);
+
+        BigInteger range = end.subtract(start);
+        if (range.compareTo(BigInteger.ZERO) < 0) range = range.add(RING_LENGTH);
+
+        List<BigInteger> values = super.split(start, range, RING_END, RING_LENGTH, numberOfSplits);
+        List<Token> tokens = Lists.newArrayListWithExpectedSize(values.size());
+        for (BigInteger value : values) tokens.add(new CDCToken(value.longValue()));
+        return tokens;
+      }
+    }
+
+    private CDCToken(long value) {
+      this.value = value;
+    }
+
+    @Override
+    public DataType getType() {
+      return FACTORY.getTokenType();
+    }
+
+    @Override
+    public Object getValue() {
+      return value;
+    }
+
+    @Override
+    public ByteBuffer serialize(ProtocolVersion protocolVersion) {
+      return TypeCodec.bigint().serialize(value, protocolVersion);
+    }
+
+    @Override
+    public int hashCode() {
+      return (int) (value ^ (value >>> 32));
+    }
+
+    @Override
+    public String toString() {
+      return Long.toString(value);
     }
   }
 }
