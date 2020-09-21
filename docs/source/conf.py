@@ -277,9 +277,9 @@ lexers['ditaa'] = DitaaLexer(startinline=True)
 # Whitelist pattern for tags (set to None to ignore all tags)
 # Whitelist pattern for branches (set to None to ignore all branches)
 smv_tag_whitelist = r'None'
-smv_branch_whitelist = r'^docs-automation$'
+smv_branch_whitelist = r"^latest$"
 # Whitelist pattern for remotes (set to None to use local branches only)
-smv_remote_whitelist = None
+smv_remote_whitelist = r"^origin$"
 # Pattern for released versions
 smv_released_pattern = r'^tags/.*$'
 # Format for versioned output directories inside the build directory
