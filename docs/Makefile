@@ -3,11 +3,12 @@ SPHINXOPTS    =
 SPHINXBUILD   = poetry run sphinx-build
 PAPER         =
 BUILDDIR      = _build
+SOURCE_DIR    = _source
 
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
 PAPEROPT_letter = -D latex_paper_size=letter
-ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) source
+ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) $(SOURCE_DIR)
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 
@@ -21,14 +22,16 @@ pristine: clean
 .PHONY: setup
 setup:
 	./_utils/setup.sh
-
+	cp -Tr source $(SOURCE_DIR)
+	cd $(SOURCE_DIR) && find -name README.md -execdir mv '{}' index.md ';'
 .PHONY: clean
 clean:
 	rm -rf $(BUILDDIR)/*
+	rm -rf $(SOURCE_DIR)/*
 
 .PHONY: preview
 preview: setup
-	cd .. && ./docs/_utils/doxygen.sh
+	./_utils/doxygen.sh
 	poetry run sphinx-autobuild -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml --port 5500
 
 .PHONY: dirhtml
@@ -67,6 +70,10 @@ linkcheck: setup
 
 .PHONY: multiversion
 multiversion: setup
-	poetry run ./_utils/multiversion.sh
+	cd .. && sphinx-multiversion docs/_source docs/$(BUILDDIR)/dirhtml  \
+		--pre-build="./_utils/doxygen.sh"  \
+		--pre-build="cp -Tr source $(SOURCE_DIR)"  \
+		--pre-build="cd $(SOURCE_DIR) && find -name README.md -execdir mv '{}' index.md ';'"
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
+

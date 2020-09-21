@@ -27,9 +27,6 @@ jobs:
         export PATH=$PATH:~/.local/bin
         cd docs
         make multiversion
-    - name: Build Doxygen docs
-      run: |
-        ./docs/_utils/doxygen.sh
     - name: Deploy
       run : ./docs/_utils/deploy.sh
       env:

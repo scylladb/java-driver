@@ -401,6 +401,17 @@ sphinx = ">=2.1"
 
 [[package]]
 category = "main"
+description = "Add support for multiple versions to sphinx"
+name = "sphinx-multiversion-scylla"
+optional = false
+python-versions = "*"
+version = "0.2.4"
+
+[package.dependencies]
+sphinx = ">=2.1"
+
+[[package]]
+category = "main"
 description = "A Sphinx Theme for ScyllaDB projects documentation"
 name = "sphinx-scylladb-theme"
 optional = false
@@ -565,7 +576,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "6318ee5d2bca7a8ac06a683541055ac8e6be7c8c8bb62c8c1fd443f06afadc47"
+content-hash = "cf1a2cd671a207948f537aa0b005efb04395998ac6ea7e1beb8e8430ea5b6d75"
 python-versions = "^3.7"
 
 [metadata.files]
@@ -745,6 +756,9 @@ sphinx-copybutton = [
 sphinx-multiversion = [
     {file = "sphinx-multiversion-0.2.3.tar.gz", hash = "sha256:e46565ac2f703f3b55652f33c159c8059865f5d13dae7f0e8403e5afc2996f5f"},
     {file = "sphinx_multiversion-0.2.3-py3-none-any.whl", hash = "sha256:dc0f18449122e3e2a61245771bfdb7fa83df4f6adbf8eafea31f5b0cfccb5dbe"},
+]
+sphinx-multiversion-scylla = [
+    {file = "sphinx-multiversion-scylla-0.2.4.tar.gz", hash = "sha256:a44fced382c9efac454749cc3b113e971a1ad63a8901c0aebd1299d131b102b2"},
 ]
 sphinx-scylladb-theme = [
     {file = "sphinx-scylladb-theme-0.1.9.tar.gz", hash = "sha256:2a2abaccedb3e00e57f412e35afda042c4a5d9baa66c288feb82362d9889294b"},
