@@ -49,10 +49,15 @@ def create_redirects(app, docname):
     with open(redirects, 'r') as yaml_file:
         for from_path, redirect_to in yaml.full_load(yaml_file).items():
             target_path = app.outdir + '/' + from_path
+            if os.getenv("SPHINX_MULTIVERSION_NAME") is not None:
+                redirect_to = '/' + os.environ['SPHINX_MULTIVERSION_NAME'] + redirect_to
             if not os.path.exists(target_path):
                 os.makedirs(target_path)
             with open(os.path.join(target_path + '/index.html'), 'w') as t_file:
                 t_file.write(write_html_redirect(redirect_to))
+            with open(os.path.join(target_path + '.html'), 'w') as t_file:
+                t_file.write(write_html_redirect(redirect_to))
+
 
 # -- General configuration ------------------------------------------------
 
