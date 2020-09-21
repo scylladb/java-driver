@@ -41,9 +41,12 @@ def write_html_redirect(redirect_to):
 redirects_file = "_utils/redirections.yaml"
 
 def create_redirects(app, docname):
-    if not os.path.exists(redirects_file):
+    redirects = redirects_file
+    if os.path.exists('docs'):
+        redirects = 'docs/' + redirects_file
+    if not os.path.exists(redirects):
         return
-    with open(redirects_file, 'r') as yaml_file:
+    with open(redirects, 'r') as yaml_file:
         for from_path, redirect_to in yaml.full_load(yaml_file).items():
             target_path = app.outdir + '/' + from_path
             if not os.path.exists(target_path):

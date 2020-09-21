@@ -2,7 +2,8 @@
 
 OUTPUT_DIR="docs/_build/dirhtml/api"
 if [[ "$SPHINX_MULTIVERSION_OUTPUTDIR" != "" ]]; then
-    OUTPUT_DIR="docs/$SPHINX_MULTIVERSION_OUTPUTDIR/api"
+    OUTPUT_DIR="$SPHINX_MULTIVERSION_OUTPUTDIR/api"
+    echo "HTML_OUTPUT = $OUTPUT_DIR" >> doxyfile
 fi
 mkdir -p "$OUTPUT_DIR"
-( cat doxyfile | echo "HTML_OUTPUT = $OUTPUT_DIR" )  | doxygen doxyfile
+doxygen doxyfile
