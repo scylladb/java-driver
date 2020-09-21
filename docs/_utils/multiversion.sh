@@ -1,6 +1,5 @@
 #! /bin/bash	
 
-cd .. && sphinx-multiversion docs/_source docs/_build/dirhtml \
-    --pre-build="./_utils/doxygen.sh" \
-    --pre-build="cp -Tr source _source" \
-    --pre-build="cd _source && find -name README.md -execdir mv '{}' index.md ';'"
+cd .. && sphinx-multiversion docs/source docs/_build/dirhtml \
+    --pre-build './docs/_utils/doxygen.sh' \
+    --pre-build "find docs/source -name README.md -execdir mv '{}' index.md ';'"

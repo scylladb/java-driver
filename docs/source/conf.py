@@ -43,8 +43,6 @@ redirects_file = "_utils/redirections.yaml"
 def create_redirects(app, docname):
     if not os.path.exists(redirects_file):
         return
-    if not app.builder.name == 'dirhtml':
-        return
     with open(redirects_file, 'r') as yaml_file:
         for from_path, redirect_to in yaml.full_load(yaml_file).items():
             target_path = app.outdir + '/' + from_path
@@ -274,12 +272,11 @@ lexers['ditaa'] = DitaaLexer(startinline=True)
 
 # -- Options for multiversion --------------------------------------------
 # Whitelist pattern for tags (set to None to ignore all tags)
-smv_tag_whitelist = 'None'
 # Whitelist pattern for branches (set to None to ignore all branches)
-smv_branch_whitelist = r"^latest$"
-
+smv_tag_whitelist = r'None'
+smv_branch_whitelist = r'^docs-automation$'
 # Whitelist pattern for remotes (set to None to use local branches only)
-smv_remote_whitelist = r"^origin$"
+smv_remote_whitelist = None
 # Pattern for released versions
 smv_released_pattern = r'^tags/.*$'
 # Format for versioned output directories inside the build directory
