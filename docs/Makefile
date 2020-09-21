@@ -70,10 +70,7 @@ linkcheck: setup
 
 .PHONY: multiversion
 multiversion: setup
-	cd .. && sphinx-multiversion docs/_source docs/$(BUILDDIR)/dirhtml  \
-		--pre-build="./_utils/doxygen.sh"  \
-		--pre-build="cp -Tr source $(SOURCE_DIR)"  \
-		--pre-build="cd $(SOURCE_DIR) && find -name README.md -execdir mv '{}' index.md ';'"
+	poetry run ./_utils/multiversion.sh
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
 
