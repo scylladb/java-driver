@@ -1,3 +1,6 @@
+```eval_rst
+:orphan:
+```
 ## Frequently Asked Questions - OSGi
 
 ### How to use the Java driver in an OSGi environment?

@@ -1,3 +1,6 @@
+```eval_rst
+:orphan:
+```
 ## Optional codecs
 
 The driver's "extras" module provides additional [codec](../) implementations: these codecs are not required by core

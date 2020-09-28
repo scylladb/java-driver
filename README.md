@@ -1,3 +1,6 @@
+```eval_rst
+:orphan:
+```
 # Datastax Java Driver for Apache Cassandra®
 
 *If you're reading this on github.com, please note that this is the readme

@@ -40,3 +40,14 @@ wrap your statements in a custom [StatementWrapper] implementation.
 [SpeculativeExecutionPolicy]: http://docs.datastax.com/en/drivers/java/3.6/com/datastax/driver/core/policies/SpeculativeExecutionPolicy.html
 [execute]:                    http://docs.datastax.com/en/drivers/java/3.6/com/datastax/driver/core/Session.html#execute-com.datastax.driver.core.Statement-
 [executeAsync]:               http://docs.datastax.com/en/drivers/java/3.6/com/datastax/driver/core/Session.html#executeAsync-com.datastax.driver.core.Statement-
+
+```eval_rst
+.. toctree::
+   :hidden:
+   :glob:
+   
+   simple/*
+   prepared/*
+   built/*
+   batch/*
+```
