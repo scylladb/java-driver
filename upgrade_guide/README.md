@@ -496,7 +496,7 @@ the impact on the public API has been kept as low as possible.
    version that takes an `int` (the exception being `RegularStatement`,
    described below). For new code, prefer the enum version.
 
-#### Internal API Changes
+#### 2.1.6 Internal API Changes
 
 1. `RegularStatement.getValues` now takes the protocol version as a
    `ProtocolVersion` instead of an `int`. This is transparent for callers
@@ -539,7 +539,7 @@ These features are only active when the native protocol v3 is in use.
 
 ### 2.1.1
 
-#### Internal API Changes
+#### 2.1.1 Internal API Changes
 
 1. The `ResultSet` interface has a new `wasApplied()` method. This will
    only affect clients that provide their own implementation of this interface.
@@ -547,7 +547,7 @@ These features are only active when the native protocol v3 is in use.
 
 ### 2.1.0
 
-#### User API Changes
+#### 2.1.0 User API Changes
 
 1. The `getCaching` method of `TableMetadata#Options` now returns a
    `Map` to account for changes to Cassandra 2.1. Also, the
@@ -564,7 +564,7 @@ These features are only active when the native protocol v3 is in use.
    set to `null`" behavior.
 
 
-#### Internal API Changes
+#### 2.1.0 Internal API Changes
 
 The changes listed in this section should normally not impact end users of the
 driver, but rather third-party frameworks and tools.
@@ -826,3 +826,11 @@ exhaustive list of new features in 2.0.
     * the `ResultSet` object provides 2 methods to check the state of paging
       (`ResultSet#getAvailableWithoutFetching` and `ResultSet#isFullyFetched`)
       as well as a mean to force the pre-fetching of the next page (`ResultSet#fetchMoreResults`).
+
+```eval_rst
+.. toctree::
+   :hidden:
+   :glob:
+   
+   migrating_from_astyanax/*
+```
