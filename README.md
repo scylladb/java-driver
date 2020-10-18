@@ -45,7 +45,7 @@ The driver contains the following modules:
 
 - JIRA (bug tracking): https://datastax-oss.atlassian.net/browse/JAVA
 - MAILING LIST: https://groups.google.com/a/lists.datastax.com/forum/#!forum/java-driver-user
-- DATASTAX ACADEMY SLACK: #datastax-drivers on https://academy.datastax.com/slack 
+- SCYLLA UNIVERSITY (training): https://university.scylladb.com 
 - TWITTER: [@dsJavaDriver](https://twitter.com/dsJavaDriver) tweets Java
   driver releases and important announcements (low frequency).
   [@DataStaxEng](https://twitter.com/datastaxeng) has more news including
@@ -56,6 +56,15 @@ The driver contains the following modules:
 - GITHUB REPOSITORY: https://github.com/datastax/java-driver
 - [changelog](changelog/)
 - [binary tarball](http://downloads.datastax.com/java-driver/cassandra-java-driver-3.10.0.tar.gz)
+
+**Training:**
+
+The course [Using Scylla Drivers](https://university.scylladb.com/courses/using-scylla-drivers/) in [Scylla University](https://university.scylladb.com/) explains how to use drivers in different languages to interact
+ with a Scylla cluster. The lesson, [Coding with Java Part 1](https://university.scylladb.com/courses/using-scylla-drivers/lessons/coding-with-java-part-1/), goes over a sample application that,
+ using the Java driver,  interacts with a three-node Scylla cluster. It connects to a Scylla cluster,
+ displays the contents of a  table, inserts and deletes data, and shows the contents of the table after each action. 
+The course also includes more advanced lessons that demonstrate working with prepares statements and datatypes.
+
 
 ## Getting the driver
 
