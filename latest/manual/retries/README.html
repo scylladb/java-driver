@@ -1,0 +1,382 @@
+
+
+
+<!doctype html>
+<html class="no-js" lang="en">
+  
+<head><!-- begin head.html -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>
+    Retries | Scylla Docs
+    </title>
+    <meta name="description" content="Scylla is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+
+    <link rel="icon" href="../../_static/img/favicon.ico" type="image/x-icon"/>
+    <link rel="canonical" href="https://docs.scylladb.com/">
+
+    <link rel="author" href="mailto:info@scylladb.com">
+    <link rel="stylesheet" href="../../_static/" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx_tabs/semantic-ui-2.4.1/segment.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx_tabs/semantic-ui-2.4.1/menu.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx_tabs/semantic-ui-2.4.1/tab.min.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx_tabs/tabs.css" />
+    
+    <link href='https://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700' rel='stylesheet' type='text/css'>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/foundation/5.5.2/css/foundation.min.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/css/doc/main.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <script src="../../_static/clipboard.min.js"></script>
+    <script src="../../_static/copybutton.js"></script>
+
+    <script src="../../_static/js/vendor/modernizr.js"></script>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-T8P2JP');</script>
+    <!-- End Google Tag Manager -->
+
+    <!-- Marketo -->
+    <script type="text/javascript"> (function() { var didInit = false; function initMunchkin() { if(didInit === false) { didInit = true; Munchkin.init('791-QBF-350'); } } var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = '//munchkin.marketo.net/munchkin.js'; s.onreadystatechange = function() { if (this.readyState == 'complete' || this.readyState == 'loaded') { initMunchkin(); } }; s.onload = initMunchkin; document.getElementsByTagName('head')[0].appendChild(s); })(); </script>
+    <!-- End Marketo -->
+
+<!-- end head.html -->
+</head>
+
+<body>
+<header id="header" class="animated">
+    <div class="topbar_continer contain-to-grid clearfix">
+        <nav class="top-bar" id="top-bar" data-topbar role="navigation">
+            <ul class="title-area">
+                <li class="name">
+                    <div class="logo">
+                        <a href="https://docs.scylladb.com/"><img src="../../_static/img/logo-scylla-docs.svg" alt="" width="151"></a>
+                    </div>
+                </li>
+                <li class="toggle-topbar"><a href="#"><span class="icon-manu"></span></a></li>
+            </ul>
+            <section class="top-bar-section clearfix">
+                <ul class="right">
+                    
+                    <li>
+                        <a href="https://scylladb.github.io/java-driver/">Scylla Java Driver</a>
+                    </li>
+                    
+                    <li>
+                        <a href="https://docs.scylladb.com/scylla-cloud/">Scylla Cloud</a>
+                    </li>
+                    
+                    <li>
+                        <a href="https://university.scylladb.com/">Scylla University</a>
+                    </li>
+                    
+                    <li>
+                        <a href="https://www.scylladb.com/">ScyllaDB Home</a>
+                    </li>
+                    
+                    <li class="search_continer show-for-medium-up">	
+                        <ci-search></ci-search>	
+                    </li>	
+                </ul>
+            </section>
+        </nav>
+    </div>
+</header>
+<section id="content">
+    <div class="row">
+	
+	<div class="large-6 large-push-3 columns">
+            <div class="section" id="retries">
+<h1>Retries<a class="headerlink" href="#retries" title="Permalink to this headline">¶</a></h1>
+<p>When a query fails, it sometimes makes sense to retry it: the error might be temporary, or the query might work on a
+different host, or with different options.</p>
+<p>The driver uses a configurable set of rules to determine when and how to retry.</p>
+<div class="section" id="concepts">
+<h2>Concepts<a class="headerlink" href="#concepts" title="Permalink to this headline">¶</a></h2>
+<p>When the driver executes a statement, it first obtains a <a class="reference external" href="../load_balancing/#query-plan">query plan</a> (a list of hosts) from the load balancing policy.
+Then it picks the first host and sends it the request; this host acts as the <strong>coordinator</strong> for the query, it will
+communicate with the rest of the cluster and reply to the client.</p>
+<p>If the coordinator can’t be reached or replies with an error, there are various things that the driver can do; they are
+expressed as <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html">RetryDecision</a> objects:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#retry-com.datastax.driver.core.ConsistencyLevel-">retry()</a>: retry the query on the same host. It’s possible to retry with a different consistency level than the one
+that was originally requested;</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#tryNextHost-com.datastax.driver.core.ConsistencyLevel-">tryNextHost()</a>: retry on the next host in the query plan. Again, it can be with a different CL;</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#rethrow--">rethrow()</a>: rethrow the exception to the user code. This means it will be thrown from the <code class="docutils literal notranslate"><span class="pre">session.execute</span></code> call (or
+returned as a failed future if <code class="docutils literal notranslate"><span class="pre">executeAsync</span></code> was used);</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#ignore--">ignore()</a>: mark the request as successful, and return an empty result set.</p></li>
+</ul>
+<p>If the driver retries on every host and reaches the end of the query plan, a <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/NoHostAvailableException.html">NoHostAvailableException</a> is thrown to the
+user code. You can use its <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/NoHostAvailableException.html#getErrors--">getErrors()</a> method to find out what went wrong on each host.</p>
+</div>
+<div class="section" id="retry-policy">
+<h2>Retry policy<a class="headerlink" href="#retry-policy" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/RetryPolicy.html">RetryPolicy</a> is a pluggable component that determines the retry decisions for various types of errors. It is configured
+when initializing the cluster:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span> <span class="n">cluster</span> <span class="o">=</span> <span class="n">Cluster</span><span class="o">.</span><span class="na">builder</span><span class="o">()</span>
+        <span class="o">.</span><span class="na">addContactPoint</span><span class="o">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="o">)</span>
+        <span class="o">.</span><span class="na">withRetryPolicy</span><span class="o">(</span><span class="k">new</span> <span class="n">MyCustomPolicy</span><span class="o">())</span>
+        <span class="o">.</span><span class="na">build</span><span class="o">();</span>
+</pre></div>
+</div>
+<p>Once the cluster has been built, you can’t change the policy, but you may inspect it at runtime:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">RetryPolicy</span> <span class="n">policy</span> <span class="o">=</span> <span class="n">cluster</span><span class="o">.</span><span class="na">getConfiguration</span><span class="o">().</span><span class="na">getPolicies</span><span class="o">().</span><span class="na">getRetryPolicy</span><span class="o">();</span>
+</pre></div>
+</div>
+<p>If you don’t explicitly configure it, you get a <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/DefaultRetryPolicy.html">DefaultRetryPolicy</a>.</p>
+<p>The policy’s methods cover different types of errors:</p>
+<div class="section" id="onunavailable">
+<h3><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onUnavailable-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-int-int-int-">onUnavailable</a><a class="headerlink" href="#onunavailable" title="Permalink to this headline">¶</a></h3>
+<p>A request reached the coordinator, but there weren’t enough live replicas to achieve the requested consistency level.
+The coordinator replied with an <code class="docutils literal notranslate"><span class="pre">UNAVAILABLE</span></code> error.</p>
+<p>If the policy rethrows the error, the user code will get an <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/UnavailableException.html">UnavailableException</a>. You can inspect the exception’s
+fields to get the amount of replicas that were <em>known</em> to be alive when the error was triggered, as well as the amount
+of replicas that where <em>required</em> by the requested consistency level.</p>
+</div>
+<div class="section" id="onreadtimeout">
+<h3><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onReadTimeout-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-int-int-boolean-int-">onReadTimeout</a><a class="headerlink" href="#onreadtimeout" title="Permalink to this headline">¶</a></h3>
+<p>A read request reached the coordinator, which initially believed that there were enough live replicas to process it.
+But, for some reason, one or several replicas were too slow to answer within the predefined timeout
+(<code class="docutils literal notranslate"><span class="pre">read_request_timeout_in_ms</span></code> in <code class="docutils literal notranslate"><span class="pre">cassandra.yaml</span></code>), and the coordinator replied to the client with a <code class="docutils literal notranslate"><span class="pre">READ_TIMEOUT</span></code>
+error.</p>
+<p>This could be due to a temporary overloading of these replicas, or even
+that they just failed or were turned off. During reads, Cassandra doesn’t request data from every replica to minimize
+internal network traffic; instead, some replicas are only asked for a checksum of the data. A read timeout may occur
+even if enough replicas responded to fulfill the consistency level, but only checksum responses were received (the
+method’s <code class="docutils literal notranslate"><span class="pre">dataRetrieved</span></code> parameter allow you to check if you’re in that situation).</p>
+<p>If the policy rethrows the error, the user code will get a <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/ReadTimeoutException.html">ReadTimeoutException</a>.</p>
+<p>Note: do not confuse this error with a <a class="reference external" href="../socket_options/#driver-read-timeout">driver read timeout</a>, which happens when the coordinator didn’t reply at all to
+the client.</p>
+</div>
+<div class="section" id="onwritetimeout">
+<h3><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onWriteTimeout-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-com.datastax.driver.core.WriteType-int-int-int-">onWriteTimeout</a><a class="headerlink" href="#onwritetimeout" title="Permalink to this headline">¶</a></h3>
+<p>This is similar to <code class="docutils literal notranslate"><span class="pre">onReadTimeout</span></code>, but for write operations. The reason reads and writes are handled separately is
+because a read is obviously a non mutating operation, whereas a write is likely to be. If a write times out at the
+coordinator level, there is no way to know whether the mutation was applied or not on the non-answering replica.</p>
+<p>If the policy rethrows the error, the user code will get a <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/WriteTimeoutException.html">WriteTimeoutException</a>.</p>
+</div>
+<div class="section" id="onrequesterror">
+<h3><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onRequestError-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-com.datastax.driver.core.exceptions.DriverException-int-">onRequestError</a><a class="headerlink" href="#onrequesterror" title="Permalink to this headline">¶</a></h3>
+<p>This gets called for any other error occurring after the request was sent.</p>
+<p>The method receives the exception as a parameter, so that implementations can refine their decision based on what
+happened. The possible exceptions are:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/ServerError.html">ServerError</a>: thrown by the coordinator when an unexpected error occurs. This is generally a Cassandra bug;</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/OperationTimedOutException.html">OperationTimedOutException</a>: thrown by the client when it didn’t hear back from the coordinator within the
+<a class="reference external" href="../socket_options/#driver-read-timeout">driver read timeout</a>;</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/ConnectionException.html">ConnectionException</a>: thrown by the client for any network issue while or after the request was written;</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/OverloadedException.html">OverloadedException</a>: thrown by the coordinator when replicas are down and the number of hinted handoffs gets too
+high; the coordinator temporarily refuses writes for these replicas (see <a class="reference external" href="https://docs.datastax.com/en/cassandra/2.1/cassandra/dml/dml_about_hh_c.html?scroll=concept_ds_ifg_jqx_zj__performance">hinted handoffs</a> in the Cassandra
+documentation).</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="hard-coded-rules">
+<h2>Hard-coded rules<a class="headerlink" href="#hard-coded-rules" title="Permalink to this headline">¶</a></h2>
+<p>There are a few cases where retrying is always the right thing to do. These are not covered by <code class="docutils literal notranslate"><span class="pre">RetryPolicy</span></code>, but
+hard-coded in the driver:</p>
+<ul class="simple">
+<li><p><strong>any error before a network write was attempted</strong>: to send a query, the driver selects a host, borrows a connection
+from the host’s <a class="reference external" href="../pooling/">connection pool</a>, and then writes the message to the connection.
+Errors can occur before the write was even attempted, for example if the connection pool is saturated, or if the
+host went down right after we borrowed. In those cases, it is always safe to retry since the request wasn’t sent, so
+the driver will transparently move to the next host in the query plan.</p></li>
+<li><p><strong>re-preparing a statement</strong>: when the driver executes a prepared statement, it may find out that the coordinator
+doesn’t know about it, and need to re-prepare it on the fly (this is described in detail <a class="reference external" href="../statements/prepared/#preparing-on-multiple-nodes">here</a>). The query
+is then retried on the same host.</p></li>
+<li><p><strong>trying to communicate with a host that is bootstrapping</strong>: this is a rare edge case, as in practice the driver
+should never try to communicate with a bootstrapping host (the only way is if it was specified as a contact point).
+Anyway, it is again safe to assume that the query was not executed at all, so the driver moves to the next host.</p></li>
+</ul>
+<p>Similarly, some errors have no chance of being solved by a retry. They will always be rethrown directly to the user.
+These include:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/QueryValidationException.html">QueryValidationException</a> and any of its subclasses (<a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/InvalidQueryException.html">InvalidQueryException</a>, <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/InvalidConfigurationInQueryException.html">InvalidConfigurationInQueryException</a>,
+<a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/UnauthorizedException.html">UnauthorizedException</a>, <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/SyntaxError.html">SyntaxError</a>, <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/AlreadyExistsException.html">AlreadyExistsException</a>);</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/TruncateException.html">TruncateException</a>.</p></li>
+</ul>
+</div>
+<div class="section" id="retries-and-idempotence">
+<h2>Retries and idempotence<a class="headerlink" href="#retries-and-idempotence" title="Permalink to this headline">¶</a></h2>
+<p>If a query is <a class="reference external" href="../idempotence/">not idempotent</a>, the driver will not retry it if that could produce inconsistent results:</p>
+<ul class="simple">
+<li><p>retrying in <code class="docutils literal notranslate"><span class="pre">onReadTimeout</span></code> is always safe, since by definition this error indicates that the query was a read, which
+didn’t mutate any data;</p></li>
+<li><p>similarly, <code class="docutils literal notranslate"><span class="pre">onUnavailable</span></code> is safe: the coordinator is telling us that it didn’t find enough replicas, so we know that
+it didn’t try to apply the query.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">onWriteTimeout</span></code> is <strong>not safe</strong>: some replicas failed to reply to the coordinator in time, but they might still have
+applied the mutation;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">onRequestError</span></code> is <strong>not safe</strong> either: the query might have been applied before the error occurred. In particular,
+an <code class="docutils literal notranslate"><span class="pre">OperationTimedOutException</span></code> could be caused by a network issue that prevented a successful response to come back
+to the client.</p></li>
+</ul>
+<p>Therefore, the driver does not retry after a write timeout or request error if the statement is not idempotent. This is
+handled internally, the retry policy methods are not even invoked in those cases.</p>
+<p>Note that this behavior was introduced in version 3.1.0 of the driver. In previous versions, it was up to retry policy
+implementations to handle idempotence (the new behavior is equivalent to what you achieved with
+<code class="docutils literal notranslate"><span class="pre">IdempotenceAwareRetryPolicy</span></code> before).</p>
+</div>
+</div>
+
+        </div>
+
+        <div id="sidebar" class="large-3 large-pull-6 columns"><div class="side-nav">
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../README.html">Manual</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../address_resolution/README.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../async/README.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../auth/README.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cloud/README.html">Connecting to Apollo (Cloud)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compression/README.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../control_connection/README.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_codecs/README.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_payloads/README.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../idempotence/README.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../load_balancing/README.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../logging/README.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metadata/README.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metrics/README.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../native_protocol/README.html">Native protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../object_mapper/README.html">Object Mapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../osgi/README.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../paging/README.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../pooling/README.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../query_timestamps/README.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reconnection/README.html">Reconnection</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shaded_jar/README.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../socket_options/README.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../speculative_execution/README.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ssl/README.html">SSL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../statements/README.html">Statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../tuples/README.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../udts/README.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../upgrade_guide/README.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/README.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog/README.html">Changelog</a></li>
+</ul>
+
+</div>
+        </div>
+
+        <div class="large-3 columns">
+            
+        </div>
+
+    </div>
+</section>
+
+<!-- newsleter modal -->
+
+<div id="newsletter_signup" class="reveal-modal tiny radius dark_modal" data-reveal aria-labelledby="modalTitle" aria-hidden="true" role="dialog">
+    <a class="close-reveal-modal" aria-label="Close">×</a>
+    <h2 id="modalTitle">Sign up for the Scylla newsletter</h2>
+    <div id="mc_embed_signup">
+        <form action="//cloudius-systems.us10.list-manage.com/subscribe/post?u=df8bb543c68230d5f7b4dcf78&amp;id=9a4589f144" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate="">
+            <div id="mc_embed_signup_scroll">
+
+                <div class="mc-field-group">
+                    <div class="row collapse">
+                        <div class="small-3 columns"><label for="mce-EMAIL">Email</label></div>
+                        <div class="small-9 columns"><input type="email" value="" name="EMAIL" class="required email" id="mce-EMAIL"></div>
+                    </div>
+                </div>
+                <div class="mc-field-group">
+                    <div class="row collapse">
+                        <div class="small-3 columns"><label for="mce-FNAME">First Name </label></div>
+                        <div class="small-9 columns"><input type="text" value="" name="FNAME" class="" id="mce-FNAME"></div>
+                    </div>
+                </div>
+                <div class="mc-field-group">
+                    <div class="row collapse">
+                        <div class="small-3 columns"><label for="mce-LNAME">Last Name </label></div>
+                        <div class="small-9 columns"><input type="text" value="" name="LNAME" class="" id="mce-LNAME"></div>
+                    </div>
+                </div>
+                <div id="mce-responses" class="clear">
+                    <div class="response" id="mce-error-response" style="display:none"></div>
+                    <div class="response" id="mce-success-response" style="display:none"></div>
+                </div>    <!-- real people should not fill this in and expect good things - do not remove this or risk form bot signups-->
+                <div style="position: absolute; left: -5000px;"><input type="text" name="b_df8bb543c68230d5f7b4dcf78_9a4589f144" tabindex="-1" value=""></div>
+                <div class="clear"><input type="submit" class="button" value="Sign up" name="subscribe" id="mc-embedded-subscribe"></div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- end newsleter modal -->
+
+
+
+<!-- footer.html -->
+<footer id="footer">
+    <div class="footer-top">
+        <a class="logo" href="https://www.scylladb.com"><img src="../../_static/img/logo-scylla-horizontal-RGB.svg" alt=""></a>
+        <div class="footer-links">
+            <a class="link" href="https://docs.scylladb.com">Docs</a>
+            <a class="link" href="https://www.scylladb.com/company/contact-us/">Contact Us</a>
+            <a class="link" href="https://www.scylladb.com/company/">About Us</a>
+            <a class="link button" href="https://github.com/scylladb/java-driver/issues/new?title=Issue in page Retries&&body=I%20would%20like%20to%20report%20an%20issue%20in%20page%20http://docs.scylladb.com/manual/retries/README%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix" target="_blank">
+                Report an issue on this page</a>
+        </div>
+        <div class="footer-actions">
+            <a class="link-icon" href="https://github.com/ScyllaDB" target="_blank">
+                <span class="icon-github2"></span></a>
+            <a class="link-icon" href="https://twitter.com/ScyllaDB" target="_blank">
+                <span class="icon-twitter"></span></a>
+            <a class="link-icon" href="https://www.linkedin.com/company/scylladb"  target="_blank">
+                <span class="icon-linkedin2"></span></a>
+            <a class="link-icon" href="https://www.facebook.com/scylladb/" target="_blank">
+                <span class="icon-facebook"></span></a>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        <div class="footer-info">
+            <div class="footer-copyright">
+                &#169; 2012, ScyllaDB. All rights reserved.
+            </div>
+            <div class="footer-last-updated">
+                Last updated on 20 October 2020.
+            </div>
+        </div>
+        <div class="footer-links">
+        </div>
+    </div>
+</footer>
+<!-- end footer.html -->
+
+<!-- bodyscripts.html -->
+<!-- at the end of the BODY --> 
+<script src="../../_static/js/vendor/jquery.js"></script>
+<script src="../../_static/expertrec.js"></script>
+<script src="../../_static/js/foundation/foundation.js"></script>
+<script src="../../_static/js/foundation/foundation.topbar.js"></script>
+<script src="../../_static/app.js"></script>
+<script>
+    $(document).foundation();
+</script>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+  <!-- end bodyscripts.html -->
+</body>
+</html>

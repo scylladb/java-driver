@@ -1,0 +1,5 @@
+var classcom_1_1datastax_1_1driver_1_1core_1_1_host_connection_pool_multi_test =
+[
+    [ "should_mark_host_down_if_all_connections_fail_on_init", "classcom_1_1datastax_1_1driver_1_1core_1_1_host_connection_pool_multi_test.html#a6fa3fc99a5516562c7680e3229b3dfa1", null ],
+    [ "should_replace_control_connection_if_it_goes_down_but_host_remains_up", "classcom_1_1datastax_1_1driver_1_1core_1_1_host_connection_pool_multi_test.html#ae57b6ba54ca175978fe5e96e1bf5ed64", null ]
+];

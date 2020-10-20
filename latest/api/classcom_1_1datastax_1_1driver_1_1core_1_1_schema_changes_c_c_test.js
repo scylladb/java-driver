@@ -1,0 +1,4 @@
+var classcom_1_1datastax_1_1driver_1_1core_1_1_schema_changes_c_c_test =
+[
+    [ "should_receive_changes_made_while_control_connection_is_down_on_reconnect", "classcom_1_1datastax_1_1driver_1_1core_1_1_schema_changes_c_c_test.html#a4d9aa8c90eb8b0bbc55eddb116090621", null ]
+];

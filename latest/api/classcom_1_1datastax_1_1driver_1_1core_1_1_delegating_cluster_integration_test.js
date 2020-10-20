@@ -1,0 +1,4 @@
+var classcom_1_1datastax_1_1driver_1_1core_1_1_delegating_cluster_integration_test =
+[
+    [ "should_allow_subclass_to_delegate_to_other_instance", "classcom_1_1datastax_1_1driver_1_1core_1_1_delegating_cluster_integration_test.html#af76324a0b1b378f457edc18388903f1b", null ]
+];

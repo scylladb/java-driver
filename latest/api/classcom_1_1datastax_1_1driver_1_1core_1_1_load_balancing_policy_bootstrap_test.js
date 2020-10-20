@@ -1,0 +1,5 @@
+var classcom_1_1datastax_1_1driver_1_1core_1_1_load_balancing_policy_bootstrap_test =
+[
+    [ "should_init_policy_with_up_contact_points", "classcom_1_1datastax_1_1driver_1_1core_1_1_load_balancing_policy_bootstrap_test.html#ac9f1e79a55b564c21686ed2448e1a211", null ],
+    [ "should_send_down_notifications_after_init_when_contact_points_are_down", "classcom_1_1datastax_1_1driver_1_1core_1_1_load_balancing_policy_bootstrap_test.html#a396fa56c4d977d06674f3a13eb6f9445", null ]
+];

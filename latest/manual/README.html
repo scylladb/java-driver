@@ -1,0 +1,516 @@
+
+
+
+<!doctype html>
+<html class="no-js" lang="en">
+  
+<head><!-- begin head.html -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>
+    Manual | Scylla Docs
+    </title>
+    <meta name="description" content="Scylla is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+
+    <link rel="icon" href="../_static/img/favicon.ico" type="image/x-icon"/>
+    <link rel="canonical" href="https://docs.scylladb.com/">
+
+    <link rel="author" href="mailto:info@scylladb.com">
+    <link rel="stylesheet" href="../_static/" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx_tabs/semantic-ui-2.4.1/segment.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx_tabs/semantic-ui-2.4.1/menu.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx_tabs/semantic-ui-2.4.1/tab.min.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx_tabs/tabs.css" />
+    
+    <link href='https://fonts.googleapis.com/css?family=Roboto:400,100,300,500,700' rel='stylesheet' type='text/css'>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/foundation/5.5.2/css/foundation.min.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/css/doc/main.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+
+    <script src="../_static/js/vendor/modernizr.js"></script>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-T8P2JP');</script>
+    <!-- End Google Tag Manager -->
+
+    <!-- Marketo -->
+    <script type="text/javascript"> (function() { var didInit = false; function initMunchkin() { if(didInit === false) { didInit = true; Munchkin.init('791-QBF-350'); } } var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true; s.src = '//munchkin.marketo.net/munchkin.js'; s.onreadystatechange = function() { if (this.readyState == 'complete' || this.readyState == 'loaded') { initMunchkin(); } }; s.onload = initMunchkin; document.getElementsByTagName('head')[0].appendChild(s); })(); </script>
+    <!-- End Marketo -->
+
+<!-- end head.html -->
+</head>
+
+<body>
+<header id="header" class="animated">
+    <div class="topbar_continer contain-to-grid clearfix">
+        <nav class="top-bar" id="top-bar" data-topbar role="navigation">
+            <ul class="title-area">
+                <li class="name">
+                    <div class="logo">
+                        <a href="https://docs.scylladb.com/"><img src="../_static/img/logo-scylla-docs.svg" alt="" width="151"></a>
+                    </div>
+                </li>
+                <li class="toggle-topbar"><a href="#"><span class="icon-manu"></span></a></li>
+            </ul>
+            <section class="top-bar-section clearfix">
+                <ul class="right">
+                    
+                    <li>
+                        <a href="https://scylladb.github.io/java-driver/">Scylla Java Driver</a>
+                    </li>
+                    
+                    <li>
+                        <a href="https://docs.scylladb.com/scylla-cloud/">Scylla Cloud</a>
+                    </li>
+                    
+                    <li>
+                        <a href="https://university.scylladb.com/">Scylla University</a>
+                    </li>
+                    
+                    <li>
+                        <a href="https://www.scylladb.com/">ScyllaDB Home</a>
+                    </li>
+                    
+                    <li class="search_continer show-for-medium-up">	
+                        <ci-search></ci-search>	
+                    </li>	
+                </ul>
+            </section>
+        </nav>
+    </div>
+</header>
+<section id="content">
+    <div class="row">
+	
+	<div class="large-6 large-push-3 columns">
+            <div class="section" id="manual">
+<h1>Manual<a class="headerlink" href="#manual" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h2>
+<p>Here’s a short program that connects to Cassandra and executes a query:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span> <span class="n">cluster</span> <span class="o">=</span> <span class="kc">null</span><span class="o">;</span>
+<span class="k">try</span> <span class="o">{</span>
+    <span class="n">cluster</span> <span class="o">=</span> <span class="n">Cluster</span><span class="o">.</span><span class="na">builder</span><span class="o">()</span>                                                    <span class="c1">// (1)</span>
+            <span class="o">.</span><span class="na">addContactPoint</span><span class="o">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="o">)</span>
+            <span class="o">.</span><span class="na">build</span><span class="o">();</span>
+    <span class="n">Session</span> <span class="n">session</span> <span class="o">=</span> <span class="n">cluster</span><span class="o">.</span><span class="na">connect</span><span class="o">();</span>                                           <span class="c1">// (2)</span>
+
+    <span class="n">ResultSet</span> <span class="n">rs</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select release_version from system.local&quot;</span><span class="o">);</span>    <span class="c1">// (3)</span>
+    <span class="n">Row</span> <span class="n">row</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="na">one</span><span class="o">();</span>
+    <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">println</span><span class="o">(</span><span class="n">row</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="s">&quot;release_version&quot;</span><span class="o">));</span>                          <span class="c1">// (4)</span>
+<span class="o">}</span> <span class="k">finally</span> <span class="o">{</span>
+    <span class="k">if</span> <span class="o">(</span><span class="n">cluster</span> <span class="o">!=</span> <span class="kc">null</span><span class="o">)</span> <span class="n">cluster</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>                                          <span class="c1">// (5)</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>the <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Cluster.html">Cluster</a> object is the main entry point of the driver. It holds the known state of the actual Cassandra cluster
+(notably the <a class="reference external" href="metadata/">Metadata</a>). This class is thread-safe, you should create a single instance (per target
+Cassandra cluster), and share it throughout your application;</p></li>
+<li><p>the <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Session.html">Session</a> is what you use to execute queries. Likewise, it is thread-safe and should be reused;</p></li>
+<li><p>we use <code class="docutils literal notranslate"><span class="pre">execute</span></code> to send a query to Cassandra. This returns a <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/ResultSet.html">ResultSet</a>, which is essentially a collection of <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Row.html">Row</a>
+objects. On the next line, we extract the first row (which is the only one in this case);</p></li>
+<li><p>we extract the value of the first (and only) column from the row;</p></li>
+<li><p>finally, we close the cluster after we’re done with it. This will also close any session that was created from this
+cluster. This step is important because it frees underlying resources (TCP connections, thread pools…). In a real
+application, you would typically do this at shutdown (for example, when undeploying your webapp).</p></li>
+</ol>
+<p>Note: this example uses the synchronous API. Most methods have <a class="reference external" href="async/">asynchronous</a> equivalents.</p>
+</div>
+<div class="section" id="setting-up-the-driver">
+<h2>Setting up the driver<a class="headerlink" href="#setting-up-the-driver" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="cluster">
+<h3><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Cluster.html">Cluster</a><a class="headerlink" href="#cluster" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="creating-an-instance">
+<h4>Creating an instance<a class="headerlink" href="#creating-an-instance" title="Permalink to this headline">¶</a></h4>
+<p>The simplest approach is to do it programmatically with <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Cluster.Builder.html">Cluster.Builder</a>, which provides a fluent API:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span> <span class="n">cluster</span> <span class="o">=</span> <span class="n">Cluster</span><span class="o">.</span><span class="na">builder</span><span class="o">()</span>
+        <span class="o">.</span><span class="na">withClusterName</span><span class="o">(</span><span class="s">&quot;myCluster&quot;</span><span class="o">)</span>
+        <span class="o">.</span><span class="na">addContactPoint</span><span class="o">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="o">)</span>
+        <span class="o">.</span><span class="na">build</span><span class="o">();</span>
+</pre></div>
+</div>
+<p>Alternatively, you might want to retrieve the settings from an external source (like a properties file or a web
+service). You’ll need to provide an implementation of <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Cluster.Initializer.html">Initializer</a> that loads these settings:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Initializer</span> <span class="n">myInitializer</span> <span class="o">=</span> <span class="o">...</span> <span class="c1">// your implementation</span>
+<span class="n">Cluster</span> <span class="n">cluster</span> <span class="o">=</span> <span class="n">Cluster</span><span class="o">.</span><span class="na">buildFrom</span><span class="o">(</span><span class="n">myInitializer</span><span class="o">);</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="creation-options">
+<h4>Creation options<a class="headerlink" href="#creation-options" title="Permalink to this headline">¶</a></h4>
+<p>The only required option is the list of contact points, i.e. the hosts that the driver will initially contact to
+discover the cluster topology. You can provide a single contact point, but it is usually a good idea to provide more, so
+that the driver can fallback if the first one is down.</p>
+<p>The other aspects that you can configure on the <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> are:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="address_resolution/">address translation</a>;</p></li>
+<li><p><a class="reference external" href="auth/">authentication</a>;</p></li>
+<li><p><a class="reference external" href="compression/">compression</a>;</p></li>
+<li><p><a class="reference external" href="load_balancing/">load balancing</a>;</p></li>
+<li><p><a class="reference external" href="metrics/">metrics</a>;</p></li>
+<li><p>low-level <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/NettyOptions.html">Netty configuration</a>;</p></li>
+<li><p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/QueryOptions.html">query options</a>;</p></li>
+<li><p><a class="reference external" href="reconnection/">reconnections</a>;</p></li>
+<li><p><a class="reference external" href="retries/">retries</a>;</p></li>
+<li><p><a class="reference external" href="socket_options/">socket options</a>;</p></li>
+<li><p><a class="reference external" href="ssl/">SSL</a>;</p></li>
+<li><p><a class="reference external" href="speculative_execution/">speculative executions</a>;</p></li>
+<li><p><a class="reference external" href="query_timestamps/">query timestamps</a>.</p></li>
+</ul>
+<p>In addition, you can register various types of listeners to be notified of cluster events; see <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Host.StateListener.html">Host.StateListener</a>,
+<a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/LatencyTracker.html">LatencyTracker</a>, and <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/SchemaChangeListener.html">SchemaChangeListener</a>.</p>
+</div>
+<div class="section" id="cluster-initialization">
+<h4>Cluster initialization<a class="headerlink" href="#cluster-initialization" title="Permalink to this headline">¶</a></h4>
+<p>A freshly-built <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> instance does not initialize automatically; that will be triggered by one of the following
+actions:</p>
+<ul class="simple">
+<li><p>an explicit call to <code class="docutils literal notranslate"><span class="pre">cluster.init()</span></code>;</p></li>
+<li><p>a call to <code class="docutils literal notranslate"><span class="pre">cluster.getMetadata()</span></code>;</p></li>
+<li><p>creating a session with <code class="docutils literal notranslate"><span class="pre">cluster.connect()</span></code> or one of its variants;</p></li>
+<li><p>calling <code class="docutils literal notranslate"><span class="pre">session.init()</span></code> on a session that was created with <code class="docutils literal notranslate"><span class="pre">cluster.newSession()</span></code>.</p></li>
+</ul>
+<p>The initialization sequence is the following:</p>
+<ul class="simple">
+<li><p>initialize internal state (thread pools, utility components, etc.);</p></li>
+<li><p>try to connect to each of the contact points in sequence. The order is not deterministic (in fact, the driver shuffles
+the list to avoid hotspots if a large number of clients share the same contact points). If no contact point replies,
+a <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/NoHostAvailableException.html">NoHostAvailableException</a> is thrown and the process stops here;</p></li>
+<li><p>otherwise, the successful contact point is elected as the <a class="reference external" href="control_connection/">control host</a>. The driver negotiates
+the <a class="reference external" href="native_protocol/">native protocol version</a> with it, and queries its system tables to discover the addresses of
+the other hosts.</p></li>
+</ul>
+<p>Note that, at this stage, only the control connection has been established. Connections to other hosts will only be
+opened when a session gets created.</p>
+</div>
+</div>
+<div class="section" id="session">
+<h3><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Session.html">Session</a><a class="headerlink" href="#session" title="Permalink to this headline">¶</a></h3>
+<p>By default, a session isn’t tied to any specific keyspace. You’ll need to prefix table names in your queries:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Session</span> <span class="n">session</span> <span class="o">=</span> <span class="n">cluster</span><span class="o">.</span><span class="na">connect</span><span class="o">();</span>
+<span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select * from myKeyspace.myTable where id = 1&quot;</span><span class="o">);</span>
+</pre></div>
+</div>
+<p>You can also specify a keyspace name at construction time, it will be used as the default when table names are not
+qualified:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Session</span> <span class="n">session</span> <span class="o">=</span> <span class="n">cluster</span><span class="o">.</span><span class="na">connect</span><span class="o">(</span><span class="s">&quot;myKeyspace&quot;</span><span class="o">);</span>
+<span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select * from myTable where id = 1&quot;</span><span class="o">);</span>
+<span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select * from otherKeyspace.otherTable where id = 1&quot;</span><span class="o">);</span>
+</pre></div>
+</div>
+<p>You might be tempted to open a separate session for each keyspace used in your application; however, note that
+<a class="reference external" href="pooling/">connection pools</a> are created at the session level, so each new session will consume additional system
+resources:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Warning: creating two sessions doubles the number of TCP connections opened by the driver</span>
+<span class="n">Session</span> <span class="n">session1</span> <span class="o">=</span> <span class="n">cluster</span><span class="o">.</span><span class="na">connect</span><span class="o">(</span><span class="s">&quot;ks1&quot;</span><span class="o">);</span>
+<span class="n">Session</span> <span class="n">session2</span> <span class="o">=</span> <span class="n">cluster</span><span class="o">.</span><span class="na">connect</span><span class="o">(</span><span class="s">&quot;ks2&quot;</span><span class="o">);</span>
+</pre></div>
+</div>
+<p>Also, there is currently a <a class="reference external" href="async/#known-limitations">known limitation</a> with named sessions, that causes the driver to
+unexpectedly block the calling thread in certain circumstances; if you use a fully asynchronous model, you should use a
+session with no keyspace.</p>
+<p>Finally, if you issue a <code class="docutils literal notranslate"><span class="pre">USE</span></code> statement, it will change the default keyspace on that session:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Session</span> <span class="n">session</span> <span class="o">=</span> <span class="n">cluster</span><span class="o">.</span><span class="na">connect</span><span class="o">();</span>
+<span class="c1">// No default keyspace set, need to prefix:</span>
+<span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select * from myKeyspace.myTable where id = 1&quot;</span><span class="o">);</span>
+
+<span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;USE myKeyspace&quot;</span><span class="o">);</span>
+<span class="c1">// Now the keyspace is set, unqualified query works:</span>
+<span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select * from myTable where id = 1&quot;</span><span class="o">);</span>
+</pre></div>
+</div>
+<p>Be very careful though: if the session is shared by multiple threads, switching the keyspace at runtime could easily
+cause unexpected query failures.</p>
+<p>Generally, the recommended approach is to use a single session with no keyspace, and prefix all your queries.</p>
+</div>
+</div>
+<div class="section" id="running-queries">
+<h2>Running queries<a class="headerlink" href="#running-queries" title="Permalink to this headline">¶</a></h2>
+<p>You run queries with the session’s <code class="docutils literal notranslate"><span class="pre">execute</span></code> method:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ResultSet</span> <span class="n">rs</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select release_version from system.local&quot;</span><span class="o">);</span>
+</pre></div>
+</div>
+<p>As shown here, the simplest form is to pass a query string directly. You can also pass an instance of
+<a class="reference external" href="statements/">Statement</a>.</p>
+<div class="section" id="processing-rows">
+<h3>Processing rows<a class="headerlink" href="#processing-rows" title="Permalink to this headline">¶</a></h3>
+<p>Executing a query produces a <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/ResultSet.html">ResultSet</a>, which is an iterable of <a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Row.html">Row</a>. The basic way to process all rows is to use
+Java’s for-each loop:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="o">(</span><span class="n">Row</span> <span class="n">row</span> <span class="o">:</span> <span class="n">rs</span><span class="o">)</span> <span class="o">{</span>
+    <span class="c1">// process the row</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>Note that this will return <strong>all results</strong> without limit (even though the driver might use multiple queries in the
+background). To handle large result sets, you might want to use a <code class="docutils literal notranslate"><span class="pre">LIMIT</span></code> clause in your CQL query, or use one of the
+techniques described in the <a class="reference external" href="paging/">paging</a> documentation.</p>
+<p>When you know that there is only one row (or are only interested in the first one), the driver provides a convenience
+method:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Row</span> <span class="n">row</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="na">one</span><span class="o">();</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="reading-columns">
+<h3>Reading columns<a class="headerlink" href="#reading-columns" title="Permalink to this headline">¶</a></h3>
+<p><a class="reference external" href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/Row.html">Row</a> provides getters to extract column values; they can be either positional or named:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Row</span> <span class="n">row</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="na">execute</span><span class="o">(</span><span class="s">&quot;select first_name, last_name from users where id = 1&quot;</span><span class="o">).</span><span class="na">one</span><span class="o">();</span>
+
+<span class="c1">// The two are equivalent:</span>
+<span class="n">String</span> <span class="n">firstName</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="mi">0</span><span class="o">);</span>
+<span class="n">String</span> <span class="n">firstName</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="na">getString</span><span class="o">(</span><span class="s">&quot;first_name&quot;</span><span class="o">);</span>
+</pre></div>
+</div>
+<div class="section" id="cql-to-java-type-mapping">
+<h4>CQL to Java type mapping<a class="headerlink" href="#cql-to-java-type-mapping" title="Permalink to this headline">¶</a></h4>
+<table border="1" style="text-align:center; width:100%;margin-bottom:1em;">
+    <tr> <td><b>CQL3 data type</b></td> <td><b>Getter name</b></td> <td><b>Java type</b></td> </tr>
+    <tr> <td>ascii</td> <td>getString</td> <td>java.lang.String</td> </tr>
+    <tr> <td>bigint</td> <td>getLong</td> <td>long</td> </tr>
+    <tr> <td>blob</td> <td>getBytes</td> <td>java.nio.ByteBuffer</td> </tr>
+    <tr> <td>boolean</td> <td>getBool</td> <td>boolean</td> </tr>
+    <tr> <td>counter</td> <td>getLong</td> <td>long</td> </tr>
+    <tr> <td>date</td> <td>getDate</td> <td><a href="https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/LocalDate.html">LocalDate</a></td> </tr>
+    <tr> <td>decimal</td> <td>getDecimal</td> <td>java.math.BigDecimal</td> </tr>
+    <tr> <td>double</td> <td>getDouble</td> <td>double</td> </tr>
+    <tr> <td>float</td> <td>getFloat</td> <td>float</td> </tr>
+    <tr> <td>inet</td> <td>getInet</td> <td>java.net.InetAddress</td> </tr>
+    <tr> <td>int</td> <td>getInt</td> <td>int</td> </tr>
+    <tr> <td>list</td> <td>getList</td> <td>java.util.List<T></td> </tr>
+    <tr> <td>map</td> <td>getMap</td> <td>java.util.Map<K, V></td> </tr>
+    <tr> <td>set</td> <td>getSet</td> <td>java.util.Set<T></td> </tr>
+    <tr> <td>smallint</td> <td>getShort</td> <td>short</td> </tr>
+    <tr> <td>text</td> <td>getString</td> <td>java.lang.String</td> </tr>
+    <tr> <td>time</td> <td>getTime</td> <td>long</td> </tr>
+    <tr> <td>timestamp</td> <td>getTimestamp</td> <td>java.util.Date</td> </tr>
+    <tr> <td>timeuuid</td> <td>getUUID</td> <td>java.util.UUID</td> </tr>
+    <tr> <td>tinyint</td> <td>getByte</td> <td>byte</td> </tr>
+    <tr> <td>tuple</td> <td>getTupleValue</td> <td><a href="tuples/">TupleValue</a></td> </tr>
+    <tr> <td>user-defined types</td> <td>getUDTValue</td> <td><a href="udts/">UDTValue</a></td> </tr>
+    <tr> <td>uuid</td> <td>getUUID</td> <td>java.util.UUID</td> </tr>
+    <tr> <td>varchar</td> <td>getString</td> <td>java.lang.String</td> </tr>
+    <tr> <td>varint</td> <td>getVarint</td> <td>java.math.BigInteger</td> </tr>
+</table><p>In addition to these default mappings, you can register your own types with <a class="reference external" href="custom_codecs/">custom codecs</a>.</p>
+</div>
+<div class="section" id="primitive-types">
+<h4>Primitive types<a class="headerlink" href="#primitive-types" title="Permalink to this headline">¶</a></h4>
+<p>For performance reasons, the driver uses primitive Java types wherever possible (<code class="docutils literal notranslate"><span class="pre">boolean</span></code>, <code class="docutils literal notranslate"><span class="pre">int</span></code>…); the CQL value
+<code class="docutils literal notranslate"><span class="pre">NULL</span></code> is encoded as the type’s default value (<code class="docutils literal notranslate"><span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">0</span></code>…), which can be ambiguous. To distinguish <code class="docutils literal notranslate"><span class="pre">NULL</span></code> from
+actual values, use <code class="docutils literal notranslate"><span class="pre">isNull</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Integer</span> <span class="n">age</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="na">isNull</span><span class="o">(</span><span class="s">&quot;age&quot;</span><span class="o">)</span> <span class="o">?</span> <span class="kc">null</span> <span class="o">:</span> <span class="n">row</span><span class="o">.</span><span class="na">getInt</span><span class="o">(</span><span class="s">&quot;age&quot;</span><span class="o">);</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="collection-types">
+<h4>Collection types<a class="headerlink" href="#collection-types" title="Permalink to this headline">¶</a></h4>
+<p>To ensure type safety, collection getters are generic. You need to provide type parameters matching your CQL type when
+calling the methods:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming given_names is a list&lt;text&gt;:</span>
+<span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span> <span class="n">givenNames</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="na">getList</span><span class="o">(</span><span class="s">&quot;given_names&quot;</span><span class="o">,</span> <span class="n">String</span><span class="o">.</span><span class="na">class</span><span class="o">);</span>
+</pre></div>
+</div>
+<p>For nested collections, element types are generic and cannot be expressed as Java <code class="docutils literal notranslate"><span class="pre">Class</span></code> instances. We use Guava’s
+<a class="reference external" href="https://github.com/google/guava/wiki/ReflectionExplained">TypeToken</a> instead:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming teams is a set&lt;list&lt;text&gt;&gt;:</span>
+<span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;&gt;</span> <span class="n">listOfStrings</span> <span class="o">=</span> <span class="k">new</span> <span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;&gt;()</span> <span class="o">{};</span>
+<span class="n">Set</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;&gt;</span> <span class="n">teams</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="na">getSet</span><span class="o">(</span><span class="s">&quot;teams&quot;</span><span class="o">,</span> <span class="n">listOfStrings</span><span class="o">);</span>
+</pre></div>
+</div>
+<p>Since type tokens are anonymous inner classes, it’s recommended to store them as constants in a utility class instead of
+re-creating them each time.</p>
+</div>
+<div class="section" id="row-metadata">
+<h4>Row metadata<a class="headerlink" href="#row-metadata" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Row</span></code> exposes an API to explore the column metadata at runtime:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="o">(</span><span class="n">ColumnDefinitions</span><span class="o">.</span><span class="na">Definition</span> <span class="n">definition</span> <span class="o">:</span> <span class="n">row</span><span class="o">.</span><span class="na">getColumnDefinitions</span><span class="o">())</span> <span class="o">{</span>
+    <span class="n">System</span><span class="o">.</span><span class="na">out</span><span class="o">.</span><span class="na">printf</span><span class="o">(</span><span class="s">&quot;Column %s has type %s%n&quot;</span><span class="o">,</span>
+            <span class="n">definition</span><span class="o">.</span><span class="na">getName</span><span class="o">(),</span>
+            <span class="n">definition</span><span class="o">.</span><span class="na">getType</span><span class="o">());</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="object-mapping">
+<h2>Object mapping<a class="headerlink" href="#object-mapping" title="Permalink to this headline">¶</a></h2>
+<p>Besides explicit work with queries and rows, you can also use
+<a class="reference external" href="object_mapper/">Object Mapper</a> to simplify retrieval &amp; store of your data.</p>
+</div>
+<div class="section" id="more-information">
+<h2>More information<a class="headerlink" href="#more-information" title="Permalink to this headline">¶</a></h2>
+<p>If you’re reading this from the <a class="reference external" href="http://datastax.github.io/java-driver/">generated HTML documentation on
+github.io</a>, use the “Contents”
+menu on the left hand side to navigate sub-sections. If you’re <a class="reference external" href="https://github.com/datastax/java-driver/tree/3.x/manual">browsing the source files on
+github.com</a>,
+simply navigate to each sub-directory.</p>
+<div class="toctree-wrapper compound">
+</div>
+</div>
+</div>
+
+        </div>
+
+        <div id="sidebar" class="large-3 large-pull-6 columns"><div class="side-nav">
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Documentation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Manual</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="address_resolution/README.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="async/README.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="auth/README.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cloud/README.html">Connecting to Apollo (Cloud)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compression/README.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="control_connection/README.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_codecs/README.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_payloads/README.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="idempotence/README.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="load_balancing/README.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging/README.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata/README.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metrics/README.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="native_protocol/README.html">Native protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="object_mapper/README.html">Object Mapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="osgi/README.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="paging/README.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pooling/README.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="query_timestamps/README.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reconnection/README.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="retries/README.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shaded_jar/README.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="socket_options/README.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="speculative_execution/README.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ssl/README.html">SSL</a></li>
+<li class="toctree-l2"><a class="reference internal" href="statements/README.html">Statements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tuples/README.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="udts/README.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../upgrade_guide/README.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/README.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog/README.html">Changelog</a></li>
+</ul>
+
+</div>
+        </div>
+
+        <div class="large-3 columns">
+            
+        </div>
+
+    </div>
+</section>
+
+<!-- newsleter modal -->
+
+<div id="newsletter_signup" class="reveal-modal tiny radius dark_modal" data-reveal aria-labelledby="modalTitle" aria-hidden="true" role="dialog">
+    <a class="close-reveal-modal" aria-label="Close">×</a>
+    <h2 id="modalTitle">Sign up for the Scylla newsletter</h2>
+    <div id="mc_embed_signup">
+        <form action="//cloudius-systems.us10.list-manage.com/subscribe/post?u=df8bb543c68230d5f7b4dcf78&amp;id=9a4589f144" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" novalidate="">
+            <div id="mc_embed_signup_scroll">
+
+                <div class="mc-field-group">
+                    <div class="row collapse">
+                        <div class="small-3 columns"><label for="mce-EMAIL">Email</label></div>
+                        <div class="small-9 columns"><input type="email" value="" name="EMAIL" class="required email" id="mce-EMAIL"></div>
+                    </div>
+                </div>
+                <div class="mc-field-group">
+                    <div class="row collapse">
+                        <div class="small-3 columns"><label for="mce-FNAME">First Name </label></div>
+                        <div class="small-9 columns"><input type="text" value="" name="FNAME" class="" id="mce-FNAME"></div>
+                    </div>
+                </div>
+                <div class="mc-field-group">
+                    <div class="row collapse">
+                        <div class="small-3 columns"><label for="mce-LNAME">Last Name </label></div>
+                        <div class="small-9 columns"><input type="text" value="" name="LNAME" class="" id="mce-LNAME"></div>
+                    </div>
+                </div>
+                <div id="mce-responses" class="clear">
+                    <div class="response" id="mce-error-response" style="display:none"></div>
+                    <div class="response" id="mce-success-response" style="display:none"></div>
+                </div>    <!-- real people should not fill this in and expect good things - do not remove this or risk form bot signups-->
+                <div style="position: absolute; left: -5000px;"><input type="text" name="b_df8bb543c68230d5f7b4dcf78_9a4589f144" tabindex="-1" value=""></div>
+                <div class="clear"><input type="submit" class="button" value="Sign up" name="subscribe" id="mc-embedded-subscribe"></div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- end newsleter modal -->
+
+
+
+<!-- footer.html -->
+<footer id="footer">
+    <div class="footer-top">
+        <a class="logo" href="https://www.scylladb.com"><img src="../_static/img/logo-scylla-horizontal-RGB.svg" alt=""></a>
+        <div class="footer-links">
+            <a class="link" href="https://docs.scylladb.com">Docs</a>
+            <a class="link" href="https://www.scylladb.com/company/contact-us/">Contact Us</a>
+            <a class="link" href="https://www.scylladb.com/company/">About Us</a>
+            <a class="link button" href="https://github.com/scylladb/java-driver/issues/new?title=Issue in page Manual&&body=I%20would%20like%20to%20report%20an%20issue%20in%20page%20http://docs.scylladb.com/manual/README%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix" target="_blank">
+                Report an issue on this page</a>
+        </div>
+        <div class="footer-actions">
+            <a class="link-icon" href="https://github.com/ScyllaDB" target="_blank">
+                <span class="icon-github2"></span></a>
+            <a class="link-icon" href="https://twitter.com/ScyllaDB" target="_blank">
+                <span class="icon-twitter"></span></a>
+            <a class="link-icon" href="https://www.linkedin.com/company/scylladb"  target="_blank">
+                <span class="icon-linkedin2"></span></a>
+            <a class="link-icon" href="https://www.facebook.com/scylladb/" target="_blank">
+                <span class="icon-facebook"></span></a>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        <div class="footer-info">
+            <div class="footer-copyright">
+                &#169; 2012, ScyllaDB. All rights reserved.
+            </div>
+            <div class="footer-last-updated">
+                Last updated on 20 October 2020.
+            </div>
+        </div>
+        <div class="footer-links">
+        </div>
+    </div>
+</footer>
+<!-- end footer.html -->
+
+<!-- bodyscripts.html -->
+<!-- at the end of the BODY --> 
+<script src="../_static/js/vendor/jquery.js"></script>
+<script src="../_static/expertrec.js"></script>
+<script src="../_static/js/foundation/foundation.js"></script>
+<script src="../_static/js/foundation/foundation.topbar.js"></script>
+<script src="../_static/app.js"></script>
+<script>
+    $(document).foundation();
+</script>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+  <!-- end bodyscripts.html -->
+</body>
+</html>

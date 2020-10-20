@@ -1,0 +1,4 @@
+var classcom_1_1datastax_1_1driver_1_1core_1_1_extended_peer_check_disabled_test =
+[
+    [ "should_use_peer_if_extended_peer_check_is_disabled", "classcom_1_1datastax_1_1driver_1_1core_1_1_extended_peer_check_disabled_test.html#aa0a2f17e811cf10ce56ccfc29c5bcd66", null ]
+];

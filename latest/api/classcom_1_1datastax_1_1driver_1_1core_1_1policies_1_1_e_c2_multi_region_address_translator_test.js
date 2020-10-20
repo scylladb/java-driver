@@ -1,0 +1,9 @@
+var classcom_1_1datastax_1_1driver_1_1core_1_1policies_1_1_e_c2_multi_region_address_translator_test =
+[
+    [ "should_build_reversed_domain_name_for_ip_v4", "classcom_1_1datastax_1_1driver_1_1core_1_1policies_1_1_e_c2_multi_region_address_translator_test.html#a3bbab3c45f23d8b5d6be6571f8ba98bd", null ],
+    [ "should_build_reversed_domain_name_for_ip_v6", "classcom_1_1datastax_1_1driver_1_1core_1_1policies_1_1_e_c2_multi_region_address_translator_test.html#abb8b5008e4bd59073f806062d2576beb", null ],
+    [ "should_close_context_when_closed", "classcom_1_1datastax_1_1driver_1_1core_1_1policies_1_1_e_c2_multi_region_address_translator_test.html#a0125a6f3f26a02a00627235647bbb3c3", null ],
+    [ "should_return_new_address_when_match_found", "classcom_1_1datastax_1_1driver_1_1core_1_1policies_1_1_e_c2_multi_region_address_translator_test.html#a411dfff60fb22167597836ac54ef54e3", null ],
+    [ "should_return_same_address_when_exception_encountered", "classcom_1_1datastax_1_1driver_1_1core_1_1policies_1_1_e_c2_multi_region_address_translator_test.html#a87b21b8c8e4a3bbe79141949c247e10e", null ],
+    [ "should_return_same_address_when_no_entry_found", "classcom_1_1datastax_1_1driver_1_1core_1_1policies_1_1_e_c2_multi_region_address_translator_test.html#a59848b6cf733a6518f89611e4c72c273", null ]
+];

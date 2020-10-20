@@ -1,0 +1,6 @@
+var classcom_1_1datastax_1_1driver_1_1core_1_1_s_s_l_authenticated_encryption_test =
+[
+    [ "should_connect_with_ssl_with_client_auth_and_node_requires_auth", "classcom_1_1datastax_1_1driver_1_1core_1_1_s_s_l_authenticated_encryption_test.html#aa40ea0bc005d3f42743e3846834596c9", null ],
+    [ "should_not_connect_without_client_auth_but_node_requires_auth", "classcom_1_1datastax_1_1driver_1_1core_1_1_s_s_l_authenticated_encryption_test.html#a4d0c67749326fe45f4437aeb4a9ac944", null ],
+    [ "should_use_system_properties_with_default_ssl_options", "classcom_1_1datastax_1_1driver_1_1core_1_1_s_s_l_authenticated_encryption_test.html#a60c4ae60676660734bcbe8bf212d6e75", null ]
+];
