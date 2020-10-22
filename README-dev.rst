@@ -8,7 +8,8 @@ To build and preview the docs locally, you will need to install the following so
 - `Git <https://git-scm.com/book/en/v2/Getting-Started-Installing-Git>`_
 - `Python 3.7 <https://www.python.org/downloads/>`_
 - `pip <https://pip.pypa.io/en/stable/installing/>`_
-- `doxygen <https://www.tutorialspoint.com/how-to-install-doxygen-on-ubuntu/>`_
+-  Java JDK 6 or above
+-  Maven
 
 Run the following command to build the docs.
 
@@ -23,8 +24,6 @@ Building multiple documentation versions
 ========================================
 
 Build Sphinx docs for all the versions defined in ``docs/conf.py``.
-
-The multiverson command does not build doxygen docs.
 
 .. code:: console
 

@@ -23,8 +23,8 @@ pristine: clean
 .PHONY: setup
 setup:
 	./_utils/setup.sh
-	cp -Tr source $(SOURCE_DIR)
-	cd $(SOURCE_DIR) && find -name README.md -execdir mv '{}' index.md ';'
+	cp -TLr source $(SOURCE_DIR)
+	cd $(SOURCE_DIR) && find . -name README.md -execdir mv '{}' index.md ';'
 .PHONY: clean
 clean:
 	rm -rf $(BUILDDIR)/*
@@ -32,7 +32,7 @@ clean:
 
 .PHONY: preview
 preview: setup
-	cd .. && ./docs/_utils/doxygen.sh
+	cd .. && ./docs/_utils/javadoc.sh
 	$(POETRY) run sphinx-autobuild -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml --port 5500
 
 .PHONY: dirhtml
