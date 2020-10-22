@@ -60,6 +60,12 @@ class CustomCommonMarkParser(CommonMarkParser):
         self.current_node.append(next_node)
         self.current_node = ref_node
 
+def replace_relative_links(app, docname, source):
+    result = source[0]
+    for key in app.config.replacements:
+        result = re.sub(key, app.config.replacements[key], result)
+    source[0] = result
+
 def setup(app):
     app.add_source_parser(CustomCommonMarkParser)
     app.add_config_value('recommonmark_config', {
@@ -67,6 +73,11 @@ def setup(app):
         'enable_auto_toc_tree': False,
     }, True)
     app.add_transform(AutoStructify)
+
+    # Replace DataStax links
+    replacements = {r'https://docs.datastax.com/en/drivers/java\/(.*?)\/': "https://scylladb.github.io/java-driver/latest/api/"}
+    app.add_config_value('replacements', replacements, True)
+    app.connect('source-read', replace_relative_links)
 
 # The master toctree document.
 master_doc = 'contents'
