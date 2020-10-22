@@ -1,4 +1,0 @@
-var classcom_1_1datastax_1_1driver_1_1core_1_1_custom_percentile_tracker_test =
-[
-    [ "should_return_negative_value_when_key_cant_be_computed", "classcom_1_1datastax_1_1driver_1_1core_1_1_custom_percentile_tracker_test.html#aa68618c82fd151ebd3915cc0c8e97737", null ]
-];

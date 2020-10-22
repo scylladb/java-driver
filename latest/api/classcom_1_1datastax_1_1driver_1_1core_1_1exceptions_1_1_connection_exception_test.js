@@ -1,7 +1,0 @@
-var classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_connection_exception_test =
-[
-    [ "getHost_should_return_null_if_address_is_null", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_connection_exception_test.html#a643aae13fd05a7def704e08a6dc28975", null ],
-    [ "getMessage_should_return_message_if_address_is_null", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_connection_exception_test.html#abe4911ecf26927c2f9d3dc0f89a25fe2", null ],
-    [ "getMessage_should_return_message_if_address_is_resolved", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_connection_exception_test.html#ac68f89a8e1b161e184579474f2d52993", null ],
-    [ "getMessage_should_return_message_if_address_is_unresolved", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_connection_exception_test.html#a2fb11dea0e2f21c0f456705427a65078", null ]
-];

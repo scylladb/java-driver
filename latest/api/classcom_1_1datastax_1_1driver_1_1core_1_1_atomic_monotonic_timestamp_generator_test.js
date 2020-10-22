@@ -1,4 +1,0 @@
-var classcom_1_1datastax_1_1driver_1_1core_1_1_atomic_monotonic_timestamp_generator_test =
-[
-    [ "should_generate_incrementing_timestamps_for_all_threads", "classcom_1_1datastax_1_1driver_1_1core_1_1_atomic_monotonic_timestamp_generator_test.html#ad8fd792251e136f3747933595a333246", null ]
-];

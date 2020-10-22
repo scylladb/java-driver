@@ -1,7 +1,0 @@
-var classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_no_host_available_exception_test =
-[
-    [ "should_build_default_message_when_less_than_3_errors", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_no_host_available_exception_test.html#a90208bb7471b4e21f70a9c4754d2527b", null ],
-    [ "should_build_default_message_when_more_than_3_errors", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_no_host_available_exception_test.html#ab1211450d5dc28d974588468cb47b884", null ],
-    [ "should_build_formatted_message_with_stack_traces", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_no_host_available_exception_test.html#a52ba11b94ad63160f3e67b1a64b06409", null ],
-    [ "should_build_formatted_message_without_stack_traces", "classcom_1_1datastax_1_1driver_1_1core_1_1exceptions_1_1_no_host_available_exception_test.html#a11a934fed403532888fba55994e3ebb6", null ]
-];

@@ -1,8 +1,0 @@
-var classcom_1_1datastax_1_1driver_1_1core_1_1_protocol_beta_version_test =
-[
-    [ "should_connect_after_renegotiation_when_no_version_explicitly_required_and_flag_not_set", "classcom_1_1datastax_1_1driver_1_1core_1_1_protocol_beta_version_test.html#aa7e07ce738646a5eb2fb9d3e19b3bf58", null ],
-    [ "should_connect_with_beta_when_no_version_explicitly_required_and_flag_set", "classcom_1_1datastax_1_1driver_1_1core_1_1_protocol_beta_version_test.html#a653bc33717352384f98118fbd6011b26", null ],
-    [ "should_not_connect_when_beta_version_explicitly_required_and_flag_not_set", "classcom_1_1datastax_1_1driver_1_1core_1_1_protocol_beta_version_test.html#a163869458f503c5a61da3bd08f31ff1b", null ],
-    [ "should_not_initialize_when_beta_flag_is_set_and_version_explicitly_required", "classcom_1_1datastax_1_1driver_1_1core_1_1_protocol_beta_version_test.html#a673b6c46492024c9404c2710b66f0d23", null ],
-    [ "should_not_initialize_when_version_explicitly_required_and_beta_flag_is_set", "classcom_1_1datastax_1_1driver_1_1core_1_1_protocol_beta_version_test.html#a66c5814f9c24a4366cc1c74bdc8aa03c", null ]
-];

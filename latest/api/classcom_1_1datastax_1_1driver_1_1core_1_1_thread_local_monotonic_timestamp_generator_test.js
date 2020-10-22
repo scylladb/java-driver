@@ -1,5 +1,0 @@
-var classcom_1_1datastax_1_1driver_1_1core_1_1_thread_local_monotonic_timestamp_generator_test =
-[
-    [ "should_generate_incrementing_timestamps_for_each_thread", "classcom_1_1datastax_1_1driver_1_1core_1_1_thread_local_monotonic_timestamp_generator_test.html#aef2ad62714cc76897e137acaa37ff9fa", null ],
-    [ "should_generate_incrementing_timestamps_on_clock_resync", "classcom_1_1datastax_1_1driver_1_1core_1_1_thread_local_monotonic_timestamp_generator_test.html#a84a28b7469ad8e58923f229b4eb32d1b", null ]
-];
