@@ -24,6 +24,7 @@ import com.datastax.oss.driver.api.core.cql.BoundStatementBuilder;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
 import com.datastax.oss.driver.internal.core.data.ValuesHelper;
@@ -58,6 +59,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   private final ConsistencyLevel consistencyLevelForBoundStatements;
   private final ConsistencyLevel serialConsistencyLevelForBoundStatements;
   private final Duration timeoutForBoundStatements;
+  private final Partitioner partitioner;
 
   public DefaultPreparedStatement(
       ByteBuffer id,
@@ -67,6 +69,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
       ByteBuffer resultMetadataId,
       ColumnDefinitions resultSetDefinitions,
       CqlIdentifier keyspace,
+      Partitioner partitioner,
       Map<String, ByteBuffer> customPayloadForPrepare,
       String executionProfileNameForBoundStatements,
       DriverExecutionProfile executionProfileForBoundStatements,
@@ -104,6 +107,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
     this.consistencyLevelForBoundStatements = consistencyLevelForBoundStatements;
     this.serialConsistencyLevelForBoundStatements = serialConsistencyLevelForBoundStatements;
     this.areBoundStatementsTracing = areBoundStatementsTracing;
+    this.partitioner = partitioner;
 
     this.codecRegistry = codecRegistry;
     this.protocolVersion = protocolVersion;
@@ -125,6 +129,11 @@ public class DefaultPreparedStatement implements PreparedStatement {
   @Override
   public ColumnDefinitions getVariableDefinitions() {
     return variableDefinitions;
+  }
+
+  @Override
+  public Partitioner getPartitioner() {
+    return partitioner;
   }
 
   @NonNull

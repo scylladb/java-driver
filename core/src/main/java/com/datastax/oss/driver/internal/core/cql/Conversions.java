@@ -37,6 +37,7 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.RelationMetadata;
+import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import com.datastax.oss.driver.api.core.servererrors.AlreadyExistsException;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
@@ -61,6 +62,7 @@ import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.data.ValuesHelper;
+import com.datastax.oss.driver.internal.core.metadata.PartitionerFactory;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.primitives.Ints;
@@ -363,6 +365,8 @@ public class Conversions {
             ? computePkIndices(variableDefinitions, context)
             : Ints.asList(pkIndicesInResponse);
 
+    Partitioner partitioner = PartitionerFactory.partitioner(variableDefinitions, context);
+
     return new DefaultPreparedStatement(
         ByteBuffer.wrap(response.preparedQueryId).asReadOnlyBuffer(),
         request.getQuery(),
@@ -373,6 +377,7 @@ public class Conversions {
             : ByteBuffer.wrap(response.resultMetadataId).asReadOnlyBuffer(),
         toColumnDefinitions(response.resultMetadata, context),
         request.getKeyspace(),
+        partitioner,
         NullAllowingImmutableMap.copyOf(request.getCustomPayload()),
         request.getExecutionProfileNameForBoundStatements(),
         request.getExecutionProfileForBoundStatements(),

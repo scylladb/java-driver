@@ -269,6 +269,7 @@ public class RequestLogFormatterTest {
         null,
         null,
         null,
+        null,
         Collections.emptyMap(),
         null,
         null,
