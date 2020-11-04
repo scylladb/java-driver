@@ -15,16 +15,14 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.token;
 
+import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
-import java.nio.ByteBuffer;
 
 /** Manages token instances for a partitioner implementation. */
-public interface TokenFactory {
+public interface TokenFactory extends Partitioner {
 
   String getPartitionerName();
-
-  Token hash(ByteBuffer partitionKey);
 
   Token parse(String tokenString);
 
