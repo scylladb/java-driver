@@ -1,7 +1,7 @@
 ```eval_rst
 :orphan:
 ```
-# Scylla Java Driver for Apache Cassandra®
+# Java Driver for Scylla and Apache Cassandra®
 
 *If you're reading this on github.com, please note that this is the readme
 for the development version and that some features described here might
@@ -124,5 +124,4 @@ Apache®, Apache Cassandra®, Cassandra®, the Apache feather logo and the Apach
 Eye logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States 
 and/or other countries. 
 No endorsement by The Apache Software Foundation is implied by the use of these marks.
-
 
