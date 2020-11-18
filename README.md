@@ -15,6 +15,8 @@ A modern, [feature-rich](manual/) and highly tunable Java client
 library for Apache Cassandra (2.1+) and using exclusively Cassandra's binary protocol 
 and Cassandra Query Language v3.
 
+The Scylla Java Driver is a fork from [DataStax Java Driver](https://github.com/datastax/java-driver), including some non-breaking changes for Scylla optimization, with more updates planned.
+
 **Features:**
 
 * Like all Scylla Drivers, the Scylla Java Driver is **Shard Aware** and contains extensions for a ``tokenAwareHostPolicy`` supported by Scylla 2.3 and onwards. 
@@ -49,7 +51,7 @@ The driver contains the following modules:
 **Useful links:**
 
 - SCYLLA UNIVERSITY JAVA [CLASS](https://university.scylladb.com/courses/using-scylla-drivers/lessons/coding-with-java-part-1/) 
-- DOCS: the [manual](https://docs.scylladb.com/using-scylla/scylla-java-driver) has quick
+- DOCS: the [manual](manual/) has quick
   start material and technical details about the driver and its features.
 - GITHUB REPOSITORY: https://github.com/scylladb/java-driver
 - [changelog](changelog/)
