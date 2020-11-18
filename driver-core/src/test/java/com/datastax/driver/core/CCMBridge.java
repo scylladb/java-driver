@@ -169,6 +169,8 @@ public class CCMBridge implements CCMAccess {
 
   static {
     String inputCassandraVersion = System.getProperty("cassandra.version");
+    String inputScyllaVersion = System.getProperty("scylla.version");
+
     String installDirectory = System.getProperty("cassandra.directory");
     String branch = System.getProperty("cassandra.branch");
 
@@ -177,7 +179,10 @@ public class CCMBridge implements CCMAccess {
       installArgs.add("--install-dir=" + new File(installDirectory).getAbsolutePath());
     } else if (branch != null && !branch.trim().isEmpty()) {
       installArgs.add("-v git:" + branch.trim().replaceAll("\"", ""));
-    } else {
+    } else if (inputScyllaVersion != null && !inputScyllaVersion.trim().isEmpty()) {
+      installArgs.add(" --scylla ");
+      installArgs.add("-v " + inputScyllaVersion);
+    } else if (inputCassandraVersion != null && !inputCassandraVersion.trim().isEmpty()) {
       installArgs.add("-v " + inputCassandraVersion);
     }
 
@@ -311,6 +316,8 @@ public class CCMBridge implements CCMAccess {
 
   private final String ipPrefix;
 
+  private final String idPrefix;
+
   private final File ccmDir;
 
   private final boolean isDSE;
@@ -332,6 +339,7 @@ public class CCMBridge implements CCMAccess {
       VersionNumber cassandraVersion,
       VersionNumber dseVersion,
       String ipPrefix,
+      String idPrefix,
       int storagePort,
       int thriftPort,
       int binaryPort,
@@ -343,6 +351,8 @@ public class CCMBridge implements CCMAccess {
     this.cassandraVersion = cassandraVersion;
     this.dseVersion = dseVersion;
     this.ipPrefix = ipPrefix;
+    this.idPrefix = idPrefix;
+
     this.storagePort = storagePort;
     this.thriftPort = thriftPort;
     this.binaryPort = binaryPort;
@@ -863,6 +873,7 @@ public class CCMBridge implements CCMAccess {
     private static final Pattern RANDOM_PORT_PATTERN = Pattern.compile(RANDOM_PORT);
 
     private String ipPrefix = TestUtils.IP_PREFIX;
+    private String idPrefix = "0";
     int[] nodes = {1};
     private int[] jmxPorts = {};
     private boolean start = true;
@@ -886,6 +897,11 @@ public class CCMBridge implements CCMAccess {
      */
     public Builder withIpPrefix(String ipPrefix) {
       this.ipPrefix = ipPrefix;
+      return this;
+    }
+
+    public Builder withIdPrefix(String idPrefix) {
+      this.idPrefix = idPrefix;
       return this;
     }
 
@@ -1067,6 +1083,7 @@ public class CCMBridge implements CCMAccess {
               cassandraVersion,
               dseVersion,
               ipPrefix,
+              idPrefix,
               storagePort,
               thriftPort,
               binaryPort,
@@ -1151,6 +1168,7 @@ public class CCMBridge implements CCMAccess {
       StringBuilder result = new StringBuilder(CCM_COMMAND + " create");
       result.append(" ").append(clusterName);
       result.append(" -i ").append(ipPrefix);
+      result.append(" --id ").append(idPrefix);
       result.append(" ");
       if (nodes.length > 0) {
         result.append(" -n ");
