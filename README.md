@@ -50,7 +50,7 @@ The driver contains the following modules:
 
 **Useful links:**
 
-- SCYLLA UNIVERSITY JAVA [CLASS](https://university.scylladb.com/courses/using-scylla-drivers/lessons/coding-with-java-part-1/) 
+- SCYLLA UNIVERSITY: Has a [Coding with Java class](https://university.scylladb.com/courses/using-scylla-drivers/lessons/coding-with-java-part-1/) 
 - DOCS: the [manual](manual/) has quick
   start material and technical details about the driver and its features.
 - SCYLLA DOCS: Contains all [Scylla Documentation](https://docs.scylladb.com)
@@ -128,4 +128,3 @@ Apache®, Apache Cassandra®, Cassandra®, the Apache feather logo and the Apach
 Eye logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States 
 and/or other countries. 
 No endorsement by The Apache Software Foundation is implied by the use of these marks.
-
