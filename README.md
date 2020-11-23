@@ -7,7 +7,7 @@
 for the development version and that some features described here might
 not yet have been released. You can find the documentation for the latest
 version through the [Java driver
-docs](https://docs.scylladb.com/using-scylla/scylla-java-driver/) or via the release tags,
+docs](https://scylladb.github.io/java-driver/latest/index.html) or via the release tags,
 [e.g.
 3.10.0](https://github.com/scylladb/java-driver/releases/tag/3.10.2-scylla-0).*
 
@@ -53,6 +53,7 @@ The driver contains the following modules:
 - SCYLLA UNIVERSITY JAVA [CLASS](https://university.scylladb.com/courses/using-scylla-drivers/lessons/coding-with-java-part-1/) 
 - DOCS: the [manual](manual/) has quick
   start material and technical details about the driver and its features.
+- SCYLLA DOCS: Contains all [Scylla Documentation](https://docs.scylladb.com)
 - GITHUB REPOSITORY: https://github.com/scylladb/java-driver
 - [changelog](changelog/)
 
