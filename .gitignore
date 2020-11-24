@@ -6,6 +6,7 @@ testing/
 .project
 docs/_build
 docs/_source
+docs/poetry.lock
 html
 latex
 notes

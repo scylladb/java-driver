@@ -2,6 +2,7 @@
    :hidden:
    :glob:
 
+   index
    api
    manual/*
    upgrade_guide/*
