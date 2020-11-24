@@ -1,6 +1,3 @@
-```eval_rst
-:orphan:
-```
 # Scylla Java Driver for Scylla and Apache Cassandra®
 
 *If you're reading this on github.com, please note that this is the readme
