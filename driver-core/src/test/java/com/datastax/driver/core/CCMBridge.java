@@ -1046,6 +1046,13 @@ public class CCMBridge implements CCMAccess {
       int binaryPort =
           Integer.parseInt(cassandraConfiguration.get("native_transport_port").toString());
 
+      if (binaryPort == 0) {
+        // for test in scylla we disable the main protocol to test the
+        // `native_shard_aware_transport_port`
+        binaryPort =
+            Integer.parseInt(
+                cassandraConfiguration.get("native_shard_aware_transport_port").toString());
+      }
       // Copy any supplied jmx ports over, and find available ports for the rest
       int numNodes = 0;
       for (int i : nodes) {

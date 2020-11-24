@@ -16,8 +16,8 @@
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
-import static com.datastax.driver.core.CreateCCM.TestMode.PER_CLASS;
 
+import com.datastax.driver.core.CreateCCM.TestMode;
 import com.datastax.driver.core.QueryTrace.Event;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
@@ -29,8 +29,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
-@CreateCCM(PER_CLASS)
-@CCMConfig(numberOfNodes = 3, config = "ring_delay_ms:10000")
+@CreateCCM(TestMode.PER_METHOD)
+@CCMConfig(numberOfNodes = 3, dirtiesContext = true, createCluster = false)
 public class ShardAwareTest extends CCMTestsSupport {
 
   static final Logger logger = LoggerFactory.getLogger(ShardAwareTest.class);
@@ -141,7 +141,8 @@ public class ShardAwareTest extends CCMTestsSupport {
     }
   }
 
-  @Test(groups = "short")
+  @Test(groups = {"short", "scylla"})
+  @CCMConfig(config = {"ring_delay_ms:10000"})
   public void verify_same_shard_in_tracing() throws InterruptedException {
 
     LoadBalancingPolicy loadBalancingPolicy = new TokenAwarePolicy(new RoundRobinPolicy());
@@ -155,6 +156,38 @@ public class ShardAwareTest extends CCMTestsSupport {
             Cluster.builder()
                 .addContactPoints(getContactPoints().get(0))
                 .withPort(ccm().getBinaryPort())
+                .withReconnectionPolicy(reconnectionPolicy)
+                .withLoadBalancingPolicy(loadBalancingPolicy)
+                .build());
+    cluster.init();
+    Session session = cluster.connect();
+
+    createKeyspaceAndColumnFamily(session);
+    createData(session);
+    this.queryData(session, true);
+  }
+
+  @Test(groups = {"short", "scylla"})
+  @CCMConfig(
+      config = {
+        "ring_delay_ms:10000",
+        "native_transport_port:0",
+        "native_shard_aware_transport_port:19042"
+      })
+  public void verify_same_shard_in_tracing_using_only_shard_aware_port()
+      throws InterruptedException {
+
+    LoadBalancingPolicy loadBalancingPolicy = new TokenAwarePolicy(new RoundRobinPolicy());
+
+    ReconnectionPolicy reconnectionPolicy = new ConstantReconnectionPolicy(1 * 1000);
+
+    // We pass only the first host as contact point, so we know the control connection will be on
+    // this host
+    Cluster cluster =
+        register(
+            Cluster.builder()
+                .addContactPoints(getContactPoints().get(0))
+                .withPort(19042)
                 .withReconnectionPolicy(reconnectionPolicy)
                 .withLoadBalancingPolicy(loadBalancingPolicy)
                 .build());
