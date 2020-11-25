@@ -19,7 +19,7 @@ The Scylla Java Driver is a fork from [DataStax Java Driver](https://github.com/
 
 **Features:**
 
-* Like all Scylla Drivers, the Scylla Java Driver is **Shard Aware** and contains extensions for a ``tokenAwareHostPolicy`` supported by Scylla 2.3 and onwards. 
+* Like all Scylla Drivers, the Scylla Java Driver is **Shard Aware** and contains extensions for a ``tokenAwareHostPolicy`. 
   Using this policy, the driver can select a connection to a particular shard based on the shard’s token. 
   As a result, latency is significantly reduced because there is no need to pass data between the shards.
 * [Sync](manual/) and [Async](manual/async/) API
