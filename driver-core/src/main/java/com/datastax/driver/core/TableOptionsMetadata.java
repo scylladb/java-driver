@@ -47,7 +47,13 @@ public class TableOptionsMetadata {
   private static final String EXTENSIONS = "extensions";
   private static final String CDC = "cdc";
   private static final String SCYLLA_CDC_EXTENSION = "cdc";
+  private static final String SCYLLA_ENCRYPTION_OPTIONS_EXTENSION = "scylla_encryption_options";
+  private static final String SCYLLA_TAGS_EXTENSION = "scylla_tags";
   private static final String ADDITIONAL_WRITE_POLICY = "additional_write_policy";
+
+  private static final String[] MAP_EXTENSIONS = {
+    SCYLLA_CDC_EXTENSION, SCYLLA_ENCRYPTION_OPTIONS_EXTENSION, SCYLLA_TAGS_EXTENSION
+  };
 
   private static final boolean DEFAULT_REPLICATE_ON_WRITE = true;
   private static final double DEFAULT_BF_FP_CHANCE = 0.01;
@@ -84,8 +90,8 @@ public class TableOptionsMetadata {
   private final Map<String, String> compression;
   private final Double crcCheckChance;
   private final Map<String, ByteBuffer> extensions;
+  private final Map<String, Map<String, String>> mapExtensions;
   private final boolean cdc;
-  private final boolean scyllaCDC;
   private final String additionalWritePolicy;
 
   TableOptionsMetadata(Row row, boolean isCompactStorage, VersionNumber version) {
@@ -185,10 +191,19 @@ public class TableOptionsMetadata {
       this.extensions = ImmutableMap.copyOf(row.getMap(EXTENSIONS, String.class, ByteBuffer.class));
     else this.extensions = ImmutableMap.of();
 
+    ImmutableMap.Builder<String, Map<String, String>> mapExtensionsBuilder =
+        new ImmutableMap.Builder<String, Map<String, String>>();
+    for (String mapExtension : MAP_EXTENSIONS) {
+      ByteBuffer rawExtensionInfo = this.extensions.get(mapExtension);
+      if (rawExtensionInfo != null) {
+        Map<String, String> extensionInfo = new MapExtensionReader(rawExtensionInfo).parse();
+        mapExtensionsBuilder.put(mapExtension, extensionInfo);
+      }
+    }
+    this.mapExtensions = mapExtensionsBuilder.build();
+
     if (is380OrHigher) this.cdc = isNullOrAbsent(row, CDC) ? DEFAULT_CDC : row.getBool(CDC);
     else this.cdc = DEFAULT_CDC;
-
-    this.scyllaCDC = this.extensions.containsKey(SCYLLA_CDC_EXTENSION);
 
     if (is400OrHigher) this.additionalWritePolicy = row.getString(ADDITIONAL_WRITE_POLICY);
     else this.additionalWritePolicy = DEFAULT_ADDITIONAL_WRITE_POLICY;
@@ -415,6 +430,17 @@ public class TableOptionsMetadata {
   }
 
   /**
+   * Returns the extension options for this table, but only those represented by {@code Map<String,
+   * String>}.
+   *
+   * @return an immutable map containing the extension options for this table, but only those
+   *     represented by {@code Map<String, String>}.
+   */
+  public Map<String, Map<String, String>> getMapExtensions() {
+    return mapExtensions;
+  }
+
+  /**
    * Returns whether or not change data capture is enabled for this table.
    *
    * <p>For Cassandra versions prior to 3.8.0, this method always returns false.
@@ -431,7 +457,48 @@ public class TableOptionsMetadata {
    * @return whether or not Scylla change data capture is enabled for this table.
    */
   public boolean isScyllaCDC() {
-    return scyllaCDC;
+    return mapExtensions.containsKey(SCYLLA_CDC_EXTENSION);
+  }
+
+  /**
+   * Returns the options of Scylla Change Data Capture (CDC) for this table or @{code null} if CDC
+   * is disabled on this table.
+   *
+   * @see <a href="https://docs.scylladb.com/using-scylla/cdc/#cdc-parameters">Scylla CDC
+   *     Parameters</a>
+   * @return the options of Scylla Change Data Capture (CDC) for this table or @{code null} if CDC
+   *     is disabled on this table.
+   */
+  public Map<String, String> getScyllaCDCOptions() {
+    return mapExtensions.get(SCYLLA_CDC_EXTENSION);
+  }
+
+  /**
+   * Returns the options of Scylla Encryption at Rest for this table or @{code null} if Scylla
+   * Encryption at Rest is disabled on this table.
+   *
+   * @see <a href="https://docs.scylladb.com/operating-scylla/security/encryption-at-rest/">Scylla
+   *     Encryption at Rest</a>
+   * @return the options of Scylla Encryption at Rest for this table or @{code null} if Scylla
+   *     Encryption at Rest is disabled on this table.
+   */
+  public Map<String, String> getScyllaEncryptionOptions() {
+    return mapExtensions.get(SCYLLA_ENCRYPTION_OPTIONS_EXTENSION);
+  }
+
+  /**
+   * Returns the DynamoDB tags associated with this table if this is a valid Scylla Alternator table
+   * or @{code null} otherwise.
+   *
+   * @see <a href="https://docs.scylladb.com/using-scylla/alternator/">Scylla Alternator</a>
+   * @see <a
+   *     href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Tagging.Operations.html">Tagging
+   *     Resources in DynamoDB</a>
+   * @return the DynamoDB tags associated with this table if this is a valid Scylla Alternator table
+   *     or @{code null} otherwise.
+   */
+  public Map<String, String> getScyllaAlternatorTags() {
+    return mapExtensions.get(SCYLLA_TAGS_EXTENSION);
   }
 
   /**
@@ -472,7 +539,8 @@ public class TableOptionsMetadata {
         && MoreObjects.equal(this.compression, that.compression)
         && MoreObjects.equal(this.crcCheckChance, that.crcCheckChance)
         && MoreObjects.equal(this.additionalWritePolicy, that.additionalWritePolicy)
-        && MoreObjects.equal(this.extensions, that.extensions);
+        && MoreObjects.equal(this.extensions, that.extensions)
+        && MoreObjects.equal(this.mapExtensions, that.mapExtensions);
   }
 
   @Override
@@ -499,6 +567,7 @@ public class TableOptionsMetadata {
         crcCheckChance,
         extensions,
         cdc,
+        mapExtensions,
         additionalWritePolicy);
   }
 }
