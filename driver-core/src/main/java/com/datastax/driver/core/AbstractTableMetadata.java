@@ -309,6 +309,13 @@ public abstract class AbstractTableMetadata {
           .append("memtable_flush_period_in_ms = ")
           .append(options.getMemtableFlushPeriodInMs());
     }
+    for (Map.Entry<String, Map<String, String>> mapExtension :
+        options.getMapExtensions().entrySet()) {
+      and(sb, formatted)
+          .append(mapExtension.getKey())
+          .append(" = ")
+          .append(formatOptionMap(mapExtension.getValue()));
+    }
     sb.append(';');
     return sb;
   }
