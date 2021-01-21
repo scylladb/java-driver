@@ -345,11 +345,18 @@ class Connection {
               host.setLwtInfo(lwt);
             }
             return MoreFutures.VOID_SUCCESS;
+          case ERROR:
+            Responses.Error error = (Responses.Error) response;
+            throw new TransportException(
+                address,
+                String.format(
+                    "Got ERROR response message from server to an OPTIONS message: %s",
+                    error.message));
           default:
             throw new TransportException(
                 address,
                 String.format(
-                    "Unexpected %s response message from server to a OPTIONS message",
+                    "Unexpected %s response message from server to an OPTIONS message",
                     response.type));
         }
       }
@@ -1419,6 +1426,15 @@ class Connection {
             case SUPPORTED:
               logger.debug("{} heartbeat query succeeded", connection);
               break;
+            case ERROR:
+              Responses.Error error = (Responses.Error) response;
+              fail(
+                  connection,
+                  new ConnectionException(
+                      connection.address,
+                      String.format(
+                          "Got ERROR response message from server to a heartbeat query: %s",
+                          error.message)));
             default:
               fail(
                   connection,
