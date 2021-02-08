@@ -199,7 +199,7 @@ public class ColumnMetadata {
       if (version.getMajor() >= 3) {
         dataType = row.getString(TYPE);
         String clusteringOrderStr = row.getString(CLUSTERING_ORDER);
-        reversed = clusteringOrderStr.equals(DESC);
+        reversed = clusteringOrderStr.equalsIgnoreCase(DESC);
       } else {
         dataType = row.getString(VALIDATOR);
         reversed = DataTypeClassNameParser.isReversed(dataType);
