@@ -77,7 +77,7 @@ def setup(app):
     app.add_transform(AutoStructify)
 
     # Replace DataStax links
-    replacements = {r'https://docs.datastax.com/en/drivers/java\/(.*?)\/': "https://scylladb.github.io/java-driver/latest/api/"}
+    replacements = {r'https://docs.datastax.com/en/drivers/java\/(.*?)\/': "https://java-driver.docs.scylladb.com/latest/api/"}
     app.add_config_value('replacements', replacements, True)
     app.connect('source-read', replace_relative_links)
 
@@ -145,7 +145,7 @@ html_style = ''
 #
 html_theme_options = {
     'header_links': [
-    ('Scylla Java Driver', 'https://scylladb.github.io/java-driver/'),
+    ('Scylla Java Driver', 'https://java-driver.docs.scylladb.com/'),
     ('Scylla Cloud', 'https://docs.scylladb.com/scylla-cloud/'),
     ('Scylla University', 'https://university.scylladb.com/'),
     ('ScyllaDB Home', 'https://www.scylladb.com/')],
@@ -174,7 +174,7 @@ html_sidebars = {'**': ['side-nav.html']}
 htmlhelp_basename = 'ScyllaDocumentationdoc'
 
 # URL which points to the root of the HTML documentation. 
-html_baseurl = 'https://scylladb.github.io/java-driver'
+html_baseurl = 'https://java-driver.docs.scylladb.com'
 
 # Dictionary of values to pass into the template engine’s context for all pages
 html_context = {'html_baseurl': html_baseurl}
