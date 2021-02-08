@@ -9,6 +9,7 @@ from docutils import nodes
 from sphinx.util import logging
 from recommonmark.transform import AutoStructify
 from recommonmark.parser import CommonMarkParser, splitext, urlparse
+from sphinx_scylladb_theme.utils import multiversion_regex_builder
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +195,8 @@ redirects_file = "_utils/redirections.yaml"
 # -- Options for multiversion extension ----------------------------------
 
 # Whitelist pattern for tags (set to None to ignore all tags)
-smv_tag_whitelist = r'None'
+TAGS = []
+smv_tag_whitelist = multiversion_regex_builder(TAGS)
 # Whitelist pattern for branches (set to None to ignore all branches)
 smv_branch_whitelist = r"^latest$"
 # Defines which version is considered to be the latest stable version.
