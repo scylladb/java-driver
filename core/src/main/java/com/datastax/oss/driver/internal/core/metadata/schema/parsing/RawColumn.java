@@ -103,7 +103,7 @@ public class RawColumn implements Comparable<RawColumn> {
     this.dataType = row.contains("validator") ? row.getString("validator") : row.getString("type");
     this.reversed =
         row.contains("clustering_order")
-            ? "desc".equals(row.getString("clustering_order"))
+            ? "desc".equalsIgnoreCase(row.getString("clustering_order"))
             : DataTypeClassNameParser.isReversed(dataType);
     this.indexName = row.getString("index_name");
     this.indexType = row.getString("index_type");
