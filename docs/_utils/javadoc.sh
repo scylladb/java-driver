@@ -12,5 +12,6 @@ fi
 
 # Generate javadoc
 mvn javadoc:javadoc
+[ -d $OUTPUT_DIR ] && rm -r $OUTPUT_DIR
 mkdir -p "$OUTPUT_DIR"
 mv -f driver-core/target/site/apidocs/* $OUTPUT_DIR

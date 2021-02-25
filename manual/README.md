@@ -305,38 +305,3 @@ simply navigate to each sub-directory.
 [SchemaChangeListener]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/SchemaChangeListener.html
 [NoHostAvailableException]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/exceptions/NoHostAvailableException.html
 [LocalDate]: https://docs.datastax.com/en/drivers/java/3.10/com/datastax/driver/core/LocalDate.html
-
-```eval_rst
-.. toctree::
-   :hidden:
-   :glob:
-   
-   address_resolution/*
-   async/*
-   auth/*
-   cloud/*
-   compression/*
-   control_connection/*
-   custom_codecs/*
-   custom_payloads/*
-   idempotence/*
-   load_balancing/*
-   logging/*
-   metadata/*
-   metrics/*
-   native_protocol/*
-   object_mapper/*
-   osgi/*
-   paging/*
-   pooling/*
-   query_timestamps/*
-   reconnection/*
-   retries/*
-   shaded_jar/*
-   socket_options/*
-   speculative_execution/*
-   ssl/*
-   statements/*
-   tuples/*
-   udts/*
-```

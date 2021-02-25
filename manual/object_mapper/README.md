@@ -21,12 +21,3 @@ See the child pages for more information:
 * [using the mapper](using/)
 * [using custom codecs](custom_codecs/)
 
-```eval_rst
-.. toctree::
-   :hidden:
-   :glob:
-      
-   creating/*
-   custom_codecs/*
-   using/*
-```
