@@ -23,6 +23,7 @@ import com.datastax.driver.core.Responses.Supported;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.BusyConnectionException;
 import com.datastax.driver.core.exceptions.ConnectionException;
+import com.datastax.driver.core.exceptions.CrcMismatchException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.exceptions.FrameTooLongException;
@@ -66,7 +67,6 @@ import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import java.lang.ref.WeakReference;
-import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -99,8 +99,6 @@ class Connection {
       SystemProperties.getBoolean("com.datastax.driver.DISABLE_COALESCING", false);
   private static final int FLUSHER_SCHEDULE_PERIOD_NS =
       SystemProperties.getInt("com.datastax.driver.FLUSHER_SCHEDULE_PERIOD_NS", 10000);
-  private static final int FLUSHER_RUN_WITHOUT_WORK_TIMES =
-      SystemProperties.getInt("com.datastax.driver.FLUSHER_RUN_WITHOUT_WORK_TIMES", 5);
 
   enum State {
     OPEN,
@@ -114,7 +112,7 @@ class Connection {
   volatile long maxIdleTime;
 
   private final Host host;
-  final InetSocketAddress address;
+  final EndPoint endPoint;
   private final String name;
   private volatile Integer shardId = null;
 
@@ -144,14 +142,14 @@ class Connection {
    * Create a new connection to a Cassandra node and associate it with the given pool.
    *
    * @param name the connection name
-   * @param address the remote address
+   * @param endPoint the information to connect to the node
    * @param factory the connection factory to use
    * @param owner the component owning this connection (may be null). Note that an existing
    *     connection can also be associated to an owner later with {@link #setOwner(Owner)}.
    */
   protected Connection(String name, Host host, Factory factory, Owner owner) {
     this.host = host;
-    this.address = host.getSocketAddress();
+    this.endPoint = host.getEndPoint();
     this.factory = factory;
     this.dispatcher = new Dispatcher();
     this.name = name;
@@ -169,7 +167,7 @@ class Connection {
   ListenableFuture<Void> initAsync() {
     if (factory.isShutdown)
       return Futures.immediateFailedFuture(
-          new ConnectionException(address, "Connection factory is shut down"));
+          new ConnectionException(endPoint, "Connection factory is shut down"));
 
     ProtocolVersion protocolVersion =
         factory.protocolVersion == null
@@ -193,7 +191,7 @@ class Connection {
                   ? factory.manager.metrics
                   : null));
 
-      ChannelFuture future = bootstrap.connect(address);
+      ChannelFuture future = bootstrap.connect(endPoint.resolve());
 
       writer.incrementAndGet();
       future.addListener(
@@ -202,10 +200,12 @@ class Connection {
             public void operationComplete(ChannelFuture future) throws Exception {
               writer.decrementAndGet();
               if (future.cause() != null) {
-                logger.warn("Error creating netty channel to " + address, future.cause());
+                logger.warn("Error creating netty channel to " + endPoint, future.cause());
               }
+              // Note: future.channel() can be null in some error cases, so we need to guard against
+              // it in the rest of the code below.
               channel = future.channel();
-              if (isClosed()) {
+              if (isClosed() && channel != null) {
                 channel
                     .close()
                     .addListener(
@@ -214,24 +214,27 @@ class Connection {
                           public void operationComplete(ChannelFuture future) throws Exception {
                             channelReadyFuture.setException(
                                 new TransportException(
-                                    Connection.this.address,
+                                    Connection.this.endPoint,
                                     "Connection closed during initialization."));
                           }
                         });
               } else {
-                Connection.this.factory.allChannels.add(channel);
+                if (channel != null) {
+                  Connection.this.factory.allChannels.add(channel);
+                }
                 if (!future.isSuccess()) {
                   if (logger.isDebugEnabled())
                     logger.debug(
                         String.format(
                             "%s Error connecting to %s%s",
                             Connection.this,
-                            Connection.this.address,
+                            Connection.this.endPoint,
                             extractMessage(future.cause())));
                   channelReadyFuture.setException(
                       new TransportException(
-                          Connection.this.address, "Cannot connect", future.cause()));
+                          Connection.this.endPoint, "Cannot connect", future.cause()));
                 } else {
+                  assert channel != null;
                   logger.debug(
                       "{} Connection established, initializing transport", Connection.this);
                   channel.closeFuture().addListener(new ChannelCloseListener());
@@ -279,7 +282,7 @@ class Connection {
                               || t instanceof Error)
                           ? t
                           : new ConnectionException(
-                              Connection.this.address,
+                              Connection.this.endPoint,
                               String.format(
                                   "Unexpected error during transport initialization (%s)", t),
                               t);
@@ -310,6 +313,12 @@ class Connection {
     if (t == null) return "";
     String msg = t.getMessage() == null || t.getMessage().isEmpty() ? t.toString() : t.getMessage();
     return " (" + msg + ')';
+  }
+
+  public ListenableFuture<String> optionsQuery() {
+    Future startupOptionsFuture = write(new Requests.Options());
+
+    return GuavaCompatibility.INSTANCE.transformAsync(startupOptionsFuture, onSupportedResponse());
   }
 
   private AsyncFunction<Void, Void> onChannelReady(
@@ -348,13 +357,13 @@ class Connection {
           case ERROR:
             Responses.Error error = (Responses.Error) response;
             throw new TransportException(
-                address,
+                endPoint,
                 String.format(
                     "Got ERROR response message from server to an OPTIONS message: %s",
                     error.message));
           default:
             throw new TransportException(
-                address,
+                endPoint,
                 String.format(
                     "Unexpected %s response message from server to an OPTIONS message",
                     response.type));
@@ -384,6 +393,28 @@ class Connection {
     };
   }
 
+  private AsyncFunction<Message.Response, String> onSupportedResponse() {
+    return new AsyncFunction<Message.Response, String>() {
+      @Override
+      public ListenableFuture<String> apply(Message.Response response) throws Exception {
+        switch (response.type) {
+          case SUPPORTED:
+            return getProductType((Responses.Supported) response);
+          case ERROR:
+            Responses.Error error = (Responses.Error) response;
+            throw new TransportException(
+                endPoint, String.format("Error initializing connection: %s", error.message));
+          default:
+            throw new TransportException(
+                endPoint,
+                String.format(
+                    "Unexpected %s response message from server to a STARTUP message",
+                    response.type));
+        }
+      }
+    };
+  }
+
   private AsyncFunction<Message.Response, Void> onStartupResponse(
       final ProtocolVersion protocolVersion, final Executor initExecutor) {
     return new AsyncFunction<Message.Response, Void>() {
@@ -398,13 +429,20 @@ class Connection {
               throw unsupportedProtocolVersionException(
                   protocolVersion, error.serverProtocolVersion);
             throw new TransportException(
-                address, String.format("Error initializing connection: %s", error.message));
+                endPoint, String.format("Error initializing connection: %s", error.message));
           case AUTHENTICATE:
             Responses.Authenticate authenticate = (Responses.Authenticate) response;
             Authenticator authenticator;
             try {
-              authenticator =
-                  factory.authProvider.newAuthenticator(address, authenticate.authenticator);
+              if (factory.authProvider instanceof ExtendedAuthProvider) {
+                authenticator =
+                    ((ExtendedAuthProvider) factory.authProvider)
+                        .newAuthenticator(endPoint, authenticate.authenticator);
+              } else {
+                authenticator =
+                    factory.authProvider.newAuthenticator(
+                        endPoint.resolve(), authenticate.authenticator);
+              }
             } catch (AuthenticationException e) {
               incrementAuthErrorMetric();
               throw e;
@@ -420,13 +458,14 @@ class Connection {
               case V3:
               case V4:
               case V5:
+              case V6:
                 return authenticateV2(authenticator, protocolVersion, initExecutor);
               default:
                 throw defunct(protocolVersion.unsupported());
             }
           default:
             throw new TransportException(
-                address,
+                endPoint,
                 String.format(
                     "Unexpected %s response message from server to a STARTUP message",
                     response.type));
@@ -464,7 +503,7 @@ class Connection {
               Row row = rs.one();
               String actual = row.getString("cluster_name");
               if (!expected.equals(actual))
-                throw new ClusterNameMismatchException(address, actual, expected);
+                throw new ClusterNameMismatchException(endPoint, actual, expected);
               markInitialized();
               return MoreFutures.VOID_SUCCESS;
             }
@@ -475,9 +514,18 @@ class Connection {
     }
   }
 
+  private ListenableFuture<String> getProductType(Responses.Supported response) {
+    if (response.supported.containsKey("PRODUCT_TYPE")
+        && response.supported.get("PRODUCT_TYPE").size() > 0) {
+      return Futures.immediateFuture(response.supported.get("PRODUCT_TYPE").get(0));
+    } else {
+      return Futures.immediateFuture("");
+    }
+  }
+
   private void markInitialized() {
     isInitialized = true;
-    Host.statesLogger.debug("[{}] {} Transport initialized, connection ready", address, this);
+    Host.statesLogger.debug("[{}] {} Transport initialized, connection ready", endPoint, this);
   }
 
   private ListenableFuture<Void> authenticateV1(
@@ -497,10 +545,10 @@ class Connection {
                 case ERROR:
                   incrementAuthErrorMetric();
                   throw new AuthenticationException(
-                      address, ((Responses.Error) authResponse).message);
+                      endPoint, ((Responses.Error) authResponse).message);
                 default:
                   throw new TransportException(
-                      address,
+                      endPoint,
                       String.format(
                           "Unexpected %s response message from server to a CREDENTIALS message",
                           authResponse.type));
@@ -571,10 +619,10 @@ class Connection {
                           + "only plain text authentication is supported with this protocol version",
                       authenticator);
             incrementAuthErrorMetric();
-            throw new AuthenticationException(address, message);
+            throw new AuthenticationException(endPoint, message);
           default:
             throw new TransportException(
-                address,
+                endPoint,
                 String.format(
                     "Unexpected %s response message from server to authentication message",
                     authResponse.type));
@@ -593,13 +641,15 @@ class Connection {
     // Testing for a specific string is a tad fragile but well, we don't have much choice
     // C* 2.1 reports a server error instead of protocol error, see CASSANDRA-9451
     return (error.code == ExceptionCode.PROTOCOL_ERROR || error.code == ExceptionCode.SERVER_ERROR)
-        && error.message.contains("Invalid or unsupported protocol version");
+        && (error.message.contains("Invalid or unsupported protocol version")
+            // JAVA-2924: server is behind driver and considers the proposed version as beta
+            || error.message.contains("Beta version of the protocol used"));
   }
 
   private UnsupportedProtocolVersionException unsupportedProtocolVersionException(
       ProtocolVersion triedVersion, ProtocolVersion serverProtocolVersion) {
     UnsupportedProtocolVersionException e =
-        new UnsupportedProtocolVersionException(address, triedVersion, serverProtocolVersion);
+        new UnsupportedProtocolVersionException(endPoint, triedVersion, serverProtocolVersion);
     logger.debug(e.getMessage());
     return e;
   }
@@ -619,7 +669,7 @@ class Connection {
       else if (Host.statesLogger.isDebugEnabled())
         Host.statesLogger.debug("Defuncting {} because: {}", this, e.getMessage());
 
-      Host host = factory.manager.metadata.getHost(address);
+      Host host = getHost();
       if (host != null) {
         // Sometimes close() can be called before defunct(); avoid decrementing the connection count
         // twice, but
@@ -670,7 +720,7 @@ class Connection {
           "Tried to set the keyspace on busy {}. "
               + "This should not happen but is not critical (it will be retried)",
           this);
-      throw new ConnectionException(address, "Tried to set the keyspace on busy connection");
+      throw new ConnectionException(endPoint, "Tried to set the keyspace on busy connection");
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof OperationTimedOutException) {
@@ -680,9 +730,9 @@ class Connection {
             "Timeout while setting keyspace on {}. "
                 + "This should not happen but is not critical (it will be retried)",
             this);
-        throw new ConnectionException(address, "Timeout while setting keyspace on connection");
+        throw new ConnectionException(endPoint, "Timeout while setting keyspace on connection");
       } else {
-        throw defunct(new ConnectionException(address, "Error while setting keyspace", cause));
+        throw defunct(new ConnectionException(endPoint, "Error while setting keyspace", cause));
       }
     }
   }
@@ -733,7 +783,7 @@ class Connection {
                   targetKeyspace.compareAndSet(attempt, defaultKeyspaceAttempt);
                   if (response.type == ERROR) {
                     Responses.Error error = (Responses.Error) response;
-                    ksFuture.setException(defunct(error.asException(address)));
+                    ksFuture.setException(defunct(error.asException(endPoint)));
                   } else {
                     ksFuture.setException(
                         defunct(
@@ -792,12 +842,12 @@ class Connection {
      */
     if (isDefunct.get()) {
       dispatcher.removeHandler(handler, true);
-      throw new ConnectionException(address, "Write attempt on defunct connection");
+      throw new ConnectionException(endPoint, "Write attempt on defunct connection");
     }
 
     if (isClosed()) {
       dispatcher.removeHandler(handler, true);
-      throw new ConnectionException(address, "Connection has been closed");
+      throw new ConnectionException(endPoint, "Connection has been closed");
     }
 
     logger.trace("{}, stream {}, writing request {}", this, request.getStreamId(), request);
@@ -833,9 +883,9 @@ class Connection {
 
           final ConnectionException ce;
           if (writeFuture.cause() instanceof java.nio.channels.ClosedChannelException) {
-            ce = new TransportException(address, "Error writing: Closed channel");
+            ce = new TransportException(endPoint, "Error writing: Closed channel");
           } else {
-            ce = new TransportException(address, "Error writing", writeFuture.cause());
+            ce = new TransportException(endPoint, "Error writing", writeFuture.cause());
           }
           final long latency = System.nanoTime() - handler.startTime;
           // This handler is executed while holding the writeLock of the channel.
@@ -916,7 +966,7 @@ class Connection {
 
     // Only signal if defunct hasn't done it already
     if (signaled.compareAndSet(false, true)) {
-      Host host = factory.manager.metadata.getHost(address);
+      Host host = getHost();
       if (host != null) {
         host.convictionPolicy.signalConnectionClosed(this);
       }
@@ -933,6 +983,16 @@ class Connection {
       factory.reaper.register(this, terminateTime);
     }
     return future;
+  }
+
+  private Host getHost() {
+    Metadata metadata = factory.manager.metadata;
+    Host host = metadata.getHost(endPoint);
+    // During init the host might not be in metatada.hosts yet, try the contact points
+    if (host == null) {
+      host = metadata.getContactPoint(endPoint);
+    }
+    return host;
   }
 
   /**
@@ -1030,9 +1090,9 @@ class Connection {
     Connection open(Host host)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
-      InetSocketAddress address = host.getSocketAddress();
+      EndPoint endPoint = host.getEndPoint();
 
-      if (isShutdown) throw new ConnectionException(address, "Connection factory is shut down");
+      if (isShutdown) throw new ConnectionException(endPoint, "Connection factory is shut down");
 
       host.convictionPolicy.signalConnectionsOpening(1);
       Connection connection = new Connection(buildConnectionName(host), host, this);
@@ -1072,7 +1132,7 @@ class Connection {
     }
 
     private String buildConnectionName(Host host) {
-      return host.getSocketAddress().toString() + '-' + getIdGenerator(host).getAndIncrement();
+      return host.getEndPoint().toString() + '-' + getIdGenerator(host).getAndIncrement();
     }
 
     static RuntimeException launderAsyncInitException(ExecutionException e)
@@ -1146,7 +1206,6 @@ class Connection {
     final Queue<FlushItem> queued = new ConcurrentLinkedQueue<FlushItem>();
     final AtomicBoolean running = new AtomicBoolean(false);
     final HashSet<Channel> channels = new HashSet<Channel>();
-    int runsWithNoWork = 0;
 
     private Flusher(EventLoop eventLoop) {
       this.eventLoopRef = new WeakReference<EventLoop>(eventLoop);
@@ -1162,14 +1221,12 @@ class Connection {
     @Override
     public void run() {
 
-      boolean doneWork = false;
       FlushItem flush;
       while (null != (flush = queued.poll())) {
         Channel channel = flush.channel;
         if (channel.isActive()) {
           channels.add(channel);
           channel.write(flush.request).addListener(flush.listener);
-          doneWork = true;
         }
       }
 
@@ -1177,15 +1234,9 @@ class Connection {
       for (Channel channel : channels) channel.flush();
       channels.clear();
 
-      if (doneWork) {
-        runsWithNoWork = 0;
-      } else {
-        // either reschedule or cancel
-        if (++runsWithNoWork > FLUSHER_RUN_WITHOUT_WORK_TIMES) {
-          running.set(false);
-          if (queued.isEmpty() || !running.compareAndSet(false, true)) return;
-        }
-      }
+      // either reschedule or cancel
+      running.set(false);
+      if (queued.isEmpty() || !running.compareAndSet(false, true)) return;
 
       EventLoop eventLoop = eventLoopRef.get();
       if (eventLoop != null && !eventLoop.isShuttingDown()) {
@@ -1354,7 +1405,7 @@ class Connection {
         // Special case, if we encountered a FrameTooLongException, raise exception on handler and
         // don't defunct it since
         // the connection is in an ok state.
-        if (error != null && error instanceof FrameTooLongException) {
+        if (error instanceof FrameTooLongException) {
           FrameTooLongException ftle = (FrameTooLongException) error;
           int streamId = ftle.getStreamId();
           ResponseHandler handler = pending.remove(streamId);
@@ -1373,11 +1424,14 @@ class Connection {
           handler.callback.onException(
               Connection.this, ftle, System.nanoTime() - handler.startTime, handler.retryCount);
           return;
+        } else if (error instanceof CrcMismatchException) {
+          // Fall back to the defunct call below, but we want a clear warning in the logs
+          logger.warn("CRC mismatch while decoding a response, dropping the connection", error);
         }
       }
       defunct(
           new TransportException(
-              address, String.format("Unexpected exception triggered (%s)", cause), cause));
+              endPoint, String.format("Unexpected exception triggered (%s)", cause), cause));
     }
 
     void errorOutAllHandler(ConnectionException ce) {
@@ -1399,10 +1453,10 @@ class Connection {
       // connection, but
       // if there is remaining thread waiting on us, we still want to wake them up
       if (!isInitialized || isClosed()) {
-        dispatcher.errorOutAllHandler(new TransportException(address, "Channel has been closed"));
+        dispatcher.errorOutAllHandler(new TransportException(endPoint, "Channel has been closed"));
         // we still want to force so that the future completes
         Connection.this.closeAsync().force();
-      } else defunct(new TransportException(address, "Channel has been closed"));
+      } else defunct(new TransportException(endPoint, "Channel has been closed"));
     }
   }
 
@@ -1431,7 +1485,7 @@ class Connection {
               fail(
                   connection,
                   new ConnectionException(
-                      connection.address,
+                      connection.endPoint,
                       String.format(
                           "Got ERROR response message from server to a heartbeat query: %s",
                           error.message)));
@@ -1439,7 +1493,7 @@ class Connection {
               fail(
                   connection,
                   new ConnectionException(
-                      connection.address, "Unexpected heartbeat response: " + response));
+                      connection.endPoint, "Unexpected heartbeat response: " + response));
           }
         }
 
@@ -1452,7 +1506,8 @@ class Connection {
         @Override
         public boolean onTimeout(Connection connection, long latency, int retryCount) {
           fail(
-              connection, new ConnectionException(connection.address, "Heartbeat query timed out"));
+              connection,
+              new ConnectionException(connection.endPoint, "Heartbeat query timed out"));
           return true;
         }
 
@@ -1480,7 +1535,7 @@ class Connection {
       // forever. In general this won't happen since we get there only when all ongoing query are
       // done, but this can happen
       // if the shutdown is forced. This is a no-op if there is no handler set anymore.
-      dispatcher.errorOutAllHandler(new TransportException(address, "Connection has been closed"));
+      dispatcher.errorOutAllHandler(new TransportException(endPoint, "Connection has been closed"));
 
       ChannelFuture future = channel.close();
       future.addListener(
@@ -1526,7 +1581,7 @@ class Connection {
   static class Future extends AbstractFuture<Message.Response> implements RequestHandler.Callback {
 
     private final Message.Request request;
-    private volatile InetSocketAddress address;
+    private volatile EndPoint endPoint;
     private volatile Host host;
 
     Future(Message.Request request) {
@@ -1566,7 +1621,7 @@ class Connection {
     @Override
     public void onSet(
         Connection connection, Message.Response response, long latency, int retryCount) {
-      this.address = connection.address;
+      this.endPoint = connection.endPoint;
       host = connection.host;
       super.set(response);
     }
@@ -1576,7 +1631,7 @@ class Connection {
         Connection connection, Exception exception, long latency, int retryCount) {
       // If all nodes are down, we will get a null connection here. This is fine, if we have
       // an exception, consumers shouldn't assume the address is not null.
-      if (connection != null) this.address = connection.address;
+      if (connection != null) this.endPoint = connection.endPoint;
       super.setException(exception);
     }
 
@@ -1584,12 +1639,12 @@ class Connection {
     public boolean onTimeout(Connection connection, long latency, int retryCount) {
       assert connection
           != null; // We always timeout on a specific connection, so this shouldn't be null
-      this.address = connection.address;
-      return super.setException(new OperationTimedOutException(connection.address));
+      this.endPoint = connection.endPoint;
+      return super.setException(new OperationTimedOutException(connection.endPoint));
     }
 
-    InetSocketAddress getAddress() {
-      return address;
+    EndPoint getEndPoint() {
+      return endPoint;
     }
   }
 
@@ -1627,7 +1682,7 @@ class Connection {
               ? statementReadTimeoutMillis
               : connection.factory.getReadTimeoutMillis();
       this.streamId = connection.dispatcher.streamIdHandler.next();
-      if (streamId == -1) throw new BusyConnectionException(connection.address);
+      if (streamId == -1) throw new BusyConnectionException(connection.endPoint);
       this.callback = callback;
       this.retryCount = callback.retryCount();
 
@@ -1688,6 +1743,8 @@ class Connection {
         new Message.ProtocolEncoder(ProtocolVersion.V4);
     private static final Message.ProtocolEncoder messageEncoderV5 =
         new Message.ProtocolEncoder(ProtocolVersion.V5);
+    private static final Message.ProtocolEncoder messageEncoderV6 =
+        new Message.ProtocolEncoder(ProtocolVersion.V6);
     private static final Frame.Encoder frameEncoder = new Frame.Encoder();
 
     private final ProtocolVersion protocolVersion;
@@ -1727,16 +1784,20 @@ class Connection {
       ChannelPipeline pipeline = channel.pipeline();
 
       if (sslOptions != null) {
-        if (sslOptions instanceof RemoteEndpointAwareSSLOptions) {
-          SslHandler handler =
+        SslHandler handler;
+        if (sslOptions instanceof ExtendedRemoteEndpointAwareSslOptions) {
+          handler =
+              ((ExtendedRemoteEndpointAwareSslOptions) sslOptions)
+                  .newSSLHandler(channel, connection.endPoint);
+
+        } else if (sslOptions instanceof RemoteEndpointAwareSSLOptions) {
+          handler =
               ((RemoteEndpointAwareSSLOptions) sslOptions)
-                  .newSSLHandler(channel, connection.address);
-          pipeline.addLast("ssl", handler);
+                  .newSSLHandler(channel, connection.endPoint.resolve());
         } else {
-          @SuppressWarnings("deprecation")
-          SslHandler handler = sslOptions.newSSLHandler(channel);
-          pipeline.addLast("ssl", handler);
+          handler = sslOptions.newSSLHandler(channel);
         }
+        pipeline.addLast("ssl", handler);
       }
 
       // pipeline.addLast("debug", new LoggingHandler(LogLevel.INFO));
@@ -1750,7 +1811,13 @@ class Connection {
       pipeline.addLast("frameDecoder", new Frame.Decoder());
       pipeline.addLast("frameEncoder", frameEncoder);
 
-      if (compressor != null) {
+      pipeline.addLast("framingFormatHandler", new FramingFormatHandler(connection.factory));
+
+      if (compressor != null
+          // Frame-level compression is only done in legacy protocol versions. In V5 and above, it
+          // happens at a higher level ("segment" that groups multiple frames), so never install
+          // those handlers.
+          && protocolVersion.compareTo(ProtocolVersion.V5) < 0) {
         pipeline.addLast("frameDecompressor", new Frame.Decompressor(compressor));
         pipeline.addLast("frameCompressor", new Frame.Compressor(compressor));
       }
@@ -1777,6 +1844,8 @@ class Connection {
           return messageEncoderV4;
         case V5:
           return messageEncoderV5;
+        case V6:
+          return messageEncoderV6;
         default:
           throw new DriverInternalError("Unsupported protocol version " + protocolVersion);
       }

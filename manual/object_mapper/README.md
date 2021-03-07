@@ -11,7 +11,7 @@ The mapper is published as a separate Maven artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-mapping</artifactId>
-  <version>3.7.2.0</version>
+  <version>3.10.2.0</version>
 </dependency>
 ```
 

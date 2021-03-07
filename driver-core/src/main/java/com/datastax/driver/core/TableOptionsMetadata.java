@@ -23,9 +23,10 @@ import java.util.Map;
 public class TableOptionsMetadata {
 
   private static final String COMMENT = "comment";
-  private static final String READ_REPAIR = "read_repair_chance";
-  private static final String DCLOCAL_READ_REPAIR = "dclocal_read_repair_chance";
-  private static final String LOCAL_READ_REPAIR = "local_read_repair_chance";
+  private static final String READ_REPAIR_CHANCE = "read_repair_chance";
+  private static final String DCLOCAL_READ_REPAIR_CHANCE = "dclocal_read_repair_chance";
+  private static final String READ_REPAIR = "read_repair";
+  private static final String LOCAL_READ_REPAIR_CHANCE = "local_read_repair_chance";
   private static final String REPLICATE_ON_WRITE = "replicate_on_write";
   private static final String GC_GRACE = "gc_grace_seconds";
   private static final String BF_FP_CHANCE = "bloom_filter_fp_chance";
@@ -52,6 +53,7 @@ public class TableOptionsMetadata {
   private static final String[] MAP_EXTENSIONS = {
     SCYLLA_CDC_EXTENSION, SCYLLA_ENCRYPTION_OPTIONS_EXTENSION, SCYLLA_TAGS_EXTENSION
   };
+  private static final String ADDITIONAL_WRITE_POLICY = "additional_write_policy";
 
   private static final boolean DEFAULT_REPLICATE_ON_WRITE = true;
   private static final double DEFAULT_BF_FP_CHANCE = 0.01;
@@ -64,12 +66,15 @@ public class TableOptionsMetadata {
   private static final int DEFAULT_MAX_INDEX_INTERVAL = 2048;
   private static final double DEFAULT_CRC_CHECK_CHANCE = 1.0;
   private static final boolean DEFAULT_CDC = false;
+  private static final String DEFAULT_READ_REPAIR = "BLOCKING";
+  private static final String DEFAULT_ADDITIONAL_WRITE_POLICY = "99p";
 
   private final boolean isCompactStorage;
 
   private final String comment;
-  private final double readRepair;
-  private final double localReadRepair;
+  private final double readRepairChance;
+  private final double localReadRepairChance;
+  private final String readRepair;
   private final boolean replicateOnWrite;
   private final int gcGrace;
   private final double bfFpChance;
@@ -87,6 +92,7 @@ public class TableOptionsMetadata {
   private final Map<String, ByteBuffer> extensions;
   private final Map<String, Map<String, String>> mapExtensions;
   private final boolean cdc;
+  private final String additionalWritePolicy;
 
   TableOptionsMetadata(Row row, boolean isCompactStorage, VersionNumber version) {
 
@@ -100,10 +106,13 @@ public class TableOptionsMetadata {
 
     this.isCompactStorage = isCompactStorage;
     this.comment = isNullOrAbsent(row, COMMENT) ? "" : row.getString(COMMENT);
-    this.readRepair = row.getDouble(READ_REPAIR);
+    this.readRepairChance = row.getDouble(READ_REPAIR_CHANCE);
 
-    if (is300OrHigher) this.localReadRepair = row.getDouble(DCLOCAL_READ_REPAIR);
-    else this.localReadRepair = row.getDouble(LOCAL_READ_REPAIR);
+    if (is400OrHigher) this.readRepair = row.getString(READ_REPAIR);
+    else this.readRepair = DEFAULT_READ_REPAIR;
+
+    if (is300OrHigher) this.localReadRepairChance = row.getDouble(DCLOCAL_READ_REPAIR_CHANCE);
+    else this.localReadRepairChance = row.getDouble(LOCAL_READ_REPAIR_CHANCE);
 
     this.replicateOnWrite =
         is210OrHigher || isNullOrAbsent(row, REPLICATE_ON_WRITE)
@@ -195,6 +204,9 @@ public class TableOptionsMetadata {
 
     if (is380OrHigher) this.cdc = isNullOrAbsent(row, CDC) ? DEFAULT_CDC : row.getBool(CDC);
     else this.cdc = DEFAULT_CDC;
+
+    if (is400OrHigher) this.additionalWritePolicy = row.getString(ADDITIONAL_WRITE_POLICY);
+    else this.additionalWritePolicy = DEFAULT_ADDITIONAL_WRITE_POLICY;
   }
 
   private static boolean isNullOrAbsent(Row row, String name) {
@@ -225,6 +237,19 @@ public class TableOptionsMetadata {
    * @return the read repair chance set for table (in [0.0, 1.0]).
    */
   public double getReadRepairChance() {
+    return readRepairChance;
+  }
+
+  /**
+   * Returns the read_repair option for this table. <b>NOTE:</b> this is a Cassandra® 4.0 and newer
+   * option (described here: <a
+   * href="http://cassandra.apache.org/doc/latest/operating/read_repair.html">
+   * http://cassandra.apache.org/doc/latest/operating/read_repair.html</a>). Possible values are
+   * {@code BLOCKING} or {@code NONE}, with the default being {@code BLOCKING}.
+   *
+   * @return the read repair option (either {@code BLOCKING} or {@code NONE}).
+   */
+  public String getReadRepair() {
     return readRepair;
   }
 
@@ -234,7 +259,7 @@ public class TableOptionsMetadata {
    * @return the local read repair chance set for table (in [0.0, 1.0]).
    */
   public double getLocalReadRepairChance() {
-    return localReadRepair;
+    return localReadRepairChance;
   }
 
   /**
@@ -476,6 +501,17 @@ public class TableOptionsMetadata {
     return mapExtensions.get(SCYLLA_TAGS_EXTENSION);
   }
 
+  /**
+   * The threshold at which a cheap quorum write will be upgraded to include transient replicas.
+   *
+   * <p>This option is only available in Cassandra® 4.0 and above. Default value is {@code 99p}.
+   *
+   * @return The additional write policy for this table (ex. '99p').
+   */
+  public String getAdditionalWritePolicy() {
+    return additionalWritePolicy;
+  }
+
   @Override
   public boolean equals(Object other) {
     if (other == this) return true;
@@ -484,8 +520,9 @@ public class TableOptionsMetadata {
     TableOptionsMetadata that = (TableOptionsMetadata) other;
     return this.isCompactStorage == that.isCompactStorage
         && MoreObjects.equal(this.comment, that.comment)
-        && this.readRepair == that.readRepair
-        && this.localReadRepair == that.localReadRepair
+        && this.readRepairChance == that.readRepairChance
+        && this.localReadRepairChance == that.localReadRepairChance
+        && MoreObjects.equal(this.readRepair, that.readRepair)
         && this.replicateOnWrite == that.replicateOnWrite
         && this.gcGrace == that.gcGrace
         && this.bfFpChance == that.bfFpChance
@@ -501,6 +538,7 @@ public class TableOptionsMetadata {
         && MoreObjects.equal(this.compaction, that.compaction)
         && MoreObjects.equal(this.compression, that.compression)
         && MoreObjects.equal(this.crcCheckChance, that.crcCheckChance)
+        && MoreObjects.equal(this.additionalWritePolicy, that.additionalWritePolicy)
         && MoreObjects.equal(this.extensions, that.extensions)
         && MoreObjects.equal(this.mapExtensions, that.mapExtensions);
   }
@@ -510,8 +548,9 @@ public class TableOptionsMetadata {
     return MoreObjects.hashCode(
         isCompactStorage,
         comment,
+        readRepairChance,
+        localReadRepairChance,
         readRepair,
-        localReadRepair,
         replicateOnWrite,
         gcGrace,
         bfFpChance,
@@ -528,6 +567,7 @@ public class TableOptionsMetadata {
         crcCheckChance,
         extensions,
         cdc,
-        mapExtensions);
+        mapExtensions,
+        additionalWritePolicy);
   }
 }

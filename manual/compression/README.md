@@ -88,4 +88,4 @@ cluster = Cluster.builder()
     .build();
 ```
 
-[pom]: https://repo1.maven.org/maven2/com/scylladb/scylla-driver-parent/3.7.2.0/scylla-driver-parent-3.7.2.0.pom
+[pom]: https://repo1.maven.org/maven2/com/scylladb/scylla-driver-parent/3.10.2.0/scylla-driver-parent-3.10.2.0.pom

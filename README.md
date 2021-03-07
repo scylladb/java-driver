@@ -6,7 +6,7 @@ not yet have been released. You can find the documentation for the latest
 version through the [Java driver
 docs](https://docs.scylladb.com/using-scylla/scylla-java-driver/) or via the release tags,
 [e.g.
-3.7.2.0](https://github.com/scylladb/java-driver/releases/tag/3.7.2.0).*
+3.10.2.0](https://github.com/scylladb/java-driver/releases/tag/3.10.2.0).*
 
 A modern, [feature-rich](manual/) and highly tunable Java client
 library for Apache Cassandra (2.1+) and using exclusively Cassandra's binary protocol 
@@ -62,7 +62,7 @@ it in your application using the following Maven dependency
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-core</artifactId>
-  <version>3.7.2.0</version>
+  <version>3.10.2.0</version>
 </dependency>
 ```
 
@@ -72,7 +72,7 @@ Note that the object mapper is published as a separate artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-mapping</artifactId>
-  <version>3.7.2.0</version>
+  <version>3.10.2.0</version>
 </dependency>
 ```
 
@@ -82,7 +82,7 @@ The 'extras' module is also published as a separate artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-extras</artifactId>
-  <version>3.7.2.0</version>
+  <version>3.10.2.0</version>
 </dependency>
 ```
 
@@ -92,7 +92,7 @@ to avoid the explicit dependency to Netty.
 
 ## Compatibility
 
-The Java client driver 3.7.2.0 ([branch 3.x](https://github.com/scylladb/java-driver/tree/3.x)) is compatible with Apache
+The Java client driver 3.10.2.0 ([branch 3.x](https://github.com/scylladb/java-driver/tree/3.x)) is compatible with Apache
 Cassandra 2.1, 2.2 and 3.0+.
 
 UDT and tuple support is available only when using Apache Cassandra 2.1 or higher.

@@ -41,7 +41,6 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
@@ -82,7 +81,7 @@ class RequestHandler {
   private final io.netty.util.Timer scheduler;
 
   private volatile List<Host> triedHosts;
-  private volatile ConcurrentMap<InetSocketAddress, Throwable> errors;
+  private volatile ConcurrentMap<EndPoint, Throwable> errors;
 
   private final Timer.Context timerContext;
   private final long startTime;
@@ -316,7 +315,7 @@ class RequestHandler {
           execution,
           null,
           new NoHostAvailableException(
-              errors == null ? Collections.<InetSocketAddress, Throwable>emptyMap() : errors));
+              errors == null ? Collections.<EndPoint, Throwable>emptyMap() : errors));
   }
 
   private boolean metricsEnabled() {
@@ -459,18 +458,21 @@ class RequestHandler {
                 // If we have any problem with the connection, move to the next node.
                 if (metricsEnabled()) metrics().getErrorMetrics().getConnectionErrors().inc();
                 if (connection != null) connection.release();
-                logError(host.getSocketAddress(), e);
+                logError(host.getEndPoint(), e);
                 findNextHostAndQuery();
               } catch (BusyConnectionException e) {
                 // The pool shouldn't have give us a busy connection unless we've maxed up the pool,
                 // so move on to the next host.
                 connection.release(true);
-                logError(host.getSocketAddress(), e);
+                logError(host.getEndPoint(), e);
                 findNextHostAndQuery();
               } catch (RuntimeException e) {
                 if (connection != null) connection.release();
-                logger.error("Unexpected error while querying " + host.getAddress(), e);
-                logError(host.getSocketAddress(), e);
+                logger.warn(
+                    "Unexpected error while querying {} - [{}]. Find next host to query.",
+                    host.getEndPoint(),
+                    e.toString());
+                logError(host.getEndPoint(), e);
                 findNextHostAndQuery();
               }
             }
@@ -478,10 +480,13 @@ class RequestHandler {
             @Override
             public void onFailure(Throwable t) {
               if (t instanceof BusyPoolException) {
-                logError(host.getSocketAddress(), t);
+                logError(host.getEndPoint(), t);
               } else {
-                logger.error("Unexpected error while querying " + host.getAddress(), t);
-                logError(host.getSocketAddress(), t);
+                logger.warn(
+                    "Unexpected error while querying {} - [{}]. Find next host to query.",
+                    host.getEndPoint(),
+                    t.toString());
+                logError(host.getEndPoint(), t);
               }
               findNextHostAndQuery();
             }
@@ -577,7 +582,7 @@ class RequestHandler {
                 retryDecision.getRetryConsistencyLevel());
           if (metricsEnabled()) metrics().getErrorMetrics().getRetries().inc();
           // log error for the current host if we are switching to another one
-          if (!retryDecision.isRetryCurrent()) logError(connection.address, exceptionToReport);
+          if (!retryDecision.isRetryCurrent()) logError(connection.endPoint, exceptionToReport);
           retry(retryDecision.isRetryCurrent(), retryDecision.getRetryConsistencyLevel());
           break;
         case RETHROW:
@@ -599,16 +604,16 @@ class RequestHandler {
       if (!retryCurrent || !query(h)) findNextHostAndQuery();
     }
 
-    private void logError(InetSocketAddress address, Throwable exception) {
-      logger.debug("[{}] Error querying {} : {}", id, address, exception.toString());
+    private void logError(EndPoint endPoint, Throwable exception) {
+      logger.debug("[{}] Error querying {} : {}", id, endPoint, exception.toString());
       if (errors == null) {
         synchronized (RequestHandler.this) {
           if (errors == null) {
-            errors = new ConcurrentHashMap<InetSocketAddress, Throwable>();
+            errors = new ConcurrentHashMap<EndPoint, Throwable>();
           }
         }
       }
-      errors.put(address, exception);
+      errors.put(endPoint, exception);
     }
 
     void cancel() {
@@ -684,7 +689,7 @@ class RequestHandler {
             break;
           case ERROR:
             Responses.Error err = (Responses.Error) response;
-            exceptionToReport = err.asException(connection.address);
+            exceptionToReport = err.asException(connection.endPoint);
             RetryPolicy.RetryDecision retry = null;
             RetryPolicy retryPolicy = retryPolicy();
             switch (err.code) {
@@ -755,7 +760,7 @@ class RequestHandler {
               case OVERLOADED:
                 connection.release();
                 assert exceptionToReport instanceof OverloadedException;
-                logger.warn("Host {} is overloaded.", connection.address);
+                logger.warn("Host {} is overloaded.", connection.endPoint);
                 retry = computeRetryDecisionOnRequestError((OverloadedException) exceptionToReport);
                 break;
               case SERVER_ERROR:
@@ -763,7 +768,7 @@ class RequestHandler {
                 assert exceptionToReport instanceof ServerError;
                 logger.warn(
                     "{} replied with server error ({}), defuncting connection.",
-                    connection.address,
+                    connection.endPoint,
                     err.message);
                 // Defunct connection
                 connection.defunct(exceptionToReport);
@@ -774,11 +779,11 @@ class RequestHandler {
                 assert exceptionToReport instanceof BootstrappingException;
                 logger.error(
                     "Query sent to {} but it is bootstrapping. This shouldn't happen but trying next host.",
-                    connection.address);
+                    connection.endPoint);
                 if (metricsEnabled()) {
                   metrics().getErrorMetrics().getOthers().inc();
                 }
-                logError(connection.address, exceptionToReport);
+                logError(connection.endPoint, exceptionToReport);
                 retry(false, null);
                 return;
               case UNPREPARED:
@@ -818,7 +823,8 @@ class RequestHandler {
                     "Query {} is not prepared on {}, preparing before retrying executing. "
                         + "Seeing this message a few times is fine, but seeing it a lot may be source of performance problems",
                     toPrepare.getQueryString(),
-                    connection.address);
+                    toPrepare.getQueryKeyspace(),
+                    connection.endPoint);
 
                 write(connection, prepareAndRetry(toPrepare.getQueryString()));
                 // we're done for now, the prepareAndRetry callback will handle the rest
@@ -910,14 +916,14 @@ class RequestHandler {
                 retry(true, null);
               } else {
                 logError(
-                    connection.address,
+                    connection.endPoint,
                     new DriverException("Got unexpected response to prepare message: " + response));
                 retry(false, null);
               }
               break;
             case ERROR:
               logError(
-                  connection.address,
+                  connection.endPoint,
                   new DriverException("Error preparing query, got " + response));
               if (metricsEnabled()) metrics().getErrorMetrics().getOthers().inc();
               retry(false, null);
@@ -949,9 +955,9 @@ class RequestHandler {
           }
           connection.release();
           logError(
-              connection.address,
+              connection.endPoint,
               new OperationTimedOutException(
-                  connection.address, "Timed out waiting for response to PREPARE message"));
+                  connection.endPoint, "Timed out waiting for response to PREPARE message"));
           retry(false, null);
           return true;
         }
@@ -1013,7 +1019,7 @@ class RequestHandler {
 
       OperationTimedOutException timeoutException =
           new OperationTimedOutException(
-              connection.address, "Timed out waiting for server response");
+              connection.endPoint, "Timed out waiting for server response");
 
       try {
         connection.release();

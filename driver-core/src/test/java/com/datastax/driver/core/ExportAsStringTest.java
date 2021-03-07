@@ -146,7 +146,7 @@ public class ExportAsStringTest extends CCMTestsSupport {
         // matter, alphabetical does.
         session.execute(
             "CREATE MATERIALIZED VIEW cyclist_by_r_age "
-                + "AS SELECT age, birthday, name, country "
+                + "AS SELECT cid, age, birthday, name, country "
                 + "FROM cyclist_mv "
                 + "WHERE age IS NOT NULL AND cid IS NOT NULL "
                 + "PRIMARY KEY (age, cid) "
@@ -163,7 +163,7 @@ public class ExportAsStringTest extends CCMTestsSupport {
         // A materialized view for cyclist_mv, select columns
         session.execute(
             "CREATE MATERIALIZED VIEW cyclist_by_age "
-                + "AS SELECT age, birthday, name, country "
+                + "AS SELECT cid, age, birthday, name, country "
                 + "FROM cyclist_mv "
                 + "WHERE age IS NOT NULL AND cid IS NOT NULL "
                 + "PRIMARY KEY (age, cid) WITH comment = 'simple view'");
@@ -225,8 +225,15 @@ public class ExportAsStringTest extends CCMTestsSupport {
   }
 
   private String getExpectedCqlString() {
-    String majorMinor =
-        ccm().getCassandraVersion().getMajor() + "." + ccm().getCassandraVersion().getMinor();
+    VersionNumber cassandraVersion = ccm().getCassandraVersion();
+    VersionNumber dseVersion = ccm().getDSEVersion();
+    String majorMinor;
+    if (dseVersion != null && dseVersion.getMajor() == 6 && dseVersion.getMinor() < 8) {
+      // DSE 6.0 and 6.7 report C* 4.0 but in reality it is C* 3.11
+      majorMinor = "3.11";
+    } else {
+      majorMinor = cassandraVersion.getMajor() + "." + cassandraVersion.getMinor();
+    }
     String resourceName = "/export_as_string_test_" + majorMinor + ".cql";
 
     Closer closer = Closer.create();
