@@ -20,15 +20,15 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.datastax.cassandra</groupId>
-        <artifactId>cassandra-driver-parent</artifactId>
-        <version>3.7.2</version>
+        <groupId>com.scylladb</groupId>
+        <artifactId>scylla-driver-parent</artifactId>
+        <version>3.7.2.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>cassandra-driver-core</artifactId>
-    <name>DataStax Java Driver for Apache Cassandra - Core</name>
+    <artifactId>scylla-driver-core</artifactId>
+    <name>Java Driver for Scylla and Apache Cassandra - Core</name>
     <description>
-        A driver for Apache Cassandra 1.2+ that works exclusively with the Cassandra Query Language version 3
+        A driver for Scylla and Apache Cassandra 1.2+ that works exclusively with the Cassandra Query Language version 3
         (CQL3) and Cassandra's binary protocol.
     </description>
 

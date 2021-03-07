@@ -26,11 +26,11 @@
 
     <moduleSets>
 
-        <!-- dependencies of module cassandra-driver-core -->
+        <!-- dependencies of module scylla-driver-core -->
         <moduleSet>
             <useAllReactorProjects>true</useAllReactorProjects>
             <includes>
-                <include>com.datastax.cassandra:cassandra-driver-core</include>
+                <include>com.scylladb:scylla-driver-core</include>
             </includes>
             <binaries>
                 <unpack>false</unpack>
@@ -39,9 +39,9 @@
                         <outputDirectory>lib</outputDirectory>
                         <excludes>
                             <!-- reactor projects -->
-                            <exclude>com.datastax.cassandra:cassandra-driver-core</exclude>
-                            <exclude>com.datastax.cassandra:cassandra-driver-mapping</exclude>
-                            <exclude>com.datastax.cassandra:cassandra-driver-extras</exclude>
+                            <exclude>com.scylladb:scylla-driver-core</exclude>
+                            <exclude>com.scylladb:scylla-driver-mapping</exclude>
+                            <exclude>com.scylladb:scylla-driver-extras</exclude>
                             <!-- platform-dependent -->
                             <exclude>io.netty:netty-transport-native-epoll:*</exclude>
                         </excludes>
@@ -59,11 +59,11 @@
             </binaries>
         </moduleSet>
 
-        <!-- dependencies of module cassandra-driver-mapping -->
+        <!-- dependencies of module scylla-driver-mapping -->
         <moduleSet>
             <useAllReactorProjects>true</useAllReactorProjects>
             <includes>
-                <include>com.datastax.cassandra:cassandra-driver-mapping</include>
+                <include>com.scylladb:scylla-driver-mapping</include>
             </includes>
             <binaries>
                 <unpack>false</unpack>
@@ -72,9 +72,9 @@
                         <outputDirectory>lib/mapping</outputDirectory>
                         <excludes>
                             <!-- reactor projects -->
-                            <exclude>com.datastax.cassandra:cassandra-driver-core</exclude>
-                            <exclude>com.datastax.cassandra:cassandra-driver-mapping</exclude>
-                            <exclude>com.datastax.cassandra:cassandra-driver-extras</exclude>
+                            <exclude>com.scylladb:scylla-driver-core</exclude>
+                            <exclude>com.scylladb:scylla-driver-mapping</exclude>
+                            <exclude>com.scylladb:scylla-driver-extras</exclude>
                             <!-- already included in lib/core -->
                             <exclude>com.google.guava:guava</exclude>
                             <exclude>org.slf4j:slf4j-api</exclude>
@@ -85,11 +85,11 @@
             </binaries>
         </moduleSet>
 
-        <!-- dependencies of module cassandra-driver-extras -->
+        <!-- dependencies of module scylla-driver-extras -->
         <moduleSet>
             <useAllReactorProjects>true</useAllReactorProjects>
             <includes>
-                <include>com.datastax.cassandra:cassandra-driver-extras</include>
+                <include>com.scylladb:scylla-driver-extras</include>
             </includes>
             <binaries>
                 <unpack>false</unpack>
@@ -98,9 +98,9 @@
                         <outputDirectory>lib/extras</outputDirectory>
                         <excludes>
                             <!-- reactor projects -->
-                            <exclude>com.datastax.cassandra:cassandra-driver-core</exclude>
-                            <exclude>com.datastax.cassandra:cassandra-driver-mapping</exclude>
-                            <exclude>com.datastax.cassandra:cassandra-driver-extras</exclude>
+                            <exclude>com.scylladb:scylla-driver-core</exclude>
+                            <exclude>com.scylladb:scylla-driver-mapping</exclude>
+                            <exclude>com.scylladb:scylla-driver-extras</exclude>
                             <!-- already included in lib/core -->
                             <exclude>com.google.guava:guava</exclude>
                             <exclude>org.slf4j:slf4j-api</exclude>
@@ -115,10 +115,10 @@
         <moduleSet>
             <useAllReactorProjects>true</useAllReactorProjects>
             <includes>
-                <include>com.datastax.cassandra:cassandra-driver-core</include>
-                <include>com.datastax.cassandra:cassandra-driver-mapping</include>
-                <include>com.datastax.cassandra:cassandra-driver-extras</include>
-                <include>com.datastax.cassandra:cassandra-driver-examples</include>
+                <include>com.scylladb:scylla-driver-core</include>
+                <include>com.scylladb:scylla-driver-mapping</include>
+                <include>com.scylladb:scylla-driver-extras</include>
+                <include>com.scylladb:scylla-driver-examples</include>
             </includes>
             <binaries>
                 <unpack>false</unpack>

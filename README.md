@@ -74,9 +74,9 @@ using DataStax Enterprise, install the [DataStax Enterprise Java driver][dse-dri
 
 ```xml
 <dependency>
-  <groupId>com.datastax.cassandra</groupId>
-  <artifactId>cassandra-driver-core</artifactId>
-  <version>3.7.2</version>
+  <groupId>com.scylladb</groupId>
+  <artifactId>scylla-driver-core</artifactId>
+  <version>3.7.2.0</version>
 </dependency>
 ```
 
@@ -84,9 +84,9 @@ Note that the object mapper is published as a separate artifact:
 
 ```xml
 <dependency>
-  <groupId>com.datastax.cassandra</groupId>
-  <artifactId>cassandra-driver-mapping</artifactId>
-  <version>3.7.2</version>
+  <groupId>com.scylladb</groupId>
+  <artifactId>scylla-driver-mapping</artifactId>
+  <version>3.7.2.0</version>
 </dependency>
 ```
 
@@ -94,9 +94,9 @@ The 'extras' module is also published as a separate artifact:
 
 ```xml
 <dependency>
-  <groupId>com.datastax.cassandra</groupId>
-  <artifactId>cassandra-driver-extras</artifactId>
-  <version>3.7.2</version>
+  <groupId>com.scylladb</groupId>
+  <artifactId>scylla-driver-extras</artifactId>
+  <version>3.7.2.0</version>
 </dependency>
 ```
 

@@ -9,9 +9,9 @@ The mapper is published as a separate Maven artifact:
 
 ```xml
 <dependency>
-  <groupId>com.datastax.cassandra</groupId>
-  <artifactId>cassandra-driver-mapping</artifactId>
-  <version>3.7.2</version>
+  <groupId>com.scylladb</groupId>
+  <artifactId>scylla-driver-mapping</artifactId>
+  <version>3.7.2.0</version>
 </dependency>
 ```
 

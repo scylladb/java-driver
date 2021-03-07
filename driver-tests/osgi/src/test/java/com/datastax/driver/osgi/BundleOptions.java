@@ -60,7 +60,7 @@ public class BundleOptions {
     return bundle(
         "reference:file:"
             + PathUtils.getBaseDir()
-            + "/../../driver-core/target/cassandra-driver-core-"
+            + "/../../driver-core/target/scylla-driver-core-"
             + Cluster.getDriverVersion()
             + classifier
             + ".jar");
@@ -70,7 +70,7 @@ public class BundleOptions {
     return bundle(
         "reference:file:"
             + PathUtils.getBaseDir()
-            + "/../../driver-mapping/target/cassandra-driver-mapping-"
+            + "/../../driver-mapping/target/scylla-driver-mapping-"
             + Cluster.getDriverVersion()
             + ".jar");
   }
@@ -79,7 +79,7 @@ public class BundleOptions {
     return bundle(
         "reference:file:"
             + PathUtils.getBaseDir()
-            + "/../../driver-extras/target/cassandra-driver-extras-"
+            + "/../../driver-extras/target/scylla-driver-extras-"
             + Cluster.getDriverVersion()
             + ".jar");
   }

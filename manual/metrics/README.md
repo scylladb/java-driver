@@ -36,9 +36,9 @@ To do this in a maven project:
 
 ```xml
 <dependency>
-  <groupId>com.datastax.cassandra</groupId>
-  <artifactId>cassandra-driver-core</artifactId>
-  <version>3.7.2</version>
+  <groupId>com.scylladb</groupId>
+  <artifactId>scylla-driver-core</artifactId>
+  <version>3.7.2.0</version>
   <exclusions>
     <exclusion>
       <groupId>io.dropwizard.metrics</groupId>

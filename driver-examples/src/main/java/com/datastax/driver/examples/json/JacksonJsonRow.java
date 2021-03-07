@@ -43,8 +43,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * <pre>{@code
  * <dependency>
- *     <groupId>com.datastax.cassandra</groupId>
- *     <artifactId>cassandra-driver-extras</artifactId>
+ *     <groupId>com.scylladb</groupId>
+ *     <artifactId>scylla-driver-extras</artifactId>
  *     <version>${driver.version}</version>
  * </dependency>
  *
