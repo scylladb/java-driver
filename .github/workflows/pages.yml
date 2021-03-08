@@ -3,9 +3,13 @@ name: "CI Docs"
 on:
   push:
     branches:
-    - latest
+    - scylla-3.x
     paths:
     - 'docs/**'
+    - 'faq/**'
+    - 'manual/**'
+    - 'changelog/**'
+    - 'upgrade_guide/**'
 jobs:
   release:
     name: Build
