@@ -144,6 +144,7 @@ html_style = ''
 # documentation.
 #
 html_theme_options = {
+    'branch_substring_removed': 'scylla-',
     'header_links': [
     ('Scylla Java Driver', 'https://java-driver.docs.scylladb.com/'),
     ('Scylla Cloud', 'https://docs.scylladb.com/scylla-cloud/'),
@@ -151,6 +152,7 @@ html_theme_options = {
     ('ScyllaDB Home', 'https://www.scylladb.com/')],
     'github_issues_repository': 'scylladb/java-driver',
     'show_sidebar_index': True,
+    'hide_version_dropdown': ['scylla-3.x'],
 }
 
 extlinks = {
@@ -198,7 +200,7 @@ redirects_file = "_utils/redirections.yaml"
 TAGS = []
 smv_tag_whitelist = multiversion_regex_builder(TAGS)
 # Whitelist pattern for branches (set to None to ignore all branches)
-BRANCHES = ['scylla-3.7.2.x', 'scylla-3.10.2.x']
+BRANCHES = ['scylla-3.x', 'scylla-3.7.2.x', 'scylla-3.10.2.x']
 smv_branch_whitelist = multiversion_regex_builder(BRANCHES)
 # Defines which version is considered to be the latest stable version.
 # Must be listed in smv_tag_whitelist or smv_branch_whitelist.
