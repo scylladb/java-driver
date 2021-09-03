@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core.cloud;
 
 import static com.datastax.driver.core.cloud.SniProxyServer.CERTS_BUNDLE_SUFFIX;
@@ -68,7 +74,7 @@ public class CloudTest {
     proxy.stopProxy();
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_connect_to_proxy_using_absolute_path() {
     Session session =
         Cluster.builder()
@@ -79,7 +85,7 @@ public class CloudTest {
     assertThat(set).isNotNull();
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_connect_to_proxy_using_non_normalized_path() {
     String path =
         String.format("%s/%s", proxy.getProxyRootPath(), "certs/bundles/../bundles/creds-v1.zip");
@@ -89,7 +95,7 @@ public class CloudTest {
     assertThat(set).isNotNull();
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_connect_to_proxy_using_file_provided_by_the_http_URL() throws IOException {
     // given
     wireMockServer.stubFor(
@@ -111,7 +117,7 @@ public class CloudTest {
     assertThat(set).isNotNull();
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_connect_to_proxy_using_file_provided_by_input_stream() throws IOException {
     // given
     wireMockServer.stubFor(
@@ -134,7 +140,7 @@ public class CloudTest {
     assertThat(set).isNotNull();
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_connect_to_proxy_using_auth_provider() {
     Session session =
         Cluster.builder()
@@ -146,7 +152,7 @@ public class CloudTest {
     assertThat(set).isNotNull();
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_not_connect_to_proxy_bad_creds() {
     try {
       Session session =
@@ -160,7 +166,7 @@ public class CloudTest {
     }
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_not_connect_to_proxy() {
     try {
       Session session =
@@ -174,7 +180,7 @@ public class CloudTest {
     }
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_not_allow_contact_points_and_cloud() {
     try {
       Session session =
@@ -192,7 +198,7 @@ public class CloudTest {
     }
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_not_allow_cloud_with_contact_points_string() {
     try {
       Session session =
@@ -210,7 +216,7 @@ public class CloudTest {
     }
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledDSECloud */)
   public void should_not_allow_cloud_with_contact_points_endpoint() {
     try {
       Session session =
