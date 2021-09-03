@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.osgi;
 
 import static com.datastax.driver.osgi.BundleOptions.defaultOptions;
@@ -28,12 +34,11 @@ import com.datastax.driver.osgi.api.MailboxException;
 import org.ops4j.pax.exam.Configuration;
 import org.ops4j.pax.exam.Option;
 import org.ops4j.pax.exam.options.MavenArtifactProvisionOption;
-import org.ops4j.pax.exam.testng.listener.PaxExam;
 import org.testng.SkipException;
-import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 
-@Listeners({CCMBridgeListener.class, PaxExam.class})
+// @IntegrationTestDisabledPaxExamHttpsFailure
+// @Listeners({CCMBridgeListener.class, PaxExam.class})
 public class MailboxServiceGuava21IT extends MailboxServiceTests {
 
   @Configuration
@@ -65,7 +70,7 @@ public class MailboxServiceGuava21IT extends MailboxServiceTests {
    * @jira_ticket JAVA-620
    * @since 2.0.10, 2.1.5
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledPaxExamHttpsFailure */)
   public void test_guava_21() throws MailboxException {
     String javaVersion = System.getProperty("java.version");
     if (javaVersion.compareTo("1.8") < 0) {

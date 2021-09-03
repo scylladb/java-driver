@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.osgi;
 
 import static com.datastax.driver.osgi.BundleOptions.defaultOptions;
@@ -28,11 +34,10 @@ import static org.ops4j.pax.exam.CoreOptions.options;
 import com.datastax.driver.osgi.api.MailboxException;
 import org.ops4j.pax.exam.Configuration;
 import org.ops4j.pax.exam.Option;
-import org.ops4j.pax.exam.testng.listener.PaxExam;
-import org.testng.annotations.Listeners;
 import org.testng.annotations.Test;
 
-@Listeners({CCMBridgeListener.class, PaxExam.class})
+// @IntegrationTestDisabledPaxExamHttpsFailure
+// @Listeners({CCMBridgeListener.class, PaxExam.class})
 public class MailboxServiceSnappyIT extends MailboxServiceTests {
 
   @Configuration
@@ -57,7 +62,7 @@ public class MailboxServiceSnappyIT extends MailboxServiceTests {
    * @jira_ticket JAVA-1200
    * @since 3.1.0
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledPaxExamHttpsFailure */)
   public void test_snappy() throws MailboxException {
     checkService();
   }
