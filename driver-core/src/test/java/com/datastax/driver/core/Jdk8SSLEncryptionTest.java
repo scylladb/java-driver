@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;
@@ -56,7 +62,11 @@ public class Jdk8SSLEncryptionTest extends SSLTestBase {
    * @jira_ticket JAVA-1364
    * @since 3.2.0
    */
-  @Test(groups = "short", dataProvider = "sslImplementation", dataProviderClass = SSLTestBase.class)
+  @Test(
+      groups = "short",
+      dataProvider = "sslImplementation",
+      dataProviderClass = SSLTestBase.class,
+      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
   public void should_pass_peer_address_to_engine(SslImplementation sslImplementation)
       throws Exception {
     String expectedPeerHost = TestUtils.IP_PREFIX + "1";

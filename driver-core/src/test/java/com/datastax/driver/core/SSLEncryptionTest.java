@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -35,7 +41,11 @@ public class SSLEncryptionTest extends SSLTestBase {
    * @test_category connection:ssl
    * @expected_result Connection can be established to a cassandra node using SSL.
    */
-  @Test(groups = "short", dataProvider = "sslImplementation", dataProviderClass = SSLTestBase.class)
+  @Test(
+      groups = "short",
+      dataProvider = "sslImplementation",
+      dataProviderClass = SSLTestBase.class,
+      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
   public void should_connect_with_ssl_without_client_auth_and_node_doesnt_require_auth(
       SslImplementation sslImplementation) throws Exception {
     connectWithSSLOptions(getSSLOptions(sslImplementation, false, true));
@@ -53,7 +63,8 @@ public class SSLEncryptionTest extends SSLTestBase {
       groups = "short",
       dataProvider = "sslImplementation",
       dataProviderClass = SSLTestBase.class,
-      expectedExceptions = {NoHostAvailableException.class})
+      expectedExceptions = {NoHostAvailableException.class},
+      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
   public void should_not_connect_with_ssl_without_trusting_server_cert(
       SslImplementation sslImplementation) throws Exception {
     connectWithSSLOptions(getSSLOptions(sslImplementation, false, false));

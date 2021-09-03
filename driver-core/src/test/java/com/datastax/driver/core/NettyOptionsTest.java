@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;
@@ -48,7 +54,9 @@ public class NettyOptionsTest extends CCMTestsSupport {
   }
 
   @CCMConfig(numberOfNodes = 3)
-  @Test(groups = "short")
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
   public void should_invoke_netty_options_hooks_multi_node() throws Exception {
     should_invoke_netty_options_hooks(3, 4);
   }

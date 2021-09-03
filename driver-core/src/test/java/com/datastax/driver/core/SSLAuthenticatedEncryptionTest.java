@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.CCMBridge.DEFAULT_CLIENT_KEYSTORE_FILE;
@@ -34,7 +40,11 @@ public class SSLAuthenticatedEncryptionTest extends SSLTestBase {
    * @expected_result Connection can be established to a cassandra node using SSL that requires
    *     client auth.
    */
-  @Test(groups = "short", dataProvider = "sslImplementation", dataProviderClass = SSLTestBase.class)
+  @Test(
+      groups = "short",
+      dataProvider = "sslImplementation",
+      dataProviderClass = SSLTestBase.class,
+      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
   public void should_connect_with_ssl_with_client_auth_and_node_requires_auth(
       SslImplementation sslImplementation) throws Exception {
     connectWithSSLOptions(getSSLOptions(sslImplementation, true, true));
@@ -52,7 +62,8 @@ public class SSLAuthenticatedEncryptionTest extends SSLTestBase {
       groups = "short",
       dataProvider = "sslImplementation",
       dataProviderClass = SSLTestBase.class,
-      expectedExceptions = {NoHostAvailableException.class})
+      expectedExceptions = {NoHostAvailableException.class},
+      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
   public void should_not_connect_without_client_auth_but_node_requires_auth(
       SslImplementation sslImplementation) throws Exception {
     connectWithSSLOptions(getSSLOptions(sslImplementation, false, true));
