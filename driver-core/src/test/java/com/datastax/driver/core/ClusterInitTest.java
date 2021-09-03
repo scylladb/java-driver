@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -58,7 +64,7 @@ public class ClusterInitTest {
    * badly and causing timeouts, we want to ensure that the driver does not wait multiple times on
    * the same host.
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_handle_failing_or_missing_contact_points() throws UnknownHostException {
     Cluster cluster = null;
     Scassandra scassandra = null;

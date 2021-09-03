@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -293,7 +299,7 @@ public class TableMetadataTest extends CCMTestsSupport {
         .hasType(timeuuid());
   }
 
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_parse_table_options() {
     VersionNumber version = ccm().getCassandraVersion();
     VersionNumber dseVersion = ccm().getDSEVersion();

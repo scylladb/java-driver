@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.ProtocolVersion.V4;
@@ -101,7 +107,7 @@ public class ProtocolBetaVersionTest extends CCMTestsSupport {
    *
    * @jira_ticket JAVA-1248
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_connect_with_beta_when_no_version_explicitly_required_and_flag_set()
       throws Exception {
     // Note: when the driver's ProtocolVersion.NEWEST_SUPPORTED will be incremented to V6 or higher

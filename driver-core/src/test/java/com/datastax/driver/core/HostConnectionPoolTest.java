@@ -861,7 +861,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
    * @test_category connection:connection_pool
    * @since 2.0.11
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_mark_host_down_when_no_connections_remaining() throws Exception {
     int readTimeout = 1000;
     int reconnectInterval = 1000;
@@ -940,7 +940,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
    * @test_category connection:connection_pool
    * @since 2.0.11
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_create_new_connections_when_connection_lost_and_under_core_connections()
       throws Exception {
     int readTimeout = 1000;
@@ -1049,7 +1049,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
    * @test_category connection:connection_pool
    * @since 2.0.11
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_not_schedule_reconnect_when_connection_lost_and_at_core_connections()
       throws Exception {
     int readTimeout = 1000;
@@ -1223,7 +1223,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
    * @test_category connection:connection_pool
    * @since 2.0.11
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_throw_exception_if_convicted_and_no_connections_available() {
     int readTimeout = 1000;
     int reconnectInterval = 1000;
@@ -1277,7 +1277,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
    * @test_category connection:connection_pool
    * @since 2.0.11
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_wait_on_connection_if_not_convicted_and_no_connections_available()
       throws Exception {
     int readTimeout = 1000;
@@ -1336,7 +1336,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
    * @test_category connection:connection_pool
    * @since 2.0.11
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_wait_on_connection_if_zero_core_connections() throws Exception {
     int readTimeout = 1000;
     int reconnectInterval = 1000;
@@ -1461,7 +1461,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
    * @test_category connection:connection_pool
    * @since 3.5.1
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void
       should_not_create_connections_if_zero_core_connections_and_reused_connection_on_reconnect()
           throws Exception {

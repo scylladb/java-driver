@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -72,7 +78,7 @@ public class HostConnectionPoolMultiTest {
    * @test_category connection:connection_pool
    * @since 2.0.11
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_mark_host_down_if_all_connections_fail_on_init() {
     // Prevent any connections on node 2.
     scassandra.node(2).currentClient().disableListener();

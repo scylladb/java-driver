@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.ProtocolVersion.V1;
@@ -43,7 +49,7 @@ public class ProtocolVersionRenegotiationTest extends CCMTestsSupport {
   }
 
   /** @jira_ticket JAVA-1367 */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   @CassandraVersion("3.8")
   public void should_fail_when_version_provided_and_too_low_3_8_plus() throws Exception {
     UnsupportedProtocolVersionException e = connectWithUnsupportedVersion(V1);
@@ -75,7 +81,7 @@ public class ProtocolVersionRenegotiationTest extends CCMTestsSupport {
   }
 
   /** @jira_ticket JAVA-1367 */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   @CCMConfig(version = "2.1.16", createCluster = false)
   public void should_negotiate_when_no_version_provided() throws Exception {
     if (protocolVersion.compareTo(ProtocolVersion.NEWEST_SUPPORTED) >= 0) {

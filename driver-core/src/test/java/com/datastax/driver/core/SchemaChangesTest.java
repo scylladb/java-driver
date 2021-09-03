@@ -607,7 +607,10 @@ public class SchemaChangesTest extends CCMTestsSupport {
     for (Metadata m : metadatas()) assertThat(m.getKeyspace(keyspace)).isNotNull();
   }
 
-  @Test(groups = "short", dataProvider = "newKeyspaceName")
+  @Test(
+      groups = "short",
+      dataProvider = "newKeyspaceName",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_notify_of_keyspace_update(String keyspace) throws InterruptedException {
     execute(CREATE_KEYSPACE, keyspace);
     ArgumentCaptor<KeyspaceMetadata> added = null;

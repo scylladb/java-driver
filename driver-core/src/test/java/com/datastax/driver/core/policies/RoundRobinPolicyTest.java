@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core.policies;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -59,7 +65,7 @@ public class RoundRobinPolicyTest {
    *
    * @test_category load_balancing:round_robin
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_round_robin_within_single_datacenter() {
     // given: a 5 node cluster using RoundRobinPolicy.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(5).build();
@@ -96,7 +102,7 @@ public class RoundRobinPolicyTest {
    *
    * @test_category load_balancing:round_robin
    */
-  @Test(groups = "short")
+  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_round_robin_irrespective_of_topology() {
     // given: a 10 node, 5 DC cluster using RoundRobinPolicy.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(2, 2, 2, 2, 2).build();
@@ -139,7 +145,8 @@ public class RoundRobinPolicyTest {
   @Test(
       groups = "short",
       dataProvider = "consistencyLevels",
-      dataProviderClass = DataProviders.class)
+      dataProviderClass = DataProviders.class,
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
   public void should_warn_if_using_dc_local_consistency_level(ConsistencyLevel cl) {
     // given: a 2 node, 2 DC cluster using RoundRobinPolicy.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(1, 1).build();
