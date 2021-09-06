@@ -37,6 +37,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.datastax.driver.core.utils.Bytes;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -51,6 +52,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUDF */
 @CCMConfig(createCluster = false, config = "enable_user_defined_functions:true")
 public class SchemaChangesTest extends CCMTestsSupport {
 

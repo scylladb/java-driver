@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,6 +26,7 @@ import static org.assertj.core.api.Assertions.fail;
 
 import com.datastax.driver.core.schemabuilder.SchemaBuilder;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
@@ -32,6 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUDF */
 @CassandraVersion("2.0")
 @CCMConfig(config = "enable_user_defined_functions:true")
 public class ExportAsStringTest extends CCMTestsSupport {

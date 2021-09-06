@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -21,9 +27,11 @@ import static com.datastax.driver.core.DataType.text;
 import static com.datastax.driver.core.TestUtils.serializeForDynamicCompositeType;
 
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import org.testng.SkipException;
 import org.testng.annotations.Test;
 
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUDF */
 @CassandraVersion("2.2.0")
 @CCMConfig(config = "enable_user_defined_functions:true")
 public class AggregateMetadataTest extends CCMTestsSupport {
