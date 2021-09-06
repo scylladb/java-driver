@@ -35,6 +35,7 @@ import static com.datastax.driver.core.DataType.timeuuid;
 import static org.assertj.core.api.Assertions.entry;
 
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.collect.ImmutableMap;
 import java.nio.ByteBuffer;
 import org.testng.annotations.Test;
@@ -756,6 +757,7 @@ public class TableMetadataTest extends CCMTestsSupport {
    * @jira_ticket CASSANDRA-9424
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality */
   @CassandraVersion("3.0")
   public void should_parse_new_compression_options() {
     // given
