@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -22,6 +28,7 @@ import static com.datastax.driver.core.TestUtils.serializeForCompositeType;
 import static com.datastax.driver.core.TestUtils.serializeForDynamicCompositeType;
 
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +36,7 @@ import org.testng.SkipException;
 import org.testng.annotations.Test;
 
 /** Test we "support" custom types. */
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality */
 public class CustomTypeTest extends CCMTestsSupport {
 
   public static final DataType CUSTOM_DYNAMIC_COMPOSITE =
