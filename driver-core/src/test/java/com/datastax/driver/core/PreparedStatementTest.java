@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.ProtocolVersion.V4;
@@ -31,6 +37,7 @@ import com.datastax.driver.core.exceptions.UnsupportedFeatureException;
 import com.datastax.driver.core.policies.FallthroughRetryPolicy;
 import com.datastax.driver.core.utils.Bytes;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.net.InetAddress;
@@ -637,6 +644,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
    * @since 2.2.0
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaQueryTrace */
   @CassandraVersion("2.2.0")
   public void should_not_create_tombstone_when_unbound_value_on_bound_statement_and_protocol_v4() {
     PreparedStatement prepared =
@@ -668,6 +676,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
    * @since 2.2.0
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaQueryTrace */
   @CassandraVersion("2.2.0")
   public void should_unset_value_by_index() {
     PreparedStatement prepared =
@@ -702,6 +711,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
    * @since 2.2.0
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaQueryTrace */
   @CassandraVersion("2.2.0")
   public void should_unset_value_by_name() {
     PreparedStatement prepared =
@@ -736,6 +746,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
    * @since 2.2.0
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaQueryTrace */
   @CassandraVersion("2.2.0")
   public void should_not_create_tombstone_when_unbound_value_on_batch_statement_and_protocol_v4() {
     PreparedStatement prepared =
@@ -792,6 +803,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
    * @since 2.2.0
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaQueryTrace */
   @CassandraVersion("2.0.0")
   public void should_create_tombstone_when_null_value_on_batch_statement() {
     PreparedStatement prepared =
