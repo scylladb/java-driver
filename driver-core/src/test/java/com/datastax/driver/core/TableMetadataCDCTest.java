@@ -13,14 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import org.testng.annotations.Test;
 
 @CCMConfig(config = "cdc_enabled:true")
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality */
 @CassandraVersion(value = "3.8", description = "Requires CASSANDRA-12041 added in 3.8")
 public class TableMetadataCDCTest extends CCMTestsSupport {
 
