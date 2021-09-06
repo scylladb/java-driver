@@ -13,10 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import com.datastax.driver.core.Token.OPPToken;
+import com.datastax.driver.core.utils.ScyllaSkip;
 
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality */
 @CCMConfig(options = "-p ByteOrderedPartitioner")
 public class OPPTokenIntegrationTest extends TokenIntegrationTest {
 
