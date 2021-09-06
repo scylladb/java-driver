@@ -449,6 +449,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   public void prepareStatementInheritPropertiesTest() {
 
     RegularStatement toPrepare = new SimpleStatement("SELECT * FROM test WHERE k=?");

@@ -28,6 +28,7 @@ import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.RoundRobinPolicy;
 import com.datastax.driver.core.policies.WhiteListPolicy;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -173,6 +174,7 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
    * @since 2.0.10, 2.1.5
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   public void should_get_token_from_row_and_set_token_in_query() {
     // get by index:
     Row row = session().execute("SELECT token(i) FROM foo WHERE i = 1").one();
@@ -208,6 +210,7 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
    * </ol>
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   @CassandraVersion("2.0")
   public void should_get_token_from_row_and_set_token_in_query_with_binding_and_aliasing() {
     Row row = session().execute("SELECT token(i) AS t FROM foo WHERE i = 1").one();

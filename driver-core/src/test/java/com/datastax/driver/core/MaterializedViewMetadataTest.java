@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -20,6 +26,7 @@ import static com.datastax.driver.core.ClusteringOrder.DESC;
 import static com.datastax.driver.core.DataType.cint;
 
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import org.testng.annotations.Test;
 
 @CassandraVersion("3.0")
@@ -32,6 +39,7 @@ public class MaterializedViewMetadataTest extends CCMTestsSupport {
    * @jira_ticket JAVA-825
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   public void should_create_view_metadata() {
 
     // given
@@ -100,6 +108,7 @@ public class MaterializedViewMetadataTest extends CCMTestsSupport {
    * @jira_ticket JAVA-825
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   public void should_create_view_metadata_with_quoted_identifiers() {
     // given
     String createTable =

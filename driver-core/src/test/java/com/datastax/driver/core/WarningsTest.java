@@ -13,11 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.base.Strings;
 import java.util.List;
 import org.testng.annotations.Test;
@@ -31,6 +38,7 @@ public class WarningsTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   @CassandraVersion("2.2.0")
   public void should_expose_warnings_on_execution_info() throws Exception {
     // the default batch size warn threshold is 5 * 1024 bytes, but after CASSANDRA-10876 there must
@@ -69,6 +77,7 @@ public class WarningsTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   @CassandraVersion("3.0.0")
   public void should_execute_query_and_log_server_side_warnings() throws Exception {
     // Assert that logging of server-side query warnings is NOT disabled

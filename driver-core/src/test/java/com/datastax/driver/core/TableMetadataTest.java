@@ -80,6 +80,7 @@ public class TableMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   public void should_parse_table_with_clustering_columns() {
     // given
     String cql =

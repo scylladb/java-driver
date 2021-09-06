@@ -628,6 +628,7 @@ public class QueryBuilderExecutionTest extends CCMTestsSupport {
    * @jira_ticket JAVA-1443
    * @since 3.3.0
    */
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   @CassandraVersion(
       value = "3.10",
       description = "Support for GROUP BY was added to C* 3.10 (CASSANDRA-10707)")
