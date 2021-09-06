@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;
@@ -24,6 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.testng.Assert.fail;
 
 import com.datastax.driver.core.exceptions.AuthenticationException;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.net.InetSocketAddress;
 import java.util.Timer;
@@ -35,6 +42,7 @@ import org.testng.annotations.Test;
 
 /** Tests for authenticated cluster access */
 @CreateCCM(PER_METHOD)
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaJVMArgs */
 @CCMConfig(
     config = "authenticator:PasswordAuthenticator",
     jvmArgs = "-Dcassandra.superuser_setup_delay_ms=0",

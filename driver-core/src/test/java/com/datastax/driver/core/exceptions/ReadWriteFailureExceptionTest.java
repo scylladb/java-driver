@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core.exceptions;
 
 import static com.datastax.driver.core.TestUtils.CREATE_KEYSPACE_SIMPLE_FORMAT;
@@ -26,12 +32,14 @@ import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import org.testng.annotations.Test;
 
 @CCMConfig(
     config = "tombstone_failure_threshold:1000",
     numberOfNodes = 2,
     jvmArgs = "-Dcassandra.test.fail_writes_ks=ks_write_fail")
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaJVMArgs */
 @CassandraVersion("2.2.0")
 public class ReadWriteFailureExceptionTest extends CCMTestsSupport {
   /**
