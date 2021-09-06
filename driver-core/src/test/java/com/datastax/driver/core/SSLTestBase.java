@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.SSLTestBase.SslImplementation.JDK;
@@ -20,6 +26,7 @@ import static com.datastax.driver.core.SSLTestBase.SslImplementation.NETTY_OPENS
 import static io.netty.handler.ssl.SslProvider.OPENSSL;
 import static org.assertj.core.api.Assertions.fail;
 
+import com.datastax.driver.core.utils.ScyllaSkip;
 import io.netty.handler.ssl.SslContextBuilder;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -28,6 +35,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import org.testng.annotations.DataProvider;
 
+@ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledSSL */
 @CCMConfig(ssl = true, createCluster = false)
 public abstract class SSLTestBase extends CCMTestsSupport {
 
