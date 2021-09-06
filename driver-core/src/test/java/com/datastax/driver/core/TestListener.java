@@ -13,10 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import com.datastax.driver.core.utils.CassandraVersion;
 import com.datastax.driver.core.utils.DseVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
@@ -115,17 +122,22 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
   }
 
   private boolean scanAnnotatedElement(AnnotatedElement element) {
+    boolean foundAnnotation = false;
+    if (element.isAnnotationPresent(ScyllaSkip.class)) {
+      scyllaSkipCheck();
+      foundAnnotation = true;
+    }
     if (element.isAnnotationPresent(CassandraVersion.class)) {
       CassandraVersion cassandraVersion = element.getAnnotation(CassandraVersion.class);
       cassandraVersionCheck(cassandraVersion);
-      return true;
+      foundAnnotation = true;
     }
     if (element.isAnnotationPresent(DseVersion.class)) {
       DseVersion dseVersion = element.getAnnotation(DseVersion.class);
       dseVersionCheck(dseVersion);
-      return true;
+      foundAnnotation = true;
     }
-    return false;
+    return foundAnnotation;
   }
 
   @Override
@@ -150,6 +162,12 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
     } else {
       throw new SkipException(
           "Skipping test because not configured for DataStax Enterprise cluster.");
+    }
+  }
+
+  private static void scyllaSkipCheck() {
+    if (CCMBridge.getGlobalScyllaVersion() != null) {
+      throw new SkipException("Skipping test because it is disabled for Scylla cluster.");
     }
   }
 
