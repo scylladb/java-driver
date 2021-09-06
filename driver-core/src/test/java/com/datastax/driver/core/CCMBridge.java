@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.TestUtils.executeNoFail;
@@ -62,6 +68,8 @@ public class CCMBridge implements CCMAccess {
   private static final VersionNumber GLOBAL_CASSANDRA_VERSION_NUMBER;
 
   private static final VersionNumber GLOBAL_DSE_VERSION_NUMBER;
+
+  private static final VersionNumber GLOBAL_SCYLLA_VERSION_NUMBER;
 
   private static final Set<String> CASSANDRA_INSTALL_ARGS;
 
@@ -169,6 +177,8 @@ public class CCMBridge implements CCMAccess {
 
   static {
     String inputCassandraVersion = System.getProperty("cassandra.version");
+    String inputScyllaVersion = System.getProperty("scylla.version");
+
     String installDirectory = System.getProperty("cassandra.directory");
     String branch = System.getProperty("cassandra.branch");
 
@@ -177,7 +187,10 @@ public class CCMBridge implements CCMAccess {
       installArgs.add("--install-dir=" + new File(installDirectory).getAbsolutePath());
     } else if (branch != null && !branch.trim().isEmpty()) {
       installArgs.add("-v git:" + branch.trim().replaceAll("\"", ""));
-    } else {
+    } else if (inputScyllaVersion != null && !inputScyllaVersion.trim().isEmpty()) {
+      installArgs.add(" --scylla ");
+      installArgs.add("-v release:" + inputScyllaVersion);
+    } else if (inputCassandraVersion != null && !inputCassandraVersion.trim().isEmpty()) {
       installArgs.add("-v " + inputCassandraVersion);
     }
 
@@ -212,6 +225,8 @@ public class CCMBridge implements CCMAccess {
     }
     ENVIRONMENT_MAP = ImmutableMap.copyOf(envMap);
 
+    GLOBAL_SCYLLA_VERSION_NUMBER = VersionNumber.parse(inputScyllaVersion);
+
     if (isDse()) {
       GLOBAL_DSE_VERSION_NUMBER = VersionNumber.parse(inputCassandraVersion);
       GLOBAL_CASSANDRA_VERSION_NUMBER = CCMBridge.getCassandraVersion(GLOBAL_DSE_VERSION_NUMBER);
@@ -238,6 +253,11 @@ public class CCMBridge implements CCMAccess {
   /** @return {@link VersionNumber} configured for DSE based on system properties. */
   public static VersionNumber getGlobalDSEVersion() {
     return GLOBAL_DSE_VERSION_NUMBER;
+  }
+
+  /** @return {@link VersionNumber} configured for Scylla based on system properties. */
+  public static VersionNumber getGlobalScyllaVersion() {
+    return GLOBAL_SCYLLA_VERSION_NUMBER;
   }
 
   public static boolean isDse() {
@@ -1060,6 +1080,12 @@ public class CCMBridge implements CCMAccess {
           // enable SASI indexing in config (disabled by default in C* 4.0)
           cassandraConfiguration.put("enable_sasi_indexes", true);
         }
+      }
+      if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
+        cassandraConfiguration.put("prometheus_port", RANDOM_PORT);
+        cassandraConfiguration.put("api_port", RANDOM_PORT);
+        cassandraConfiguration.put("native_shard_aware_transport_port", RANDOM_PORT);
+        cassandraConfiguration = randomizePorts(cassandraConfiguration);
       }
       final CCMBridge ccm =
           new CCMBridge(
