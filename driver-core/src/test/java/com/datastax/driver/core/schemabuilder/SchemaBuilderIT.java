@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core.schemabuilder;
 
 import static com.datastax.driver.core.schemabuilder.SchemaBuilder.dateTieredStrategy;
@@ -33,7 +39,12 @@ import org.testng.annotations.Test;
 
 public class SchemaBuilderIT extends CCMTestsSupport {
 
-  @Test(groups = "short")
+  // Test relies on existence of 'ks' keyspace,
+  // but no such keyspace is created. If (fixed) created,
+  // then it fails with 'Unconfigured table schema_columns'.
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   @CassandraVersion("2.1.2")
   public void should_modify_table_metadata() {
     // Create a table
@@ -139,7 +150,9 @@ public class SchemaBuilderIT extends CCMTestsSupport {
     }
   }
 
-  @Test(groups = "short")
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   @CassandraVersion("2.1.0")
   public void should_create_a_table_and_a_udt() {
     // Create a UDT and a table
@@ -210,7 +223,9 @@ public class SchemaBuilderIT extends CCMTestsSupport {
         "org.apache.cassandra.db.marshal.UserType");
   }
 
-  @Test(groups = "short")
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_add_and_drop_a_column() {
     // Create a table, add a column to it with an alter table statement and delete that column
     session()
@@ -247,7 +262,9 @@ public class SchemaBuilderIT extends CCMTestsSupport {
     }
   }
 
-  @Test(groups = "short")
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_drop_a_table() {
     // Create a table
     session()
@@ -269,7 +286,9 @@ public class SchemaBuilderIT extends CCMTestsSupport {
     }
   }
 
-  @Test(groups = "short")
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_create_an_index() {
     // Create a table
     session()
@@ -312,7 +331,9 @@ public class SchemaBuilderIT extends CCMTestsSupport {
     assertThat(nextIndex.getInt("component_index")).isEqualTo(index);
   }
 
-  @Test(groups = "short")
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_drop_an_index() {
     // Create a table
     session()

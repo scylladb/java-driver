@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,7 +51,11 @@ public abstract class PercentileTrackerTest<
 
   public abstract B builder();
 
-  @Test(groups = "unit")
+  // To reproduce flakiness, add a sleep (simulating a GC pause)
+  // inside last 'for' loop.
+  @Test(
+      groups = "unit",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_ignore_certain_exceptions() throws Exception {
     // given - a percentile tracker.
     Cluster cluster0 = mock(Cluster.class);
@@ -89,7 +99,9 @@ public abstract class PercentileTrackerTest<
     }
   }
 
-  @Test(groups = "unit")
+  @Test(
+      groups = "unit",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_not_record_anything_if_not_enough_measurements() throws Exception {
     // given - a percentile tracker with 100 min recorded values.
     Cluster cluster0 = mock(Cluster.class);
@@ -118,7 +130,9 @@ public abstract class PercentileTrackerTest<
     }
   }
 
-  @Test(groups = "short")
+  @Test(
+      groups = "short",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_return_negative_value_when_interval_hasnt_elapsed() throws Exception {
     // given - a percentile tracker with a long interval.
     Cluster cluster0 = mock(Cluster.class);
@@ -143,7 +157,9 @@ public abstract class PercentileTrackerTest<
     }
   }
 
-  @Test(groups = "unit")
+  @Test(
+      groups = "unit",
+      enabled = false /* @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledFlaky */)
   public void should_not_record_value_and_log_when_measurement_higher_than_max_trackable_value()
       throws Exception {
     // given - a percentile tracker with a long interval.
