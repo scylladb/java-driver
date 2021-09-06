@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -33,6 +39,7 @@ import static com.datastax.driver.core.IndexMetadata.Kind.KEYS;
 import com.datastax.driver.core.ColumnMetadata.Raw;
 import com.datastax.driver.core.Token.M3PToken;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Ints;
@@ -115,6 +122,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion(
       value = "2.1",
       description =
@@ -145,6 +153,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("2.1.0")
   public void should_create_metadata_for_index_on_map_values() {
     // 3.0 assumes the 'values' keyword if index on a collection
@@ -167,6 +176,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("2.1.0")
   public void should_create_metadata_for_index_on_map_keys() {
     String createKeysIndex =
@@ -185,6 +195,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("2.1.3")
   public void should_create_metadata_for_full_index_on_map() {
     String createFullIndex =
@@ -203,6 +214,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("2.1.3")
   public void should_create_metadata_for_full_index_on_set() {
     String createFullIndex =
@@ -221,6 +233,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("2.1.3")
   public void should_create_metadata_for_full_index_on_list() {
     String createFullIndex =
@@ -239,6 +252,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("2.2.0")
   public void should_create_metadata_for_index_on_map_entries() {
     String createEntriesIndex =
@@ -258,6 +272,7 @@ public class IndexMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("3.0")
   public void should_allow_multiple_indexes_on_map_column() {
     String createEntriesIndex =

@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core.querybuilder;
 
 import static com.datastax.driver.core.Assertions.assertThat;
@@ -55,6 +61,7 @@ import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.TestUtils;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -382,6 +389,7 @@ public class QueryBuilderExecutionTest extends CCMTestsSupport {
    * @since 3.0.1
    */
   @Test(groups = "short")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */
   @CassandraVersion("3.6")
   public void should_retrieve_using_like_operator_on_table_with_sasi_index() {
     // given
