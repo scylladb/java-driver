@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.ConditionChecker.check;
@@ -780,6 +786,7 @@ public abstract class TestUtils {
       };
 
   public static void waitUntilPortIsUp(InetSocketAddress address) {
+    logger.info("Waiting until port is up: {}", address);
     check().before(5, MINUTES).that(address, PORT_IS_UP).becomesTrue();
   }
 

@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_CLASS;
@@ -949,7 +955,7 @@ public class CCMTestsSupport {
       }
       try {
         ccm.start();
-      } catch (CCMException e) {
+      } catch (Exception e) {
         errorOut();
         fail(e.getMessage());
       }

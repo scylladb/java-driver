@@ -737,7 +737,7 @@ public class CCMBridge implements CCMAccess {
     final PrintWriter pw = new PrintWriter(sw);
     closer.register(pw);
     try {
-      logger.trace("Executing: " + fullCommand);
+      logger.info("Executing: " + fullCommand);
       CommandLine cli = CommandLine.parse(fullCommand);
       Executor executor = new DefaultExecutor();
       LogOutputStream outStream =

@@ -55,7 +55,9 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
   public void onTestSkipped(ITestResult tr) {
     long elapsedTime = TimeUnit.NANOSECONDS.toSeconds((System.nanoTime() - start_time));
     long testTime = tr.getEndMillis() - tr.getStartMillis();
-    System.out.println("SKIPPED: " + tr.getName());
+    String skipReason =
+        tr.getThrowable() != null ? " (" + tr.getThrowable().getMessage() + ")" : "";
+    System.out.println("SKIPPED: " + tr.getName() + skipReason);
     System.out.println("Test   : " + formatIntoHHMMSS(testTime / 1000));
     System.out.println("Elapsed: " + formatIntoHHMMSS(elapsedTime));
     System.out.println();
