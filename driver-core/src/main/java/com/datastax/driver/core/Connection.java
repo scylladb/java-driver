@@ -72,8 +72,10 @@ import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -1047,6 +1049,72 @@ class Connection {
   public String toString() {
     return String.format(
         "Connection[%s, inFlight=%d, closed=%b]", name, inFlight.get(), isClosed());
+  }
+
+  static class PortAllocator {
+    private static final AtomicInteger lastPort = new AtomicInteger(-1);
+
+    public static int getNextAvailablePort(int shardCount, int shardId, int lowPort, int highPort) {
+      int lastPortValue, foundPort = -1;
+      do {
+        lastPortValue = lastPort.get();
+
+        // We will scan from lastPortValue
+        // (or lowPort is there was no lastPort or lastPort is too low)
+        int scanStart = lastPortValue == -1 ? lowPort : lastPortValue;
+        if (scanStart < lowPort) {
+          scanStart = lowPort;
+        }
+
+        // Round it up to "% shardCount == shardId"
+        scanStart += (shardCount - scanStart % shardCount) + shardId;
+
+        // Scan from scanStart upwards to highPort.
+        for (int port = scanStart; port <= highPort; port += shardCount) {
+          if (isTcpPortAvailable(port)) {
+            foundPort = port;
+            break;
+          }
+        }
+
+        // If we started scanning from a high scanStart port
+        // there might have been not enough ports left that are
+        // smaller than highPort. Scan from the beginning
+        // from the lowPort.
+        if (foundPort == -1) {
+          scanStart = lowPort + (shardCount - lowPort % shardCount) + shardId;
+
+          for (int port = scanStart; port <= highPort; port += shardCount) {
+            if (isTcpPortAvailable(port)) {
+              foundPort = port;
+              break;
+            }
+          }
+        }
+
+        // No luck! All ports taken!
+        if (foundPort == -1) {
+          return -1;
+        }
+      } while (!lastPort.compareAndSet(lastPortValue, foundPort));
+
+      return foundPort;
+    }
+
+    public static boolean isTcpPortAvailable(int port) {
+      try {
+        ServerSocket serverSocket = new ServerSocket();
+        try {
+          serverSocket.setReuseAddress(false);
+          serverSocket.bind(new InetSocketAddress(port), 1);
+          return true;
+        } finally {
+          serverSocket.close();
+        }
+      } catch (IOException ex) {
+        return false;
+      }
+    }
   }
 
   static class Factory {
