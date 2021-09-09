@@ -748,6 +748,9 @@ public class Cluster implements Closeable {
     private boolean allowBetaProtocolVersion = false;
     private boolean noCompact = false;
     private boolean isCloud = false;
+    private boolean useAdvancedShardAwareness = true;
+    private int localPortLow = ProtocolOptions.DEFAULT_LOCAL_PORT_LOW;
+    private int localPortHigh = ProtocolOptions.DEFAULT_LOCAL_PORT_HIGH;
 
     private Collection<Host.StateListener> listeners;
 
@@ -1473,6 +1476,44 @@ public class Cluster implements Closeable {
       return addCloudConfigToBuilder(cloudConfig);
     }
 
+    /**
+     * Disables advanced shard awareness. By default, this driver chooses local port while making a
+     * connection to node, to signal which shard it wants to connect to. This allows driver to
+     * estabilish connection pool faster, especially when there are multiple clients connecting
+     * concurrently. If this causes any issues, you can disable it using this method. The most
+     * common issues are the NAT between client and node (which messes up client port numbers) and
+     * shard aware port (default: 19042) blocked by firewall.
+     *
+     * @return this builder.
+     */
+    public Builder withoutAdvancedShardAwareness() {
+      this.useAdvancedShardAwareness = false;
+      return this;
+    }
+
+    /**
+     * Sets local port range for use by advanced shard awareness. Driver will use ports from this
+     * range as local ports when connecting to cluster. If {@link #withoutAdvancedShardAwareness()}
+     * was called, then setting this range does not affect anything.
+     *
+     * @param low Lower bound of range, inclusive.
+     * @param high Upper bound of range, inclusive.
+     * @return this builder.
+     */
+    public Builder withLocalPortRange(int low, int high) {
+      if (low < 1 || 65535 < low || high < 1 || 65535 < high) {
+        throw new IllegalArgumentException("Port numbers must be between 1 and 65535");
+      }
+
+      if (high - low < 1000) {
+        throw new IllegalArgumentException("Port range should be sufficiently large");
+      }
+
+      this.localPortLow = low;
+      this.localPortHigh = high;
+      return this;
+    }
+
     private Builder addCloudConfigToBuilder(CloudConfig cloudConfig) {
       Builder builder =
           withEndPointFactory(new SniEndPointFactory(cloudConfig.getProxyAddress()))
@@ -1519,7 +1560,10 @@ public class Cluster implements Closeable {
                   maxSchemaAgreementWaitSeconds,
                   sslOptions,
                   authProvider,
-                  noCompact)
+                  noCompact,
+                  useAdvancedShardAwareness,
+                  localPortLow,
+                  localPortHigh)
               .setCompression(compression);
 
       MetricsOptions metricsOptions = new MetricsOptions(metricsEnabled, jmxEnabled);
