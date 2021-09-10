@@ -112,6 +112,10 @@ class Connection {
   private static final int FLUSHER_SCHEDULE_PERIOD_NS =
       SystemProperties.getInt("com.datastax.driver.FLUSHER_SCHEDULE_PERIOD_NS", 10000);
 
+  private static final long ADV_SHARD_AWARENESS_BLOCK_ON_NAT = 1000000L * 60L * 1000L;
+
+  private static final long ADV_SHARD_AWARENESS_BLOCK_ON_ERROR = 5 * 60 * 1000;
+
   enum State {
     OPEN,
     TRASHED,
@@ -126,6 +130,8 @@ class Connection {
   final EndPoint endPoint;
   private final String name;
   private volatile Integer shardId = null;
+
+  private int requestedShardId = -1;
 
   @VisibleForTesting volatile Channel channel;
   private final Factory factory;
@@ -182,6 +188,8 @@ class Connection {
     if (factory.isShutdown)
       return Futures.immediateFailedFuture(
           new ConnectionException(endPoint, "Connection factory is shut down"));
+
+    this.requestedShardId = shardId;
 
     final ProtocolVersion protocolVersion =
         factory.protocolVersion == null
@@ -312,6 +320,11 @@ class Connection {
                   channelReadyFuture.setException(
                       new TransportException(
                           Connection.this.endPoint, "Cannot connect", future.cause()));
+                  if (shardId != -1) {
+                    // We are using advanced shard awareness, so pool must be non-null.
+                    pool.tempBlockAdvShardAwareness(ADV_SHARD_AWARENESS_BLOCK_ON_ERROR);
+                  }
+
                 } else {
                   assert channel != null;
                   logger.debug(
@@ -444,6 +457,16 @@ class Connection {
             if (sharding != null) {
               getHost().setShardingInfo(sharding.shardingInfo);
               Connection.this.shardId = sharding.shardId;
+              if (Connection.this.requestedShardId != -1
+                  && Connection.this.requestedShardId != sharding.shardId) {
+                logger.warn(
+                    "Advanced shard awareness: requested connection to shard {}, but connected to {}. Is there a NAT between client and server?",
+                    Connection.this.requestedShardId,
+                    sharding.shardId);
+                // Owner is a HostConnectionPool if we are using adv. shard awareness
+                ((HostConnectionPool) Connection.this.ownerRef.get())
+                    .tempBlockAdvShardAwareness(ADV_SHARD_AWARENESS_BLOCK_ON_NAT);
+              }
             } else {
               getHost().setShardingInfo(null);
               Connection.this.shardId = 0;
