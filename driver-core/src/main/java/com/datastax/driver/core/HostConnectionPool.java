@@ -41,6 +41,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -155,6 +156,23 @@ class HostConnectionPool implements Connection.Owner {
     }
   }
 
+  private boolean canUseAdvancedShardAwareness() {
+    ShardingInfo shardingInfo = host.getShardingInfo();
+    if (shardingInfo == null) {
+      return false;
+    }
+    if (!manager.configuration().getProtocolOptions().isUseAdvancedShardAwareness()) {
+      return false;
+    }
+
+    boolean isSSLUsed = null != manager.configuration().getProtocolOptions().getSSLOptions();
+    if (shardingInfo.getShardAwarePort(isSSLUsed) == 0) {
+      return false;
+    }
+
+    return true;
+  }
+
   private final ConnectionTasksSharedState connectionTasksSharedState =
       new ConnectionTasksSharedState();
 
@@ -261,7 +279,7 @@ class HostConnectionPool implements Connection.Owner {
       pendingBorrows[i] = new ConcurrentLinkedQueue<PendingBorrow>();
     }
 
-    final List<Connection> connections = Lists.newArrayListWithCapacity(2 * toCreate);
+    final List<Connection> connections = Lists.newArrayListWithCapacity(toCreate);
     final List<ListenableFuture<Void>> connectionFutures =
         Lists.newArrayListWithCapacity(2 * toCreate);
 
@@ -269,12 +287,39 @@ class HostConnectionPool implements Connection.Owner {
     connections.add(reusedConnection);
     connectionFutures.add(MoreFutures.VOID_SUCCESS);
 
-    List<Connection> newConnections =
-        manager.connectionFactory().newConnections(this, 2 * toCreate);
+    List<Connection> newConnections = manager.connectionFactory().newConnections(this, toCreate);
     connections.addAll(newConnections);
-    for (Connection connection : newConnections) {
-      ListenableFuture<Void> connectionFuture = connection.initAsync();
-      connectionFutures.add(handleErrors(connectionFuture, initExecutor));
+
+    if (canUseAdvancedShardAwareness()) {
+      ShardingInfo shardingInfo = host.getShardingInfo();
+      boolean isSSLUsed = null != manager.configuration().getProtocolOptions().getSSLOptions();
+      int serverPort = shardingInfo.getShardAwarePort(isSSLUsed);
+
+      int shardId = 0;
+      int shardConnectionIndex = 0;
+      for (Connection connection : newConnections) {
+        if (shardConnectionIndex == connectionsPerShard) {
+          shardConnectionIndex = 0;
+          shardId++;
+        }
+        if (shardId == reusedConnection.shardId() && shardConnectionIndex == 0) {
+          shardConnectionIndex++;
+          if (shardConnectionIndex == connectionsPerShard) {
+            shardConnectionIndex = 0;
+            shardId++;
+          }
+        }
+
+        ListenableFuture<Void> connectionFuture = connection.initAsync(shardId, serverPort);
+        connectionFutures.add(handleErrors(connectionFuture, initExecutor));
+
+        shardConnectionIndex++;
+      }
+    } else {
+      for (Connection connection : newConnections) {
+        ListenableFuture<Void> connectionFuture = connection.initAsync();
+        connectionFutures.add(handleErrors(connectionFuture, initExecutor));
+      }
     }
 
     final SettableFuture<Void> initFuture = SettableFuture.create();
@@ -699,10 +744,26 @@ class HostConnectionPool implements Connection.Owner {
           open[shardId].decrementAndGet();
           return ConnectionResult.SHOULD_RETRY;
         }
-        logger.debug("Creating new connection on busy pool to {}", host);
         newConnection = sharedState.getConnection(shardId);
         if (newConnection == null) {
-          newConnection = manager.connectionFactory().open(this);
+          InetSocketAddress serverAddress = host.getEndPoint().resolve();
+          int serverPort, effectiveShardId = shardId;
+          if (canUseAdvancedShardAwareness()) {
+            ShardingInfo shardingInfo = host.getShardingInfo();
+            boolean isSSLUsed =
+                null != manager.configuration().getProtocolOptions().getSSLOptions();
+            serverPort = shardingInfo.getShardAwarePort(isSSLUsed);
+          } else {
+            effectiveShardId = -1;
+            serverPort = serverAddress.getPort();
+          }
+
+          logger.debug(
+              "Creating new connection to {}:{} for shard {}",
+              serverAddress.getAddress().getHostAddress(),
+              serverPort,
+              shardId);
+          newConnection = manager.connectionFactory().open(this, effectiveShardId, serverPort);
           if (newConnection.shardId() == shardId) {
             newConnection.setKeyspace(manager.poolsState.keyspace);
           } else {
