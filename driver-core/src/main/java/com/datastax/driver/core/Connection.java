@@ -74,6 +74,7 @@ import io.netty.util.TimerTask;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
+import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.security.InvalidParameterException;
@@ -182,29 +183,18 @@ class Connection {
       return Futures.immediateFailedFuture(
           new ConnectionException(endPoint, "Connection factory is shut down"));
 
-    ProtocolVersion protocolVersion =
+    final ProtocolVersion protocolVersion =
         factory.protocolVersion == null
             ? ProtocolVersion.NEWEST_SUPPORTED
             : factory.protocolVersion;
     final SettableFuture<Void> channelReadyFuture = SettableFuture.create();
 
     try {
-      Bootstrap bootstrap = factory.newBootstrap();
-      ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
-      bootstrap.handler(
-          new Initializer(
-              this,
-              protocolVersion,
-              protocolOptions.getCompression().compressor(),
-              protocolOptions.getSSLOptions(),
-              factory.configuration.getPoolingOptions().getHeartbeatIntervalSeconds(),
-              factory.configuration.getNettyOptions(),
-              factory.configuration.getCodecRegistry(),
-              factory.configuration.getMetricsOptions().isEnabled()
-                  ? factory.manager.metrics
-                  : null));
+      final ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
+      final Bootstrap bootstrap = factory.newBootstrap();
+      prepareBootstrap(bootstrap, protocolVersion, protocolOptions);
 
-      InetSocketAddress serverAddress =
+      final InetSocketAddress serverAddress =
           (serverPort == 0)
               ? endPoint.resolve()
               : new InetSocketAddress(endPoint.resolve().getAddress(), serverPort);
@@ -247,15 +237,48 @@ class Connection {
             shardingInfo.getShardsCount());
       }
 
-      writer.incrementAndGet();
-      future.addListener(
+      final ChannelFutureListener channelListener =
           new ChannelFutureListener() {
             @Override
             public void operationComplete(ChannelFuture future) throws Exception {
-              writer.decrementAndGet();
               if (future.cause() != null) {
+                // Local port busy, let's try another one
+                if (shardId != -1 && future.cause().getCause() instanceof BindException) {
+                  int localPort =
+                      PortAllocator.getNextAvailablePort(
+                          shardingInfo.getShardsCount(), shardId, lowPort, highPort);
+                  if (localPort != -1) {
+                    if (future.channel() != null) {
+                      future
+                          .channel()
+                          .close()
+                          .addListener(
+                              new ChannelFutureListener() {
+                                @Override
+                                public void operationComplete(ChannelFuture future)
+                                    throws Exception {
+                                  if (future.cause() != null) {
+                                    logger.warn("Error while closing old channel", future.cause());
+                                  }
+                                }
+                              });
+                    }
+                    prepareBootstrap(bootstrap, protocolVersion, protocolOptions);
+                    ChannelFuture newFuture =
+                        bootstrap.connect(serverAddress, new InetSocketAddress(localPort));
+                    newFuture.addListener(this);
+                    logger.debug(
+                        "Retrying connecting to shard {} using local port {} (shardCount: {})\n",
+                        shardId,
+                        localPort,
+                        shardingInfo.getShardsCount());
+                    return;
+                  }
+                }
                 logger.warn("Error creating netty channel to " + endPoint, future.cause());
               }
+
+              writer.decrementAndGet();
 
               // Note: future.channel() can be null in some error cases, so we need to guard against
               // it in the rest of the code below.
@@ -278,13 +301,14 @@ class Connection {
                   Connection.this.factory.allChannels.add(channel);
                 }
                 if (!future.isSuccess()) {
-                  if (logger.isDebugEnabled())
+                  if (logger.isDebugEnabled()) {
                     logger.debug(
                         String.format(
                             "%s Error connecting to %s%s",
                             Connection.this,
                             Connection.this.endPoint,
                             extractMessage(future.cause())));
+                  }
                   channelReadyFuture.setException(
                       new TransportException(
                           Connection.this.endPoint, "Cannot connect", future.cause()));
@@ -297,7 +321,10 @@ class Connection {
                 }
               }
             }
-          });
+          };
+
+      writer.incrementAndGet();
+      future.addListener(channelListener);
     } catch (RuntimeException e) {
       closeAsync().force();
       throw e;
@@ -362,6 +389,23 @@ class Connection {
         initExecutor);
 
     return initFuture;
+  }
+
+  private Bootstrap prepareBootstrap(
+      Bootstrap bootstrap, ProtocolVersion protocolVersion, ProtocolOptions protocolOptions) {
+    bootstrap.handler(
+        new Initializer(
+            this,
+            protocolVersion,
+            protocolOptions.getCompression().compressor(),
+            protocolOptions.getSSLOptions(),
+            factory.configuration.getPoolingOptions().getHeartbeatIntervalSeconds(),
+            factory.configuration.getNettyOptions(),
+            factory.configuration.getCodecRegistry(),
+            factory.configuration.getMetricsOptions().isEnabled()
+                ? factory.manager.metrics
+                : null));
+    return bootstrap;
   }
 
   private static String extractMessage(Throwable t) {
@@ -1407,6 +1451,7 @@ class Connection {
     flusher.start();
   }
 
+  @ChannelHandler.Sharable
   class Dispatcher extends SimpleChannelInboundHandler<Message.Response> {
 
     final StreamIdGenerator streamIdHandler;
