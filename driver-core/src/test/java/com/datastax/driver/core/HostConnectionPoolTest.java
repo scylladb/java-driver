@@ -512,7 +512,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       allRequests.add(MockRequest.send(pool));
 
       // Allow time for new connection to be spawned.
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt());
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertPoolSize(pool, 2);
 
       // Borrow more and ensure the connection returned is a non-core connection.
@@ -563,7 +563,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       allRequests.add(MockRequest.send(pool));
 
       // Reaching the threshold should have triggered the creation of an extra one
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt());
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertPoolSize(pool, 2);
     } finally {
       MockRequest.completeAll(allRequests);
@@ -796,7 +796,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       allRequests.addAll(requests);
       allRequests.add(MockRequest.send(pool));
 
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt());
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertThat(pool.connections[0]).hasSize(2);
 
       // Grab the new non-core connection and replace it with a spy.
@@ -1199,7 +1199,8 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       Uninterruptibles.sleepUninterruptibly(reconnectInterval, TimeUnit.MILLISECONDS);
 
       // Reconnection mechanism should fill missing connections by now.
-      verify(factory, timeout(readTimeout).times(4)).open(any(HostConnectionPool.class), anyInt());
+      verify(factory, timeout(readTimeout).times(4))
+          .open(any(HostConnectionPool.class), anyInt(), anyInt());
       reset(factory);
       assertPoolSize(pool, 8);
     } finally {

@@ -76,6 +76,8 @@ import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.security.InvalidParameterException;
+import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -172,10 +174,10 @@ class Connection {
   }
 
   ListenableFuture<Void> initAsync() {
-    return initAsync(0);
+    return initAsync(-1, 0);
   }
 
-  ListenableFuture<Void> initAsync(int serverPort) {
+  ListenableFuture<Void> initAsync(final int shardId, int serverPort) {
     if (factory.isShutdown)
       return Futures.immediateFailedFuture(
           new ConnectionException(endPoint, "Connection factory is shut down"));
@@ -207,7 +209,43 @@ class Connection {
               ? endPoint.resolve()
               : new InetSocketAddress(endPoint.resolve().getAddress(), serverPort);
 
-      ChannelFuture future = bootstrap.connect(serverAddress);
+      final Owner owner = ownerRef.get();
+      final HostConnectionPool pool =
+          owner instanceof HostConnectionPool ? (HostConnectionPool) owner : null;
+      final ShardingInfo shardingInfo = pool == null ? null : pool.host.getShardingInfo();
+      if ((shardingInfo == null) && shardId != -1) {
+        throw new InvalidParameterException(
+            MessageFormat.format(
+                "Requested connection to shard {0} of host {1}:{2}, but sharding info or pool is absent",
+                shardId, serverAddress.getAddress().getHostAddress(), serverPort));
+      }
+
+      ChannelFuture future;
+      final int lowPort, highPort;
+      if (pool != null) {
+        lowPort = pool.manager.configuration().getProtocolOptions().getLowLocalPort();
+        highPort = pool.manager.configuration().getProtocolOptions().getHighLocalPort();
+      } else {
+        lowPort = highPort = -1;
+      }
+
+      if (shardId == -1) {
+        future = bootstrap.connect(serverAddress);
+      } else {
+        int localPort =
+            PortAllocator.getNextAvailablePort(
+                shardingInfo.getShardsCount(), shardId, lowPort, highPort);
+        if (localPort == -1) {
+          throw new RuntimeException("Can't find free local port to use");
+        }
+
+        future = bootstrap.connect(serverAddress, new InetSocketAddress(localPort));
+        logger.debug(
+            "Connecting to shard {} using local port {} (shardCount: {})\n",
+            shardId,
+            localPort,
+            shardingInfo.getShardsCount());
+      }
 
       writer.incrementAndGet();
       future.addListener(
@@ -1194,17 +1232,17 @@ class Connection {
     Connection open(HostConnectionPool pool)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
-      return open(pool, 0);
+      return open(pool, -1, 0);
     }
 
-    Connection open(HostConnectionPool pool, int serverPort)
+    Connection open(HostConnectionPool pool, int shardId, int serverPort)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
       pool.host.convictionPolicy.signalConnectionsOpening(1);
       Connection connection =
           new Connection(buildConnectionName(pool.host), pool.host.getEndPoint(), this, pool);
       try {
-        connection.initAsync(serverPort).get();
+        connection.initAsync(shardId, serverPort).get();
         return connection;
       } catch (ExecutionException e) {
         throw launderAsyncInitException(e);
