@@ -144,13 +144,8 @@ html_style = ''
 # documentation.
 #
 html_theme_options = {
-    'header_links': [
-    ('Scylla Java Driver', 'https://java-driver.docs.scylladb.com/'),
-    ('Scylla Cloud', 'https://docs.scylladb.com/scylla-cloud/'),
-    ('Scylla University', 'https://university.scylladb.com/'),
-    ('ScyllaDB Home', 'https://www.scylladb.com/')],
     'github_issues_repository': 'scylladb/java-driver',
-    'show_sidebar_index': True,
+    'hide_sidebar_index': 'False',
 }
 
 extlinks = {
