@@ -3,9 +3,13 @@ name: "Publish docs to GitHub Pages"
 on:
   push:
     branches:
-      - master
+    - scylla-3.x
     paths:
-      - "docs/**"
+    - 'docs/**'
+    - 'faq/**'
+    - 'manual/**'
+    - 'changelog/**'
+    - 'upgrade_guide/**'
 jobs:
   release:
     name: Build
