@@ -3,9 +3,13 @@ name: "Build docs on pull requests"
 on:
   pull_request:
     branches:
-      - master
+    - scylla-3.x
     paths:
-      - "docs/**"
+    - 'docs/**'
+    - 'faq/**'
+    - 'manual/**'
+    - 'changelog/**'
+    - 'upgrade_guide/**'
 
 jobs:
   release:
