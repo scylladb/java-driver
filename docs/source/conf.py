@@ -146,7 +146,7 @@ html_style = ''
 html_theme_options = {
     'branch_substring_removed': 'scylla-',
     'github_issues_repository': 'scylladb/java-driver',
-    'hide_sidebar_index': 'False',
+    'hide_sidebar_index': 'false',
     'hide_version_dropdown': ['scylla-3.x'],
 }
 
