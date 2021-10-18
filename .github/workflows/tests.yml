@@ -36,19 +36,19 @@ jobs:
           java-version: '8'
           distribution: 'adopt'
 
-      - name: Setup environment (Integration test on Cassandra 3.11)
+      - name: Setup environment (Integration test on Cassandra 3.11.11)
         run: |
           sudo apt-get update
           sudo apt-get install -y python3 python3-pip python-is-python3 python3-boto3
           sudo pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
 
-      - name: Run integration tests on Cassandra 3.11
-        run: mvn -B verify -Pshort -Dcassandra.version=3.11
+      - name: Run integration tests on Cassandra 3.11.11
+        run: mvn -B verify -Pshort -Dcassandra.version=3.11.11
 
       - uses: actions/upload-artifact@v2
         if: ${{ failure() }}
         with:
-          name: ccm-logs-cassandra-3.11
+          name: ccm-logs-cassandra-3.11.11
           path: /tmp/*-0/ccm*/node*/logs/*
 
   run-scylla-integration-tests:
