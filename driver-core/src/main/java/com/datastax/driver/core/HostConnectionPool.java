@@ -24,6 +24,7 @@ import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
+import com.datastax.driver.core.policies.TokenAwarePolicy;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -388,20 +389,44 @@ class HostConnectionPool implements Connection.Owner {
   }
 
   ListenableFuture<Connection> borrowConnection(
-      long timeout, TimeUnit unit, int maxQueueSize, ByteBuffer routingKey) {
+      long timeout, TimeUnit unit, int maxQueueSize, Statement statement) {
+
     Phase phase = this.phase.get();
     if (phase != Phase.READY)
       return Futures.immediateFailedFuture(
           new ConnectionException(host.getSocketAddress(), "Pool is " + phase));
 
     int shardId = 0;
-    if (host.getShardingInfo() != null) {
+    if ((host.getShardingInfo() != null) && (statement != null)) {
+      Metadata metadata = manager.cluster.getMetadata();
+      ProtocolVersion protocolVersion =
+          manager.cluster.getConfiguration().getProtocolOptions().getProtocolVersion();
+      CodecRegistry codecRegistry = manager.cluster.getConfiguration().getCodecRegistry();
+      ByteBuffer routingKey = statement.getRoutingKey(protocolVersion, codecRegistry);
       if (routingKey != null) {
-        Metadata metadata = manager.cluster.getMetadata();
         Token t = metadata.newToken(routingKey);
         shardId = host.getShardingInfo().shardId(t);
       } else {
-        shardId = RAND.nextInt(host.getShardingInfo().getShardsCount());
+        String csTokens = TokenAwarePolicy.getTokenRange(statement);
+        if (csTokens != null) {
+          String[] strTokens = csTokens.split(",");
+          Token start = metadata.newToken(strTokens[0]);
+          Token end = metadata.newToken(strTokens[1]);
+          int startShardId = host.getShardingInfo().shardId(start);
+          int endShardId = host.getShardingInfo().shardId(end);
+          if (startShardId == endShardId) {
+            shardId = startShardId;
+          } else {
+            if (endShardId < startShardId) {
+              int tmp = startShardId;
+              startShardId = endShardId;
+              endShardId = tmp;
+            }
+            shardId = RAND.nextInt(endShardId - startShardId + 1) + startShardId;
+          }
+        } else {
+          shardId = RAND.nextInt(host.getShardingInfo().getShardsCount());
+        }
       }
     }
 

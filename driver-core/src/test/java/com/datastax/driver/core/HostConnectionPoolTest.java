@@ -54,7 +54,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -1590,10 +1589,8 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
 
     private MockRequest(HostConnectionPool pool, int timeoutMillis, int maxQueueSize)
         throws ConnectionException {
-      ByteBuffer routingKey = ByteBuffer.allocate(4);
-      routingKey.putInt(0, 0);
       this.connectionFuture =
-          pool.borrowConnection(timeoutMillis, MILLISECONDS, maxQueueSize, routingKey);
+          pool.borrowConnection(timeoutMillis, MILLISECONDS, maxQueueSize, null);
       requestInitialized =
           GuavaCompatibility.INSTANCE.transform(
               this.connectionFuture,
