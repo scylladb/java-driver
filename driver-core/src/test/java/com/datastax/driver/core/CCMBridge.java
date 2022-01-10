@@ -31,6 +31,7 @@ import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
 import com.google.common.io.Files;
+import com.google.common.primitives.Ints;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -43,8 +44,10 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -881,6 +884,7 @@ public class CCMBridge implements CCMAccess {
 
     public static final String RANDOM_PORT = "__RANDOM_PORT__";
     private static final Pattern RANDOM_PORT_PATTERN = Pattern.compile(RANDOM_PORT);
+    private static final int RANDOMIZE_PORT_MAX_RETRIES = 20;
 
     private String ipPrefix = TestUtils.IP_PREFIX;
     int[] nodes = {1};
@@ -893,6 +897,7 @@ public class CCMBridge implements CCMAccess {
     private final Map<String, Object> cassandraConfiguration = Maps.newLinkedHashMap();
     private final Map<String, Object> dseConfiguration = Maps.newLinkedHashMap();
     private final Map<Integer, Workload[]> workloads = new HashMap<Integer, Workload[]>();
+    private final HashSet<Integer> selectedPorts = new HashSet<Integer>();
 
     private Builder() {
       cassandraConfiguration.put("start_rpc", false);
@@ -1044,6 +1049,14 @@ public class CCMBridge implements CCMAccess {
         cassandraVersion = this.version;
       }
 
+      selectedPorts.clear();
+      // Preemptively banning every number that looks like explicitly provided port
+      selectedPorts.addAll(collectPorts(this.cassandraConfiguration));
+      if (dseVersion != null) {
+        selectedPorts.addAll(collectPorts(this.dseConfiguration));
+      }
+      selectedPorts.addAll(Ints.asList(jmxPorts));
+
       Map<String, Object> cassandraConfiguration = randomizePorts(this.cassandraConfiguration);
       int storagePort = Integer.parseInt(cassandraConfiguration.get("storage_port").toString());
       int thriftPort = Integer.parseInt(cassandraConfiguration.get("rpc_port").toString());
@@ -1059,7 +1072,7 @@ public class CCMBridge implements CCMAccess {
       int[] generatedJmxPorts = new int[numNodes];
       for (int i = 0; i < numNodes; i++) {
         if (i >= jmxPorts.length) {
-          generatedJmxPorts[i] = TestUtils.findAvailablePort();
+          generatedJmxPorts[i] = selectAvailablePort();
         } else {
           generatedJmxPorts[i] = jmxPorts[i];
         }
@@ -1217,7 +1230,7 @@ public class CCMBridge implements CCMAccess {
           int nodesInDc = nodes[dc - 1];
           for (int i = 0; i < nodesInDc; i++) {
             int jmxPort = ccm.jmxAddressOfNode(n).getPort();
-            int debugPort = TestUtils.findAvailablePort();
+            int debugPort = selectAvailablePort();
             logger.trace(
                 "Node {} in cluster {} using JMX port {} and debug port {}",
                 n,
@@ -1282,10 +1295,46 @@ public class CCMBridge implements CCMAccess {
       Matcher matcher = RANDOM_PORT_PATTERN.matcher(str);
       StringBuffer sb = new StringBuffer();
       while (matcher.find()) {
-        matcher.appendReplacement(sb, Integer.toString(TestUtils.findAvailablePort()));
+        matcher.appendReplacement(sb, Integer.toString(selectAvailablePort()));
       }
       matcher.appendTail(sb);
       return sb.toString();
+    }
+
+    // Collects port numbers from configuration map. May catch some non-issue false positives.
+    private static Collection<Integer> collectPorts(Map<String, Object> config) {
+      HashSet<Integer> set = new HashSet<Integer>();
+      for (Object value : config.values()) {
+        try {
+          int result = Integer.parseInt(value.toString());
+          if ((1 <= result) && (result <= 65535)) {
+            set.add(result);
+          }
+        } catch (NumberFormatException e) {
+        }
+      }
+      return set;
+    }
+
+    private int findUnselectedPort() {
+      int port, cnt = 0;
+      do {
+        cnt++;
+        port = TestUtils.findAvailablePort();
+      } while (selectedPorts.contains(port) && (cnt < RANDOMIZE_PORT_MAX_RETRIES));
+
+      if (cnt >= RANDOMIZE_PORT_MAX_RETRIES) {
+        throw new RuntimeException(
+            "Couldn't assign random ports. "
+                + "This may happen when you're trying to exhaust nearly all available ports.");
+      }
+      return port;
+    }
+
+    private int selectAvailablePort() {
+      int port = findUnselectedPort();
+      selectedPorts.add(port);
+      return port;
     }
 
     @Override
