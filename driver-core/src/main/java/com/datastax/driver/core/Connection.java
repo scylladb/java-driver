@@ -440,12 +440,13 @@ class Connection {
       public ListenableFuture<Void> apply(Void input) throws Exception {
         Future startupOptionsFuture = write(new Requests.Options());
         return GuavaCompatibility.INSTANCE.transformAsync(
-            startupOptionsFuture, onOptionsResponse(initExecutor), initExecutor);
+            startupOptionsFuture, onOptionsResponse(protocolVersion, initExecutor), initExecutor);
       }
     };
   }
 
-  private AsyncFunction<Message.Response, Void> onOptionsResponse(final Executor initExecutor) {
+  private AsyncFunction<Message.Response, Void> onOptionsResponse(
+      final ProtocolVersion protocolVersion, final Executor initExecutor) {
     return new AsyncFunction<Message.Response, Void>() {
       @Override
       public ListenableFuture<Void> apply(Message.Response response) throws Exception {
@@ -478,6 +479,9 @@ class Connection {
             return MoreFutures.VOID_SUCCESS;
           case ERROR:
             Responses.Error error = (Responses.Error) response;
+            if (isUnsupportedProtocolVersion(error))
+              throw unsupportedProtocolVersionException(
+                  protocolVersion, error.serverProtocolVersion);
             throw new TransportException(
                 endPoint,
                 String.format(
