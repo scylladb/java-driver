@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [ scylla-3.x ]
+    branches: [ scylla-3.*x ]
   pull_request:
-    branches: [ scylla-3.x ]
+    branches: [ scylla-3.*x ]
 
 jobs:
   run-unit-tests:
