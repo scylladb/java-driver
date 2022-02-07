@@ -123,7 +123,7 @@ class DataTypeClassNameParser {
           TypeCodec.varchar()
               .deserialize(Bytes.fromHexString("0x" + parser.readOne()), protocolVersion);
       parser.skipBlankAndComma();
-      Map<String, String> rawFields = parser.getNameAndTypeParameters();
+      Map<String, String> rawFields = parser.getNameAndTypeParameters(protocolVersion);
       List<UserType.Field> fields = new ArrayList<UserType.Field>(rawFields.size());
       for (Map.Entry<String, String> entry : rawFields.entrySet())
         fields.add(
@@ -199,7 +199,7 @@ class DataTypeClassNameParser {
       count--;
       Parser collectionParser = new Parser(last, 0);
       collectionParser.parseNextName(); // skips columnToCollectionType
-      Map<String, String> params = collectionParser.getCollectionsParameters();
+      Map<String, String> params = collectionParser.getCollectionsParameters(protocolVersion);
       for (Map.Entry<String, String> entry : params.entrySet())
         collections.put(entry.getKey(), parseOne(entry.getValue(), protocolVersion, codecRegistry));
     }
@@ -320,18 +320,18 @@ class DataTypeClassNameParser {
               "Syntax error parsing '%s' at char %d: unexpected end of string", str, idx));
     }
 
-    public Map<String, String> getCollectionsParameters() {
+    public Map<String, String> getCollectionsParameters(ProtocolVersion protocolVersion) {
       if (isEOS()) return Collections.<String, String>emptyMap();
 
       if (str.charAt(idx) != '(') throw new IllegalStateException();
 
       ++idx; // skipping '('
 
-      return getNameAndTypeParameters();
+      return getNameAndTypeParameters(protocolVersion);
     }
 
     // Must be at the start of the first parameter to read
-    public Map<String, String> getNameAndTypeParameters() {
+    public Map<String, String> getNameAndTypeParameters(ProtocolVersion protocolVersion) {
       // The order of the hashmap matters for UDT
       Map<String, String> map = new LinkedHashMap<String, String>();
 
@@ -345,8 +345,7 @@ class DataTypeClassNameParser {
         String name = null;
         try {
           name =
-              TypeCodec.varchar()
-                  .deserialize(Bytes.fromHexString("0x" + bbHex), ProtocolVersion.NEWEST_SUPPORTED);
+              TypeCodec.varchar().deserialize(Bytes.fromHexString("0x" + bbHex), protocolVersion);
         } catch (NumberFormatException e) {
           throwSyntaxError(e.getMessage());
         }
