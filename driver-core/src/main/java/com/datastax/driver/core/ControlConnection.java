@@ -301,7 +301,7 @@ class ControlConnection implements Connection.Owner {
     // If no protocol version was specified, set the default as soon as a connection succeeds (it's
     // needed to parse UDTs in refreshSchema)
     if (cluster.connectionFactory.protocolVersion == null)
-      cluster.connectionFactory.protocolVersion = ProtocolVersion.NEWEST_SUPPORTED;
+      cluster.connectionFactory.protocolVersion = ProtocolVersion.DEFAULT;
 
     try {
       logger.trace("[Control connection] Registering for events");

@@ -94,7 +94,7 @@ public class NettyOptionsTest extends CCMTestsSupport {
     int expectedNumberOfCalls = TestUtils.numberOfLocalCoreConnections(cluster) * hosts + 1;
     // If the driver supports a more recent protocol version than C*, the negotiation at startup
     // will open an additional connection for each protocol version tried.
-    ProtocolVersion version = ProtocolVersion.NEWEST_SUPPORTED;
+    ProtocolVersion version = ProtocolVersion.DEFAULT;
     ProtocolVersion usedVersion = ccm().getProtocolVersion();
     while (version != usedVersion && version != null) {
       version = version.getLowerSupported();

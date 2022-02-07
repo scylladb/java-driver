@@ -192,9 +192,7 @@ class Connection {
     this.requestedShardId = shardId;
 
     final ProtocolVersion protocolVersion =
-        factory.protocolVersion == null
-            ? ProtocolVersion.NEWEST_SUPPORTED
-            : factory.protocolVersion;
+        factory.protocolVersion == null ? ProtocolVersion.DEFAULT : factory.protocolVersion;
     final SettableFuture<Void> channelReadyFuture = SettableFuture.create();
 
     try {

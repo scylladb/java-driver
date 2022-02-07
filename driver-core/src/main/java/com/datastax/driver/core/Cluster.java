@@ -866,11 +866,11 @@ public class Cluster implements Closeable {
      *
      * <p>By default, the driver will "auto-detect" which protocol version it can use when
      * connecting to the first node. More precisely, it will try first with {@link
-     * ProtocolVersion#NEWEST_SUPPORTED}, and if not supported fallback to the highest version
-     * supported by the first node it connects to. Please note that once the version is
-     * "auto-detected", it won't change: if the first node the driver connects to is a Cassandra 1.2
-     * node and auto-detection is used (the default), then the native protocol version 1 will be use
-     * for the lifetime of the Cluster instance.
+     * ProtocolVersion#DEFAULT}, and if not supported fallback to the highest version supported by
+     * the first node it connects to. Please note that once the version is "auto-detected", it won't
+     * change: if the first node the driver connects to is a Cassandra 1.2 node and auto-detection
+     * is used (the default), then the native protocol version 1 will be use for the lifetime of the
+     * Cluster instance.
      *
      * <p>By using {@link Builder#allowBetaProtocolVersion()}, it is possible to force driver to
      * connect to Cassandra node that supports the latest protocol beta version. Leaving this flag

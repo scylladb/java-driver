@@ -87,7 +87,7 @@ public class TokenAwarePolicyTest {
     when(cluster.getConfiguration()).thenReturn(configuration);
     when(configuration.getCodecRegistry()).thenReturn(codecRegistry);
     when(configuration.getProtocolOptions()).thenReturn(protocolOptions);
-    when(protocolOptions.getProtocolVersion()).thenReturn(ProtocolVersion.NEWEST_SUPPORTED);
+    when(protocolOptions.getProtocolVersion()).thenReturn(ProtocolVersion.DEFAULT);
     when(cluster.getMetadata()).thenReturn(metadata);
     when(metadata.getReplicas(Metadata.quote("keyspace"), null, routingKey))
         .thenReturn(Sets.newLinkedHashSet(host1, host2));
@@ -178,8 +178,7 @@ public class TokenAwarePolicyTest {
       // Encodes into murmur hash '4874351301193663061' which should be owned by node 6 with
       // replicas 7 and 8.
       ByteBuffer routingKey =
-          TypeCodec.varchar()
-              .serialize("This is some sample text", ProtocolVersion.NEWEST_SUPPORTED);
+          TypeCodec.varchar().serialize("This is some sample text", ProtocolVersion.DEFAULT);
 
       // then: The replicas resolved from the cluster metadata must match node 6 and its replicas.
       List<Host> replicas =
@@ -244,9 +243,7 @@ public class TokenAwarePolicyTest {
       // Encodes into murmur hash '4557949199137838892' which should be owned by node 3.
       ByteBuffer routingKey =
           TypeCodec.varchar()
-              .serialize(
-                  "should_choose_proper_host_based_on_routing_key",
-                  ProtocolVersion.NEWEST_SUPPORTED);
+              .serialize("should_choose_proper_host_based_on_routing_key", ProtocolVersion.DEFAULT);
       SimpleStatement statement =
           new SimpleStatement("select * from table where k=5")
               .setRoutingKey(routingKey)
@@ -307,7 +304,7 @@ public class TokenAwarePolicyTest {
           TypeCodec.varchar()
               .serialize(
                   "should_choose_host_in_local_dc_when_using_network_topology_strategy_and_dc_aware",
-                  ProtocolVersion.NEWEST_SUPPORTED);
+                  ProtocolVersion.DEFAULT);
       SimpleStatement statement =
           new SimpleStatement("select * from table where k=5")
               .setRoutingKey(routingKey)
@@ -358,7 +355,7 @@ public class TokenAwarePolicyTest {
           TypeCodec.varchar()
               .serialize(
                   "should_use_other_nodes_when_replicas_having_token_are_down",
-                  ProtocolVersion.NEWEST_SUPPORTED);
+                  ProtocolVersion.DEFAULT);
       SimpleStatement statement =
           new SimpleStatement("select * from table where k=5")
               .setRoutingKey(routingKey)
@@ -460,7 +457,7 @@ public class TokenAwarePolicyTest {
 
       // Derive a routing key for single routing key component, this should resolve to
       // '4891967783720036163'
-      ByteBuffer routingKey = TypeCodec.bigint().serialize(33L, ProtocolVersion.NEWEST_SUPPORTED);
+      ByteBuffer routingKey = TypeCodec.bigint().serialize(33L, ProtocolVersion.DEFAULT);
       bs.setRoutingKey(routingKey);
 
       QueryTracker queryTracker = new QueryTracker();
@@ -479,10 +476,9 @@ public class TokenAwarePolicyTest {
       // Derive a routing key for multiple routing key components, this should resolve to
       // '3735658072872431718'
       bs = preparedStatement.bind("a", "b");
-      ByteBuffer routingKeyK0Part =
-          TypeCodec.bigint().serialize(42L, ProtocolVersion.NEWEST_SUPPORTED);
+      ByteBuffer routingKeyK0Part = TypeCodec.bigint().serialize(42L, ProtocolVersion.DEFAULT);
       ByteBuffer routingKeyK1Part =
-          TypeCodec.varchar().serialize("hello_world", ProtocolVersion.NEWEST_SUPPORTED);
+          TypeCodec.varchar().serialize("hello_world", ProtocolVersion.DEFAULT);
       bs.setRoutingKey(routingKeyK0Part, routingKeyK1Part);
 
       queryTracker.query(session, 10, bs);

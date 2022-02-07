@@ -41,6 +41,12 @@ public enum ProtocolVersion {
   /** The most recent beta protocol version supported by the driver. */
   public static final ProtocolVersion NEWEST_BETA = V6;
 
+  /**
+   * The default protocol version used by the driver to connect to the cluster if no specific
+   * protocol version was set.
+   */
+  public static final ProtocolVersion DEFAULT = V4;
+
   private final VersionNumber minCassandraVersion;
 
   private final int asInt;

@@ -532,8 +532,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
     PreparedStatement ps =
         session().prepare(String.format("INSERT INTO %s.foo (i) VALUES (?)", keyspace));
     BoundStatement bs = ps.bind(1);
-    assertThat(bs.getRoutingKey(ProtocolVersion.NEWEST_SUPPORTED, CodecRegistry.DEFAULT_INSTANCE))
-        .isNotNull();
+    assertThat(bs.getRoutingKey(protocolVersion, CodecRegistry.DEFAULT_INSTANCE)).isNotNull();
   }
 
   @Test(groups = "short")
@@ -548,8 +547,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
 
     PreparedStatement ps = session().prepare("INSERT INTO \"Test\".\"Foo\" (i) VALUES (?)");
     BoundStatement bs = ps.bind(1);
-    assertThat(bs.getRoutingKey(ProtocolVersion.NEWEST_SUPPORTED, CodecRegistry.DEFAULT_INSTANCE))
-        .isNotNull();
+    assertThat(bs.getRoutingKey(protocolVersion, CodecRegistry.DEFAULT_INSTANCE)).isNotNull();
   }
 
   @Test(groups = "short", expectedExceptions = InvalidQueryException.class)

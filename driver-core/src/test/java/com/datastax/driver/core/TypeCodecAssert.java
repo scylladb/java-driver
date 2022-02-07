@@ -24,7 +24,7 @@ import org.assertj.core.api.AbstractAssert;
 @SuppressWarnings("unused")
 public class TypeCodecAssert<T> extends AbstractAssert<TypeCodecAssert<T>, TypeCodec<T>> {
 
-  private ProtocolVersion version = ProtocolVersion.NEWEST_SUPPORTED;
+  private ProtocolVersion version = ProtocolVersion.DEFAULT;
 
   protected TypeCodecAssert(TypeCodec<T> actual) {
     super(actual, TypeCodecAssert.class);
