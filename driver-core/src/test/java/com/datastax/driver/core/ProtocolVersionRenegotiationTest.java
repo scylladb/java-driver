@@ -93,6 +93,30 @@ public class ProtocolVersionRenegotiationTest extends CCMTestsSupport {
     assertThat(actualProtocolVersion(cluster)).isEqualTo(protocolVersion);
   }
 
+  @Test(groups = "short")
+  public void should_successfully_negotiate_down_from_newest_supported_version() {
+    // By default, the driver will connect with ProtocolVersion.DEFAULT (<=
+    // ProtocolVersion.NEWEST_SUPPORTED).
+    // This test verifies that the driver can connect starting with the
+    // newest supported version, potentially renegotiating the protocol
+    // version to a lower version.
+
+    // We will explicitly set a protocol version, so we need to force
+    // the driver to negotiate protocol version.
+    Cluster.shouldAlwaysNegotiateProtocolVersion = true;
+
+    try {
+      Cluster cluster = connectWithVersion(ProtocolVersion.NEWEST_SUPPORTED);
+      assertThat(actualProtocolVersion(cluster))
+          .isLessThanOrEqualTo(ProtocolVersion.NEWEST_SUPPORTED);
+    } catch (RuntimeException e) {
+      Cluster.shouldAlwaysNegotiateProtocolVersion = false;
+      throw e;
+    }
+
+    Cluster.shouldAlwaysNegotiateProtocolVersion = false;
+  }
+
   private UnsupportedProtocolVersionException connectWithUnsupportedVersion(
       ProtocolVersion version) {
     Cluster cluster =

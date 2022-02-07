@@ -133,6 +133,10 @@ public class Cluster implements Closeable {
   static final int NEW_NODE_DELAY_SECONDS =
       SystemProperties.getInt("com.datastax.driver.NEW_NODE_DELAY_SECONDS", 1);
 
+  // Used in integration tests to force the driver to negotiate the protocol
+  // version even if it was explicitly set.
+  @VisibleForTesting static boolean shouldAlwaysNegotiateProtocolVersion = false;
+
   // Some per-JVM number that allows to generate unique cluster names when
   // multiple Cluster instance are created in the same JVM.
   private static final AtomicInteger CLUSTER_ID = new AtomicInteger(0);
@@ -1887,7 +1891,9 @@ public class Cluster implements Closeable {
     }
 
     private void negotiateProtocolVersionAndConnect() {
-      boolean shouldNegotiate = (configuration.getProtocolOptions().initialProtocolVersion == null);
+      boolean shouldNegotiate =
+          (configuration.getProtocolOptions().initialProtocolVersion == null
+              || shouldAlwaysNegotiateProtocolVersion);
       while (true) {
         try {
           controlConnection.connect();
