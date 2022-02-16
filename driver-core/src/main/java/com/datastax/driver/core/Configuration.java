@@ -348,6 +348,10 @@ public class Configuration {
       return this;
     }
 
+    public QueryOptions getQueryOptions() {
+      return queryOptions;
+    }
+
     /**
      * Builds the final object from this builder.
      *

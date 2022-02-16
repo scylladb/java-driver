@@ -1226,7 +1226,8 @@ abstract class SchemaParser {
         VersionNumber cassandraVersion)
         throws ConnectionException, BusyConnectionException, ExecutionException,
             InterruptedException {
-      if (targetType == null) {
+      if (targetType == null
+          && cluster.getConfiguration().getQueryOptions().isSchemaQueriesPaged()) {
         Map<String, KeyspaceMetadata> keyspaces =
             buildSchema(cluster, connection, cassandraVersion);
         Metadata metadata;

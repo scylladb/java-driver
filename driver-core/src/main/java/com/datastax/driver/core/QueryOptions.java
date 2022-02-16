@@ -70,6 +70,8 @@ public class QueryOptions {
   private volatile Cluster.Manager manager;
   private volatile boolean prepareOnAllHosts = true;
 
+  private volatile boolean schemaQueriesPaged = true;
+
   /**
    * Creates a new {@link QueryOptions} instance using the {@link #DEFAULT_CONSISTENCY_LEVEL},
    * {@link #DEFAULT_SERIAL_CONSISTENCY_LEVEL} and {@link #DEFAULT_FETCH_SIZE}.
@@ -322,6 +324,26 @@ public class QueryOptions {
   }
 
   /**
+   * Toggle schema queries paging.
+   *
+   * @param enabled whether paging is enabled in schema queries.
+   * @return this {@code QueryOptions} instance.
+   */
+  public QueryOptions setSchemaQueriesPaged(boolean enabled) {
+    this.schemaQueriesPaged = enabled;
+    return this;
+  }
+
+  /**
+   * Whether schema queries are using paging.
+   *
+   * @return the value.
+   */
+  public boolean isSchemaQueriesPaged() {
+    return schemaQueriesPaged;
+  }
+
+  /**
    * Sets the default window size in milliseconds used to debounce node list refresh requests.
    *
    * <p>When the control connection receives a new schema refresh request, it puts it on hold and
@@ -486,18 +508,19 @@ public class QueryOptions {
     QueryOptions other = (QueryOptions) that;
 
     return (this.consistency.equals(other.consistency)
-        && this.serialConsistency.equals(other.serialConsistency)
-        && this.fetchSize == other.fetchSize
-        && this.defaultIdempotence == other.defaultIdempotence
-        && this.metadataEnabled == other.metadataEnabled
-        && this.maxPendingRefreshNodeListRequests == other.maxPendingRefreshNodeListRequests
-        && this.maxPendingRefreshNodeRequests == other.maxPendingRefreshNodeRequests
-        && this.maxPendingRefreshSchemaRequests == other.maxPendingRefreshSchemaRequests
-        && this.refreshNodeListIntervalMillis == other.refreshNodeListIntervalMillis
-        && this.refreshNodeIntervalMillis == other.refreshNodeIntervalMillis
-        && this.refreshSchemaIntervalMillis == other.refreshSchemaIntervalMillis
-        && this.reprepareOnUp == other.reprepareOnUp
-        && this.prepareOnAllHosts == other.prepareOnAllHosts);
+            && this.serialConsistency.equals(other.serialConsistency)
+            && this.fetchSize == other.fetchSize
+            && this.defaultIdempotence == other.defaultIdempotence
+            && this.metadataEnabled == other.metadataEnabled
+            && this.maxPendingRefreshNodeListRequests == other.maxPendingRefreshNodeListRequests
+            && this.maxPendingRefreshNodeRequests == other.maxPendingRefreshNodeRequests
+            && this.maxPendingRefreshSchemaRequests == other.maxPendingRefreshSchemaRequests
+            && this.refreshNodeListIntervalMillis == other.refreshNodeListIntervalMillis
+            && this.refreshNodeIntervalMillis == other.refreshNodeIntervalMillis
+            && this.refreshSchemaIntervalMillis == other.refreshSchemaIntervalMillis
+            && this.reprepareOnUp == other.reprepareOnUp
+            && this.prepareOnAllHosts == other.prepareOnAllHosts)
+        && this.schemaQueriesPaged == other.schemaQueriesPaged;
   }
 
   @Override
@@ -515,7 +538,8 @@ public class QueryOptions {
         refreshNodeIntervalMillis,
         refreshSchemaIntervalMillis,
         reprepareOnUp,
-        prepareOnAllHosts);
+        prepareOnAllHosts,
+        schemaQueriesPaged);
   }
 
   public boolean isConsistencySet() {
