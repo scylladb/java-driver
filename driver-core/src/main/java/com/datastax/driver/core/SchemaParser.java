@@ -861,18 +861,28 @@ abstract class SchemaParser {
     private static final String FUNCTION_NAME = "function_name";
     private static final String ARGUMENT_TYPES = "argument_types";
     private static final String AGGREGATE_NAME = "aggregate_name";
+    private static final String TYPE_NAME = "type_name";
     private static final String LIMIT = " LIMIT 100";
 
     private List<Row> fetchUDTs(
         KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
         throws ConnectionException, BusyConnectionException, InterruptedException,
             ExecutionException {
-      return queryAsync(
-              SELECT_USERTYPES + whereClause(KEYSPACE, keyspace.getName(), null, null),
-              connection,
-              protocolVersion)
-          .get()
-          .all();
+      String queryPrefix = SELECT_USERTYPES + whereClause(KEYSPACE, keyspace.getName(), null, null);
+      List<Row> result = new ArrayList<Row>();
+      List<Row> rs = queryAsync(queryPrefix + LIMIT, connection, protocolVersion).get().all();
+      while (!rs.isEmpty()) {
+        result.addAll(rs);
+        String lastSeen = "'" + result.get(result.size() - 1).getString(TYPE_NAME) + "'";
+        rs =
+            queryAsync(
+                    queryPrefix + " AND " + TYPE_NAME + " > " + lastSeen + LIMIT,
+                    connection,
+                    protocolVersion)
+                .get()
+                .all();
+      }
+      return result;
     }
 
     private void buildUDTs(
