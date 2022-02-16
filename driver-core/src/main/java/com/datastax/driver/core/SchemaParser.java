@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.SchemaElement.AGGREGATE;
@@ -34,6 +40,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -255,7 +262,7 @@ abstract class SchemaParser {
     return keyspaces;
   }
 
-  private Map<String, TableMetadata> buildTables(
+  protected Map<String, TableMetadata> buildTables(
       KeyspaceMetadata keyspace,
       List<Row> tableRows,
       Map<String, Map<String, ColumnMetadata.Raw>> colsDefs,
@@ -322,7 +329,7 @@ abstract class SchemaParser {
     return tables;
   }
 
-  private Map<String, UserType> buildUserTypes(
+  protected Map<String, UserType> buildUserTypes(
       KeyspaceMetadata keyspace,
       List<Row> udtRows,
       VersionNumber cassandraVersion,
@@ -342,7 +349,7 @@ abstract class SchemaParser {
     return udtRows;
   }
 
-  private Map<String, FunctionMetadata> buildFunctions(
+  protected Map<String, FunctionMetadata> buildFunctions(
       KeyspaceMetadata keyspace,
       List<Row> functionRows,
       VersionNumber cassandraVersion,
@@ -362,7 +369,7 @@ abstract class SchemaParser {
     return functions;
   }
 
-  private Map<String, AggregateMetadata> buildAggregates(
+  protected Map<String, AggregateMetadata> buildAggregates(
       KeyspaceMetadata keyspace,
       List<Row> aggregateRows,
       VersionNumber cassandraVersion,
@@ -382,7 +389,7 @@ abstract class SchemaParser {
     return aggregates;
   }
 
-  private Map<String, MaterializedViewMetadata> buildViews(
+  protected Map<String, MaterializedViewMetadata> buildViews(
       KeyspaceMetadata keyspace,
       List<Row> viewRows,
       Map<String, Map<String, ColumnMetadata.Raw>> colsDefs,
@@ -417,7 +424,7 @@ abstract class SchemaParser {
 
   // Update oldKeyspaces with the changes contained in newKeyspaces.
   // This method also takes care of triggering the relevant events
-  private void updateKeyspaces(
+  protected void updateKeyspaces(
       Metadata metadata,
       Map<String, KeyspaceMetadata> oldKeyspaces,
       Map<String, KeyspaceMetadata> newKeyspaces,
@@ -849,6 +856,288 @@ abstract class SchemaParser {
 
     private static final String TABLE_NAME = "table_name";
 
+    private List<Row> fetchUDTs(
+        KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      return queryAsync(
+              SELECT_USERTYPES + whereClause(KEYSPACE, keyspace.getName(), null, null),
+              connection,
+              protocolVersion)
+          .get()
+          .all();
+    }
+
+    private void buildUDTs(
+        KeyspaceMetadata keyspace,
+        Cluster cluster,
+        Connection connection,
+        VersionNumber cassandraVersion,
+        ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      List<Row> raw = fetchUDTs(keyspace, connection, protocolVersion);
+      Map<String, UserType> userTypes = buildUserTypes(keyspace, raw, cassandraVersion, cluster);
+      for (UserType userType : userTypes.values()) {
+        keyspace.add(userType);
+      }
+    }
+
+    private List<Row> fetchFunctions(
+        KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      return queryAsync(
+              SELECT_FUNCTIONS + whereClause(KEYSPACE, keyspace.getName(), null, null),
+              connection,
+              protocolVersion)
+          .get()
+          .all();
+    }
+
+    private void buildFunctions(
+        KeyspaceMetadata keyspace,
+        Cluster cluster,
+        Connection connection,
+        VersionNumber cassandraVersion,
+        ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      List<Row> raw = fetchFunctions(keyspace, connection, protocolVersion);
+      Map<String, FunctionMetadata> functions =
+          buildFunctions(keyspace, raw, cassandraVersion, cluster);
+      for (FunctionMetadata function : functions.values()) {
+        keyspace.add(function);
+      }
+    }
+
+    private List<Row> fetchAggregates(
+        KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      return queryAsync(
+              SELECT_AGGREGATES + whereClause(KEYSPACE, keyspace.getName(), null, null),
+              connection,
+              protocolVersion)
+          .get()
+          .all();
+    }
+
+    private void buildAggregates(
+        KeyspaceMetadata keyspace,
+        Cluster cluster,
+        Connection connection,
+        VersionNumber cassandraVersion,
+        ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      List<Row> raw = fetchAggregates(keyspace, connection, protocolVersion);
+      Map<String, AggregateMetadata> aggregates =
+          buildAggregates(keyspace, raw, cassandraVersion, cluster);
+      for (AggregateMetadata aggregate : aggregates.values()) {
+        keyspace.add(aggregate);
+      }
+    }
+
+    private Map<String, Map<String, Row>> fetchColumns(
+        KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      ResultSet rs =
+          queryAsync(
+                  SELECT_COLUMNS + whereClause(KEYSPACE, keyspace.getName(), null, null),
+                  connection,
+                  protocolVersion)
+              .get();
+
+      if (rs == null) return Collections.emptyMap();
+
+      Map<String, Map<String, Row>> result = new HashMap<String, Map<String, Row>>();
+      for (Row row : rs) {
+        String cfName = row.getString(TABLE_NAME);
+        Map<String, Row> colsByCf = result.get(cfName);
+        if (colsByCf == null) {
+          colsByCf = new HashMap<String, Row>();
+          result.put(cfName, colsByCf);
+        }
+        colsByCf.put(row.getString(ColumnMetadata.COLUMN_NAME), row);
+      }
+      return result;
+    }
+
+    private Map<String, Map<String, ColumnMetadata.Raw>> buildColumns(
+        KeyspaceMetadata keyspace,
+        Connection connection,
+        VersionNumber cassandraVersion,
+        ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      Map<String, Map<String, Row>> raw = fetchColumns(keyspace, connection, protocolVersion);
+      Map<String, Map<String, ColumnMetadata.Raw>> result =
+          new HashMap<String, Map<String, ColumnMetadata.Raw>>();
+      for (Entry<String, Map<String, Row>> table : raw.entrySet()) {
+        Map<String, ColumnMetadata.Raw> columns = new HashMap<String, ColumnMetadata.Raw>();
+        for (Entry<String, Row> column : table.getValue().entrySet()) {
+          columns.put(
+              column.getKey(), ColumnMetadata.Raw.fromRow(column.getValue(), cassandraVersion));
+        }
+        result.put(table.getKey(), columns);
+      }
+      return result;
+    }
+
+    private List<Row> fetchTables(
+        KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      return queryAsync(
+              SELECT_TABLES + whereClause(KEYSPACE, keyspace.getName(), null, null),
+              connection,
+              protocolVersion)
+          .get()
+          .all();
+    }
+
+    private Map<String, List<Row>> fetchIndexes(
+        KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      ResultSet rs =
+          queryAsync(
+                  SELECT_INDEXES + whereClause(KEYSPACE, keyspace.getName(), null, null),
+                  connection,
+                  protocolVersion)
+              .get();
+      if (rs == null) return Collections.emptyMap();
+
+      Map<String, List<Row>> result = Maps.newHashMap();
+      for (Row row : rs) {
+        String cfName = row.getString(TABLE_NAME);
+        List<Row> rowsByCf = result.get(cfName);
+        if (rowsByCf == null) {
+          rowsByCf = Lists.newArrayList();
+          result.put(cfName, rowsByCf);
+        }
+        rowsByCf.add(row);
+      }
+      return result;
+    }
+
+    private List<Row> fetchViews(
+        KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      return queryAsync(
+              SELECT_VIEWS + whereClause(KEYSPACE, keyspace.getName(), null, null),
+              connection,
+              protocolVersion)
+          .get()
+          .all();
+    }
+
+    private void buildTablesIndexesAndViews(
+        KeyspaceMetadata keyspace,
+        Cluster cluster,
+        Connection connection,
+        VersionNumber cassandraVersion,
+        ProtocolVersion protocolVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      List<Row> cf = fetchTables(keyspace, connection, protocolVersion);
+      Map<String, Map<String, ColumnMetadata.Raw>> columns =
+          buildColumns(keyspace, connection, cassandraVersion, protocolVersion);
+      Map<String, List<Row>> indexes = fetchIndexes(keyspace, connection, protocolVersion);
+      Map<String, TableMetadata> tables =
+          buildTables(keyspace, cf, columns, indexes, cassandraVersion, cluster);
+      for (TableMetadata table : tables.values()) {
+        keyspace.add(table);
+      }
+      List<Row> viewsData = fetchViews(keyspace, connection, protocolVersion);
+      Map<String, MaterializedViewMetadata> views =
+          buildViews(keyspace, viewsData, columns, cassandraVersion, cluster);
+      for (MaterializedViewMetadata view : views.values()) {
+        keyspace.add(view);
+      }
+    }
+
+    private Map<String, KeyspaceMetadata> buildSchema(
+        Cluster cluster, Connection connection, VersionNumber cassandraVersion)
+        throws ConnectionException, BusyConnectionException, InterruptedException,
+            ExecutionException {
+      ProtocolVersion protocolVersion =
+          cluster.getConfiguration().getProtocolOptions().getProtocolVersion();
+
+      Map<String, KeyspaceMetadata> keyspaces = new LinkedHashMap<String, KeyspaceMetadata>();
+      ResultSet keyspacesData = queryAsync(SELECT_KEYSPACES, connection, protocolVersion).get();
+      for (Row keyspaceRow : keyspacesData) {
+        KeyspaceMetadata keyspace = KeyspaceMetadata.build(keyspaceRow, cassandraVersion);
+        keyspaces.put(keyspace.getName(), keyspace);
+      }
+
+      for (Entry<String, KeyspaceMetadata> keyspace : keyspaces.entrySet()) {
+        buildUDTs(keyspace.getValue(), cluster, connection, cassandraVersion, protocolVersion);
+        buildFunctions(keyspace.getValue(), cluster, connection, cassandraVersion, protocolVersion);
+        buildAggregates(
+            keyspace.getValue(), cluster, connection, cassandraVersion, protocolVersion);
+        buildTablesIndexesAndViews(
+            keyspace.getValue(), cluster, connection, cassandraVersion, protocolVersion);
+      }
+
+      return keyspaces;
+    }
+
+    @Override
+    void refresh(
+        Cluster cluster,
+        SchemaElement targetType,
+        String targetKeyspace,
+        String targetName,
+        List<String> targetSignature,
+        Connection connection,
+        VersionNumber cassandraVersion)
+        throws ConnectionException, BusyConnectionException, ExecutionException,
+            InterruptedException {
+      if (targetType == null) {
+        Map<String, KeyspaceMetadata> keyspaces =
+            buildSchema(cluster, connection, cassandraVersion);
+        Metadata metadata;
+        try {
+          metadata = cluster.getMetadata();
+        } catch (IllegalStateException e) {
+          logger.warn("Unable to refresh metadata, cluster has been closed");
+          return;
+        }
+        metadata.lock.lock();
+        try {
+          updateKeyspaces(metadata, metadata.keyspaces, keyspaces, null);
+          // If we rebuild all from scratch or have an updated keyspace, rebuild the token map
+          // since some replication on some keyspace may have changed
+          metadata.rebuildTokenMap();
+        } catch (RuntimeException e) {
+          // Failure to parse the schema is definitively wrong so log a full-on error, but this
+          // won't
+          // generally prevent queries to
+          // work and this can happen when new Cassandra versions modify stuff in the schema and the
+          // driver hasn't yet be modified.
+          // So log, but let things go otherwise.
+          logger.error(
+              "Error parsing schema from Cassandra system tables: the schema in Cluster#getMetadata() will appear incomplete or stale",
+              e);
+        } finally {
+          metadata.lock.unlock();
+        }
+      } else {
+        super.refresh(
+            cluster,
+            targetType,
+            targetKeyspace,
+            targetName,
+            targetSignature,
+            connection,
+            cassandraVersion);
+      }
+    }
+
     @Override
     SystemRows fetchSystemRows(
         Cluster cluster,
@@ -860,7 +1149,6 @@ abstract class SchemaParser {
         VersionNumber cassandraVersion)
         throws ConnectionException, BusyConnectionException, ExecutionException,
             InterruptedException {
-
       boolean isSchemaOrKeyspace = (targetType == null || targetType == KEYSPACE);
 
       ResultSetFuture ksFuture = null,
@@ -957,7 +1245,7 @@ abstract class SchemaParser {
       return TABLE_NAME;
     }
 
-    protected String whereClause(
+    protected static String whereClause(
         SchemaElement targetType,
         String targetKeyspace,
         String targetName,
