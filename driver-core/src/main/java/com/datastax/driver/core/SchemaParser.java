@@ -858,6 +858,8 @@ abstract class SchemaParser {
     private static final String VIEW_NAME = "view_name";
     private static final String COLUMN_NAME = "column_name";
     private static final String INDEX_NAME = "index_name";
+    private static final String FUNCTION_NAME = "function_name";
+    private static final String ARGUMENT_TYPES = "argument_types";
     private static final String LIMIT = " LIMIT 100";
 
     private List<Row> fetchUDTs(
@@ -891,12 +893,32 @@ abstract class SchemaParser {
         KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
         throws ConnectionException, BusyConnectionException, InterruptedException,
             ExecutionException {
-      return queryAsync(
-              SELECT_FUNCTIONS + whereClause(KEYSPACE, keyspace.getName(), null, null),
-              connection,
-              protocolVersion)
-          .get()
-          .all();
+      String queryPrefix = SELECT_FUNCTIONS + whereClause(KEYSPACE, keyspace.getName(), null, null);
+      List<Row> result = new ArrayList<Row>();
+      List<Row> rs = queryAsync(queryPrefix + LIMIT, connection, protocolVersion).get().all();
+      while (!rs.isEmpty()) {
+        String lastSeenFunction = "'" + rs.get(rs.size() - 1).getString(FUNCTION_NAME) + "'";
+        String lastSeenArgs = "'" + rs.get(rs.size() - 1).getString(ARGUMENT_TYPES) + "'";
+        result.addAll(rs);
+        rs =
+            queryAsync(
+                    queryPrefix
+                        + " AND ("
+                        + FUNCTION_NAME
+                        + ", "
+                        + ARGUMENT_TYPES
+                        + ") > ("
+                        + lastSeenFunction
+                        + ", "
+                        + lastSeenArgs
+                        + ")"
+                        + LIMIT,
+                    connection,
+                    protocolVersion)
+                .get()
+                .all();
+      }
+      return result;
     }
 
     private void buildFunctions(
