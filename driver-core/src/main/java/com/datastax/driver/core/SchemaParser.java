@@ -860,6 +860,7 @@ abstract class SchemaParser {
     private static final String INDEX_NAME = "index_name";
     private static final String FUNCTION_NAME = "function_name";
     private static final String ARGUMENT_TYPES = "argument_types";
+    private static final String AGGREGATE_NAME = "aggregate_name";
     private static final String LIMIT = " LIMIT 100";
 
     private List<Row> fetchUDTs(
@@ -941,12 +942,33 @@ abstract class SchemaParser {
         KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
         throws ConnectionException, BusyConnectionException, InterruptedException,
             ExecutionException {
-      return queryAsync(
-              SELECT_AGGREGATES + whereClause(KEYSPACE, keyspace.getName(), null, null),
-              connection,
-              protocolVersion)
-          .get()
-          .all();
+      String queryPrefix =
+          SELECT_AGGREGATES + whereClause(KEYSPACE, keyspace.getName(), null, null);
+      List<Row> result = new ArrayList<Row>();
+      List<Row> rs = queryAsync(queryPrefix + LIMIT, connection, protocolVersion).get().all();
+      while (!rs.isEmpty()) {
+        String lastSeenAggregate = "'" + rs.get(rs.size() - 1).getString(AGGREGATE_NAME) + "'";
+        String lastSeenArgs = "'" + rs.get(rs.size() - 1).getString(ARGUMENT_TYPES) + "'";
+        result.addAll(rs);
+        rs =
+            queryAsync(
+                    queryPrefix
+                        + " AND ("
+                        + AGGREGATE_NAME
+                        + ", "
+                        + ARGUMENT_TYPES
+                        + ") > ("
+                        + lastSeenAggregate
+                        + ", "
+                        + lastSeenArgs
+                        + ")"
+                        + LIMIT,
+                    connection,
+                    protocolVersion)
+                .get()
+                .all();
+      }
+      return result;
     }
 
     private void buildAggregates(
