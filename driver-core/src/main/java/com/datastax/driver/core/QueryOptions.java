@@ -70,6 +70,8 @@ public class QueryOptions {
   private volatile Cluster.Manager manager;
   private volatile boolean prepareOnAllHosts = true;
 
+  private volatile boolean schemaQueriesPaged = true;
+
   /**
    * Creates a new {@link QueryOptions} instance using the {@link #DEFAULT_CONSISTENCY_LEVEL},
    * {@link #DEFAULT_SERIAL_CONSISTENCY_LEVEL} and {@link #DEFAULT_FETCH_SIZE}.
@@ -319,6 +321,26 @@ public class QueryOptions {
    */
   public boolean isMetadataEnabled() {
     return metadataEnabled;
+  }
+
+  /**
+   * Toggle schema queries paging.
+   *
+   * @param enabled whether paging is enabled in schema queries.
+   * @return this {@code QueryOptions} instance.
+   */
+  public QueryOptions setSchemaQueriesPaged(boolean enabled) {
+    this.schemaQueriesPaged = enabled;
+    return this;
+  }
+
+  /**
+   * Whether schema queries are using paging.
+   *
+   * @return the value.
+   */
+  public boolean isSchemaQueriesPaged() {
+    return schemaQueriesPaged;
   }
 
   /**

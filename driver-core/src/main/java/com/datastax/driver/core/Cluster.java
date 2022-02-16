@@ -753,6 +753,7 @@ public class Cluster implements Closeable {
     private boolean noCompact = false;
     private boolean isCloud = false;
     private boolean useAdvancedShardAwareness = true;
+    private boolean schemaQueriesPaged = true;
     private int localPortLow = ProtocolOptions.DEFAULT_LOCAL_PORT_LOW;
     private int localPortHigh = ProtocolOptions.DEFAULT_LOCAL_PORT_HIGH;
 
@@ -1496,6 +1497,19 @@ public class Cluster implements Closeable {
     }
 
     /**
+     * Disables paging in schema queries. By default, Queries that fetch schema from the cluster are
+     * paged. This option causes the least impact on the cluster latencies when a new client
+     * connects. Turning off paging may result in faster driver initialisation at the expense of
+     * higher cluster latencies.
+     *
+     * @return this builder.
+     */
+    public Builder withoutPagingInSchemaQueries() {
+      this.schemaQueriesPaged = false;
+      return this;
+    }
+
+    /**
      * Sets local port range for use by advanced shard awareness. Driver will use ports from this
      * range as local ports when connecting to cluster. If {@link #withoutAdvancedShardAwareness()}
      * was called, then setting this range does not affect anything.
@@ -1572,10 +1586,14 @@ public class Cluster implements Closeable {
 
       MetricsOptions metricsOptions = new MetricsOptions(metricsEnabled, jmxEnabled);
 
+      QueryOptions queryOptions = new QueryOptions();
+      queryOptions.setSchemaQueriesPaged(schemaQueriesPaged);
+
       return configurationBuilder
           .withProtocolOptions(protocolOptions)
           .withMetricsOptions(metricsOptions)
           .withPolicies(policiesBuilder.build())
+          .withQueryOptions(queryOptions)
           .build();
     }
 
