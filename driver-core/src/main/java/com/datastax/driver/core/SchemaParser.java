@@ -855,6 +855,7 @@ abstract class SchemaParser {
     protected static final String SELECT_VIEWS = "SELECT * FROM system_schema.views";
 
     private static final String TABLE_NAME = "table_name";
+    private static final String VIEW_NAME = "view_name";
     private static final String LIMIT = " LIMIT 100";
 
     private List<Row> fetchUDTs(
@@ -1037,12 +1038,21 @@ abstract class SchemaParser {
         KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
         throws ConnectionException, BusyConnectionException, InterruptedException,
             ExecutionException {
-      return queryAsync(
-              SELECT_VIEWS + whereClause(KEYSPACE, keyspace.getName(), null, null),
-              connection,
-              protocolVersion)
-          .get()
-          .all();
+      String queryPrefix = SELECT_VIEWS + whereClause(KEYSPACE, keyspace.getName(), null, null);
+      List<Row> result = new ArrayList<Row>();
+      List<Row> rs = queryAsync(queryPrefix + LIMIT, connection, protocolVersion).get().all();
+      while (!rs.isEmpty()) {
+        result.addAll(rs);
+        String lastSeen = "'" + result.get(result.size() - 1).getString(VIEW_NAME) + "'";
+        rs =
+            queryAsync(
+                    queryPrefix + " AND " + VIEW_NAME + " > " + lastSeen + LIMIT,
+                    connection,
+                    protocolVersion)
+                .get()
+                .all();
+      }
+      return result;
     }
 
     private void buildTablesIndexesAndViews(
