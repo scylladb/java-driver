@@ -857,6 +857,7 @@ abstract class SchemaParser {
     private static final String TABLE_NAME = "table_name";
     private static final String VIEW_NAME = "view_name";
     private static final String COLUMN_NAME = "column_name";
+    private static final String INDEX_NAME = "index_name";
     private static final String LIMIT = " LIMIT 100";
 
     private List<Row> fetchUDTs(
@@ -1028,23 +1029,38 @@ abstract class SchemaParser {
         KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
         throws ConnectionException, BusyConnectionException, InterruptedException,
             ExecutionException {
-      ResultSet rs =
-          queryAsync(
-                  SELECT_INDEXES + whereClause(KEYSPACE, keyspace.getName(), null, null),
-                  connection,
-                  protocolVersion)
-              .get();
-      if (rs == null) return Collections.emptyMap();
-
+      String queryPrefix = SELECT_INDEXES + whereClause(KEYSPACE, keyspace.getName(), null, null);
       Map<String, List<Row>> result = Maps.newHashMap();
-      for (Row row : rs) {
-        String cfName = row.getString(TABLE_NAME);
-        List<Row> rowsByCf = result.get(cfName);
-        if (rowsByCf == null) {
-          rowsByCf = Lists.newArrayList();
-          result.put(cfName, rowsByCf);
+      List<Row> rs = queryAsync(queryPrefix + LIMIT, connection, protocolVersion).get().all();
+      while (!rs.isEmpty()) {
+        String lastSeenTable = "'" + rs.get(rs.size() - 1).getString(TABLE_NAME) + "'";
+        String lastSeenIndex = "'" + rs.get(rs.size() - 1).getString(INDEX_NAME) + "'";
+        for (Row row : rs) {
+          String cfName = row.getString(TABLE_NAME);
+          List<Row> rowsByCf = result.get(cfName);
+          if (rowsByCf == null) {
+            rowsByCf = Lists.newArrayList();
+            result.put(cfName, rowsByCf);
+          }
+          rowsByCf.add(row);
         }
-        rowsByCf.add(row);
+        rs =
+            queryAsync(
+                    queryPrefix
+                        + " AND ("
+                        + TABLE_NAME
+                        + ", "
+                        + INDEX_NAME
+                        + ") > ("
+                        + lastSeenTable
+                        + ", "
+                        + lastSeenIndex
+                        + ")"
+                        + LIMIT,
+                    connection,
+                    protocolVersion)
+                .get()
+                .all();
       }
       return result;
     }
