@@ -856,6 +856,7 @@ abstract class SchemaParser {
 
     private static final String TABLE_NAME = "table_name";
     private static final String VIEW_NAME = "view_name";
+    private static final String COLUMN_NAME = "column_name";
     private static final String LIMIT = " LIMIT 1000";
 
     private List<Row> fetchUDTs(
@@ -945,24 +946,38 @@ abstract class SchemaParser {
         KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
         throws ConnectionException, BusyConnectionException, InterruptedException,
             ExecutionException {
-      ResultSet rs =
-          queryAsync(
-                  SELECT_COLUMNS + whereClause(KEYSPACE, keyspace.getName(), null, null),
-                  connection,
-                  protocolVersion)
-              .get();
-
-      if (rs == null) return Collections.emptyMap();
-
+      String queryPrefix = SELECT_COLUMNS + whereClause(KEYSPACE, keyspace.getName(), null, null);
       Map<String, Map<String, Row>> result = new HashMap<String, Map<String, Row>>();
-      for (Row row : rs) {
-        String cfName = row.getString(TABLE_NAME);
-        Map<String, Row> colsByCf = result.get(cfName);
-        if (colsByCf == null) {
-          colsByCf = new HashMap<String, Row>();
-          result.put(cfName, colsByCf);
+      List<Row> rs = queryAsync(queryPrefix + LIMIT, connection, protocolVersion).get().all();
+      while (!rs.isEmpty()) {
+        String lastSeenTable = "'" + rs.get(rs.size() - 1).getString(TABLE_NAME) + "'";
+        String lastSeenColumn = "'" + rs.get(rs.size() - 1).getString(COLUMN_NAME) + "'";
+        for (Row row : rs) {
+          String cfName = row.getString(TABLE_NAME);
+          Map<String, Row> colsByCf = result.get(cfName);
+          if (colsByCf == null) {
+            colsByCf = new HashMap<String, Row>();
+            result.put(cfName, colsByCf);
+          }
+          colsByCf.put(row.getString(ColumnMetadata.COLUMN_NAME), row);
         }
-        colsByCf.put(row.getString(ColumnMetadata.COLUMN_NAME), row);
+        rs =
+            queryAsync(
+                    queryPrefix
+                        + " AND ("
+                        + TABLE_NAME
+                        + ", "
+                        + COLUMN_NAME
+                        + ") > ("
+                        + lastSeenTable
+                        + ", "
+                        + lastSeenColumn
+                        + ")"
+                        + LIMIT,
+                    connection,
+                    protocolVersion)
+                .get()
+                .all();
       }
       return result;
     }
