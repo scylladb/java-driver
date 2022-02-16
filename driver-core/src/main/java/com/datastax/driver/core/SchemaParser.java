@@ -860,6 +860,7 @@ abstract class SchemaParser {
     private static final String INDEX_NAME = "index_name";
     private static final String FUNCTION_NAME = "function_name";
     private static final String ARGUMENT_TYPES = "argument_types";
+    private static final String AGGREGATE_NAME = "aggregate_name";
     private static final String LIMIT = " LIMIT 1000";
 
     private List<Row> fetchUDTs(
@@ -953,12 +954,45 @@ abstract class SchemaParser {
         KeyspaceMetadata keyspace, Connection connection, ProtocolVersion protocolVersion)
         throws ConnectionException, BusyConnectionException, InterruptedException,
             ExecutionException {
-      return queryAsync(
-              SELECT_AGGREGATES + whereClause(KEYSPACE, keyspace.getName(), null, null),
-              connection,
-              protocolVersion)
-          .get()
-          .all();
+      String queryPrefix =
+          SELECT_AGGREGATES + whereClause(KEYSPACE, keyspace.getName(), null, null);
+      List<Row> result = new ArrayList<Row>();
+      List<Row> rs = queryAsync(queryPrefix + LIMIT, connection, protocolVersion).get().all();
+      while (!rs.isEmpty()) {
+        String lastSeenAggregate = "'" + rs.get(rs.size() - 1).getString(AGGREGATE_NAME) + "'";
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        boolean first = true;
+        for (String arg_type : rs.get(rs.size() - 1).getList(ARGUMENT_TYPES, String.class)) {
+          if (first) {
+            first = false;
+          } else {
+            sb.append(", ");
+          }
+          sb.append("'").append(arg_type).append("'");
+        }
+        sb.append("]");
+        String lastSeenArgs = sb.toString();
+        result.addAll(rs);
+        rs =
+            queryAsync(
+                    queryPrefix
+                        + " AND ("
+                        + AGGREGATE_NAME
+                        + ", "
+                        + ARGUMENT_TYPES
+                        + ") > ("
+                        + lastSeenAggregate
+                        + ", "
+                        + lastSeenArgs
+                        + ")"
+                        + LIMIT,
+                    connection,
+                    protocolVersion)
+                .get()
+                .all();
+      }
+      return result;
     }
 
     private void buildAggregates(
