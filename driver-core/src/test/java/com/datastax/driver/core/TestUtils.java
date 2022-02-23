@@ -70,6 +70,9 @@ import org.testng.SkipException;
 /** A number of static fields/methods handy for tests. */
 public abstract class TestUtils {
 
+  private static final Map<Integer, Long> recentPorts = new HashMap<Integer, Long>();
+  private static final long RECENT_PORT_TTL = 4 * 60 * (long) (1e9); // nanoseconds
+  private static final int MAX_FIND_PORT_RETRIES = 20;
   public static final String IP_PREFIX;
 
   static {
@@ -760,10 +763,22 @@ public abstract class TestUtils {
   public static synchronized int findAvailablePort() throws RuntimeException {
     ServerSocket ss = null;
     try {
-      // let the system pick an ephemeral port
-      ss = new ServerSocket(0);
-      ss.setReuseAddress(true);
-      return ss.getLocalPort();
+      int retries = 0;
+      while (retries++ < MAX_FIND_PORT_RETRIES) {
+        // let the system pick an ephemeral port
+        ss = new ServerSocket(0);
+        ss.setReuseAddress(true);
+        long time = System.nanoTime();
+        int port = ss.getLocalPort();
+        Long last = recentPorts.get(port);
+        if (last == null || time - last > RECENT_PORT_TTL) {
+          recentPorts.put(port, time);
+          logger.info("Found available port: {}", port);
+          return port;
+        } else {
+          ss.close();
+        }
+      }
     } catch (IOException e) {
       throw Throwables.propagate(e);
     } finally {
@@ -775,6 +790,8 @@ public abstract class TestUtils {
         }
       }
     }
+    throw new RuntimeException(
+        "Couldn't find available port. Max retries (" + MAX_FIND_PORT_RETRIES + ") exceeded.");
   }
 
   private static final Predicate<InetSocketAddress> PORT_IS_UP =
