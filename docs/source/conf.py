@@ -117,11 +117,11 @@ redirects_file = "_utils/redirections.yaml"
 TAGS = []
 smv_tag_whitelist = multiversion_regex_builder(TAGS)
 # Whitelist pattern for branches (set to None to ignore all branches)
-BRANCHES = ['scylla-3.x', 'scylla-3.7.2.x', 'scylla-3.10.2.x']
+BRANCHES = ['scylla-3.7.2.x', 'scylla-3.10.2.x', 'scylla-3.11.0.x']
 smv_branch_whitelist = multiversion_regex_builder(BRANCHES)
 # Defines which version is considered to be the latest stable version.
 # Must be listed in smv_tag_whitelist or smv_branch_whitelist.
-smv_latest_version = 'scylla-3.10.2.x'
+smv_latest_version = 'scylla-3.11.0.x'
 smv_rename_latest_version = 'stable'
 # Whitelist pattern for remotes (set to None to use local branches only)
 smv_remote_whitelist = r"^origin$"
