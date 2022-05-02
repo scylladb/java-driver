@@ -185,7 +185,8 @@ public class CCMBridge implements CCMAccess {
 
     String installDirectory = System.getProperty("cassandra.directory");
     String branch = System.getProperty("cassandra.branch");
-
+    // Inherit the current environment.
+    Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
     ImmutableSet.Builder<String> installArgs = ImmutableSet.builder();
     if (installDirectory != null && !installDirectory.trim().isEmpty()) {
       installArgs.add("--install-dir=" + new File(installDirectory).getAbsolutePath());
@@ -194,6 +195,12 @@ public class CCMBridge implements CCMAccess {
     } else if (inputScyllaVersion != null && !inputScyllaVersion.trim().isEmpty()) {
       installArgs.add(" --scylla ");
       installArgs.add("-v release:" + inputScyllaVersion);
+
+      // Detect Scylla Enterprise - it should start with
+      // a 4-digit year.
+      if (inputScyllaVersion.matches("\\d{4}\\..*")) {
+        envMap.put("SCYLLA_PRODUCT", "enterprise");
+      }
     } else if (inputCassandraVersion != null && !inputCassandraVersion.trim().isEmpty()) {
       installArgs.add("-v " + inputCassandraVersion);
     }
@@ -204,8 +211,6 @@ public class CCMBridge implements CCMAccess {
 
     CASSANDRA_INSTALL_ARGS = installArgs.build();
 
-    // Inherit the current environment.
-    Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
     // If ccm.path is set, override the PATH variable with it.
     String ccmPath = System.getProperty("ccm.path");
     if (ccmPath != null) {
