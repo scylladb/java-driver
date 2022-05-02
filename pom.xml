@@ -951,7 +951,7 @@
         <profile>
             <id>short</id>
             <properties>
-                <test.groups>unit,short</test.groups>
+                <test.groups>short</test.groups>
                 <test.osgi.skip>false</test.osgi.skip>
             </properties>
         </profile>
@@ -959,7 +959,7 @@
         <profile>
             <id>long</id>
             <properties>
-                <test.groups>unit,short,long</test.groups>
+                <test.groups>long</test.groups>
                 <test.osgi.skip>false</test.osgi.skip>
             </properties>
         </profile>
@@ -967,7 +967,7 @@
         <profile>
             <id>duration</id>
             <properties>
-                <test.groups>unit,short,long,duration</test.groups>
+                <test.groups>duration</test.groups>
                 <test.osgi.skip>false</test.osgi.skip>
             </properties>
         </profile>
@@ -975,7 +975,7 @@
         <profile>
             <id>doc</id>
             <properties>
-                <test.groups>unit,doc</test.groups>
+                <test.groups>doc</test.groups>
             </properties>
         </profile>
 

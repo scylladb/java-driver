@@ -89,7 +89,7 @@ The Maven build uses profiles named after the categories to choose which tests t
 mvn test -Pshort
 ```
 
-The default is "unit". Each profile runs the ones before it ("short" runs unit, etc.)
+The default is "unit". Each profile runs only their own category ("short" will *not* run "unit").
 
 Integration tests use [CCM](https://github.com/pcmanus/ccm) to bootstrap Cassandra instances.
 Two Maven properties control its execution:
