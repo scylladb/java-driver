@@ -732,7 +732,7 @@
                 <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <!-- do not upgrade until https://issues.apache.org/jira/browse/SUREFIRE-1302 is fixed -->
-                    <version>2.18</version>
+                    <version>3.0.0-M6</version>
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>

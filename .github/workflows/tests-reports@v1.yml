@@ -1,0 +1,24 @@
+# This is a workflow that runs after 'Tests'
+# workflow, because the 'Tests' (PR) workflow
+# has insufficient permissions to write
+# GitHub Actions checks.
+name: 'Tests Reports'
+on:
+  workflow_run:
+    workflows: ['Tests']
+    types:
+      - completed
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Generate test report
+        uses: dorny/test-reporter@v1
+        with:
+          artifact: 'test-results'
+          name: 'Test report'
+          path: '**/TEST-TestSuite.xml'
+          reporter: java-junit
+          list-tests: failed
