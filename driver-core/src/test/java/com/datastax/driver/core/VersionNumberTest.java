@@ -106,6 +106,14 @@ public class VersionNumberTest {
     assertThat(version1.hashCode()).isEqualTo(version2.hashCode());
   }
 
+  @Test(groups = "unit")
+  public void should_parse_scylla_release_candidates() {
+    assertThat(VersionNumber.parse("4.3.rc5"))
+        .hasMajorMinorPatch(4, 3, 0)
+        .hasToString("4.3.0-rc5")
+        .hasPreReleaseLabels("rc5");
+  }
+
   private void assertOrder(String version1, String version2, int expected) {
     assertThat(VersionNumber.parse(version1).compareTo(VersionNumber.parse(version2)))
         .isEqualTo(expected);
