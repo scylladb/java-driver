@@ -2,7 +2,7 @@
 
 ### Install CCM
 
-    pip install ccm
+    pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
 
 ### Setup CCM Loopbacks (required for OSX)
 

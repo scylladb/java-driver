@@ -22,10 +22,12 @@ imports in ASCII sort order.  In addition, please avoid using wildcard imports.
 
 ## Working on an issue
 
-Before starting to work on something, please comment in JIRA or ask on the mailing list
-to make sure nobody else is working on it.
+We use [github issues](https://github.com/scylladb/java-driver/issues) to track ongoing issues. 
+Before starting to work on something, please check the issues list to make sure nobody else is working on it.
+It's also a good idea to get in contact through [ScyllaDB-Users Slack](https://scylladb-users.slack.com/) 
+to make your intentions known and clear.
 
-If your fix applies to multiple branches, base your work on the lowest active branch. Since version 3 of the driver,
+If your fix applies to multiple branches, base your work on the lowest active branch. Most of the time if you want to implement a feature for driver version 3, then you'll base your work on `scylla-3.x` (and `scylla-4.x` for version 4). Since version 3 of the driver,
 we've adopted [semantic versioning](http://semver.org/) and our branches use the following scheme:
 
 ```
@@ -59,15 +61,13 @@ Before you send your pull request, make sure that:
 
 - you have a unit test that failed before the fix and succeeds after.
 - the fix is mentioned in `changelog/README.md`.
-- the commit message include the reference of the JIRA ticket for automatic linking
-  (example: `JAVA-503: Fix NPE when a connection fails during pool construction.`).
+- the commit message includes the reference of the github issue for 
+  <a href="https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue">automatic linking</a>
+  (example: `Fixes #1234`).
 
 As long as your pull request is not merged, it's OK to rebase your branch and push with
-`--force`.
-
-If you want to contribute but don't have a specific issue in mind, the [lhf](https://datastax-oss.atlassian.net/secure/IssueNavigator.jspa?reset=true&mode=hide&jqlQuery=project%20%3D%20JAVA%20AND%20status%20in%20(Open%2C%20Reopened)%20AND%20labels%20%3D%20lhf)
-label in JIRA is a good place to start: it marks "low hanging fruits" that don't require
-in-depth knowledge of the codebase.
+`--force`. Commit history should be as flat as reasonably possible. Multiple commits where each one represents a single logical piece of pull request are fine.
+If you want to contribute but don't have a specific issue in mind, it's best to reach out through users slack.
 
 ## Editor configuration
 
@@ -91,13 +91,25 @@ mvn test -Pshort
 
 The default is "unit". Each profile runs the ones before it ("short" runs unit, etc.)
 
-Integration tests use [CCM](https://github.com/pcmanus/ccm) to bootstrap Cassandra instances.
+Integration tests use [CCM](https://github.com/pcmanus/ccm) to bootstrap Cassandra instances. It is recommended to 
+setup [Scylla CCM](https://github.com/scylladb/scylla-ccm) in its place:
+```
+pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
+```
+
 Two Maven properties control its execution:
 
 - `cassandra.version`: the Cassandra version. This has a default value in the root POM,
   you can override it on the command line (`-Dcassandra.version=...`).
 - `ipprefix`: the prefix of the IP addresses that the Cassandra instances will bind to (see
   below). This defaults to `127.0.1.`.
+
+Additionally `-Dscylla.version=${{ matrix.scylla-version }}` can be used instead with Scylla CCM to test against Scylla.
+
+Examples:
+- `mvn test -Pshort -Dcassandra.version=3.11.11`
+- `mvn test -Plong -Dcassandra.version=3.11.11`
+- `mvn verify -Plong -Dscylla.version=4.3.6`
 
 
 CCM launches multiple Cassandra instances on localhost by binding to different addresses. The
