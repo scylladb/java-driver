@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from datetime import date
 import os
+from datetime import date
 import re
 from docutils import nodes
 from recommonmark.transform import AutoStructify
@@ -84,7 +84,8 @@ def setup(app):
     app.add_transform(AutoStructify)
 
     # Replace DataStax links
-    replacements = {r'https://docs.datastax.com/en/drivers/java\/(.*?)\/': "https://java-driver.docs.scylladb.com/stable/api/"}
+    current_slug = os.getenv("SPHINX_MULTIVERSION_NAME", "stable")
+    replacements = {r'docs.datastax.com/en/drivers/java\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/api/"}
     app.add_config_value('replacements', replacements, True)
     app.connect('source-read', replace_relative_links)
 
