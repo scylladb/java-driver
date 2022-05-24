@@ -9,7 +9,7 @@ To build and preview the docs locally, you will need to install the following so
 - Git
 - Python 3.7
 - pip
-- Java JDK 6 or above
+- Java JDK 8 or above
 - Maven
 
 ## Commands
