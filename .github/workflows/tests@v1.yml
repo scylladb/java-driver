@@ -193,7 +193,7 @@ jobs:
 
       - name: Setup environment
         run: |
-          pip3 install https://github.com/avelanarius/scylla-ccm/archive/master.zip
+          pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
           sudo sh -c "echo 2097152 >> /proc/sys/fs/aio-max-nr"
 
       - name: Run integration tests on Scylla (${{ matrix.scylla-version }})
