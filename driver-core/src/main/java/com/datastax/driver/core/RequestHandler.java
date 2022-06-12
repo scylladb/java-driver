@@ -71,6 +71,8 @@ class RequestHandler {
   private static final boolean HOST_METRICS_ENABLED =
       Boolean.getBoolean("com.datastax.driver.HOST_METRICS_ENABLED");
   private static final QueryLogger QUERY_LOGGER = QueryLogger.builder().build();
+
+  private static final int SPECULATIVE_EXECUTION_MAX_REPREPARES = 5;
   static final String DISABLE_QUERY_WARNING_LOGS = "com.datastax.driver.DISABLE_QUERY_WARNING_LOGS";
 
   final String id;
@@ -380,6 +382,10 @@ class RequestHandler {
     // UNPREPARED response).
     // This is incremented by one writer at a time, so volatile is good enough.
     private volatile int retriesByPolicy;
+
+    // In rare cases we can enter seemingly infinite loop of repreparing a statement.
+    // This counter is used for breaking such stalemates.
+    private volatile int retriesByUnprepared;
 
     private volatile Connection.ResponseHandler connectionHandler;
 
@@ -825,6 +831,21 @@ class RequestHandler {
                           toPrepare.getQueryString()));
                 }
 
+                if(retriesByUnprepared > SPECULATIVE_EXECUTION_MAX_REPREPARES) {
+                  connection.release();
+                  String msg = String.format(
+                          "Statement %s (%s) is not prepared on %s and reprepare threshold (%d) has been reached for this execution. " +
+                                  "This might have been caused by driver misuse or the cluster. Check cluster logs for the reason of possible prepared statement cache evictions.",
+                          toPrepare.getQueryString(),
+                          id,
+                          toPrepare.getQueryKeyspace(),
+                          SPECULATIVE_EXECUTION_MAX_REPREPARES);
+
+                  logger.error(msg);
+                  setFinalException(connection, new DriverInternalError(msg));
+                  return;
+                }
+
                 logger.info(
                     "Query {} is not prepared on {}, preparing before retrying executing. "
                         + "Seeing this message a few times is fine, but seeing it a lot may be source of performance problems",
@@ -832,6 +853,7 @@ class RequestHandler {
                     toPrepare.getQueryKeyspace(),
                     connection.endPoint);
 
+                retriesByUnprepared++;
                 write(connection, prepareAndRetry(toPrepare.getQueryString()));
                 // we're done for now, the prepareAndRetry callback will handle the rest
                 return;
