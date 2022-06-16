@@ -831,11 +831,12 @@ class RequestHandler {
                           toPrepare.getQueryString()));
                 }
 
-                if(retriesByUnprepared > SPECULATIVE_EXECUTION_MAX_REPREPARES) {
+                if (retriesByUnprepared > SPECULATIVE_EXECUTION_MAX_REPREPARES) {
                   connection.release();
-                  String msg = String.format(
-                          "Statement %s (%s) is not prepared on %s and reprepare threshold (%d) has been reached for this execution. " +
-                                  "This might have been caused by driver misuse or the cluster. Check cluster logs for the reason of possible prepared statement cache evictions.",
+                  String msg =
+                      String.format(
+                          "Statement %s (%s) is not prepared on %s and reprepare threshold (%d) has been reached for this execution. "
+                              + "This might have been caused by driver misuse or the cluster. Check cluster logs for the reason of possible prepared statement cache evictions.",
                           toPrepare.getQueryString(),
                           id,
                           toPrepare.getQueryKeyspace(),
