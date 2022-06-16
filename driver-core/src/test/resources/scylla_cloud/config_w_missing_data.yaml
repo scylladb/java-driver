@@ -1,0 +1,16 @@
+datacenters:
+  eu-west-3:
+    server: any.nodes.scyllacluster-0.apps.eu-west-3.gke.k8s-scylla.dev-test.scylla-operator.scylladb.com:443
+    nodeDomain: nodes.scyllacluster-0.apps.eu-west-3.gke.k8s-scylla.dev-test.scylla-operator.scylladb.com
+authInfos:
+  default:
+    username: cassandra
+    password: cassandra
+contexts:
+  default:
+    datacenterName: eu-west-3
+    authInfoName: default
+currentContext: default
+parameters:
+  defaultConsistency: LOCAL_QUORUM
+  defaultSerialConsistency: LOCAL_SERIAL

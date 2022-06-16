@@ -1,0 +1,23 @@
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.Host;
+import com.datastax.driver.core.Session;
+
+import java.io.File;
+import java.util.Collection;
+
+public class Test {
+    public static void main(String[] args) {
+        //Cluster c = Cluster.builder().withCloudSecureConnectBundle(new File("../gocql/cmd/config.zip")).build();
+        Cluster c = Cluster.builder().withCloudSecureConnectBundle(new File("/home/wo/Documents/gites/java-driver/driver-core/src/test/resources/scylla_cloud/test1.zip")).build();
+        Session s = c.connect();
+        System.out.println(s.execute("SELECT broadcast_address, host_id FROM system.local").all());
+        System.out.println(s.execute("SELECT peer, host_id FROM system.peers").all());
+        Collection<Host> hosts = s.getState().getConnectedHosts();
+        for (Host host : hosts) {
+            System.out.println(host);
+        }
+
+        s.close();
+        c.close();
+    }
+}
