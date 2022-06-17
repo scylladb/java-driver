@@ -97,6 +97,9 @@ setup [Scylla CCM](https://github.com/scylladb/scylla-ccm) in its place:
 pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
 ```
 
+The SSL tests use `libssl.1.0.0.so`. Before starting the tests, make sure it is installed on your system
+(`compat-openssl10` on Fedora and `libssl1.0.0` on Ubuntu, `xenial-security` repository source).
+
 Two Maven properties control its execution:
 
 - `cassandra.version`: the Cassandra version. This has a default value in the root POM,

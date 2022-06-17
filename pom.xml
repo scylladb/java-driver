@@ -92,6 +92,9 @@
         <test.groups>unit</test.groups>
         <test.osgi.skip>true</test.osgi.skip>
         <javadoc.opts />
+        <!-- Append "-fedora" to os.detected.classifier for Fedora systems
+             (see https://netty.io/wiki/forked-tomcat-native.html) -->
+        <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
     </properties>
 
     <dependencyManagement>
