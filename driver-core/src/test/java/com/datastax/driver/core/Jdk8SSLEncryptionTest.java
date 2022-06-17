@@ -62,11 +62,7 @@ public class Jdk8SSLEncryptionTest extends SSLTestBase {
    * @jira_ticket JAVA-1364
    * @since 3.2.0
    */
-  @Test(
-      groups = "short",
-      dataProvider = "sslImplementation",
-      dataProviderClass = SSLTestBase.class,
-      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
+  @Test(groups = "short", dataProvider = "sslImplementation", dataProviderClass = SSLTestBase.class)
   public void should_pass_peer_address_to_engine(SslImplementation sslImplementation)
       throws Exception {
     String expectedPeerHost = TestUtils.IP_PREFIX + "1";

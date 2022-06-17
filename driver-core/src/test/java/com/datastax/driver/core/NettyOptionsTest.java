@@ -54,9 +54,7 @@ public class NettyOptionsTest extends CCMTestsSupport {
   }
 
   @CCMConfig(numberOfNodes = 3)
-  @Test(
-      groups = "short",
-      enabled = false /* @IntegrationTestDisabledNettyFailure @IntegrationTestDisabledSSL */)
+  @Test(groups = "short")
   public void should_invoke_netty_options_hooks_multi_node() throws Exception {
     should_invoke_netty_options_hooks(3, 4);
   }
