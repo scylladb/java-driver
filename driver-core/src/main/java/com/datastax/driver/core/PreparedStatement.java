@@ -361,4 +361,7 @@ public interface PreparedStatement {
 
   /** Whether a prepared statement is LWT statement */
   public boolean isLWT();
+
+  /** Type of prepared operation (e.g. SELECT) */
+  public String getOperationType();
 }

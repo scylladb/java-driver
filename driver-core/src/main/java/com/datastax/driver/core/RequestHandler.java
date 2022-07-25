@@ -48,6 +48,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
@@ -73,6 +74,10 @@ class RequestHandler {
       Boolean.getBoolean("com.datastax.driver.HOST_METRICS_ENABLED");
   private static final QueryLogger QUERY_LOGGER = QueryLogger.builder().build();
   static final String DISABLE_QUERY_WARNING_LOGS = "com.datastax.driver.DISABLE_QUERY_WARNING_LOGS";
+
+  private static final int STATEMENT_MAX_LENGTH = 1000;
+  private static final int PARTITION_KEY_MAX_LENGTH = 1000;
+  private static final int REPLICAS_MAX_LENGTH = 1000;
 
   final String id;
 
@@ -161,8 +166,70 @@ class RequestHandler {
     this.timerContext = metricsEnabled() ? metrics().getRequestsTimer().time() : null;
     this.startTime = System.nanoTime();
 
+    ConsistencyLevel consistency = statement.getConsistencyLevel();
+    if (consistency == null) consistency = Statement.DEFAULT.getConsistencyLevel();
+
+    String statementType = null;
+    String statementText = null;
+    int batchSize = 1;
+
+    String keyspace = null;
+    String partitionKey = null;
+    String table = null;
+    String operationType = null;
+
+    if (statement instanceof BatchStatement) {
+      statementType = "batch";
+      batchSize = ((BatchStatement) statement).size();
+      StringBuilder statementTextBuilder = new StringBuilder(STATEMENT_MAX_LENGTH);
+      for (Statement subStatement : ((BatchStatement) statement).getStatements()) {
+        if (subStatement instanceof BoundStatement)
+          statementTextBuilder.append(((BoundStatement) subStatement).statement.getQueryString());
+        else statementTextBuilder.append(subStatement.toString());
+      }
+      statementText = statementTextBuilder.toString();
+    } else if (statement instanceof BoundStatement) {
+      statementType = "prepared";
+      statementText = ((BoundStatement) statement).statement.getQueryString();
+      keyspace = ((BoundStatement) statement).getKeyspace();
+      operationType = ((BoundStatement) statement).getOperationType();
+
+      ColumnDefinitions boundColumns =
+          ((BoundStatement) statement).statement.getPreparedId().boundValuesMetadata.variables;
+
+      StringBuilder partitionKeyBuilder = new StringBuilder(PARTITION_KEY_MAX_LENGTH);
+      int[] rkIndexes = ((BoundStatement) statement).statement.getPreparedId().routingKeyIndexes;
+      if (rkIndexes != null) {
+        for (int i : rkIndexes) {
+          Object value = ((BoundStatement) statement).getObject(i);
+          String valueString = (value == null) ? "NULL" : value.toString();
+          if (partitionKeyBuilder.length() > 0) partitionKeyBuilder.append(", ");
+          String columnName = boundColumns.getName(i);
+          partitionKeyBuilder.append(columnName);
+          partitionKeyBuilder.append('=');
+          partitionKeyBuilder.append(valueString);
+        }
+      }
+      partitionKey = partitionKeyBuilder.toString();
+
+      if (boundColumns.size() > 0) table = boundColumns.getTable(0);
+    } else if (statement instanceof RegularStatement) {
+      statementType = "regular";
+      statementText = ((RegularStatement) statement).toString();
+    }
+
     this.tracingInfo = tracingInfo;
     this.tracingInfo.setNameAndStartTime("request");
+    this.tracingInfo.setConsistencyLevel(consistency);
+    this.tracingInfo.setRetryPolicy(retryPolicy());
+    this.tracingInfo.setBatchSize(batchSize);
+    this.tracingInfo.setLoadBalancingPolicy(manager.loadBalancingPolicy());
+    if (statementType != null) this.tracingInfo.setStatementType(statementType);
+    if (statementText != null) this.tracingInfo.setStatement(statementText, STATEMENT_MAX_LENGTH);
+    if (keyspace != null) this.tracingInfo.setKeyspace(keyspace);
+    if (partitionKey != null) this.tracingInfo.setPartitionKey(partitionKey);
+    if (table != null) this.tracingInfo.setTable(table);
+    if (operationType != null) this.tracingInfo.setOperationType(operationType);
   }
 
   void sendRequest() {
@@ -281,6 +348,15 @@ class RequestHandler {
         logServerWarnings(response.warnings);
       }
       callback.onSet(connection, response, info, statement, System.nanoTime() - startTime);
+
+      if (response.type == Message.Response.Type.RESULT) {
+        Responses.Result rm = (Responses.Result) response;
+        if (rm.kind == Responses.Result.Kind.ROWS) {
+          Responses.Result.Rows r = (Responses.Result.Rows) rm;
+          tracingInfo.setRowsCount(r.data.size());
+        }
+      }
+      tracingInfo.setQueryPaged(info.getPagingState() != null);
       tracingInfo.setStatus(TracingInfo.StatusCode.OK);
       tracingInfo.tracingFinished();
     } catch (Exception e) {
@@ -291,8 +367,8 @@ class RequestHandler {
           System.nanoTime() - startTime, /*unused*/
           0);
 
-      tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, e.toString());
       tracingInfo.recordException(e);
+      tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, e.toString());
       tracingInfo.tracingFinished();
     }
   }
@@ -332,6 +408,7 @@ class RequestHandler {
   // Triggered when an execution reaches the end of the query plan.
   // This is only a failure if there are no other running executions.
   private void reportNoMoreHosts(SpeculativeExecution execution) {
+    execution.parentTracingInfo.setRetryCount(execution.retryCount());
     execution.parentTracingInfo.tracingFinished();
     runningExecutions.remove(execution);
     if (runningExecutions.isEmpty())
@@ -455,6 +532,10 @@ class RequestHandler {
 
       currentChildTracingInfo = manager.getTracingInfoFactory().buildTracingInfo(parentTracingInfo);
       currentChildTracingInfo.setNameAndStartTime("query");
+      InetSocketAddress hostAddress = host.getEndPoint().resolve();
+      currentChildTracingInfo.setPeerName(hostAddress.getHostName());
+      currentChildTracingInfo.setPeerIP(hostAddress.getAddress());
+      currentChildTracingInfo.setPeerPort(hostAddress.getPort());
 
       if (allowSpeculativeExecutions && nextExecutionScheduled.compareAndSet(false, true))
         scheduleExecution(speculativeExecutionPlan.nextExecution(host));
@@ -674,6 +755,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setRetryCount(retryCount());
           parentTracingInfo.tracingFinished();
           return;
         } else if (!previous.inProgress
@@ -687,6 +769,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setRetryCount(retryCount());
           parentTracingInfo.tracingFinished();
           return;
         }
@@ -703,6 +786,7 @@ class RequestHandler {
     @Override
     public void onSet(
         Connection connection, Message.Response response, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
       currentChildTracingInfo.tracingFinished();
 
       QueryState queryState = queryStateRef.get();
@@ -1013,6 +1097,7 @@ class RequestHandler {
     @Override
     public void onException(
         Connection connection, Exception exception, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
       currentChildTracingInfo.tracingFinished();
 
       QueryState queryState = queryStateRef.get();
@@ -1052,6 +1137,7 @@ class RequestHandler {
 
     @Override
     public boolean onTimeout(Connection connection, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
       currentChildTracingInfo.tracingFinished();
 
       QueryState queryState = queryStateRef.get();
@@ -1095,11 +1181,13 @@ class RequestHandler {
     }
 
     private void setFinalException(Connection connection, Exception exception) {
+      parentTracingInfo.setRetryCount(retryCount());
       parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalException(this, connection, exception);
     }
 
     private void setFinalResult(Connection connection, Message.Response response) {
+      parentTracingInfo.setRetryCount(retryCount());
       parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalResult(this, connection, response);
     }
