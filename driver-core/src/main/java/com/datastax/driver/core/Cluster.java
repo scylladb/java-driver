@@ -39,6 +39,8 @@ import com.datastax.driver.core.policies.Policies;
 import com.datastax.driver.core.policies.ReconnectionPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
+import com.datastax.driver.core.tracing.NoopTracingInfoFactory;
+import com.datastax.driver.core.tracing.TracingInfoFactory;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
@@ -146,6 +148,8 @@ public class Cluster implements Closeable {
 
   final Manager manager;
 
+  private TracingInfoFactory tracingInfoFactory = new NoopTracingInfoFactory();
+
   /**
    * Constructs a new Cluster instance.
    *
@@ -195,6 +199,25 @@ public class Cluster implements Closeable {
     System.out.println("===== Using optimized driver!!! =====");
     logger.info("===== Using optimized driver!!! =====");
     this.manager = new Manager(name, contactPoints, configuration, listeners);
+  }
+
+  /**
+   * The tracingInfo factory class used by this Cluster.
+   *
+   * @return the factory used currently by this Cluster.
+   */
+  public TracingInfoFactory getTracingInfoFactory() {
+    return tracingInfoFactory;
+  }
+
+  /**
+   * Sets desired factory for tracing information for this Cluster. By default it is {@link
+   * com.datastax.driver.core.tracing.NoopTracingInfoFactory}
+   *
+   * @param tracingInfoFactory the factory to be set for this Cluster.
+   */
+  public void setTracingInfoFactory(TracingInfoFactory tracingInfoFactory) {
+    this.tracingInfoFactory = tracingInfoFactory;
   }
 
   /**

@@ -17,6 +17,12 @@
 -->
 <differences>
     <difference>
+        <differenceType>7012</differenceType> <!-- method added to interface -->
+        <className>com/datastax/driver/core/Session</className>
+        <method>com.datastax.driver.core.tracing.TracingInfoFactory getTracingInfoFactory()</method>
+        <justification>New method to get the TracingInfo data factory associated with this Session</justification>
+    </difference>
+    <difference>
         <differenceType>7004</differenceType> <!-- the number of arguments has changed -->
         <className>com/datastax/driver/core/Metadata</className>
         <method>java.util.Set getReplicas(java.lang.String, java.nio.ByteBuffer)</method>

@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2021 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import com.datastax.driver.core.exceptions.AuthenticationException;
@@ -20,6 +26,7 @@ import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.QueryExecutionException;
 import com.datastax.driver.core.exceptions.QueryValidationException;
 import com.datastax.driver.core.exceptions.UnsupportedFeatureException;
+import com.datastax.driver.core.tracing.TracingInfoFactory;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.Closeable;
 import java.util.Collection;
@@ -40,6 +47,13 @@ import java.util.Map;
  * names in queries.
  */
 public interface Session extends Closeable {
+
+  /**
+   * The tracingInfo factory class used by this Session.
+   *
+   * @return the factory used currently by this Session.
+   */
+  TracingInfoFactory getTracingInfoFactory();
 
   /**
    * The keyspace to which this Session is currently logged in, if any.
