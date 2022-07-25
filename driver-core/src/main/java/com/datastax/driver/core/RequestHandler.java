@@ -40,6 +40,7 @@ import com.datastax.driver.core.exceptions.WriteTimeoutException;
 import com.datastax.driver.core.policies.RetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy.RetryDecision.Type;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy.SpeculativeExecutionPlan;
+import com.datastax.driver.core.tracing.TracingInfo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
@@ -95,6 +96,8 @@ class RequestHandler {
   private final AtomicBoolean isDone = new AtomicBoolean();
   private final AtomicInteger executionIndex = new AtomicInteger();
 
+  private final TracingInfo tracingInfo;
+
   private Iterator<Host> getReplicas(
       String loggedKeyspace, Statement statement, Iterator<Host> fallback) {
     ProtocolVersion protocolVersion = manager.cluster.manager.protocolVersion();
@@ -120,7 +123,8 @@ class RequestHandler {
     return replicas.iterator();
   }
 
-  public RequestHandler(SessionManager manager, Callback callback, Statement statement) {
+  public RequestHandler(
+      SessionManager manager, Callback callback, Statement statement, TracingInfo tracingInfo) {
     this.id = Long.toString(System.identityHashCode(this));
     if (logger.isTraceEnabled()) logger.trace("[{}] {}", id, statement);
     this.manager = manager;
@@ -156,6 +160,9 @@ class RequestHandler {
 
     this.timerContext = metricsEnabled() ? metrics().getRequestsTimer().time() : null;
     this.startTime = System.nanoTime();
+
+    this.tracingInfo = tracingInfo;
+    this.tracingInfo.setNameAndStartTime("request");
   }
 
   void sendRequest() {
@@ -274,6 +281,7 @@ class RequestHandler {
         logServerWarnings(response.warnings);
       }
       callback.onSet(connection, response, info, statement, System.nanoTime() - startTime);
+      tracingInfo.tracingFinished();
     } catch (Exception e) {
       callback.onException(
           connection,
@@ -281,6 +289,8 @@ class RequestHandler {
               "Unexpected exception while setting final result from " + response, e),
           System.nanoTime() - startTime, /*unused*/
           0);
+
+      tracingInfo.tracingFinished();
     }
   }
 
@@ -305,6 +315,8 @@ class RequestHandler {
 
     cancelPendingExecutions(execution);
 
+    tracingInfo.tracingFinished();
+
     try {
       if (timerContext != null) timerContext.stop();
     } finally {
@@ -315,6 +327,7 @@ class RequestHandler {
   // Triggered when an execution reaches the end of the query plan.
   // This is only a failure if there are no other running executions.
   private void reportNoMoreHosts(SpeculativeExecution execution) {
+    execution.parentTracingInfo.tracingFinished();
     runningExecutions.remove(execution);
     if (runningExecutions.isEmpty())
       setFinalException(
@@ -383,11 +396,17 @@ class RequestHandler {
 
     private volatile Connection.ResponseHandler connectionHandler;
 
+    private final TracingInfo parentTracingInfo;
+    private TracingInfo currentChildTracingInfo;
+
     SpeculativeExecution(Message.Request request, int position) {
       this.id = RequestHandler.this.id + "-" + position;
       this.request = request;
       this.position = position;
       this.queryStateRef = new AtomicReference<QueryState>(QueryState.INITIAL);
+      this.parentTracingInfo =
+          manager.getTracingInfoFactory().buildTracingInfo(RequestHandler.this.tracingInfo);
+      this.parentTracingInfo.setNameAndStartTime("speculative_execution." + position);
       if (logger.isTraceEnabled()) logger.trace("[{}] Starting", id);
     }
 
@@ -428,6 +447,9 @@ class RequestHandler {
       if (pool == null || pool.isClosed()) return false;
 
       if (logger.isTraceEnabled()) logger.trace("[{}] Querying node {}", id, host);
+
+      currentChildTracingInfo = manager.getTracingInfoFactory().buildTracingInfo(parentTracingInfo);
+      currentChildTracingInfo.setNameAndStartTime("query");
 
       if (allowSpeculativeExecutions && nextExecutionScheduled.compareAndSet(false, true))
         scheduleExecution(speculativeExecutionPlan.nextExecution(host));
@@ -647,6 +669,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.tracingFinished();
           return;
         } else if (!previous.inProgress
             && queryStateRef.compareAndSet(previous, QueryState.CANCELLED_WHILE_COMPLETE)) {
@@ -659,6 +682,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.tracingFinished();
           return;
         }
       }
@@ -674,6 +698,8 @@ class RequestHandler {
     @Override
     public void onSet(
         Connection connection, Message.Response response, long latency, int retryCount) {
+      currentChildTracingInfo.tracingFinished();
+
       QueryState queryState = queryStateRef.get();
       if (!queryState.isInProgressAt(retryCount)
           || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -832,7 +858,10 @@ class RequestHandler {
                     toPrepare.getQueryKeyspace(),
                     connection.endPoint);
 
-                write(connection, prepareAndRetry(toPrepare.getQueryString()));
+                TracingInfo prepareTracingInfo =
+                    manager.getTracingInfoFactory().buildTracingInfo(parentTracingInfo);
+                prepareTracingInfo.setNameAndStartTime("prepare");
+                write(connection, prepareAndRetry(toPrepare.getQueryString(), prepareTracingInfo));
                 // we're done for now, the prepareAndRetry callback will handle the rest
                 return;
               case READ_FAILURE:
@@ -878,7 +907,8 @@ class RequestHandler {
       }
     }
 
-    private Connection.ResponseCallback prepareAndRetry(final String toPrepare) {
+    private Connection.ResponseCallback prepareAndRetry(
+        final String toPrepare, final TracingInfo prepareTracingInfo) {
       // do not bother inspecting retry policy at this step, no other decision
       // makes sense than retry on the same host if the query was prepared,
       // or on another host, if an error/timeout occurred.
@@ -902,6 +932,8 @@ class RequestHandler {
         @Override
         public void onSet(
             Connection connection, Message.Response response, long latency, int retryCount) {
+          prepareTracingInfo.tracingFinished();
+
           QueryState queryState = queryStateRef.get();
           if (!queryState.isInProgressAt(retryCount)
               || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -944,11 +976,14 @@ class RequestHandler {
         @Override
         public void onException(
             Connection connection, Exception exception, long latency, int retryCount) {
+          prepareTracingInfo.tracingFinished();
           SpeculativeExecution.this.onException(connection, exception, latency, retryCount);
         }
 
         @Override
         public boolean onTimeout(Connection connection, long latency, int retryCount) {
+          prepareTracingInfo.tracingFinished();
+
           QueryState queryState = queryStateRef.get();
           if (!queryState.isInProgressAt(retryCount)
               || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -973,6 +1008,8 @@ class RequestHandler {
     @Override
     public void onException(
         Connection connection, Exception exception, long latency, int retryCount) {
+      currentChildTracingInfo.tracingFinished();
+
       QueryState queryState = queryStateRef.get();
       if (!queryState.isInProgressAt(retryCount)
           || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -1010,6 +1047,8 @@ class RequestHandler {
 
     @Override
     public boolean onTimeout(Connection connection, long latency, int retryCount) {
+      currentChildTracingInfo.tracingFinished();
+
       QueryState queryState = queryStateRef.get();
       if (!queryState.isInProgressAt(retryCount)
           || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -1051,10 +1090,12 @@ class RequestHandler {
     }
 
     private void setFinalException(Connection connection, Exception exception) {
+      parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalException(this, connection, exception);
     }
 
     private void setFinalResult(Connection connection, Message.Response response) {
+      parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalResult(this, connection, response);
     }
   }
