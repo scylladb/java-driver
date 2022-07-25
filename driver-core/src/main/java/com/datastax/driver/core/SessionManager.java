@@ -29,6 +29,7 @@ import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.ReconnectionPolicy;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
+import com.datastax.driver.core.tracing.TracingInfo;
 import com.datastax.driver.core.tracing.TracingInfoFactory;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.base.Functions;
@@ -161,6 +162,7 @@ class SessionManager extends AbstractSession {
       // Because of the way the future is built, we need another 'proxy' future that we can return
       // now.
       final ChainedResultSetFuture chainedFuture = new ChainedResultSetFuture();
+      final TracingInfo tracingInfo = getTracingInfoFactory().buildTracingInfo();
       this.initAsync()
           .addListener(
               new Runnable() {
@@ -171,7 +173,7 @@ class SessionManager extends AbstractSession {
                           SessionManager.this,
                           cluster.manager.protocolVersion(),
                           makeRequestMessage(statement, null));
-                  execute(actualFuture, statement);
+                  execute(actualFuture, statement, tracingInfo);
                   chainedFuture.setSource(actualFuture);
                 }
               },
@@ -712,23 +714,32 @@ class SessionManager extends AbstractSession {
    * <p>This method will find a suitable node to connect to using the {@link LoadBalancingPolicy}
    * and handle host failover.
    */
-  void execute(final RequestHandler.Callback callback, final Statement statement) {
+  void execute(
+      final RequestHandler.Callback callback,
+      final Statement statement,
+      final TracingInfo tracingInfo) {
     if (this.isClosed()) {
       callback.onException(
           null, new IllegalStateException("Could not send request, session is closed"), 0, 0);
       return;
     }
-    if (isInit) new RequestHandler(this, callback, statement).sendRequest();
+    if (isInit) new RequestHandler(this, callback, statement, tracingInfo).sendRequest();
     else
       this.initAsync()
           .addListener(
               new Runnable() {
                 @Override
                 public void run() {
-                  new RequestHandler(SessionManager.this, callback, statement).sendRequest();
+                  new RequestHandler(SessionManager.this, callback, statement, tracingInfo)
+                      .sendRequest();
                 }
               },
               executor());
+  }
+
+  void execute(final RequestHandler.Callback callback, final Statement statement) {
+    final TracingInfo tracingInfo = getTracingInfoFactory().buildTracingInfo();
+    execute(callback, statement, tracingInfo);
   }
 
   private ListenableFuture<PreparedStatement> prepare(
