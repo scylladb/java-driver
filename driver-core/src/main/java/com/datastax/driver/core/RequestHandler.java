@@ -281,6 +281,7 @@ class RequestHandler {
         logServerWarnings(response.warnings);
       }
       callback.onSet(connection, response, info, statement, System.nanoTime() - startTime);
+      tracingInfo.setStatus(TracingInfo.StatusCode.OK);
       tracingInfo.tracingFinished();
     } catch (Exception e) {
       callback.onException(
@@ -290,6 +291,8 @@ class RequestHandler {
           System.nanoTime() - startTime, /*unused*/
           0);
 
+      tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, e.toString());
+      tracingInfo.recordException(e);
       tracingInfo.tracingFinished();
     }
   }
@@ -315,6 +318,8 @@ class RequestHandler {
 
     cancelPendingExecutions(execution);
 
+    tracingInfo.recordException(exception);
+    tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, exception.toString());
     tracingInfo.tracingFinished();
 
     try {
