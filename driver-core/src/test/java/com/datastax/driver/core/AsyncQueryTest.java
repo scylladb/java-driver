@@ -27,6 +27,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 import com.datastax.driver.core.exceptions.InvalidQueryException;
+import com.datastax.driver.core.tracing.TracingInfoFactory;
 import com.datastax.driver.core.utils.CassandraVersion;
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
@@ -284,6 +285,11 @@ public class AsyncQueryTest extends CCMTestsSupport {
       // test a custom call to checkNotInEventLoop()
       checkNotInEventLoop();
       return executeAsync(statement).getUninterruptibly();
+    }
+
+    @Override
+    public TracingInfoFactory getTracingInfoFactory() {
+      return session.getTracingInfoFactory();
     }
 
     @Override

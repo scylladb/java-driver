@@ -29,6 +29,7 @@ import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.ReconnectionPolicy;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
+import com.datastax.driver.core.tracing.TracingInfoFactory;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableList;
@@ -74,6 +75,11 @@ class SessionManager extends AbstractSession {
     this.cluster = cluster;
     this.pools = new ConcurrentHashMap<Host, HostConnectionPool>();
     this.poolsState = new HostConnectionPool.PoolState();
+  }
+
+  @Override
+  public TracingInfoFactory getTracingInfoFactory() {
+    return cluster.getTracingInfoFactory();
   }
 
   @Override
