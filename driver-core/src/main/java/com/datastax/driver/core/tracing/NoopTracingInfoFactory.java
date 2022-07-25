@@ -23,6 +23,15 @@ public class NoopTracingInfoFactory implements TracingInfoFactory {
     public void setNameAndStartTime(String name) {}
 
     @Override
+    public void recordException(Exception exception) {}
+
+    @Override
+    public void setStatus(StatusCode code, String description) {}
+
+    @Override
+    public void setStatus(StatusCode code) {}
+
+    @Override
     public void tracingFinished() {}
   }
 

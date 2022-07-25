@@ -281,6 +281,11 @@ class RequestHandler {
         logServerWarnings(response.warnings);
       }
       callback.onSet(connection, response, info, statement, System.nanoTime() - startTime);
+
+      tracingInfo.setStatus(
+          response.type == Message.Response.Type.ERROR
+              ? TracingInfo.StatusCode.ERROR
+              : TracingInfo.StatusCode.OK);
       tracingInfo.tracingFinished();
     } catch (Exception e) {
       callback.onException(
@@ -290,6 +295,8 @@ class RequestHandler {
           System.nanoTime() - startTime, /*unused*/
           0);
 
+      tracingInfo.recordException(e);
+      tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, e.toString());
       tracingInfo.tracingFinished();
     }
   }
@@ -315,6 +322,8 @@ class RequestHandler {
 
     cancelPendingExecutions(execution);
 
+    tracingInfo.recordException(exception);
+    tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, exception.toString());
     tracingInfo.tracingFinished();
 
     try {
@@ -327,6 +336,7 @@ class RequestHandler {
   // Triggered when an execution reaches the end of the query plan.
   // This is only a failure if there are no other running executions.
   private void reportNoMoreHosts(SpeculativeExecution execution) {
+    execution.parentTracingInfo.setStatus(TracingInfo.StatusCode.ERROR);
     execution.parentTracingInfo.tracingFinished();
     runningExecutions.remove(execution);
     if (runningExecutions.isEmpty())
@@ -669,6 +679,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setStatus(TracingInfo.StatusCode.OK);
           parentTracingInfo.tracingFinished();
           return;
         } else if (!previous.inProgress
@@ -682,6 +693,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setStatus(TracingInfo.StatusCode.OK);
           parentTracingInfo.tracingFinished();
           return;
         }
@@ -698,6 +710,7 @@ class RequestHandler {
     @Override
     public void onSet(
         Connection connection, Message.Response response, long latency, int retryCount) {
+      currentChildTracingInfo.setStatus(TracingInfo.StatusCode.OK);
       currentChildTracingInfo.tracingFinished();
 
       QueryState queryState = queryStateRef.get();
@@ -1008,6 +1021,8 @@ class RequestHandler {
     @Override
     public void onException(
         Connection connection, Exception exception, long latency, int retryCount) {
+      currentChildTracingInfo.recordException(exception);
+      currentChildTracingInfo.setStatus(TracingInfo.StatusCode.ERROR);
       currentChildTracingInfo.tracingFinished();
 
       QueryState queryState = queryStateRef.get();
@@ -1047,6 +1062,7 @@ class RequestHandler {
 
     @Override
     public boolean onTimeout(Connection connection, long latency, int retryCount) {
+      currentChildTracingInfo.setStatus(TracingInfo.StatusCode.ERROR, "timeout");
       currentChildTracingInfo.tracingFinished();
 
       QueryState queryState = queryStateRef.get();
@@ -1090,11 +1106,13 @@ class RequestHandler {
     }
 
     private void setFinalException(Connection connection, Exception exception) {
+      parentTracingInfo.setStatus(TracingInfo.StatusCode.ERROR);
       parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalException(this, connection, exception);
     }
 
     private void setFinalResult(Connection connection, Message.Response response) {
+      parentTracingInfo.setStatus(TracingInfo.StatusCode.OK);
       parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalResult(this, connection, response);
     }

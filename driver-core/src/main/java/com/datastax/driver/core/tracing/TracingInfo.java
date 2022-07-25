@@ -22,6 +22,12 @@ package com.datastax.driver.core.tracing;
  */
 public interface TracingInfo {
 
+  /** Final status of the traced execution. */
+  enum StatusCode {
+    OK,
+    ERROR,
+  }
+
   /**
    * Starts a span corresponding to this {@link TracingInfo} object. Must be called exactly once,
    * before any other method, at the beginning of the traced execution.
@@ -29,6 +35,28 @@ public interface TracingInfo {
    * @param name the name given to the span being created.
    */
   void setNameAndStartTime(String name);
+
+  /**
+   * Records in the trace that the provided exception occured.
+   *
+   * @param exception the exception to be recorded.
+   */
+  void recordException(Exception exception);
+
+  /**
+   * Sets the final status of the traced execution.
+   *
+   * @param code the status code to be set.
+   */
+  void setStatus(StatusCode code);
+
+  /**
+   * Sets the final status of the traced execution, with additional description.
+   *
+   * @param code the status code to be set.
+   * @param description the additional description of the status.
+   */
+  void setStatus(StatusCode code, String description);
 
   /** Must be always called exactly once at the logical end of traced execution. */
   void tracingFinished();
