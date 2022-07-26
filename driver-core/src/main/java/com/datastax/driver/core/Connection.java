@@ -180,11 +180,11 @@ class Connection {
     this(name, endPoint, factory, null);
   }
 
-  ListenableFuture<Void> initAsync() {
-    return initAsync(-1, 0);
+  ListenableFuture<Void> initAsync(boolean tracingRequested) {
+    return initAsync(-1, 0, tracingRequested);
   }
 
-  ListenableFuture<Void> initAsync(final int shardId, int serverPort) {
+  ListenableFuture<Void> initAsync(final int shardId, int serverPort, boolean tracingRequested) {
     if (factory.isShutdown)
       return Futures.immediateFailedFuture(
           new ConnectionException(endPoint, "Connection factory is shut down"));
@@ -350,7 +350,9 @@ class Connection {
 
     ListenableFuture<Void> initializeTransportFuture =
         GuavaCompatibility.INSTANCE.transformAsync(
-            queryOptionsFuture, onOptionsReady(protocolVersion, initExecutor), initExecutor);
+            queryOptionsFuture,
+            onOptionsReady(protocolVersion, initExecutor, tracingRequested),
+            initExecutor);
 
     // Fallback on initializeTransportFuture so we can properly propagate specific exceptions.
     ListenableFuture<Void> initFuture =
@@ -497,12 +499,17 @@ class Connection {
   }
 
   private AsyncFunction<Void, Void> onOptionsReady(
-      final ProtocolVersion protocolVersion, final Executor initExecutor) {
+      final ProtocolVersion protocolVersion,
+      final Executor initExecutor,
+      final boolean tracingRequested) {
     return new AsyncFunction<Void, Void>() {
       @Override
       public ListenableFuture<Void> apply(Void input) throws Exception {
         ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
         Map<String, String> extraOptions = new HashMap<String, String>();
+        if (tracingRequested) {
+          extraOptions.put("SCYLLA_OPENTELEMETRY_TRACING", "true");
+        }
         LwtInfo lwtInfo = getHost().getLwtInfo();
         if (lwtInfo != null) {
           lwtInfo.addOption(extraOptions);
@@ -1288,7 +1295,7 @@ class Connection {
       Connection connection = new Connection(buildConnectionName(host), endPoint, this);
       // This method opens the connection synchronously, so wait until it's initialized
       try {
-        connection.initAsync().get();
+        connection.initAsync(false).get();
         return connection;
       } catch (ExecutionException e) {
         throw launderAsyncInitException(e);
@@ -1306,10 +1313,11 @@ class Connection {
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
       pool.host.convictionPolicy.signalConnectionsOpening(1);
+      boolean tracingRequested = pool.isTracingRequested();
       Connection connection =
           new Connection(buildConnectionName(pool.host), pool.host.getEndPoint(), this, pool);
       try {
-        connection.initAsync(shardId, serverPort).get();
+        connection.initAsync(shardId, serverPort, tracingRequested).get();
         return connection;
       } catch (ExecutionException e) {
         throw launderAsyncInitException(e);

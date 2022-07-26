@@ -48,6 +48,11 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>com.scylladb</groupId>
+            <artifactId>scylla-driver-opentelemetry</artifactId>
+        </dependency>
+
         <!--Jackson-->
 
         <dependency>
@@ -134,6 +139,26 @@
             <artifactId>logback-classic</artifactId>
         </dependency>
 
+        <!-- OpenTelemetry -->
+
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+            <version>1.9.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-semconv</artifactId>
+            <version>1.9.0-alpha</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-zipkin</artifactId>
+            <version>1.9.1</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -181,6 +206,15 @@
                 <artifactId>maven-deploy-plugin</artifactId>
                 <configuration>
                     <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>8</source>
+                    <target>8</target>
                 </configuration>
             </plugin>
 

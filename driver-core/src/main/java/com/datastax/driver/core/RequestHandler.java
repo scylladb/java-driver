@@ -40,6 +40,7 @@ import com.datastax.driver.core.exceptions.WriteTimeoutException;
 import com.datastax.driver.core.policies.RetryPolicy;
 import com.datastax.driver.core.policies.RetryPolicy.RetryDecision.Type;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy.SpeculativeExecutionPlan;
+import com.datastax.driver.core.tracing.TracingInfo;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
@@ -47,6 +48,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
@@ -73,6 +75,10 @@ class RequestHandler {
   private static final QueryLogger QUERY_LOGGER = QueryLogger.builder().build();
   static final String DISABLE_QUERY_WARNING_LOGS = "com.datastax.driver.DISABLE_QUERY_WARNING_LOGS";
 
+  private static final int STATEMENT_MAX_LENGTH = 1000;
+  private static final int PARTITION_KEY_MAX_LENGTH = 1000;
+  private static final int REPLICAS_MAX_LENGTH = 1000;
+
   final String id;
 
   private final SessionManager manager;
@@ -94,6 +100,8 @@ class RequestHandler {
 
   private final AtomicBoolean isDone = new AtomicBoolean();
   private final AtomicInteger executionIndex = new AtomicInteger();
+
+  private final TracingInfo tracingInfo;
 
   private Iterator<Host> getReplicas(
       String loggedKeyspace, Statement statement, Iterator<Host> fallback) {
@@ -120,7 +128,8 @@ class RequestHandler {
     return replicas.iterator();
   }
 
-  public RequestHandler(SessionManager manager, Callback callback, Statement statement) {
+  public RequestHandler(
+      SessionManager manager, Callback callback, Statement statement, TracingInfo tracingInfo) {
     this.id = Long.toString(System.identityHashCode(this));
     if (logger.isTraceEnabled()) logger.trace("[{}] {}", id, statement);
     this.manager = manager;
@@ -156,6 +165,71 @@ class RequestHandler {
 
     this.timerContext = metricsEnabled() ? metrics().getRequestsTimer().time() : null;
     this.startTime = System.nanoTime();
+
+    ConsistencyLevel consistency = statement.getConsistencyLevel();
+    if (consistency == null) consistency = Statement.DEFAULT.getConsistencyLevel();
+
+    String statementType = null;
+    String statementText = null;
+    int batchSize = 1;
+
+    String keyspace = null;
+    String partitionKey = null;
+    String table = null;
+    String operationType = null;
+
+    if (statement instanceof BatchStatement) {
+      statementType = "batch";
+      batchSize = ((BatchStatement) statement).size();
+      StringBuilder statementTextBuilder = new StringBuilder(STATEMENT_MAX_LENGTH);
+      for (Statement subStatement : ((BatchStatement) statement).getStatements()) {
+        if (subStatement instanceof BoundStatement)
+          statementTextBuilder.append(((BoundStatement) subStatement).statement.getQueryString());
+        else statementTextBuilder.append(subStatement.toString());
+      }
+      statementText = statementTextBuilder.toString();
+    } else if (statement instanceof BoundStatement) {
+      statementType = "prepared";
+      statementText = ((BoundStatement) statement).statement.getQueryString();
+      keyspace = ((BoundStatement) statement).getKeyspace();
+      operationType = ((BoundStatement) statement).getOperationType();
+
+      ColumnDefinitions boundColumns =
+          ((BoundStatement) statement).statement.getPreparedId().boundValuesMetadata.variables;
+
+      StringBuilder partitionKeyBuilder = new StringBuilder(PARTITION_KEY_MAX_LENGTH);
+      int[] rkIndexes = ((BoundStatement) statement).statement.getPreparedId().routingKeyIndexes;
+      if (rkIndexes != null) {
+        for (int i : rkIndexes) {
+          Object value = ((BoundStatement) statement).getObject(i);
+          String valueString = (value == null) ? "NULL" : value.toString();
+          if (partitionKeyBuilder.length() > 0) partitionKeyBuilder.append(", ");
+          String columnName = boundColumns.getName(i);
+          partitionKeyBuilder.append(columnName);
+          partitionKeyBuilder.append('=');
+          partitionKeyBuilder.append(valueString);
+        }
+      }
+      partitionKey = partitionKeyBuilder.toString();
+
+      if (boundColumns.size() > 0) table = boundColumns.getTable(0);
+    } else if (statement instanceof RegularStatement) {
+      statementType = "regular";
+      statementText = ((RegularStatement) statement).toString();
+    }
+
+    this.tracingInfo = tracingInfo;
+    this.tracingInfo.setNameAndStartTime("request");
+    this.tracingInfo.setConsistencyLevel(consistency);
+    this.tracingInfo.setRetryPolicy(retryPolicy());
+    this.tracingInfo.setBatchSize(batchSize);
+    this.tracingInfo.setLoadBalancingPolicy(manager.loadBalancingPolicy());
+    if (statementType != null) this.tracingInfo.setStatementType(statementType);
+    if (statementText != null) this.tracingInfo.setStatement(statementText, STATEMENT_MAX_LENGTH);
+    if (keyspace != null) this.tracingInfo.setKeyspace(keyspace);
+    if (partitionKey != null) this.tracingInfo.setPartitionKey(partitionKey);
+    if (table != null) this.tracingInfo.setTable(table);
+    if (operationType != null) this.tracingInfo.setOperationType(operationType);
   }
 
   void sendRequest() {
@@ -274,6 +348,17 @@ class RequestHandler {
         logServerWarnings(response.warnings);
       }
       callback.onSet(connection, response, info, statement, System.nanoTime() - startTime);
+
+      if (response.type == Message.Response.Type.RESULT) {
+        Responses.Result rm = (Responses.Result) response;
+        if (rm.kind == Responses.Result.Kind.ROWS) {
+          Responses.Result.Rows r = (Responses.Result.Rows) rm;
+          tracingInfo.setRowsCount(r.data.size());
+        }
+      }
+      tracingInfo.setQueryPaged(info.getPagingState() != null);
+      tracingInfo.setStatus(TracingInfo.StatusCode.OK);
+      tracingInfo.tracingFinished();
     } catch (Exception e) {
       callback.onException(
           connection,
@@ -281,6 +366,10 @@ class RequestHandler {
               "Unexpected exception while setting final result from " + response, e),
           System.nanoTime() - startTime, /*unused*/
           0);
+
+      tracingInfo.recordException(e);
+      tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, e.toString());
+      tracingInfo.tracingFinished();
     }
   }
 
@@ -305,6 +394,10 @@ class RequestHandler {
 
     cancelPendingExecutions(execution);
 
+    tracingInfo.recordException(exception);
+    tracingInfo.setStatus(TracingInfo.StatusCode.ERROR, exception.toString());
+    tracingInfo.tracingFinished();
+
     try {
       if (timerContext != null) timerContext.stop();
     } finally {
@@ -315,6 +408,8 @@ class RequestHandler {
   // Triggered when an execution reaches the end of the query plan.
   // This is only a failure if there are no other running executions.
   private void reportNoMoreHosts(SpeculativeExecution execution) {
+    execution.parentTracingInfo.setRetryCount(execution.retryCount());
+    execution.parentTracingInfo.tracingFinished();
     runningExecutions.remove(execution);
     if (runningExecutions.isEmpty())
       setFinalException(
@@ -383,11 +478,17 @@ class RequestHandler {
 
     private volatile Connection.ResponseHandler connectionHandler;
 
+    private final TracingInfo parentTracingInfo;
+    private TracingInfo currentChildTracingInfo;
+
     SpeculativeExecution(Message.Request request, int position) {
       this.id = RequestHandler.this.id + "-" + position;
       this.request = request;
       this.position = position;
       this.queryStateRef = new AtomicReference<QueryState>(QueryState.INITIAL);
+      this.parentTracingInfo =
+          manager.getTracingInfoFactory().buildTracingInfo(RequestHandler.this.tracingInfo);
+      this.parentTracingInfo.setNameAndStartTime("speculative_execution." + position);
       if (logger.isTraceEnabled()) logger.trace("[{}] Starting", id);
     }
 
@@ -428,6 +529,13 @@ class RequestHandler {
       if (pool == null || pool.isClosed()) return false;
 
       if (logger.isTraceEnabled()) logger.trace("[{}] Querying node {}", id, host);
+
+      currentChildTracingInfo = manager.getTracingInfoFactory().buildTracingInfo(parentTracingInfo);
+      currentChildTracingInfo.setNameAndStartTime("query");
+      InetSocketAddress hostAddress = host.getEndPoint().resolve();
+      currentChildTracingInfo.setPeerName(hostAddress.getHostName());
+      currentChildTracingInfo.setPeerIP(hostAddress.getAddress());
+      currentChildTracingInfo.setPeerPort(hostAddress.getPort());
 
       if (allowSpeculativeExecutions && nextExecutionScheduled.compareAndSet(false, true))
         scheduleExecution(speculativeExecutionPlan.nextExecution(host));
@@ -647,6 +755,8 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setRetryCount(retryCount());
+          parentTracingInfo.tracingFinished();
           return;
         } else if (!previous.inProgress
             && queryStateRef.compareAndSet(previous, QueryState.CANCELLED_WHILE_COMPLETE)) {
@@ -659,6 +769,8 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setRetryCount(retryCount());
+          parentTracingInfo.tracingFinished();
           return;
         }
       }
@@ -674,6 +786,9 @@ class RequestHandler {
     @Override
     public void onSet(
         Connection connection, Message.Response response, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
+      currentChildTracingInfo.tracingFinished();
+
       QueryState queryState = queryStateRef.get();
       if (!queryState.isInProgressAt(retryCount)
           || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -832,7 +947,10 @@ class RequestHandler {
                     toPrepare.getQueryKeyspace(),
                     connection.endPoint);
 
-                write(connection, prepareAndRetry(toPrepare.getQueryString()));
+                TracingInfo prepareTracingInfo =
+                    manager.getTracingInfoFactory().buildTracingInfo(parentTracingInfo);
+                prepareTracingInfo.setNameAndStartTime("prepare");
+                write(connection, prepareAndRetry(toPrepare.getQueryString(), prepareTracingInfo));
                 // we're done for now, the prepareAndRetry callback will handle the rest
                 return;
               case READ_FAILURE:
@@ -878,7 +996,8 @@ class RequestHandler {
       }
     }
 
-    private Connection.ResponseCallback prepareAndRetry(final String toPrepare) {
+    private Connection.ResponseCallback prepareAndRetry(
+        final String toPrepare, final TracingInfo prepareTracingInfo) {
       // do not bother inspecting retry policy at this step, no other decision
       // makes sense than retry on the same host if the query was prepared,
       // or on another host, if an error/timeout occurred.
@@ -902,6 +1021,8 @@ class RequestHandler {
         @Override
         public void onSet(
             Connection connection, Message.Response response, long latency, int retryCount) {
+          prepareTracingInfo.tracingFinished();
+
           QueryState queryState = queryStateRef.get();
           if (!queryState.isInProgressAt(retryCount)
               || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -944,11 +1065,14 @@ class RequestHandler {
         @Override
         public void onException(
             Connection connection, Exception exception, long latency, int retryCount) {
+          prepareTracingInfo.tracingFinished();
           SpeculativeExecution.this.onException(connection, exception, latency, retryCount);
         }
 
         @Override
         public boolean onTimeout(Connection connection, long latency, int retryCount) {
+          prepareTracingInfo.tracingFinished();
+
           QueryState queryState = queryStateRef.get();
           if (!queryState.isInProgressAt(retryCount)
               || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -973,6 +1097,9 @@ class RequestHandler {
     @Override
     public void onException(
         Connection connection, Exception exception, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
+      currentChildTracingInfo.tracingFinished();
+
       QueryState queryState = queryStateRef.get();
       if (!queryState.isInProgressAt(retryCount)
           || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -1010,6 +1137,9 @@ class RequestHandler {
 
     @Override
     public boolean onTimeout(Connection connection, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
+      currentChildTracingInfo.tracingFinished();
+
       QueryState queryState = queryStateRef.get();
       if (!queryState.isInProgressAt(retryCount)
           || !queryStateRef.compareAndSet(queryState, queryState.complete())) {
@@ -1051,10 +1181,31 @@ class RequestHandler {
     }
 
     private void setFinalException(Connection connection, Exception exception) {
+      parentTracingInfo.setRetryCount(retryCount());
+      parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalException(this, connection, exception);
     }
 
     private void setFinalResult(Connection connection, Message.Response response) {
+      parentTracingInfo.setRetryCount(retryCount());
+
+      if (response.getCustomPayload() != null
+          && response.getCustomPayload().containsKey("opentelemetry")) {
+        ByteBuffer buf = response.getCustomPayload().get("opentelemetry");
+        int rep = buf.getInt();
+        StringBuilder replicasBuilder = new StringBuilder(REPLICAS_MAX_LENGTH);
+        for (int i = 0; i < rep; i++) {
+          int addrSize = (buf.get() & 0xFF); // convert to unsigned int
+          if (i > 0) replicasBuilder.append(", ");
+          for (int j = 0; j < addrSize; j++) {
+            if (j > 0) replicasBuilder.append('.');
+            replicasBuilder.append(buf.get() & 0xFF); // convert to unsigned int
+          }
+        }
+        parentTracingInfo.setReplicas(replicasBuilder.toString());
+      }
+
+      parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalResult(this, connection, response);
     }
   }

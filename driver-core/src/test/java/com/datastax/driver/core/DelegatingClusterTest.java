@@ -29,7 +29,8 @@ import org.mockito.invocation.Invocation;
 import org.testng.annotations.Test;
 
 public class DelegatingClusterTest {
-  private static final Set<String> NON_DELEGATED_METHODS = ImmutableSet.of("getClusterName");
+  private static final Set<String> NON_DELEGATED_METHODS =
+      ImmutableSet.of("getClusterName", "setTracingInfoFactory", "getTracingInfoFactory");
 
   /**
    * Checks that all methods of {@link DelegatingCluster} invoke their counterpart in {@link

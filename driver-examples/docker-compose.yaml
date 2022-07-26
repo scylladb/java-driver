@@ -1,0 +1,12 @@
+version: '3.4'
+
+services:
+    zipkin:
+        image: openzipkin/zipkin
+        ports:
+            - "9411:9411"
+    scylla_node:
+        image: scylladb/scylla
+        ports:
+            - "9042:9042"
+        command: "--smp 1 --skip-wait-for-gossip-to-settle 0"

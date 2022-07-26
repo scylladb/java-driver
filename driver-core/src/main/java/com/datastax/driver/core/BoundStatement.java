@@ -74,6 +74,8 @@ public class BoundStatement extends Statement
 
   private ByteBuffer routingKey;
 
+  private final String operationType;
+
   /**
    * Creates a new {@code BoundStatement} from the provided prepared statement.
    *
@@ -92,6 +94,7 @@ public class BoundStatement extends Statement
       this.setSerialConsistencyLevel(statement.getSerialConsistencyLevel());
     if (statement.isTracing()) this.enableTracing();
     if (statement.getRetryPolicy() != null) this.setRetryPolicy(statement.getRetryPolicy());
+    this.operationType = statement.getOperationType();
     if (statement.getOutgoingPayload() != null)
       this.setOutgoingPayload(statement.getOutgoingPayload());
     else
@@ -102,6 +105,10 @@ public class BoundStatement extends Statement
     if (statement.isIdempotent() != null) {
       this.setIdempotent(statement.isIdempotent());
     }
+  }
+
+  public String getOperationType() {
+    return operationType;
   }
 
   @Override
