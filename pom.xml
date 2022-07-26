@@ -44,6 +44,7 @@
         <module>driver-examples</module>
         <module>driver-tests</module>
         <module>driver-dist</module>
+        <module>driver-opentelemetry</module>
     </modules>
 
     <properties>
@@ -130,6 +131,12 @@
             <dependency>
                 <groupId>com.scylladb</groupId>
                 <artifactId>scylla-driver-extras</artifactId>
+                <version>${project.parent.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.scylladb</groupId>
+                <artifactId>scylla-driver-opentelemetry</artifactId>
                 <version>${project.parent.version}</version>
             </dependency>
 
@@ -727,6 +734,9 @@
                                     <artifactId>java18</artifactId>
                                     <version>1.0</version>
                                 </signature>
+                                <excludeDependencies>
+                                    <excludeDependency>io.opentelemetry:*</excludeDependency>
+                                </excludeDependencies>
                             </configuration>
                         </execution>
                     </executions>
