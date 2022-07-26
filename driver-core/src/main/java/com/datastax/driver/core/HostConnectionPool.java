@@ -30,6 +30,7 @@ import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
+import com.datastax.driver.core.tracing.NoopTracingInfoFactory;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -267,6 +268,10 @@ class HostConnectionPool implements Connection.Owner {
     this.timeoutsExecutor = manager.getCluster().manager.connectionFactory.eventLoopGroup.next();
   }
 
+  protected boolean isTracingRequested() {
+    return !(manager.getTracingInfoFactory() == NoopTracingInfoFactory.INSTANCE);
+  }
+
   /**
    * @param reusedConnection an existing connection (from a reconnection attempt) that we want to
    *     reuse as part of this pool. Might be null or already used by another pool.
@@ -344,14 +349,15 @@ class HostConnectionPool implements Connection.Owner {
           }
         }
 
-        ListenableFuture<Void> connectionFuture = connection.initAsync(shardId, serverPort);
+        ListenableFuture<Void> connectionFuture =
+            connection.initAsync(shardId, serverPort, isTracingRequested());
         connectionFutures.add(handleErrors(connectionFuture, initExecutor));
 
         shardConnectionIndex++;
       }
     } else {
       for (Connection connection : newConnections) {
-        ListenableFuture<Void> connectionFuture = connection.initAsync();
+        ListenableFuture<Void> connectionFuture = connection.initAsync(isTracingRequested());
         connectionFutures.add(handleErrors(connectionFuture, initExecutor));
       }
     }

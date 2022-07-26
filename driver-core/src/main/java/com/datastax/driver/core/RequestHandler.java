@@ -1188,6 +1188,23 @@ class RequestHandler {
 
     private void setFinalResult(Connection connection, Message.Response response) {
       parentTracingInfo.setRetryCount(retryCount());
+
+      if (response.getCustomPayload() != null
+          && response.getCustomPayload().containsKey("opentelemetry")) {
+        ByteBuffer buf = response.getCustomPayload().get("opentelemetry");
+        int rep = buf.getInt();
+        StringBuilder replicasBuilder = new StringBuilder(REPLICAS_MAX_LENGTH);
+        for (int i = 0; i < rep; i++) {
+          int addrSize = (buf.get() & 0xFF); // convert to unsigned int
+          if (i > 0) replicasBuilder.append(", ");
+          for (int j = 0; j < addrSize; j++) {
+            if (j > 0) replicasBuilder.append('.');
+            replicasBuilder.append(buf.get() & 0xFF); // convert to unsigned int
+          }
+        }
+        parentTracingInfo.setReplicas(replicasBuilder.toString());
+      }
+
       parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalResult(this, connection, response);
     }
