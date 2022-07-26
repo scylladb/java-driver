@@ -20,8 +20,8 @@ import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
-import com.datastax.driver.core.tracing.PrecisionLevel;
 import com.datastax.driver.core.tracing.TracingInfo;
+import com.datastax.driver.core.tracing.VerbosityLevel;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
@@ -32,9 +32,9 @@ public class OpenTelemetryTracingInfo implements TracingInfo {
   private final Tracer tracer;
   private final Context context;
   private boolean tracingStarted;
-  private final PrecisionLevel precision;
+  private final VerbosityLevel precision;
 
-  protected OpenTelemetryTracingInfo(Tracer tracer, Context context, PrecisionLevel precision) {
+  protected OpenTelemetryTracingInfo(Tracer tracer, Context context, VerbosityLevel precision) {
     this.tracer = tracer;
     this.context = context;
     this.precision = precision;
@@ -53,7 +53,7 @@ public class OpenTelemetryTracingInfo implements TracingInfo {
     assert tracingStarted : "TracingInfo.setStartTime must be called before any other method";
   }
 
-  public PrecisionLevel getPrecision() {
+  public VerbosityLevel getVerbosity() {
     return precision;
   }
 
@@ -72,14 +72,14 @@ public class OpenTelemetryTracingInfo implements TracingInfo {
 
   public void setStatement(String statement) {
     assertStarted();
-    if (currentPrecisionLevelIsAtLeast(PrecisionLevel.FULL)) {
+    if (currentVerbosityLevelIsAtLeast(VerbosityLevel.FULL)) {
       span.setAttribute("db.scylladb.statement", statement);
     }
   }
 
   public void setHostname(String hostname) {
     assertStarted();
-    if (currentPrecisionLevelIsAtLeast(PrecisionLevel.FULL)) {
+    if (currentVerbosityLevelIsAtLeast(VerbosityLevel.FULL)) {
       span.setAttribute("net.peer.name", hostname);
     }
   }
@@ -168,7 +168,7 @@ public class OpenTelemetryTracingInfo implements TracingInfo {
   @Override
   public void setStatement(String statement, int limit) {
     assertStarted();
-    if (currentPrecisionLevelIsAtLeast(PrecisionLevel.FULL)) {
+    if (currentVerbosityLevelIsAtLeast(VerbosityLevel.FULL)) {
       if (statement.length() > limit) statement = statement.substring(0, limit);
       span.setAttribute("db.scylladb.statement", statement);
     }
@@ -244,7 +244,7 @@ public class OpenTelemetryTracingInfo implements TracingInfo {
     span.end();
   }
 
-  private boolean currentPrecisionLevelIsAtLeast(PrecisionLevel requiredLevel) {
+  private boolean currentVerbosityLevelIsAtLeast(VerbosityLevel requiredLevel) {
     return requiredLevel.compareTo(precision) <= 0;
   }
 }
