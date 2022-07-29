@@ -48,6 +48,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Iterator;
@@ -73,6 +74,10 @@ class RequestHandler {
       Boolean.getBoolean("com.datastax.driver.HOST_METRICS_ENABLED");
   private static final QueryLogger QUERY_LOGGER = QueryLogger.builder().build();
   static final String DISABLE_QUERY_WARNING_LOGS = "com.datastax.driver.DISABLE_QUERY_WARNING_LOGS";
+
+  private static final int STATEMENT_MAX_LENGTH = 1000;
+  private static final int PARTITION_KEY_MAX_LENGTH = 1000;
+  private static final int BOUND_VALUES_MAX_LENGTH = 1000;
 
   final String id;
 
@@ -161,8 +166,92 @@ class RequestHandler {
     this.timerContext = metricsEnabled() ? metrics().getRequestsTimer().time() : null;
     this.startTime = System.nanoTime();
 
+    ConsistencyLevel consistency = statement.getConsistencyLevel();
+    if (consistency == null) consistency = Statement.DEFAULT.getConsistencyLevel();
+
+    String statementType = null;
+    String statementText = null;
+    Integer batchSize = null;
+
+    String keyspace = null;
+    String partitionKey = null;
+    String boundValues = null;
+    String table = null;
+    String operationType = null;
+
+    if (statement instanceof BatchStatement) {
+      statementType = "batch";
+      batchSize = ((BatchStatement) statement).size();
+      StringBuilder statementTextBuilder = new StringBuilder(STATEMENT_MAX_LENGTH);
+      for (Statement subStatement : ((BatchStatement) statement).getStatements()) {
+        if (subStatement instanceof BoundStatement)
+          statementTextBuilder.append(((BoundStatement) subStatement).statement.getQueryString());
+        else statementTextBuilder.append(subStatement.toString());
+      }
+      statementText = statementTextBuilder.toString();
+    } else if (statement instanceof BoundStatement) {
+      statementType = "prepared";
+      statementText = ((BoundStatement) statement).statement.getQueryString();
+      keyspace = ((BoundStatement) statement).getKeyspace();
+      operationType = ((BoundStatement) statement).getOperationType();
+
+      ColumnDefinitions boundColumns =
+          ((BoundStatement) statement).statement.getPreparedId().boundValuesMetadata.variables;
+
+      StringBuilder boundValuesBuilder = new StringBuilder(BOUND_VALUES_MAX_LENGTH);
+      StringBuilder partitionKeyBuilder = new StringBuilder(PARTITION_KEY_MAX_LENGTH);
+      int[] rkIndexes = ((BoundStatement) statement).statement.getPreparedId().routingKeyIndexes;
+
+      for (int i = 0; i < boundColumns.size(); ++i) {
+        Object value = ((BoundStatement) statement).getObject(i);
+        String valueString =
+            (value == null)
+                ? "NULL"
+                : value instanceof ByteBuffer
+                    ? CodecUtils.bytesToHex(((ByteBuffer) value).array())
+                    : value.toString();
+        String columnName = boundColumns.getName(i);
+        if (boundValuesBuilder.length() > 0) boundValuesBuilder.append(", ");
+        boundValuesBuilder.append(columnName);
+        boundValuesBuilder.append('=');
+        boundValuesBuilder.append(valueString);
+
+        if (rkIndexes != null) {
+          for (int j : rkIndexes) {
+            if (i == j) {
+              if (partitionKeyBuilder.length() > 0) partitionKeyBuilder.append(", ");
+              partitionKeyBuilder.append(columnName);
+              partitionKeyBuilder.append('=');
+              partitionKeyBuilder.append(valueString);
+              break;
+            }
+          }
+        }
+      }
+      boundValues = boundValuesBuilder.toString();
+      partitionKey = partitionKeyBuilder.toString();
+
+      if (boundColumns.size() > 0) table = boundColumns.getTable(0);
+    } else if (statement instanceof RegularStatement) {
+      statementType = "regular";
+      statementText = ((RegularStatement) statement).toString();
+    }
+
     this.tracingInfo = tracingInfo;
     this.tracingInfo.setNameAndStartTime("request");
+    this.tracingInfo.setConsistencyLevel(consistency);
+    this.tracingInfo.setRetryPolicy(retryPolicy());
+    this.tracingInfo.setLoadBalancingPolicy(manager.loadBalancingPolicy());
+    this.tracingInfo.setSpeculativeExecutionPolicy(manager.speculativeExecutionPolicy());
+    if (statement.getFetchSize() > 0) this.tracingInfo.setFetchSize(statement.getFetchSize());
+    if (statementType != null) this.tracingInfo.setStatementType(statementType);
+    if (statementText != null) this.tracingInfo.setStatement(statementText, STATEMENT_MAX_LENGTH);
+    if (batchSize != null) this.tracingInfo.setBatchSize(batchSize);
+    if (keyspace != null) this.tracingInfo.setKeyspace(keyspace);
+    if (boundValues != null) this.tracingInfo.setBoundValues(boundValues);
+    if (partitionKey != null) this.tracingInfo.setPartitionKey(partitionKey);
+    if (table != null) this.tracingInfo.setTable(table);
+    if (operationType != null) this.tracingInfo.setOperationType(operationType);
   }
 
   void sendRequest() {
@@ -280,6 +369,15 @@ class RequestHandler {
           && logger.isWarnEnabled()) {
         logServerWarnings(response.warnings);
       }
+
+      if (response.type == Message.Response.Type.RESULT) {
+        Responses.Result rm = (Responses.Result) response;
+        if (rm.kind == Responses.Result.Kind.ROWS) {
+          Responses.Result.Rows r = (Responses.Result.Rows) rm;
+          tracingInfo.setRowsCount(r.data.size());
+          tracingInfo.setHasMorePages(r.metadata.pagingState != null);
+        }
+      }
       callback.onSet(connection, response, info, statement, System.nanoTime() - startTime);
 
       tracingInfo.setStatus(
@@ -336,6 +434,7 @@ class RequestHandler {
   // Triggered when an execution reaches the end of the query plan.
   // This is only a failure if there are no other running executions.
   private void reportNoMoreHosts(SpeculativeExecution execution) {
+    execution.parentTracingInfo.setAttemptCount(execution.retryCount() + 1);
     execution.parentTracingInfo.setStatus(TracingInfo.StatusCode.ERROR);
     execution.parentTracingInfo.tracingFinished();
     runningExecutions.remove(execution);
@@ -460,6 +559,10 @@ class RequestHandler {
 
       currentChildTracingInfo = manager.getTracingInfoFactory().buildTracingInfo(parentTracingInfo);
       currentChildTracingInfo.setNameAndStartTime("attempt");
+      InetSocketAddress hostAddress = host.getEndPoint().resolve();
+      currentChildTracingInfo.setPeerName(hostAddress.getHostName());
+      currentChildTracingInfo.setPeerIP(hostAddress.getAddress());
+      currentChildTracingInfo.setPeerPort(hostAddress.getPort());
 
       if (allowSpeculativeExecutions && nextExecutionScheduled.compareAndSet(false, true))
         scheduleExecution(speculativeExecutionPlan.nextExecution(host));
@@ -679,6 +782,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setAttemptCount(previous.retryCount + 1);
           parentTracingInfo.setStatus(TracingInfo.StatusCode.OK);
           parentTracingInfo.tracingFinished();
           return;
@@ -693,6 +797,7 @@ class RequestHandler {
                 CancelledSpeculativeExecutionException.INSTANCE,
                 System.nanoTime() - startTime);
           }
+          parentTracingInfo.setAttemptCount(previous.retryCount + 1);
           parentTracingInfo.setStatus(TracingInfo.StatusCode.OK);
           parentTracingInfo.tracingFinished();
           return;
@@ -710,6 +815,7 @@ class RequestHandler {
     @Override
     public void onSet(
         Connection connection, Message.Response response, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
       currentChildTracingInfo.setStatus(TracingInfo.StatusCode.OK);
       currentChildTracingInfo.tracingFinished();
 
@@ -1021,6 +1127,7 @@ class RequestHandler {
     @Override
     public void onException(
         Connection connection, Exception exception, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
       currentChildTracingInfo.recordException(exception);
       currentChildTracingInfo.setStatus(TracingInfo.StatusCode.ERROR);
       currentChildTracingInfo.tracingFinished();
@@ -1062,6 +1169,7 @@ class RequestHandler {
 
     @Override
     public boolean onTimeout(Connection connection, long latency, int retryCount) {
+      currentChildTracingInfo.setShardID(connection.shardId());
       currentChildTracingInfo.setStatus(TracingInfo.StatusCode.ERROR, "timeout");
       currentChildTracingInfo.tracingFinished();
 
@@ -1106,12 +1214,14 @@ class RequestHandler {
     }
 
     private void setFinalException(Connection connection, Exception exception) {
+      parentTracingInfo.setAttemptCount(retryCount() + 1);
       parentTracingInfo.setStatus(TracingInfo.StatusCode.ERROR);
       parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalException(this, connection, exception);
     }
 
     private void setFinalResult(Connection connection, Message.Response response) {
+      parentTracingInfo.setAttemptCount(retryCount() + 1);
       parentTracingInfo.setStatus(TracingInfo.StatusCode.OK);
       parentTracingInfo.tracingFinished();
       RequestHandler.this.setFinalResult(this, connection, response);

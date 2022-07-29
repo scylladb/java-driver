@@ -18,6 +18,12 @@
 <differences>
     <difference>
         <differenceType>7012</differenceType> <!-- method added to interface -->
+        <className>com/datastax/driver/core/PreparedStatement</className>
+        <method>java.lang.String getOperationType()</method>
+        <justification>New method to get the type of operation performed by this PreparedStatement</justification>
+    </difference>
+    <difference>
+        <differenceType>7012</differenceType> <!-- method added to interface -->
         <className>com/datastax/driver/core/Session</className>
         <method>com.datastax.driver.core.tracing.TracingInfoFactory getTracingInfoFactory()</method>
         <justification>New method to get the TracingInfo data factory associated with this Session</justification>

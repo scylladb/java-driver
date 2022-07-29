@@ -16,11 +16,81 @@
 
 package com.datastax.driver.core.tracing;
 
+import com.datastax.driver.core.ConsistencyLevel;
+import com.datastax.driver.core.policies.LoadBalancingPolicy;
+import com.datastax.driver.core.policies.RetryPolicy;
+import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
+import java.net.InetAddress;
+
 public class NoopTracingInfoFactory implements TracingInfoFactory {
 
   private static class NoopTracingInfo implements TracingInfo {
     @Override
     public void setNameAndStartTime(String name) {}
+
+    @Override
+    public void setConsistencyLevel(ConsistencyLevel consistency) {}
+
+    @Override
+    public void setStatementType(String statementType) {}
+
+    @Override
+    public void setRetryPolicy(RetryPolicy retryPolicy) {}
+
+    @Override
+    public void setLoadBalancingPolicy(LoadBalancingPolicy loadBalancingPolicy) {};
+
+    @Override
+    public void setSpeculativeExecutionPolicy(
+        SpeculativeExecutionPolicy speculativeExecutionPolicy) {}
+
+    @Override
+    public void setBatchSize(int batchSize) {}
+
+    @Override
+    public void setAttemptCount(int attemptCount) {}
+
+    @Override
+    public void setShardID(int shardID) {}
+
+    @Override
+    public void setPeerName(String peerName) {}
+
+    @Override
+    public void setPeerIP(InetAddress peerIP) {}
+
+    @Override
+    public void setPeerPort(int peerPort) {}
+
+    @Override
+    public void setFetchSize(int fetchSize) {}
+
+    @Override
+    public void setHasMorePages(boolean hasMorePages) {}
+
+    @Override
+    public void setRowsCount(int rowsCount) {}
+
+    @Override
+    public void setStatement(String statement, int limit) {}
+
+    @Override
+    public void setKeyspace(String keyspace) {}
+
+    @Override
+    public void setBoundValues(String boundValues) {}
+
+    @Override
+    public void setPartitionKey(String partitionKey) {}
+
+    @Override
+    public void setTable(String table) {}
+
+    @Override
+    public void setOperationType(String operationType) {}
+
+    @Override
+    public void setReplicas(String replicas) {}
 
     @Override
     public void recordException(Exception exception) {}

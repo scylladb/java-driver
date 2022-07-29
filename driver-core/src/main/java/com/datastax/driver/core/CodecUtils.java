@@ -24,6 +24,8 @@ public final class CodecUtils {
 
   private static final long EPOCH_AS_CQL_LONG = (1L << 31);
 
+  private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+
   private CodecUtils() {}
 
   /**
@@ -210,6 +212,19 @@ public final class CodecUtils {
    */
   public static long fromDaysSinceEpochToCqlDate(int days) {
     return ((long) days + EPOCH_AS_CQL_LONG);
+  }
+
+  public static String bytesToHex(byte[] bytes) {
+    final int INITIAL_CHARS = 2;
+    char[] hexChars = new char[INITIAL_CHARS + bytes.length * 2];
+    hexChars[0] = '0';
+    hexChars[1] = 'x';
+    for (int j = 0; j < bytes.length; j++) {
+      int v = bytes[j] & 0xFF;
+      hexChars[INITIAL_CHARS + j * 2] = HEX_ARRAY[v >>> 4];
+      hexChars[INITIAL_CHARS + j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+    }
+    return new String(hexChars);
   }
 
   private static int sizeOfCollectionSize(ProtocolVersion version) {
