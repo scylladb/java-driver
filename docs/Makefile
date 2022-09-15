@@ -50,17 +50,15 @@ clean:
 # Generate output commands
 .PHONY: dirhtml
 dirhtml: setup
-	@$(javadoc)
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
 
-.PHONY: singlehtml
-singlehtml: setup
+.PHONY: javadoc
+javadoc: setup
 	@$(javadoc)
-	$(SPHINXBUILD) -b singlehtml $(ALLSPHINXOPTS) $(BUILDDIR)/singlehtml
 	@echo
-	@echo "Build finished. The HTML page is in $(BUILDDIR)/singlehtml."
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
 
 .PHONY: multiversion
 multiversion: setup
