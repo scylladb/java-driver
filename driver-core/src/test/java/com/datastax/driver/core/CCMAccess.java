@@ -81,6 +81,9 @@ public interface CCMAccess extends Closeable {
   /** @return The binary port for this CCM cluster. */
   int getBinaryPort();
 
+  /** @return The SNI proxy port for this CCM cluster. */
+  int getSniPort();
+
   /** Signals that logs for this CCM cluster should be kept after the cluster is stopped. */
   void setKeepLogs(boolean keepLogs);
 

@@ -13,6 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * Copyright (C) 2022 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static java.lang.annotation.ElementType.METHOD;
@@ -209,6 +214,8 @@ public @interface CCMConfig {
    *     otherwise.
    */
   boolean[] createKeyspace() default {};
+
+  boolean[] startSniProxy() default {};
 
   /**
    * Returns {@code true} if the test class or the test method alters the CCM cluster, e.g. by

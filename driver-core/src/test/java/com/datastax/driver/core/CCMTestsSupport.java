@@ -24,6 +24,7 @@ package com.datastax.driver.core;
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_CLASS;
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;
 import static com.datastax.driver.core.TestUtils.CREATE_KEYSPACE_SIMPLE_FORMAT;
+import static com.datastax.driver.core.TestUtils.addressOfNode;
 import static com.datastax.driver.core.TestUtils.executeNoFail;
 import static com.datastax.driver.core.TestUtils.ipOfNode;
 import static org.assertj.core.api.Assertions.fail;
@@ -39,6 +40,7 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -152,6 +154,11 @@ public class CCMTestsSupport {
     @Override
     public int getBinaryPort() {
       return delegate.getBinaryPort();
+    }
+
+    @Override
+    public int getSniPort() {
+      return delegate.getSniPort();
     }
 
     @Override
@@ -484,6 +491,14 @@ public class CCMTestsSupport {
       return false;
     }
 
+    @SuppressWarnings("SimplifiableIfStatement")
+    private boolean startSniProxy() {
+      for (CCMConfig ann : annotations) {
+        if (ann != null && ann.startSniProxy().length > 0) return ann.startSniProxy()[0];
+      }
+      return false;
+    }
+
     private CCMBridge.Builder ccmBuilder(Object testInstance) throws Exception {
       if (ccmBuilder == null) {
         ccmBuilder = ccmProvider(testInstance);
@@ -501,6 +516,7 @@ public class CCMTestsSupport {
         if (dse != null) ccmBuilder.withDSE(dse);
         if (ssl()) ccmBuilder.withSSL();
         if (auth()) ccmBuilder.withAuth();
+        if (startSniProxy()) ccmBuilder.withSniProxy();
         for (Map.Entry<String, Object> entry : config().entrySet()) {
           ccmBuilder.withCassandraConfiguration(entry.getKey(), entry.getValue());
         }
@@ -740,6 +756,49 @@ public class CCMTestsSupport {
    */
   public Cluster.Builder createClusterBuilderNoDebouncing() {
     return createClusterBuilder().withQueryOptions(TestUtils.nonDebouncingQueryOptions());
+  }
+
+  /**
+   * Returns the cluster builder to test against Scylla Cloud (sniProxy enabled).
+   *
+   * <p>This implementation returns a vanilla builder with contact points and port that match
+   * datacenter description in CCM generated yaml configuration file. This configuration may contain
+   * domain names that cannot be resolved on local machine, therefore we overwrite EndPointFactory
+   * afterwards and add sniProxy contact point using raw ip addresses (with ports from configuration
+   * file). It's not required to call {@link Cluster.Builder#addContactPointsWithPorts}, it will be
+   * done automatically.
+   *
+   * @return The cluster builder to use for the tests.
+   */
+  public Cluster.Builder createClusterBuilderScyllaCloud() throws IOException {
+    assert ccmTestConfig.startSniProxy();
+    Cluster.Builder builder = Cluster.builder();
+
+    File ccmdir = ccm.getCcmDir();
+    File clusterFile = new File(ccmdir, ccm.getClusterName());
+    File yamlFile = new File(clusterFile, "config_data.yaml");
+
+    final ScyllaCloudConnectionConfig cloudConfig =
+        ScyllaCloudConnectionConfig.fromInputStream(new FileInputStream(yamlFile));
+
+    builder.withScyllaCloudConnectionConfig(cloudConfig);
+    builder.withEndPointFactory(
+        new MockSniEndPointFactory(
+            InetSocketAddress.createUnresolved(
+                addressOfNode(1).getHostAddress(),
+                cloudConfig.getCurrentDatacenter().getServer().getPort()),
+            builder.getConfiguration().getPolicies().getEndPointFactory()));
+    builder.addContactPoint(
+        new SniEndPoint(
+            InetSocketAddress.createUnresolved(
+                addressOfNode(1).getHostAddress(),
+                cloudConfig.getCurrentDatacenter().getServer().getPort()),
+            cloudConfig.getCurrentDatacenter().getServer().getHostName()));
+
+    builder
+        .withCodecRegistry(new CodecRegistry())
+        .withPort(cloudConfig.getCurrentDatacenter().getServer().getPort());
+    return builder;
   }
 
   /**

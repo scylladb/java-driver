@@ -100,6 +100,11 @@ public class CCMCache {
     }
 
     @Override
+    public int getSniPort() {
+      return ccm.getSniPort();
+    }
+
+    @Override
     public void setKeepLogs(boolean keepLogs) {
       ccm.setKeepLogs(keepLogs);
     }
