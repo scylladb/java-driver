@@ -23,6 +23,7 @@ package com.datastax.driver.core;
 
 import com.datastax.driver.core.utils.CassandraVersion;
 import com.datastax.driver.core.utils.DseVersion;
+import com.datastax.driver.core.utils.ScyllaOnly;
 import com.datastax.driver.core.utils.ScyllaSkip;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
@@ -129,6 +130,10 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
       scyllaSkipCheck();
       foundAnnotation = true;
     }
+    if (element.isAnnotationPresent(ScyllaOnly.class)) {
+      scyllaOnlyCheck();
+      foundAnnotation = true;
+    }
     if (element.isAnnotationPresent(CassandraVersion.class)) {
       CassandraVersion cassandraVersion = element.getAnnotation(CassandraVersion.class);
       cassandraVersionCheck(cassandraVersion);
@@ -170,6 +175,12 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
   private static void scyllaSkipCheck() {
     if (CCMBridge.getGlobalScyllaVersion() != null) {
       throw new SkipException("Skipping test because it is disabled for Scylla cluster.");
+    }
+  }
+
+  private static void scyllaOnlyCheck() {
+    if (CCMBridge.getGlobalScyllaVersion() == null) {
+      throw new SkipException("Skipping test because it is enabled only for Scylla cluster.");
     }
   }
 

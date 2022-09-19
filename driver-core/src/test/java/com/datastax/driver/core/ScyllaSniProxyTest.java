@@ -10,10 +10,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import com.datastax.driver.core.utils.ScyllaOnly;
 import java.util.Collection;
 import org.testng.annotations.Test;
 
 @CreateCCM(CreateCCM.TestMode.PER_METHOD)
+@ScyllaOnly
 public class ScyllaSniProxyTest extends CCMTestsSupport {
 
   private void test_ccm_cluster(int testNodes) {
