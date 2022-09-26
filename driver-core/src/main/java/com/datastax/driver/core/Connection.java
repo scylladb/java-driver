@@ -127,7 +127,7 @@ class Connection {
 
   volatile long maxIdleTime;
 
-  final EndPoint endPoint;
+  EndPoint endPoint;
   private final String name;
   private volatile Integer shardId = null;
 

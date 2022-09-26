@@ -1481,6 +1481,54 @@ public class Cluster implements Closeable {
       return addCloudConfigToBuilder(cloudConfig);
     }
 
+    public Builder withScyllaCloudConnectionConfig(File configurationFile) throws IOException {
+      return withScyllaCloudConnectionConfig(configurationFile.toURI().toURL());
+    }
+
+    public Builder withScyllaCloudConnectionConfig(URL configurationUrl) throws IOException {
+      return withScyllaCloudConnectionConfig(configurationUrl.openStream());
+    }
+
+    public Builder withScyllaCloudConnectionConfig(InputStream inputStream) throws IOException {
+      return withScyllaCloudConnectionConfig(
+          ScyllaCloudConnectionConfig.fromInputStream(inputStream));
+    }
+
+    protected Builder withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig config) {
+      try {
+        ScyllaCloudDatacenter currentDatacenter = config.getCurrentDatacenter();
+        InetSocketAddress proxyAddress = currentDatacenter.getServer();
+
+        Builder builder =
+            withEndPointFactory(
+                    new ScyllaCloudSniEndPointFactory(
+                        currentDatacenter.getNodeDomain(), proxyAddress.getPort()))
+                .withSSL(
+                    (config.getCurrentAuthInfo().isInsecureSkipTlsVerify()
+                        ? config.createBundle().getInsecureSSLOptions()
+                        : config.createBundle().getSSLOptions()))
+                .withAuthProvider(
+                    new PlainTextAuthProvider(
+                        config.getCurrentAuthInfo().getUsername(),
+                        config.getCurrentAuthInfo().getPassword()))
+                .withoutAdvancedShardAwareness();
+
+        if (builder.rawHostContactPoints.size() > 0
+            || builder.rawHostAndPortContactPoints.size() > 0
+            || builder.contactPoints.size() > 0) {
+          throw new IllegalStateException(
+              "Can't use withCloudSecureConnectBundle if you've already called addContactPoint(s)");
+        }
+        builder.addContactPoint(new SniEndPoint(proxyAddress, proxyAddress.getHostName()));
+
+        return builder;
+      } catch (IOException e) {
+        throw new IllegalStateException("Cannot construct cloud config", e);
+      } catch (GeneralSecurityException e) {
+        throw new IllegalStateException("Cannot construct cloud config", e);
+      }
+    }
+
     /**
      * Disables advanced shard awareness. By default, this driver chooses local port while making a
      * connection to node, to signal which shard it wants to connect to. This allows driver to
@@ -1699,6 +1747,7 @@ public class Cluster implements Closeable {
                         .withLoadBalancingPolicy(
                             new PagingOptimizingLoadBalancingPolicy(
                                 policies.getLoadBalancingPolicy()))
+                        .withEndPointFactory(policies.getEndPointFactory())
                         .withReconnectionPolicy(policies.getReconnectionPolicy())
                         .withRetryPolicy(policies.getRetryPolicy())
                         .withAddressTranslator(policies.getAddressTranslator())

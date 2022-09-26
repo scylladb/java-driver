@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2022 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.SchemaElement.KEYSPACE;
@@ -668,6 +674,11 @@ class ControlConnection implements Connection.Owner {
     }
     host.setHostId(row.getUUID("host_id"));
     host.setSchemaVersion(row.getUUID("schema_version"));
+
+    EndPoint endPoint = cluster.configuration.getPolicies().getEndPointFactory().create(row);
+    if (endPoint != null) {
+      host.setEndPoint(endPoint);
+    }
   }
 
   private static void updateLocationInfo(
@@ -799,6 +810,8 @@ class ControlConnection implements Connection.Owner {
           connection.endPoint);
     } else {
       updateInfo(controlHost, localRow, cluster, isInitialConnection);
+      connection.endPoint = controlHost.getEndPoint();
+
       if (metadataEnabled && factory != null) {
         Set<String> tokensStr = localRow.getSet("tokens", String.class);
         if (!tokensStr.isEmpty()) {

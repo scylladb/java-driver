@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * Copyright (C) 2022 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import java.net.InetAddress;
@@ -60,8 +66,12 @@ public class DefaultEndPointFactory implements EndPointFactory {
           cluster.manager.translateAddress(new InetSocketAddress(nativeAddress, nativePort));
       return new TranslatedAddressEndPoint(translateAddress);
     } else {
-      InetAddress broadcastAddress = peersRow.getInet("peer");
-      InetAddress rpcAddress = peersRow.getInet("rpc_address");
+      InetAddress broadcastAddress =
+          peersRow.getColumnDefinitions().contains("peer") ? peersRow.getInet("peer") : null;
+      InetAddress rpcAddress =
+          peersRow.getColumnDefinitions().contains("rpc_address")
+              ? peersRow.getInet("rpc_address")
+              : null;
       if (broadcastAddress == null || rpcAddress == null) {
         return null;
       } else if (rpcAddress.equals(BIND_ALL_ADDRESS)) {

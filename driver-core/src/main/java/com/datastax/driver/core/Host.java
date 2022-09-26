@@ -43,7 +43,7 @@ public class Host {
   static final Logger statesLogger = LoggerFactory.getLogger(Host.class.getName() + ".STATES");
 
   // The address we'll use to connect to the node
-  private final EndPoint endPoint;
+  private EndPoint endPoint;
 
   // The broadcast RPC address, as reported in system tables.
   // Note that, unlike previous versions of the driver, this address is NOT TRANSLATED.
@@ -178,6 +178,10 @@ public class Host {
   /** Returns information to connect to the node. */
   public EndPoint getEndPoint() {
     return endPoint;
+  }
+
+  public void setEndPoint(EndPoint endPoint) {
+    this.endPoint = endPoint;
   }
 
   /**
