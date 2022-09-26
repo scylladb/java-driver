@@ -41,6 +41,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   final Cluster cluster;
   final boolean isLWT;
   final Token.Factory partitioner;
+  final String operationType;
 
   volatile ByteBuffer routingKey;
 
@@ -66,6 +67,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
     this.cluster = cluster;
     this.isLWT = isLWT;
     this.partitioner = partitioner;
+    this.operationType = null;
   }
 
   static DefaultPreparedStatement fromMessage(
@@ -314,5 +316,11 @@ public class DefaultPreparedStatement implements PreparedStatement {
   @Override
   public boolean isLWT() {
     return isLWT;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String getOperationType() {
+    return operationType;
   }
 }
