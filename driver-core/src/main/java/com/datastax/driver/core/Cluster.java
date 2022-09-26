@@ -65,7 +65,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
@@ -751,7 +750,6 @@ public class Cluster implements Closeable {
     private boolean jmxEnabled = true;
     private boolean allowBetaProtocolVersion = false;
     private boolean noCompact = false;
-    private boolean isCloud = false;
     private boolean useAdvancedShardAwareness = true;
     private boolean schemaQueriesPaged = true;
     private int localPortLow = ProtocolOptions.DEFAULT_LOCAL_PORT_LOW;
@@ -950,7 +948,6 @@ public class Cluster implements Closeable {
       // We explicitly check for nulls because InetAdress.getByName() will happily
       // accept it and use localhost (while a null here almost likely mean a user error,
       // not "connect to localhost")
-      failIfCloud();
       if (address == null) throw new NullPointerException();
 
       try {
@@ -970,7 +967,6 @@ public class Cluster implements Closeable {
      * host-and-port-based variants such as {@link #addContactPoint(String)}.
      */
     public Builder addContactPoint(EndPoint contactPoint) {
-      failIfCloud();
       contactPoints.add(contactPoint);
       return this;
     }
@@ -1011,7 +1007,6 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPoints(InetAddress... addresses) {
-      failIfCloud();
       Collections.addAll(this.rawHostContactPoints, addresses);
       return this;
     }
@@ -1026,7 +1021,6 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPoints(Collection<InetAddress> addresses) {
-      failIfCloud();
       this.rawHostContactPoints.addAll(addresses);
       return this;
     }
@@ -1050,7 +1044,6 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPointsWithPorts(InetSocketAddress... addresses) {
-      failIfCloud();
       Collections.addAll(this.rawHostAndPortContactPoints, addresses);
       return this;
     }
@@ -1074,7 +1067,6 @@ public class Cluster implements Closeable {
      * @see Builder#addContactPoint
      */
     public Builder addContactPointsWithPorts(Collection<InetSocketAddress> addresses) {
-      failIfCloud();
       this.rawHostAndPortContactPoints.addAll(addresses);
       return this;
     }
@@ -1393,94 +1385,6 @@ public class Cluster implements Closeable {
       return this;
     }
 
-    /**
-     * Configures this Builder for Cloud deployments by retrieving connection information from the
-     * provided {@link String}.
-     *
-     * <p>To connect to a Cloud database, you must first download the secure database bundle from
-     * the DataStax Constellation console that contains the connection information, then instruct
-     * the driver to read its contents using either this method or one if its variants.
-     *
-     * <p>For more information, please refer to the DataStax Constellation documentation.
-     *
-     * <p>Note that the provided stream will be consumed <em>and closed</em> when this method will
-     * return; attempting to reuse it afterwards will result in an error being thrown.
-     *
-     * @param cloudConfigFile File that contains secure connect bundle zip file.
-     * @see #withCloudSecureConnectBundle(URL)
-     * @see #withCloudSecureConnectBundle(InputStream)
-     */
-    public Builder withCloudSecureConnectBundle(File cloudConfigFile) {
-      try {
-        return withCloudSecureConnectBundle(cloudConfigFile.toURI().toURL());
-      } catch (MalformedURLException e) {
-        throw new IllegalArgumentException(
-            "The cloudConfigFile URL " + cloudConfigFile + " is in the wrong format.", e);
-      }
-    }
-
-    /**
-     * Configures this Builder for Cloud deployments by retrieving connection information from the
-     * provided {@link URL}.
-     *
-     * <p>To connect to a Cloud database, you must first download the secure database bundle from
-     * the DataStax Constellation console that contains the connection information, then instruct
-     * the driver to read its contents using either this method or one if its variants.
-     *
-     * <p>For more information, please refer to the DataStax Constellation documentation.
-     *
-     * <p>Note that the provided stream will be consumed <em>and closed</em> when this method will
-     * return; attempting to reuse it afterwards will result in an error being thrown.
-     *
-     * @param cloudConfigUrl URL to the secure connect bundle zip file.
-     * @see #withCloudSecureConnectBundle(File)
-     * @see #withCloudSecureConnectBundle(InputStream)
-     */
-    public Builder withCloudSecureConnectBundle(URL cloudConfigUrl) {
-      CloudConfig cloudConfig;
-      try {
-        cloudConfig = new CloudConfigFactory().createCloudConfig(cloudConfigUrl.openStream());
-      } catch (GeneralSecurityException e) {
-        throw new IllegalStateException(
-            "Cannot construct cloud config from the cloudConfigUrl: " + cloudConfigUrl, e);
-      } catch (IOException e) {
-        throw new IllegalStateException(
-            "Cannot construct cloud config from the cloudConfigUrl: " + cloudConfigUrl, e);
-      }
-
-      return addCloudConfigToBuilder(cloudConfig);
-    }
-
-    /**
-     * Configures this Builder for Cloud deployments by retrieving connection information from the
-     * provided {@link InputStream}.
-     *
-     * <p>To connect to a Cloud database, you must first download the secure database bundle from
-     * the DataStax Constellation console that contains the connection information, then instruct
-     * the driver to read its contents using either this method or one if its variants.
-     *
-     * <p>For more information, please refer to the DataStax Constellation documentation.
-     *
-     * <p>Note that the provided stream will be consumed <em>and closed</em> when this method will
-     * return; attempting to reuse it afterwards will result in an error being thrown.
-     *
-     * @param cloudConfigInputStream A stream containing the secure connect bundle zip file.
-     * @see #withCloudSecureConnectBundle(File)
-     * @see #withCloudSecureConnectBundle(URL)
-     */
-    public Builder withCloudSecureConnectBundle(InputStream cloudConfigInputStream) {
-      CloudConfig cloudConfig;
-      try {
-        cloudConfig = new CloudConfigFactory().createCloudConfig(cloudConfigInputStream);
-      } catch (GeneralSecurityException e) {
-        throw new IllegalStateException("Cannot construct cloud config from the InputStream.", e);
-      } catch (IOException e) {
-        throw new IllegalStateException("Cannot construct cloud config from the InputStream.", e);
-      }
-
-      return addCloudConfigToBuilder(cloudConfig);
-    }
-
     public Builder withScyllaCloudConnectionConfig(File configurationFile) throws IOException {
       return withScyllaCloudConnectionConfig(configurationFile.toURI().toURL());
     }
@@ -1578,34 +1482,6 @@ public class Cluster implements Closeable {
       this.localPortLow = low;
       this.localPortHigh = high;
       return this;
-    }
-
-    private Builder addCloudConfigToBuilder(CloudConfig cloudConfig) {
-      Builder builder =
-          withEndPointFactory(new SniEndPointFactory(cloudConfig.getProxyAddress()))
-              .withSSL(cloudConfig.getSslOptions());
-
-      if (cloudConfig.getAuthProvider() != null) {
-        builder = builder.withAuthProvider(cloudConfig.getAuthProvider());
-      }
-      if (builder.rawHostContactPoints.size() > 0
-          || builder.rawHostAndPortContactPoints.size() > 0
-          || builder.contactPoints.size() > 0) {
-        throw new IllegalStateException(
-            "Can't use withCloudSecureConnectBundle if you've already called addContactPoint(s)");
-      }
-      for (EndPoint endPoint : cloudConfig.getEndPoints()) {
-        builder.addContactPoint(endPoint);
-      }
-      isCloud = true;
-      return builder;
-    }
-
-    private void failIfCloud() {
-      if (isCloud) {
-        throw new IllegalStateException(
-            "Can't use addContactPoint(s) if you've already called withCloudSecureConnectBundle");
-      }
     }
 
     /**
@@ -1879,9 +1755,6 @@ public class Cluster implements Closeable {
         }
         // Initialize the control connection:
         negotiateProtocolVersionAndConnect();
-        if (controlConnection.isCloud() && !configuration.getQueryOptions().isConsistencySet()) {
-          configuration.getQueryOptions().setConsistencyLevel(ConsistencyLevel.LOCAL_QUORUM);
-        }
         // The control connection:
         // - marked contact points down if they couldn't be reached
         // - triggered an initial full refresh of metadata.allHosts. If any contact points weren't
