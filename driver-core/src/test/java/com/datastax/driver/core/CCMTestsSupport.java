@@ -24,7 +24,6 @@ package com.datastax.driver.core;
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_CLASS;
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;
 import static com.datastax.driver.core.TestUtils.CREATE_KEYSPACE_SIMPLE_FORMAT;
-import static com.datastax.driver.core.TestUtils.addressOfNode;
 import static com.datastax.driver.core.TestUtils.executeNoFail;
 import static com.datastax.driver.core.TestUtils.ipOfNode;
 import static org.assertj.core.api.Assertions.fail;
@@ -40,7 +39,6 @@ import com.google.common.io.Closer;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -778,26 +776,7 @@ public class CCMTestsSupport {
     File clusterFile = new File(ccmdir, ccm.getClusterName());
     File yamlFile = new File(clusterFile, "config_data.yaml");
 
-    final ScyllaCloudConnectionConfig cloudConfig =
-        ScyllaCloudConnectionConfig.fromInputStream(new FileInputStream(yamlFile));
-
-    builder.withScyllaCloudConnectionConfig(cloudConfig);
-    builder.withEndPointFactory(
-        new MockSniEndPointFactory(
-            InetSocketAddress.createUnresolved(
-                addressOfNode(1).getHostAddress(),
-                cloudConfig.getCurrentDatacenter().getServer().getPort()),
-            builder.getConfiguration().getPolicies().getEndPointFactory()));
-    builder.addContactPoint(
-        new SniEndPoint(
-            InetSocketAddress.createUnresolved(
-                addressOfNode(1).getHostAddress(),
-                cloudConfig.getCurrentDatacenter().getServer().getPort()),
-            cloudConfig.getCurrentDatacenter().getServer().getHostName()));
-
-    builder
-        .withCodecRegistry(new CodecRegistry())
-        .withPort(cloudConfig.getCurrentDatacenter().getServer().getPort());
+    builder.withScyllaCloudConnectionConfig(yamlFile);
     return builder;
   }
 

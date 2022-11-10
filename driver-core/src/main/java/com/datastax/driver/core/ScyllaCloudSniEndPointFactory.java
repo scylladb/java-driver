@@ -25,11 +25,12 @@ import java.util.UUID;
 
 class ScyllaCloudSniEndPointFactory implements EndPointFactory {
   private final String nodeDomain;
-  private final int port;
 
-  public ScyllaCloudSniEndPointFactory(String nodeDomain, int port) {
+  private final InetSocketAddress proxy;
+
+  public ScyllaCloudSniEndPointFactory(InetSocketAddress proxy, String nodeDomain) {
+    this.proxy = proxy;
     this.nodeDomain = nodeDomain;
-    this.port = port;
   }
 
   @Override
@@ -39,7 +40,6 @@ class ScyllaCloudSniEndPointFactory implements EndPointFactory {
   public EndPoint create(Row row) {
     UUID host_id = row.getUUID("host_id");
     String sni = host_id.toString() + "." + nodeDomain;
-    InetSocketAddress proxy = InetSocketAddress.createUnresolved(sni, port);
     return new SniEndPoint(proxy, sni);
   }
 }

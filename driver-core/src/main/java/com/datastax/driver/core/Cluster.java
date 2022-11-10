@@ -1406,7 +1406,7 @@ public class Cluster implements Closeable {
         Builder builder =
             withEndPointFactory(
                     new ScyllaCloudSniEndPointFactory(
-                        currentDatacenter.getNodeDomain(), proxyAddress.getPort()))
+                        proxyAddress, currentDatacenter.getNodeDomain()))
                 .withSSL(
                     (config.getCurrentAuthInfo().isInsecureSkipTlsVerify()
                         ? config.createBundle().getInsecureSSLOptions()
@@ -1423,7 +1423,7 @@ public class Cluster implements Closeable {
           throw new IllegalStateException(
               "Can't use withCloudSecureConnectBundle if you've already called addContactPoint(s)");
         }
-        builder.addContactPoint(new SniEndPoint(proxyAddress, proxyAddress.getHostName()));
+        builder.addContactPoint(new SniEndPoint(proxyAddress, currentDatacenter.getNodeDomain()));
 
         return builder;
       } catch (IOException e) {
