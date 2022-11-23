@@ -21,6 +21,7 @@ import com.datastax.driver.core.CCMTestsSupport;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.exceptions.CodecNotFoundException;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaSkip;
 import com.datastax.driver.mapping.annotations.Accessor;
 import com.datastax.driver.mapping.annotations.Param;
 import com.datastax.driver.mapping.annotations.PartitionKey;
@@ -44,6 +45,7 @@ public class MapperAccessorParamsTest extends CCMTestsSupport {
 
   @Test(groups = "short")
   @CassandraVersion(value = "2.0", description = "Uses named parameters")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure Disabled due to scylladb/scylladb#11945 */
   public void should_allow_less_parameters_than_bind_markers_if_there_are_repeated_names() {
     UserPhoneAccessor accessor =
         new MappingManager(session()).createAccessor(UserPhoneAccessor.class);
