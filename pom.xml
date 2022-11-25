@@ -746,6 +746,7 @@
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
                         <argLine>-Djdk.attach.allowAttachSelf=true</argLine>
+                        <runOrder>alphabetical</runOrder>
                         <systemPropertyVariables>
                             <cassandra.version>${cassandra.version}</cassandra.version>
                             <ipprefix>${ipprefix}</ipprefix>
@@ -776,6 +777,7 @@
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
+                        <runOrder>alphabetical</runOrder>
                         <systemPropertyVariables>
                             <cassandra.version>${cassandra.version}</cassandra.version>
                             <ipprefix>${ipprefix}</ipprefix>
