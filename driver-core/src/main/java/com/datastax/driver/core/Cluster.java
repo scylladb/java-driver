@@ -1408,7 +1408,7 @@ public class Cluster implements Closeable {
                     new ScyllaCloudSniEndPointFactory(
                         proxyAddress, currentDatacenter.getNodeDomain()))
                 .withSSL(
-                    (config.getCurrentAuthInfo().isInsecureSkipTlsVerify()
+                    (config.getCurrentDatacenter().isInsecureSkipTlsVerify()
                         ? config.createBundle().getInsecureSSLOptions()
                         : config.createBundle().getSSLOptions()))
                 .withAuthProvider(

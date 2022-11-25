@@ -20,6 +20,7 @@ class ScyllaCloudDatacenter {
   private final String tlsServerName;
   private final String nodeDomain;
   private final String proxyURL;
+  private final boolean insecureSkipTlsVerify;
 
   // Full hostname has limit of 255 chars.
   // Host UUID takes 32 chars for hex digits and 4 dashes. Additional 1 is for separator dot before
@@ -33,13 +34,16 @@ class ScyllaCloudDatacenter {
       @JsonProperty(value = "server") String server,
       @JsonProperty(value = "tlsServerName") String tlsServerName,
       @JsonProperty(value = "nodeDomain") String nodeDomain,
-      @JsonProperty(value = "proxyURL") String proxyURL) {
+      @JsonProperty(value = "proxyURL") String proxyURL,
+      @JsonProperty(value = "insecureSkipTlsVerify", defaultValue = "false")
+          boolean insecureSkipTlsVerify) {
     this.certificateAuthorityPath = certificateAuthorityPath;
     this.certificateAuthorityData = certificateAuthorityData;
     this.server = server;
     this.tlsServerName = tlsServerName;
     this.nodeDomain = nodeDomain;
     this.proxyURL = proxyURL;
+    this.insecureSkipTlsVerify = insecureSkipTlsVerify;
   }
 
   public void validate() {
@@ -83,6 +87,10 @@ class ScyllaCloudDatacenter {
 
   public String getProxyURL() {
     return proxyURL;
+  }
+
+  public boolean isInsecureSkipTlsVerify() {
+    return insecureSkipTlsVerify;
   }
 
   // Using parts relevant to hostnames as we're dealing with a part of hostname

@@ -26,7 +26,6 @@ class ScyllaCloudAuthInfo {
   private final String clientKeyPath;
   private final String username;
   private final String password;
-  private final boolean insecureSkipTlsVerify;
 
   @JsonCreator
   public ScyllaCloudAuthInfo(
@@ -35,16 +34,13 @@ class ScyllaCloudAuthInfo {
       @JsonProperty(value = "clientKeyData") byte[] clientKeyData,
       @JsonProperty(value = "clientKeyPath") String clientKeyPath,
       @JsonProperty(value = "username") String username,
-      @JsonProperty(value = "password") String password,
-      @JsonProperty(value = "insecureSkipTlsVerify", defaultValue = "false")
-          boolean insecureSkipTlsVerify) {
+      @JsonProperty(value = "password") String password) {
     this.clientCertificateData = clientCertificateData;
     this.clientCertificatePath = clientCertificatePath;
     this.clientKeyData = clientKeyData;
     this.clientKeyPath = clientKeyPath;
     this.username = username;
     this.password = password;
-    this.insecureSkipTlsVerify = insecureSkipTlsVerify;
   }
 
   public void validate() {
@@ -95,9 +91,5 @@ class ScyllaCloudAuthInfo {
 
   public String getPassword() {
     return password;
-  }
-
-  public boolean isInsecureSkipTlsVerify() {
-    return insecureSkipTlsVerify;
   }
 }
