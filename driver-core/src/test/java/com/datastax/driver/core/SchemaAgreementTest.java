@@ -54,6 +54,13 @@ public class SchemaAgreementTest extends CCMTestsSupport {
     protocolOptions.maxSchemaAgreementWaitSeconds = 0;
     ResultSet rs = session().execute(String.format(CREATE_TABLE, COUNTER.getAndIncrement()));
     assertThat(rs.getExecutionInfo().isSchemaInAgreement()).isFalse();
+
+    // Execute a dummy query, that will wait for schema agreement,
+    // so that the next tests that run afterwards have a clean state.
+    protocolOptions = cluster().getConfiguration().getProtocolOptions();
+    protocolOptions.maxSchemaAgreementWaitSeconds = 10;
+    rs = session().execute(String.format(CREATE_TABLE, COUNTER.getAndIncrement()));
+    assertThat(rs.getExecutionInfo().isSchemaInAgreement()).isTrue();
   }
 
   @Test(groups = "short")
