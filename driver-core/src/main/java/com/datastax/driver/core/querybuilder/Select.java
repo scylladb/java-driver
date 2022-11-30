@@ -43,6 +43,7 @@ public class Select extends BuiltStatement {
   private Object limit;
   private Object perPartitionLimit;
   private boolean allowFiltering;
+  private boolean bypassCache;
 
   Select(
       String keyspace, String table, List<Object> columnNames, boolean isDistinct, boolean isJson) {
@@ -121,6 +122,10 @@ public class Select extends BuiltStatement {
 
     if (allowFiltering) {
       builder.append(" ALLOW FILTERING");
+    }
+
+    if (bypassCache) {
+      builder.append(" BYPASS CACHE");
     }
 
     return builder;
@@ -283,6 +288,16 @@ public class Select extends BuiltStatement {
     return this;
   }
 
+  /**
+   * Adds on {@code BYPASS CACHE} clause to this statement.
+   *
+   * @return this statement.
+   */
+  public Select bypassCache() {
+    bypassCache = true;
+    return this;
+  }
+
   /** The {@code WHERE} clause of a {@code SELECT} statement. */
   public static class Where extends BuiltStatement.ForwardingStatement<Select> {
 
@@ -397,6 +412,16 @@ public class Select extends BuiltStatement {
      */
     public Select allowFiltering() {
       return statement.allowFiltering();
+    }
+
+    /**
+     * Adds an {@code BYPASS CACHE} clause to the {@code SELECT} statement this {@code WHERE} clause
+     * is part of.
+     *
+     * @return the {@code SELECT} statement this {@code WHERE} clause is part of.
+     */
+    public Select bypassCache() {
+      return statement.bypassCache();
     }
   }
 

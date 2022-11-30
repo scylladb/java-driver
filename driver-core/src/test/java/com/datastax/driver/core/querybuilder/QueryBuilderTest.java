@@ -1686,4 +1686,14 @@ public class QueryBuilderTest {
     assertThat(select().all().from("foo").where(eq("x", 42)).allowFiltering().toString())
         .isEqualTo("SELECT * FROM foo WHERE x=42 ALLOW FILTERING;");
   }
+
+  /** @test_category queries:builder */
+  @Test(groups = "unit")
+  public void should_handle_bypass_cache() {
+    assertThat(select().all().from("foo").allowFiltering().bypassCache().toString())
+        .isEqualTo("SELECT * FROM foo ALLOW FILTERING BYPASS CACHE;");
+    assertThat(
+            select().all().from("foo").where(eq("x", 42)).allowFiltering().bypassCache().toString())
+        .isEqualTo("SELECT * FROM foo WHERE x=42 ALLOW FILTERING BYPASS CACHE;");
+  }
 }
