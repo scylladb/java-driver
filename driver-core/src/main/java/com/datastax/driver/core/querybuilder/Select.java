@@ -38,6 +38,7 @@ public class Select extends BuiltStatement {
   private final boolean isJson;
   private final List<Object> columnNames;
   private final Where where;
+  private final Options usings;
   private List<Ordering> orderings;
   private List<Object> groupByColumnNames;
   private Object limit;
@@ -76,6 +77,7 @@ public class Select extends BuiltStatement {
     this.isDistinct = isDistinct;
     this.isJson = isJson;
     this.where = new Where(this);
+    this.usings = new Options(this);
   }
 
   @Override
@@ -128,6 +130,11 @@ public class Select extends BuiltStatement {
       builder.append(" BYPASS CACHE");
     }
 
+    if (!usings.usings.isEmpty()) {
+      builder.append(" USING ");
+      Utils.joinAndAppend(builder, codecRegistry, " AND ", usings.usings, variables);
+    }
+
     return builder;
   }
 
@@ -150,6 +157,16 @@ public class Select extends BuiltStatement {
    */
   public Where where() {
     return where;
+  }
+
+  /**
+   * Adds a new options for this SELECT statement.
+   *
+   * @param using the option to add.
+   * @return the options of this SELECT statement.
+   */
+  public Options using(Using using) {
+    return usings.and(using);
   }
 
   /**
@@ -321,6 +338,16 @@ public class Select extends BuiltStatement {
     }
 
     /**
+     * Adds an option to the SELECT statement this WHERE clause is part of.
+     *
+     * @param using the using clause to add.
+     * @return the options of the SELECT statement this WHERE clause is part of.
+     */
+    public Options using(Using using) {
+      return statement.using(using);
+    }
+
+    /**
      * Adds an ORDER BY clause to the {@code SELECT} statement this {@code WHERE} clause if part of.
      *
      * @param orderings the orderings to add.
@@ -422,6 +449,27 @@ public class Select extends BuiltStatement {
      */
     public Select bypassCache() {
       return statement.bypassCache();
+    }
+  }
+
+  /** The options of a SELECT statement. */
+  public static class Options extends BuiltStatement.ForwardingStatement<Select> {
+    private final List<Using> usings = new ArrayList<Using>();
+
+    Options(Select statement) {
+      super(statement);
+    }
+
+    /**
+     * Adds the provided option.
+     *
+     * @param using a SELECT option.
+     * @return this {@code Options} object.
+     */
+    public Options and(Using using) {
+      usings.add(using);
+      checkForBindMarkers(using);
+      return this;
     }
   }
 

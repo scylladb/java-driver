@@ -15,10 +15,7 @@
  */
 package com.datastax.driver.core.querybuilder;
 
-import com.datastax.driver.core.DataType;
-import com.datastax.driver.core.Metadata;
-import com.datastax.driver.core.RegularStatement;
-import com.datastax.driver.core.TableMetadata;
+import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -619,6 +616,33 @@ public final class QueryBuilder {
    */
   public static Using ttl(BindMarker marker) {
     return new Using.WithMarker("TTL", marker);
+  }
+
+  /**
+   * Adds a {@code USING TIMEOUT} clause to this statement with a {@link Duration} value.
+   *
+   * <p>If this method or {@link #timeout(BindMarker) } is called multiple times, the value from the
+   * last invocation is used.
+   *
+   * @param timeout A timeout value controlling server-side query timeout.
+   */
+  public static Using timeout(Duration timeout) {
+    if (timeout == null) throw new IllegalArgumentException("Invalid timeout, should not be null");
+
+    return new Using.WithObject("TIMEOUT", timeout.toString());
+  }
+
+  /**
+   * Adds a {@code USING TIMEOUT} clause to this statement with a bind marker.
+   *
+   * <p>If this method or {@link #timeout(Duration) } is called multiple times, the value from the
+   * last invocation is used.
+   *
+   * @param marker A bind marker understood as {@link Duration} controlling server-side query
+   *     timeout.
+   */
+  public static Using timeout(BindMarker marker) {
+    return new Using.WithMarker("TIMEOUT", marker);
   }
 
   /**

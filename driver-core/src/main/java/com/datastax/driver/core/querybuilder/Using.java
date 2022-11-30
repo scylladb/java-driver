@@ -63,4 +63,23 @@ public abstract class Using extends Utils.Appendeable {
       return true;
     }
   }
+
+  static class WithObject extends Using {
+    private final Object object;
+
+    WithObject(String optionName, Object object) {
+      super(optionName);
+      this.object = object;
+    }
+
+    @Override
+    void appendTo(StringBuilder sb, List<Object> variables, CodecRegistry codecRegistry) {
+      sb.append(optionName).append(' ').append(object);
+    }
+
+    @Override
+    boolean containsBindMarker() {
+      return false;
+    }
+  }
 }

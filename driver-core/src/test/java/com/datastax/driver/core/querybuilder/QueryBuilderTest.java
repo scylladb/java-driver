@@ -15,67 +15,13 @@
  */
 package com.datastax.driver.core.querybuilder;
 
-import static com.datastax.driver.core.querybuilder.QueryBuilder.add;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.addAll;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.alias;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.append;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.appendAll;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.asc;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.batch;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.bindMarker;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.cast;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.column;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.contains;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.containsKey;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.decr;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.delete;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.desc;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.discard;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.discardAll;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.eq;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.fcall;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.fromJson;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.gt;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.gte;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.in;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.incr;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.insertInto;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.like;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.lt;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.lte;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.ne;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.notNull;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.path;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.prepend;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.prependAll;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.put;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.putAll;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.quote;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.raw;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.remove;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.removeAll;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.select;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.setIdx;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.timestamp;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.toJson;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.token;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.truncate;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.ttl;
-import static com.datastax.driver.core.querybuilder.QueryBuilder.update;
+import static com.datastax.driver.core.querybuilder.QueryBuilder.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
-import com.datastax.driver.core.CodecRegistry;
-import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.DataType;
-import com.datastax.driver.core.Metadata;
-import com.datastax.driver.core.ProtocolVersion;
-import com.datastax.driver.core.RegularStatement;
-import com.datastax.driver.core.Statement;
-import com.datastax.driver.core.TypeCodec;
+import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.CodecNotFoundException;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
@@ -262,6 +208,10 @@ public class QueryBuilderTest {
 
     query = "SELECT * FROM foo WHERE k IS NOT NULL;";
     select = select().from("foo").where(notNull("k"));
+    assertEquals(select.toString(), query);
+
+    query = "SELECT * FROM foo WHERE k IS NOT NULL USING TIMEOUT 50ms;";
+    select = select().from("foo").where(notNull("k")).using(timeout(Duration.from("50ms")));
     assertEquals(select.toString(), query);
 
     try {
