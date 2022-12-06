@@ -69,7 +69,7 @@ public class DriverChannel {
   @SuppressWarnings("RedundantStringConstructorCall")
   static final Object FORCEFUL_CLOSE_MESSAGE = new String("FORCEFUL_CLOSE_MESSAGE");
 
-  private final EndPoint endPoint;
+  private EndPoint endPoint;
   private final Channel channel;
   private final InFlightHandler inFlightHandler;
   private final WriteCoalescer writeCoalescer;
@@ -325,5 +325,10 @@ public class DriverChannel {
       this.keyspaceName = keyspaceName;
       this.promise = promise;
     }
+  }
+
+  // Necessary for swapping ControlConnection endpoint when connecting with serverless clusters
+  public void setEndPoint(EndPoint endPoint) {
+    this.endPoint = endPoint;
   }
 }

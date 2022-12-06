@@ -44,15 +44,17 @@ import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.api.core.type.codec.registry.MutableCodecRegistry;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.datastax.oss.driver.internal.core.ContactPoints;
-import com.datastax.oss.driver.internal.core.config.cloud.CloudConfig;
-import com.datastax.oss.driver.internal.core.config.cloud.CloudConfigFactory;
+import com.datastax.oss.driver.internal.core.config.scyllacloud.ConfigurationBundle;
+import com.datastax.oss.driver.internal.core.config.scyllacloud.ScyllaCloudConnectionConfig;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfigLoader;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.SniEndPoint;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.InputStream;
@@ -60,7 +62,6 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -96,6 +97,7 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   protected Set<EndPoint> programmaticContactPoints = new HashSet<>();
   protected CqlIdentifier keyspace;
   protected Callable<InputStream> cloudConfigInputStream;
+  protected Callable<InputStream> scyllaCloudConfigInputStream;
 
   protected ProgrammaticArguments.Builder programmaticArgumentsBuilder =
       ProgrammaticArguments.builder();
@@ -655,6 +657,17 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     return self;
   }
 
+  @NonNull
+  public SelfT withScyllaCloudSecureConnectBundle(@NonNull Path cloudConfigPath) {
+    try {
+      URL cloudConfigUrl = cloudConfigPath.toAbsolutePath().normalize().toUri().toURL();
+      this.scyllaCloudConfigInputStream = cloudConfigUrl::openStream;
+    } catch (MalformedURLException e) {
+      throw new IllegalArgumentException("Incorrect format of cloudConfigPath", e);
+    }
+    return self;
+  }
+
   /**
    * Registers a CodecRegistry to use for the session.
    *
@@ -687,6 +700,12 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     return self;
   }
 
+  @NonNull
+  public SelfT withScyllaCloudSecureConnectBundle(@NonNull URL cloudConfigUrl) {
+    this.scyllaCloudConfigInputStream = cloudConfigUrl::openStream;
+    return self;
+  }
+
   /**
    * Configures this SessionBuilder for Cloud deployments by retrieving connection information from
    * the provided {@link InputStream}.
@@ -711,6 +730,12 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     return self;
   }
 
+  @NonNull
+  public SelfT withScyllaCloudSecureConnectBundle(@NonNull InputStream cloudConfigInputStream) {
+    this.scyllaCloudConfigInputStream = () -> cloudConfigInputStream;
+    return self;
+  }
+
   /**
    * Configures this SessionBuilder to use the provided Cloud proxy endpoint.
    *
@@ -730,6 +755,13 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   @NonNull
   public SelfT withCloudProxyAddress(@Nullable InetSocketAddress cloudProxyAddress) {
     this.programmaticArgumentsBuilder.withCloudProxyAddress(cloudProxyAddress);
+    return self;
+  }
+
+  @NonNull
+  public SelfT withScyllaCloudProxyAddress(
+      @Nullable InetSocketAddress cloudProxyAddress, String nodeDomain) {
+    this.programmaticArgumentsBuilder.withScyllaCloudProxyAddress(cloudProxyAddress, nodeDomain);
     return self;
   }
 
@@ -857,16 +889,9 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
               : defaultConfigLoader(programmaticArguments.getClassLoader());
 
       DriverExecutionProfile defaultConfig = configLoader.getInitialConfig().getDefaultProfile();
-      if (cloudConfigInputStream == null) {
-        String configUrlString =
-            defaultConfig.getString(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE, null);
-        if (configUrlString != null) {
-          cloudConfigInputStream = () -> getURL(configUrlString).openStream();
-        }
-      }
       List<String> configContactPoints =
           defaultConfig.getStringList(DefaultDriverOption.CONTACT_POINTS, Collections.emptyList());
-      if (cloudConfigInputStream != null) {
+      if (scyllaCloudConfigInputStream != null) {
         if (!programmaticContactPoints.isEmpty() || !configContactPoints.isEmpty()) {
           LOG.info(
               "Both a secure connect bundle and contact points were provided. These are mutually exclusive. The contact points from the secure bundle will have priority.");
@@ -880,20 +905,27 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
           LOG.info(
               "Both a secure connect bundle and SSL options were provided. They are mutually exclusive. The SSL options from the secure bundle will have priority.");
         }
-        CloudConfig cloudConfig =
-            new CloudConfigFactory().createCloudConfig(cloudConfigInputStream.call());
-        addContactEndPoints(cloudConfig.getEndPoints());
+        ScyllaCloudConnectionConfig cloudConfig =
+            ScyllaCloudConnectionConfig.fromInputStream(scyllaCloudConfigInputStream.call());
+        InetSocketAddress proxyAddress = cloudConfig.getCurrentDatacenter().getServer();
+        addContactEndPoints(
+            ImmutableList.of(
+                new SniEndPoint(proxyAddress, cloudConfig.getCurrentDatacenter().getNodeDomain())));
 
         boolean localDataCenterDefined =
             anyProfileHasDatacenterDefined(configLoader.getInitialConfig());
         if (programmaticLocalDatacenter || localDataCenterDefined) {
           LOG.info(
-              "Both a secure connect bundle and a local datacenter were provided. They are mutually exclusive. The local datacenter from the secure bundle will have priority.");
+              "Both a secure connect bundle and a local datacenter were provided. They are mutually exclusive. The currentContext datacenter name from the secure bundle will be ignored.");
+        } else {
           programmaticArgumentsBuilder.clearDatacenters();
+          withLocalDatacenter(cloudConfig.getCurrentContext().getDatacenterName());
         }
-        withLocalDatacenter(cloudConfig.getLocalDatacenter());
-        withSslEngineFactory(cloudConfig.getSslEngineFactory());
-        withCloudProxyAddress(cloudConfig.getProxyAddress());
+        ConfigurationBundle bundle = cloudConfig.createBundle();
+        withSslEngineFactory(bundle.getSSLEngineFactory());
+        withScyllaCloudProxyAddress(
+            proxyAddress, cloudConfig.getCurrentDatacenter().getNodeDomain());
+
         programmaticArguments = programmaticArgumentsBuilder.build();
       }
 
@@ -912,7 +944,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
           (InternalDriverContext) buildContext(configLoader, programmaticArguments),
           contactPoints,
           keyspace);
-
     } catch (Throwable t) {
       // We construct the session synchronously (until the init() call), but async clients expect a
       // failed future if anything goes wrong. So wrap any error from that synchronous part.
@@ -927,27 +958,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
       }
     }
     return false;
-  }
-
-  /**
-   * Returns URL based on the configUrl setting. If the configUrl has no protocol provided, the
-   * method will fallback to file:// protocol and return URL that has file protocol specified.
-   *
-   * @param configUrl url to config secure bundle
-   * @return URL with file protocol if there was not explicit protocol provided in the configUrl
-   *     setting
-   */
-  private URL getURL(String configUrl) throws MalformedURLException {
-    try {
-      return new URL(configUrl);
-    } catch (MalformedURLException e1) {
-      try {
-        return Paths.get(configUrl).toAbsolutePath().normalize().toUri().toURL();
-      } catch (MalformedURLException e2) {
-        e2.addSuppressed(e1);
-        throw e2;
-      }
-    }
   }
 
   /**

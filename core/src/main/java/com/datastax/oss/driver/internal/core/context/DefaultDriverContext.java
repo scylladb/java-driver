@@ -60,6 +60,7 @@ import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.MultiplexingNodeStateListener;
 import com.datastax.oss.driver.internal.core.metadata.NoopNodeStateListener;
+import com.datastax.oss.driver.internal.core.metadata.ScyllaCloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.schema.MultiplexingSchemaChangeListener;
 import com.datastax.oss.driver.internal.core.metadata.schema.NoopSchemaChangeListener;
@@ -236,6 +237,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final Map<String, NodeDistanceEvaluator> nodeDistanceEvaluatorsFromBuilder;
   private final ClassLoader classLoader;
   private final InetSocketAddress cloudProxyAddress;
+  private final String scyllaCloudNodeDomain;
   private final LazyReference<RequestLogFormatter> requestLogFormatterRef =
       new LazyReference<>("requestLogFormatter", this::buildRequestLogFormatter, cycleDetector);
   private final UUID startupClientId;
@@ -291,6 +293,7 @@ public class DefaultDriverContext implements InternalDriverContext {
     this.nodeDistanceEvaluatorsFromBuilder = programmaticArguments.getNodeDistanceEvaluators();
     this.classLoader = programmaticArguments.getClassLoader();
     this.cloudProxyAddress = programmaticArguments.getCloudProxyAddress();
+    this.scyllaCloudNodeDomain = programmaticArguments.getScyllaCloudNodeDomain();
     this.startupClientId = programmaticArguments.getStartupClientId();
     this.startupApplicationName = programmaticArguments.getStartupApplicationName();
     this.startupApplicationVersion = programmaticArguments.getStartupApplicationVersion();
@@ -491,6 +494,9 @@ public class DefaultDriverContext implements InternalDriverContext {
   protected TopologyMonitor buildTopologyMonitor() {
     if (cloudProxyAddress == null) {
       return new DefaultTopologyMonitor(this);
+    }
+    if (scyllaCloudNodeDomain != null) {
+      return new ScyllaCloudTopologyMonitor(this, cloudProxyAddress, scyllaCloudNodeDomain);
     }
     return new CloudTopologyMonitor(this, cloudProxyAddress);
   }

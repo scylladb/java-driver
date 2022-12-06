@@ -68,11 +68,11 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
   private static final int INFINITE_PAGE_SIZE = -1;
 
   private final String logPrefix;
-  private final InternalDriverContext context;
-  private final ControlConnection controlConnection;
+  protected final InternalDriverContext context;
+  protected final ControlConnection controlConnection;
   private final Duration timeout;
-  private final boolean reconnectOnInit;
-  private final CompletableFuture<Void> closeFuture;
+  protected final boolean reconnectOnInit;
+  protected final CompletableFuture<Void> closeFuture;
 
   @VisibleForTesting volatile boolean isSchemaV2;
   @VisibleForTesting volatile int port = -1;

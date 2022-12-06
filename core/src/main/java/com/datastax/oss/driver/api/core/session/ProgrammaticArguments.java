@@ -64,6 +64,7 @@ public class ProgrammaticArguments {
   private final AuthProvider authProvider;
   private final SslEngineFactory sslEngineFactory;
   private final InetSocketAddress cloudProxyAddress;
+  private final String scyllaCloudNodeDomain;
   private final UUID startupClientId;
   private final String startupApplicationName;
   private final String startupApplicationVersion;
@@ -82,6 +83,7 @@ public class ProgrammaticArguments {
       @Nullable AuthProvider authProvider,
       @Nullable SslEngineFactory sslEngineFactory,
       @Nullable InetSocketAddress cloudProxyAddress,
+      @Nullable String scyllaCloudNodeDomain,
       @Nullable UUID startupClientId,
       @Nullable String startupApplicationName,
       @Nullable String startupApplicationVersion,
@@ -99,6 +101,7 @@ public class ProgrammaticArguments {
     this.authProvider = authProvider;
     this.sslEngineFactory = sslEngineFactory;
     this.cloudProxyAddress = cloudProxyAddress;
+    this.scyllaCloudNodeDomain = scyllaCloudNodeDomain;
     this.startupClientId = startupClientId;
     this.startupApplicationName = startupApplicationName;
     this.startupApplicationVersion = startupApplicationVersion;
@@ -164,6 +167,11 @@ public class ProgrammaticArguments {
   }
 
   @Nullable
+  public String getScyllaCloudNodeDomain() {
+    return scyllaCloudNodeDomain;
+  }
+
+  @Nullable
   public UUID getStartupClientId() {
     return startupClientId;
   }
@@ -203,6 +211,7 @@ public class ProgrammaticArguments {
     private AuthProvider authProvider;
     private SslEngineFactory sslEngineFactory;
     private InetSocketAddress cloudProxyAddress;
+    private String scyllaCloudNodeDomain;
     private UUID startupClientId;
     private String startupApplicationName;
     private String startupApplicationVersion;
@@ -367,6 +376,14 @@ public class ProgrammaticArguments {
     }
 
     @NonNull
+    public Builder withScyllaCloudProxyAddress(
+        @Nullable InetSocketAddress cloudAddress, String scyllaCloudNodeDomain) {
+      this.cloudProxyAddress = cloudAddress;
+      this.scyllaCloudNodeDomain = scyllaCloudNodeDomain;
+      return this;
+    }
+
+    @NonNull
     public Builder withAuthProvider(@Nullable AuthProvider authProvider) {
       this.authProvider = authProvider;
       return this;
@@ -422,6 +439,7 @@ public class ProgrammaticArguments {
           authProvider,
           sslEngineFactory,
           cloudProxyAddress,
+          scyllaCloudNodeDomain,
           startupClientId,
           startupApplicationName,
           startupApplicationVersion,
