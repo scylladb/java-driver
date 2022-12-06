@@ -112,6 +112,11 @@ public class CustomCcmRule extends BaseCcmRule {
       return this;
     }
 
+    public Builder withSniProxy(int port) {
+      bridgeBuilder.withSniProxy(port);
+      return this;
+    }
+
     public CustomCcmRule build() {
       return new CustomCcmRule(bridgeBuilder.build());
     }

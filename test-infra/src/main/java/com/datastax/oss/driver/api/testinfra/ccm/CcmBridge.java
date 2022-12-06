@@ -23,6 +23,7 @@ package com.datastax.oss.driver.api.testinfra.ccm;
 
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.shaded.guava.common.base.Joiner;
+import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
 import com.datastax.oss.driver.shaded.guava.common.io.Resources;
@@ -179,6 +180,8 @@ public class CcmBridge implements AutoCloseable {
   private final List<String> dseWorkloads;
   private final String jvmArgs;
 
+  private final int sniProxyPort;
+
   private CcmBridge(
       Path configDirectory,
       int[] nodes,
@@ -188,7 +191,8 @@ public class CcmBridge implements AutoCloseable {
       List<String> dseConfigurationRawYaml,
       List<String> createOptions,
       Collection<String> jvmArgs,
-      List<String> dseWorkloads) {
+      List<String> dseWorkloads,
+      int sniProxyPort) {
     this.configDirectory = configDirectory;
     if (nodes.length == 1) {
       // Hack to ensure that the default DC is always called 'dc1': pass a list ('-nX:0') even if
@@ -223,6 +227,7 @@ public class CcmBridge implements AutoCloseable {
     }
     this.jvmArgs = allJvmArgs.toString();
     this.dseWorkloads = dseWorkloads;
+    this.sniProxyPort = sniProxyPort;
   }
 
   // Copied from Netty's PlatformDependent to avoid the dependency on Netty
@@ -295,6 +300,14 @@ public class CcmBridge implements AutoCloseable {
       return sb.toString();
     }
     return version.toString();
+  }
+
+  public String getScyllaCloudConfigPathString() {
+    return configDirectory.toFile().getAbsolutePath() + "/" + CLUSTER_NAME + "/config_data.yaml";
+  }
+
+  public String getIpPrefix() {
+    return ipPrefix;
   }
 
   public void create() {
@@ -371,7 +384,12 @@ public class CcmBridge implements AutoCloseable {
   public void start() {
     if (started.compareAndSet(false, true)) {
       try {
-        execute("start", jvmArgs, "--wait-for-binary-proto");
+        execute(
+            "start",
+            jvmArgs,
+            "--wait-for-binary-proto",
+            (sniProxyPort >= 0 ? "--sni-proxy" : ""),
+            (sniProxyPort > 0 ? "--sni-port=" + sniProxyPort : ""));
       } catch (RuntimeException re) {
         // if something went wrong starting CCM, see if we can also dump the error
         executeCheckLogError();
@@ -531,6 +549,8 @@ public class CcmBridge implements AutoCloseable {
 
     private final Path configDirectory;
 
+    private int sniProxyPort = -1;
+
     private Builder() {
       try {
         this.configDirectory = Files.createTempDirectory("ccm");
@@ -635,6 +655,14 @@ public class CcmBridge implements AutoCloseable {
       return this;
     }
 
+    /** Enable SNI proxy and use given port number. Port 0 means any port. */
+    public Builder withSniProxy(int port) {
+      Preconditions.checkArgument(port >= 0);
+      Preconditions.checkArgument(port <= 65535);
+      this.sniProxyPort = port;
+      return this;
+    }
+
     public CcmBridge build() {
       return new CcmBridge(
           configDirectory,
@@ -645,7 +673,8 @@ public class CcmBridge implements AutoCloseable {
           dseRawYaml,
           createOptions,
           jvmArgs,
-          dseWorkloads);
+          dseWorkloads,
+          sniProxyPort);
     }
   }
 }
