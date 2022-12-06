@@ -1,4 +1,4 @@
-package com.datastax.oss.driver.api.core.cloud;
+package com.datastax.oss.driver.api.core.scyllacloud;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Matchers.any;

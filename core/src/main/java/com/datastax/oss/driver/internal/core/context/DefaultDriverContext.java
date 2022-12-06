@@ -54,7 +54,6 @@ import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
-import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
@@ -492,13 +491,10 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected TopologyMonitor buildTopologyMonitor() {
-    if (cloudProxyAddress == null) {
-      return new DefaultTopologyMonitor(this);
-    }
-    if (scyllaCloudNodeDomain != null) {
+    if (cloudProxyAddress != null) {
       return new ScyllaCloudTopologyMonitor(this, cloudProxyAddress, scyllaCloudNodeDomain);
     }
-    return new CloudTopologyMonitor(this, cloudProxyAddress);
+    return new DefaultTopologyMonitor(this);
   }
 
   protected MetadataManager buildMetadataManager() {
