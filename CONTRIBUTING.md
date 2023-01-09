@@ -286,6 +286,10 @@ If you use CCM, it **must** be with `CcmRule`.
 For an example of a Simulacron-based parallelizable test, see `NodeTargetingIT`. For a CCM-based
 test, see `DirectCompressionIT`.
 
+Currently `CcmRule` based tests will not preserve CCM config directory upon failure. To have CCM
+logs available in case of failure during automated testing combine it with `PreserveLogsRule` so
+that logs can be uploaded.
+
 ##### Serial tests
 
 These tests cannot run in parallel, in general because they require CCM clusters of different sizes,

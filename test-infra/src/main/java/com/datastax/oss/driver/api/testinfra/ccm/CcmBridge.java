@@ -179,6 +179,8 @@ public class CcmBridge implements AutoCloseable {
   private final List<String> dseWorkloads;
   private final String jvmArgs;
 
+  private boolean keepLogs = false;
+
   private CcmBridge(
       Path configDirectory,
       int[] nodes,
@@ -378,6 +380,14 @@ public class CcmBridge implements AutoCloseable {
     execute("remove");
   }
 
+  public void removeOrStop() {
+    if (keepLogs) {
+      stop();
+    } else {
+      remove();
+    }
+  }
+
   public void pause(int n) {
     execute("node" + n, "pause");
   }
@@ -471,7 +481,11 @@ public class CcmBridge implements AutoCloseable {
 
   @Override
   public void close() {
-    remove();
+    removeOrStop();
+  }
+
+  public void setKeepLogs(boolean keepLogs) {
+    this.keepLogs = keepLogs;
   }
 
   /**
