@@ -130,7 +130,35 @@ public class Metrics {
               return value;
             }
           });
+  private final Gauge<Map<Host, Map<Integer, Integer>>> perShardInflightRequestInfo =
+      registry.register(
+          "per-shard-inflight-request-info",
+          new Gauge<Map<Host, Map<Integer, Integer>>>() {
+            @Override
+            public Map<Host, Map<Integer, Integer>> getValue() {
+              Map<Host, Map<Integer, Integer>> result = new HashMap<Host, Map<Integer, Integer>>();
+              for (SessionManager session : manager.sessions) {
+                for (Map.Entry<Host, HostConnectionPool> poolEntry : session.pools.entrySet()) {
+                  HostConnectionPool hostConnectionPool = poolEntry.getValue();
+                  Map<Integer, Integer> perShardInflightRequests = new HashMap<Integer, Integer>();
 
+                  for (int shardId = 0;
+                      shardId < hostConnectionPool.connections.length;
+                      shardId++) {
+                    int shardInflightRequests = 0;
+                    for (Connection connection : hostConnectionPool.connections[shardId]) {
+                      shardInflightRequests += connection.inFlight.get();
+                    }
+                    perShardInflightRequests.put(shardId, shardInflightRequests);
+                  }
+
+                  result.put(poolEntry.getKey(), perShardInflightRequests);
+                }
+              }
+
+              return result;
+            }
+          });
   private final Gauge<Integer> executorQueueDepth;
   private final Gauge<Integer> blockingExecutorQueueDepth;
   private final Gauge<Integer> reconnectionSchedulerQueueSize;
@@ -372,6 +400,10 @@ public class Metrics {
 
   public Gauge<Map<Host, Integer>> getShardAwarenessInfo() {
     return shardAwarenessInfo;
+  }
+
+  public Gauge<Map<Host, Map<Integer, Integer>>> getPerShardInflightRequestInfo() {
+    return perShardInflightRequestInfo;
   }
 
   /**
