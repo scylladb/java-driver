@@ -1047,7 +1047,7 @@ class Connection {
   }
 
   public int shardId() {
-    return shardId == null || getHost().getShardingInfo() == null ? 0 : shardId;
+    return shardId == null ? 0 : shardId;
   }
 
   /**
