@@ -19,6 +19,8 @@ package com.datastax.driver.core;
  * The distance to a Cassandra node as assigned by a {@link
  * com.datastax.driver.core.policies.LoadBalancingPolicy} (through its {@code distance} method).
  *
+ * <p>Note: the meaning and interpretation of the distance depends on the load balancing policy.
+ *
  * <p>The distance assigned to an host influences how many connections the driver maintains towards
  * this host. If for a given host the assigned {@code HostDistance} is {@code LOCAL} or {@code
  * REMOTE}, some connections will be maintained by the driver to this host. More active connections
@@ -34,5 +36,6 @@ public enum HostDistance {
   // Note: PoolingOptions rely on the order of the enum.
   LOCAL,
   REMOTE,
+  FOREIGN,
   IGNORED
 }
