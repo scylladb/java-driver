@@ -315,6 +315,7 @@ simply navigate to each sub-directory.
    async/*
    auth/*
    compression/*
+   serverless/*
    control_connection/*
    custom_codecs/*
    custom_payloads/*
