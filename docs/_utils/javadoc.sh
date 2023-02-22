@@ -15,3 +15,5 @@ mvn javadoc:javadoc
 [ -d $OUTPUT_DIR ] && rm -r $OUTPUT_DIR
 mkdir -p "$OUTPUT_DIR"
 mv -f core/target/site/apidocs/* $OUTPUT_DIR
+cp -f -r query-builder/target/site/apidocs/* $OUTPUT_DIR
+cp -f -r mapper-runtime/target/site/apidocs/* $OUTPUT_DIR
