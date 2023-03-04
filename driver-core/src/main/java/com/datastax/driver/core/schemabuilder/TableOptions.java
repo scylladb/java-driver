@@ -66,6 +66,10 @@ public abstract class TableOptions<T extends TableOptions> extends SchemaStateme
 
   private Optional<Boolean> replicateOnWrite = Optional.absent();
 
+  private Optional<Integer> maxReadsPerSecond = Optional.absent();
+
+  private Optional<Integer> maxWritesPerSecond = Optional.absent();
+
   private Optional<SpeculativeRetryValue> speculativeRetry = Optional.absent();
 
   private Optional<Boolean> cdc = Optional.absent();
@@ -349,6 +353,36 @@ public abstract class TableOptions<T extends TableOptions> extends SchemaStateme
   }
 
   /**
+   * Sets rate limit for read operations in table option "per_partition_rate_limit". NOTE: Due to
+   * ScyllaDB’s distributed nature, tracking per-partition request rates is not perfect and the
+   * actual rate of accepted requests may be higher up to a factor of keyspace’s RF. This feature
+   * should not be used to enforce precise limits but rather serve as an overload protection
+   * feature.
+   *
+   * @param maxReadsPerSecond rate limit for read operations
+   * @return this {@code TableOptions} object.
+   */
+  public T maxReadsPerSecond(int maxReadsPerSecond) {
+    this.maxReadsPerSecond = Optional.of(maxReadsPerSecond);
+    return self;
+  }
+
+  /**
+   * Sets rate limit for write operations in table option "per_partition_rate_limit". NOTE: Due to
+   * ScyllaDB’s distributed nature, tracking per-partition request rates is not perfect and the
+   * actual rate of accepted requests may be higher up to a factor of keyspace’s RF. This feature
+   * should not be used to enforce precise limits but rather serve as an overload protection
+   * feature.
+   *
+   * @param maxWritesPerSecond rate limit for write operations
+   * @return this {@code TableOptions} object.
+   */
+  public T maxWritesPerSecond(int maxWritesPerSecond) {
+    this.maxWritesPerSecond = Optional.of(maxWritesPerSecond);
+    return self;
+  }
+
+  /**
    * To override normal read timeout when read_repair_chance is not 1.0, sending another request to
    * read, choose one of these values and use the property to create or alter the table:
    *
@@ -516,6 +550,25 @@ public abstract class TableOptions<T extends TableOptions> extends SchemaStateme
 
     if (replicateOnWrite.isPresent()) {
       options.add("replicate_on_write = " + replicateOnWrite.get());
+    }
+
+    if (maxReadsPerSecond.isPresent() || maxWritesPerSecond.isPresent()) {
+      StringBuilder sBuilder = new StringBuilder("per_partition_rate_limit = {");
+
+      if (maxReadsPerSecond.isPresent()) {
+        sBuilder.append("'max_reads_per_second': ").append(maxReadsPerSecond.get());
+
+        if (maxWritesPerSecond.isPresent()) {
+          sBuilder.append(", ");
+        }
+      }
+
+      if (maxWritesPerSecond.isPresent()) {
+        sBuilder.append("'max_writes_per_second': ").append(maxWritesPerSecond.get());
+      }
+
+      sBuilder.append("}");
+      options.add(sBuilder.toString());
     }
 
     if (speculativeRetry.isPresent()) {

@@ -352,6 +352,30 @@ public class CreateTest {
   }
 
   @Test(groups = "unit")
+  public void should_omit_write_rate_limit_option() throws Exception {
+    // When
+    SchemaStatement statement =
+        createTable("test")
+            .addPartitionKey("id", DataType.bigint())
+            .addClusteringColumn("col1", DataType.uuid())
+            .addClusteringColumn("col2", DataType.uuid())
+            .addColumn("name", DataType.text())
+            .withOptions()
+            .maxReadsPerSecond(123);
+
+    // Then
+    assertThat(statement.getQueryString())
+        .isEqualTo(
+            "\n\tCREATE TABLE test(\n\t\t"
+                + "id bigint,\n\t\t"
+                + "col1 uuid,\n\t\t"
+                + "col2 uuid,\n\t\t"
+                + "name text,\n\t\t"
+                + "PRIMARY KEY(id, col1, col2))\n\t"
+                + "WITH per_partition_rate_limit = {'max_reads_per_second': 123}");
+  }
+
+  @Test(groups = "unit")
   public void should_create_table_with_all_options() throws Exception {
     // When
     SchemaStatement statement =
@@ -378,6 +402,8 @@ public class CreateTest {
             .populateIOCacheOnFlush(true)
             .readRepairChance(0.05)
             .replicateOnWrite(true)
+            .maxReadsPerSecond(123)
+            .maxWritesPerSecond(456)
             .speculativeRetry(always())
             .cdc(true);
 
@@ -403,6 +429,7 @@ public class CreateTest {
                 + "AND populate_io_cache_on_flush = true "
                 + "AND read_repair_chance = 0.05 "
                 + "AND replicate_on_write = true "
+                + "AND per_partition_rate_limit = {'max_reads_per_second': 123, 'max_writes_per_second': 456} "
                 + "AND speculative_retry = 'ALWAYS' "
                 + "AND cdc = true AND CLUSTERING ORDER BY(col1 ASC, col2 DESC) AND COMPACT STORAGE");
   }

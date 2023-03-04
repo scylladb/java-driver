@@ -121,6 +121,8 @@ public class AlterTest {
             .memtableFlushPeriodInMillis(12)
             .populateIOCacheOnFlush(true)
             .replicateOnWrite(true)
+            .maxReadsPerSecond(123)
+            .maxWritesPerSecond(456)
             .readRepairChance(0.42)
             .speculativeRetry(always())
             .cdc(true);
@@ -147,6 +149,7 @@ public class AlterTest {
                 + "AND populate_io_cache_on_flush = true "
                 + "AND read_repair_chance = 0.42 "
                 + "AND replicate_on_write = true "
+                + "AND per_partition_rate_limit = {'max_reads_per_second': 123, 'max_writes_per_second': 456} "
                 + "AND speculative_retry = 'ALWAYS' "
                 + "AND cdc = true");
 
