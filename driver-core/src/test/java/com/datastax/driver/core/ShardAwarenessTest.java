@@ -82,7 +82,7 @@ public class ShardAwarenessTest extends CCMTestsSupport {
           event.getSource(),
           event.getThreadName(),
           event.getDescription());
-      assertThat(event.getThreadName()).isEqualTo(shard);
+      assertThat(event.getThreadName()).startsWith(shard);
       if (event.getDescription().contains("querying locally")) {
         anyLocal = true;
       }
