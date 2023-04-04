@@ -9,7 +9,7 @@ You also need the following software installed to generate the reference documen
 - Java JDK 8 or higher
 - Maven
 
-Once you have installed the above software, you can build and preview the documentation by following the steps outlined in the `Quickstart guide <https://sphinx-theme.scylladb.com/stable/getting-started/quickstart.html>`_.
+Once you have installed the above software, you can build and preview the documentation by following the steps outlined in the [Quickstart guide](https://sphinx-theme.scylladb.com/stable/getting-started/quickstart.html).
 
 ## Custom commands
 
