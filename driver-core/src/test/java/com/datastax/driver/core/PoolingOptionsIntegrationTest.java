@@ -74,7 +74,7 @@ public class PoolingOptionsIntegrationTest extends CCMTestsSupport {
 
     // Expect core connections + control connection.
     assertThat(cluster().getMetrics().getOpenConnections().getValue())
-        .isEqualTo(TestUtils.numberOfLocalCoreConnections(cluster()) + 1);
+        .isEqualTo(TestUtils.numberOfLocalCoreConnectionsSharded(cluster()) + 1);
 
     reset();
 
