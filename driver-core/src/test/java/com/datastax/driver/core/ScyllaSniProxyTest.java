@@ -3,6 +3,7 @@
  */
 package com.datastax.driver.core;
 
+import static com.datastax.driver.core.Assertions.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.atMost;
@@ -25,13 +26,13 @@ public class ScyllaSniProxyTest extends CCMTestsSupport {
     TestUtils.waitForUp(TestUtils.ipOfNode(1), c);
 
     Collection<Host> hosts = s.getState().getConnectedHosts();
-    assert hosts.size() == testNodes;
+    assertThat(hosts.size()).isEqualTo(testNodes);
     for (Host host : hosts) {
-      assert (host.getListenAddress() == null
-          || host.getListenAddress().equals(TestUtils.addressOfNode(1)));
-      assert host.getEndPoint().resolve().getAddress().equals(TestUtils.addressOfNode(1));
-      assert host.getEndPoint().resolve().getPort() == ccm().getSniPort();
-      assert !host.getEndPoint().toString().contains("any.");
+      assertThat(host.getListenAddress()).isNotNull();
+      assertThat(host.getListenAddress()).isEqualTo(TestUtils.addressOfNode(1));
+      assertThat(host.getEndPoint().resolve().getAddress()).isEqualTo(TestUtils.addressOfNode(1));
+      assertThat(host.getEndPoint().resolve().getPort()).isEqualTo(ccm().getSniPort());
+      assertThat(host.getEndPoint().toString()).doesNotContain("any.");
     }
     ((SessionManager) s).cluster.manager.controlConnection.triggerReconnect();
 
