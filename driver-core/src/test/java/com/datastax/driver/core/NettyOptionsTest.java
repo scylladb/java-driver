@@ -89,7 +89,7 @@ public class NettyOptionsTest extends CCMTestsSupport {
     // when
     cluster.connect(); // force session creation to populate pools
 
-    int expectedNumberOfCalls = TestUtils.numberOfLocalCoreConnections(cluster) * hosts + 1;
+    int expectedNumberOfCalls = TestUtils.numberOfLocalCoreConnectionsSharded(cluster) + 1;
     // If the driver supports a more recent protocol version than C*, the negotiation at startup
     // will open an additional connection for each protocol version tried.
     ProtocolVersion version = ProtocolVersion.DEFAULT;

@@ -728,6 +728,25 @@ public abstract class TestUtils {
     return configuration.getPoolingOptions().getCoreConnectionsPerHost(HostDistance.LOCAL);
   }
 
+  // Calculates number of connections the same way
+  // HostConnectionPool.initAsyncWithConnection(connection) does
+  public static int numberOfLocalCoreConnectionsSharded(Cluster cluster) {
+    int connections = 0;
+    for (Host host : cluster.getMetadata().getAllHosts()) {
+      ShardingInfo shardingInfo = host.getShardingInfo();
+      int shardsCount = 1;
+      if (shardingInfo != null) {
+        shardsCount = shardingInfo.getShardsCount();
+      }
+      int optionsCoreConnections = TestUtils.numberOfLocalCoreConnections(cluster);
+      connections +=
+          shardsCount
+              * (optionsCoreConnections / shardsCount
+                  + (optionsCoreConnections % shardsCount > 0 ? 1 : 0));
+    }
+    return connections;
+  }
+
   /**
    * @return A Scassandra instance with an arbitrarily chosen binary port from 8042-8142 and admin
    *     port from 8052-8152.
