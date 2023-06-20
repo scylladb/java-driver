@@ -30,11 +30,12 @@ public class SingleConnectionPoolTest extends CCMTestsSupport {
   @Test(groups = "short")
   public void should_throttle_requests() {
     // Throttle to a very low value. Even a single thread can generate a higher throughput.
-    final int maxRequests = 10;
+    final int maxRequestsPerConnection = 10;
     cluster()
         .getConfiguration()
         .getPoolingOptions()
-        .setMaxRequestsPerConnection(HostDistance.LOCAL, maxRequests);
+        .setMaxRequestsPerConnection(HostDistance.LOCAL, maxRequestsPerConnection);
+    final int maxRequests = 10 * TestUtils.numberOfLocalCoreConnectionsSharded(cluster());
 
     // Track in flight requests in a dedicated thread every second
     final AtomicBoolean excessInflightQueriesSpotted = new AtomicBoolean(false);
