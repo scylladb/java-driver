@@ -237,7 +237,7 @@ public class ReconnectionTest extends CCMTestsSupport {
     cluster.connect();
     cluster.connect();
 
-    int corePoolSize = TestUtils.numberOfLocalCoreConnections(cluster);
+    int corePoolSize = TestUtils.numberOfLocalCoreConnectionsSharded(cluster);
 
     // Right after init, 1 connection has been opened by the control connection, and the core size
     // for each pool.

@@ -197,7 +197,7 @@ public class ClusterStressTest extends CCMTestsSupport {
         assertEquals(cluster.manager.sessions.size(), 1);
         assertEquals(
             (int) cluster.getMetrics().getOpenConnections().getValue(),
-            1 + TestUtils.numberOfLocalCoreConnections(cluster));
+            1 + TestUtils.numberOfLocalCoreConnectionsSharded(cluster));
         assertEquals(
             channelMonitor.openChannels(getContactPointsWithPorts()).size(),
             1 + TestUtils.numberOfLocalCoreConnections(cluster));

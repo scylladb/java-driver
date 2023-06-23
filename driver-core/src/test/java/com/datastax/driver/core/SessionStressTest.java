@@ -116,11 +116,12 @@ public class SessionStressTest extends CCMTestsSupport {
       // This is a local cluster so we also have 2 connections per session
       Session session = stressCluster.connect();
       assertEquals(stressCluster.manager.sessions.size(), 1);
-      int coreConnections = TestUtils.numberOfLocalCoreConnections(stressCluster);
+      int coreConnections = TestUtils.numberOfLocalCoreConnectionsSharded(stressCluster);
       assertEquals(
           (int) stressCluster.getMetrics().getOpenConnections().getValue(), 1 + coreConnections);
       assertEquals(
-          channelMonitor.openChannels(getContactPointsWithPorts()).size(), 1 + coreConnections);
+          channelMonitor.openChannels(getContactPointsWithPorts()).size(),
+          1 + TestUtils.numberOfLocalCoreConnections(stressCluster));
 
       // Closing the session keeps the control connection opened
       session.close();

@@ -132,8 +132,9 @@ public class TimeoutStressTest extends CCMTestsSupport {
     AtomicBoolean stopped = new AtomicBoolean(false);
 
     // Ensure that we never exceed MaxConnectionsPerHost * nodes + 1 control connection.
-    int maxConnections =
-        TestUtils.numberOfLocalCoreConnections(cluster()) * getContactPoints().size() + 1;
+    // numberOfLocalCoreConnectionsSharded iterates over all hosts, so there is no need to multiply
+    // by nodes now.
+    int maxConnections = TestUtils.numberOfLocalCoreConnectionsSharded(cluster()) + 1;
 
     try {
       Semaphore concurrentQueries = new Semaphore(CONCURRENT_QUERIES);
