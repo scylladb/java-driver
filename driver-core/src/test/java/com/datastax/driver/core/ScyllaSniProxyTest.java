@@ -13,6 +13,9 @@ import static org.mockito.Mockito.verify;
 import com.datastax.driver.core.utils.ScyllaOnly;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
 import org.testng.annotations.Test;
 
 @CreateCCM(CreateCCM.TestMode.PER_METHOD)
@@ -27,13 +30,14 @@ public class ScyllaSniProxyTest extends CCMTestsSupport {
 
     Collection<Host> hosts = s.getState().getConnectedHosts();
     assertThat(hosts.size()).isEqualTo(testNodes);
+    Set<UUID> uuidSet = new TreeSet<UUID>();
     for (Host host : hosts) {
-      assertThat(host.getListenAddress()).isNotNull();
-      assertThat(host.getListenAddress()).isEqualTo(TestUtils.addressOfNode(1));
+      uuidSet.add(host.getHostId());
       assertThat(host.getEndPoint().resolve().getAddress()).isEqualTo(TestUtils.addressOfNode(1));
       assertThat(host.getEndPoint().resolve().getPort()).isEqualTo(ccm().getSniPort());
       assertThat(host.getEndPoint().toString()).doesNotContain("any.");
     }
+    assertThat(uuidSet.size()).isEqualTo(testNodes);
     ((SessionManager) s).cluster.manager.controlConnection.triggerReconnect();
 
     SchemaChangeListener listener = mock(SchemaChangeListenerBase.class);
