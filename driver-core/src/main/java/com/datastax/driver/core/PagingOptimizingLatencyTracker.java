@@ -8,6 +8,9 @@ class PagingOptimizingLatencyTracker implements LatencyTracker {
 
   @Override
   public void update(Host host, Statement statement, Exception exception, long newLatencyNanos) {
+    if (!(statement instanceof BoundStatement)) {
+      return;
+    }
     if (exception == null) {
       statement.setLastHost(host);
     } else {

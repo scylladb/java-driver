@@ -329,7 +329,7 @@ public class TokenAwarePolicyTest {
    *
    * @test_category load_balancing:token_aware
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_use_other_nodes_when_replicas_having_token_are_down() {
     // given: A 4 node cluster using TokenAwarePolicy with a replication factor of 2.
     ScassandraCluster sCluster =

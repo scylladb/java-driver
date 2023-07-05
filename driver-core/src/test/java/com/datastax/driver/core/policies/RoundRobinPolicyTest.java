@@ -65,7 +65,7 @@ public class RoundRobinPolicyTest {
    *
    * @test_category load_balancing:round_robin
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_round_robin_within_single_datacenter() {
     // given: a 5 node cluster using RoundRobinPolicy.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(5).build();
@@ -102,7 +102,7 @@ public class RoundRobinPolicyTest {
    *
    * @test_category load_balancing:round_robin
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_round_robin_irrespective_of_topology() {
     // given: a 10 node, 5 DC cluster using RoundRobinPolicy.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(2, 2, 2, 2, 2).build();
@@ -145,8 +145,7 @@ public class RoundRobinPolicyTest {
   @Test(
       groups = "short",
       dataProvider = "consistencyLevels",
-      dataProviderClass = DataProviders.class,
-      enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+      dataProviderClass = DataProviders.class)
   public void should_warn_if_using_dc_local_consistency_level(ConsistencyLevel cl) {
     // given: a 2 node, 2 DC cluster using RoundRobinPolicy.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(1, 1).build();

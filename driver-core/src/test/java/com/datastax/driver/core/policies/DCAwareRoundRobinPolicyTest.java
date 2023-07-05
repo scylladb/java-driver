@@ -87,7 +87,7 @@ public class DCAwareRoundRobinPolicyTest {
    *
    * @test_category load_balancing:dc_aware
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_round_robin_within_local_dc() {
     // given: a 10 node 2 DC cluster.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(5, 5).build();
@@ -123,7 +123,7 @@ public class DCAwareRoundRobinPolicyTest {
    *
    * @test_category load_balancing:dc_aware
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_not_use_remote_hosts_if_some_nodes_are_up_in_local_dc() {
     // given: a 10 node 2 DC cluster with DC policy with 2 remote hosts.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(5, 5).build();
@@ -172,7 +172,7 @@ public class DCAwareRoundRobinPolicyTest {
    *
    * @test_category load_balancing:dc_aware
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_round_robin_on_remote_hosts_when_no_up_nodes_in_local_dc() {
     // given: a 10 node 2 DC cluster with DC policy with 2 remote hosts.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(5, 5).build();
@@ -221,8 +221,7 @@ public class DCAwareRoundRobinPolicyTest {
   @Test(
       groups = "short",
       dataProvider = "consistencyLevels",
-      dataProviderClass = DataProviders.class,
-      enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+      dataProviderClass = DataProviders.class)
   public void should_only_use_remote_hosts_when_using_non_dc_local_cl(ConsistencyLevel cl) {
     // given: a 4 node 2 DC Cluster with a LB policy that specifies to not allow remote dcs for
     // a local consistency level.
@@ -276,8 +275,7 @@ public class DCAwareRoundRobinPolicyTest {
   @Test(
       groups = "short",
       dataProvider = "consistencyLevels",
-      dataProviderClass = DataProviders.class,
-      enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+      dataProviderClass = DataProviders.class)
   public void should_use_remote_hosts_for_local_cl_when_allowed(ConsistencyLevel cl) {
     // given: a 4 node 2 DC Cluster with a LB policy that specifies to allow remote dcs for
     // a local consistency level.
@@ -325,7 +323,7 @@ public class DCAwareRoundRobinPolicyTest {
    *
    * @test_category load_balancing:dc_aware
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_not_send_requests_to_blacklisted_dc_using_host_filter_policy() {
     // given: a 6 node 3 DC cluster with a DCAwareRoundRobinPolicy that is filtering hosts in DC2.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(2, 2, 2).build();
@@ -382,7 +380,7 @@ public class DCAwareRoundRobinPolicyTest {
    *
    * @test_category load_balancing:dc_aware
    */
-  @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
+  @Test(groups = "short")
   public void should_send_requests_to_whitelisted_dcs_using_host_filter_policy() {
     // given: a 6 node 3 DC cluster with a DCAwareRoundRobinPolicy that is whitelisting hosts in DC1
     // and DC2.
