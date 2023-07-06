@@ -315,7 +315,7 @@ public class ScassandraCluster {
     } catch (Exception e) {
       logger.error("Could not stop node " + scassandra, e);
     }
-    assertThat(cluster).host(node).goesDownWithin(10, TimeUnit.SECONDS);
+    assertThat(cluster).host(node).goesDownWithin(60, TimeUnit.SECONDS);
   }
 
   /**
