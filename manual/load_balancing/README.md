@@ -115,6 +115,47 @@ local datacenter. In general, providing the datacenter name explicitly is a safe
 Hosts belonging to the local datacenter are at distance `LOCAL`, and appear first in query plans (in a round-robin
 fashion).
 
+### [RackAwareRoundRobinPolicy]
+
+```java
+Cluster cluster = Cluster.builder()
+        .addContactPoint("127.0.0.1")
+        .withLoadBalancingPolicy(
+                RackAwareRoundRobinPolicy.builder()
+                        .withLocalDc("myLocalDC")
+                        .withLocalRack("myLocalRack")
+                        .build()
+        ).build();
+```
+
+This policy queries nodes of the local rack in a round-robin fashion.
+
+Call `withLocalDc` to specify the name of your local datacenter and `withLocalRack` to specify the name of your local rack. 
+You can also leave it out, and the driver will use the datacenter and rack of the first contact point that was reached [at initialization](../#cluster-initialization). 
+However, remember that the driver shuffles the initial list of contact points, so this assumes that all contact points are in the
+local datacenter and rack. In general, providing the datacenter and rack name explicitly is a safer option.
+
+Hosts belonging to the local datacenter are at distance `LOCAL`, and appear first in query plans (in a round-robin
+fashion) with hosts in the local rack having precedence over nodes in remote racks in the local datacenter.
+
+For example, if there are any UP hosts in the local rack the policy will query those nodes in round-robin fashion:
+* query 1: host1 *(local DC, local rack)*, host2 *(local DC, local rack)*, host3 *(local DC, local rack)*
+* query 2: host2 *(local DC, local rack)*, host3 *(local DC, local rack)*, host1 *(local DC, local rack)*
+* query 3: host3 *(local DC, local rack)*, host1 *(local DC, local rack)*, host2 *(local DC, local rack)*
+* query 4: host1 *(local DC, local rack)*, host2 *(local DC, local rack)*, host3 *(local DC, local rack)*
+
+If all nodes in the local rack are DOWN, the policy will then move on to remote racks in local DC:
+* query 1: host4 *(local DC, remote rack 1)*, host5 *(local DC, remote rack 1)*, host6 *(local DC, remote rack 2)*
+* query 2: host5 *(local DC, remote rack 1)*, host6 *(local DC, remote rack 2)*, host4 *(local DC, remote rack 1)*
+* query 3: host6 *(local DC, remote rack 2)*, host4 *(local DC, remote rack 1)*, host5 *(local DC, remote rack 1)*
+* query 4: host4 *(local DC, remote rack 1)*, host5 *(local DC, remote rack 1)*, host6 *(local DC, remote rack 2)*
+
+If all nodes in the local datacenter are DOWN, the policy can query remote DCs (configurable by `withUsedHostsPerRemoteDc`):
+* query 1: host7 *(remote DC, remote rack 1)*, host8 *(remote DC, remote rack 1)*, host9 *(remote DC, remote rack 2)*
+* query 2: host8 *(remote DC, remote rack 1)*, host9 *(remote DC, remote rack 2)*, host7 *(remote DC, remote rack 1)*
+* query 3: host9 *(remote DC, remote rack 2)*, host7 *(remote DC, remote rack 1)*, host8 *(remote DC, remote rack 1)*
+* query 4: host7 *(remote DC, remote rack 1)*, host8 *(remote DC, remote rack 1)*, host9 *(remote DC, remote rack 2)*
+
 ### [TokenAwarePolicy]
 
 ```java
@@ -302,6 +343,7 @@ complex ones like `DCAwareRoundRobinPolicy`.
 [LoadBalancingPolicy]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/LoadBalancingPolicy.html
 [RoundRobinPolicy]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/RoundRobinPolicy.html
 [DCAwareRoundRobinPolicy]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/DCAwareRoundRobinPolicy.html
+[RackAwareRoundRobinPolicy]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/RackAwareRoundRobinPolicy.html
 [TokenAwarePolicy]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/TokenAwarePolicy.html
 [LatencyAwarePolicy]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/LatencyAwarePolicy.html
 [HostFilterPolicy]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/HostFilterPolicy.html

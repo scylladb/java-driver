@@ -246,6 +246,10 @@ public class ScassandraCluster {
     return "DC" + dc;
   }
 
+  public static String rack(int rack) {
+    return "RACK" + rack;
+  }
+
   public void init() {
     for (Map.Entry<Integer, List<Scassandra>> dc : dcNodeMap.entrySet()) {
       for (Scassandra node : dc.getValue()) {
@@ -833,6 +837,10 @@ public class ScassandraCluster {
       ntsKeyspaceRow.put("replication", replicationBuilder.build());
       keyspaceRows.add(ntsKeyspaceRow);
       return this;
+    }
+
+    public ScassandraClusterBuilder withRack(int dc, int node, String rack) {
+      return forcePeerInfo(dc, node, "rack", rack);
     }
 
     public ScassandraClusterBuilder forcePeerInfo(int dc, int node, String name, Object value) {
