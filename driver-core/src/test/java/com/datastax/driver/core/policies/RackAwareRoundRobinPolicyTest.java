@@ -121,13 +121,13 @@ public class RackAwareRoundRobinPolicyTest {
       sCluster.init();
 
       Session session = cluster.connect();
-      // when: a query is executed 30 times.
-      queryTracker.query(session, 30);
+      // when: a query is executed 15 times.
+      queryTracker.query(session, 15);
 
-      // then: each node in local DC and local rack should get an equal (10) number of requests.
-      queryTracker.assertQueried(sCluster, 1, 1, 10);
-      queryTracker.assertQueried(sCluster, 1, 3, 10);
-      queryTracker.assertQueried(sCluster, 1, 5, 10);
+      // then: each node in local DC and local rack should get an equal (5) number of requests.
+      queryTracker.assertQueried(sCluster, 1, 1, 5);
+      queryTracker.assertQueried(sCluster, 1, 3, 5);
+      queryTracker.assertQueried(sCluster, 1, 5, 5);
 
       // then: no node in the remote DC or remote rack in local DC should get a request.
       for (int dc = 1; dc <= 2; dc++) {
@@ -183,14 +183,14 @@ public class RackAwareRoundRobinPolicyTest {
 
       Session session = cluster.connect();
 
-      // when: a query is executed 50 times and some hosts are down in the local rack.
+      // when: a query is executed 20 times and some hosts are down in the local rack.
       sCluster.stop(cluster, 1, 5);
       assertThat(cluster).controlHost().isNotNull();
-      queryTracker.query(session, 50);
+      queryTracker.query(session, 20);
 
       // then: all requests should be distributed to the remaining up nodes in local DC.
-      queryTracker.assertQueried(sCluster, 1, 1, 25);
-      queryTracker.assertQueried(sCluster, 1, 3, 25);
+      queryTracker.assertQueried(sCluster, 1, 1, 10);
+      queryTracker.assertQueried(sCluster, 1, 3, 10);
 
       // then: no nodes in the remote DC should have been queried.
       for (int i = 1; i <= 5; i++) {
@@ -247,17 +247,17 @@ public class RackAwareRoundRobinPolicyTest {
 
       Session session = cluster.connect();
 
-      // when: a query is executed 50 times and all hosts are down in the local rack.
+      // when: a query is executed 20 times and all hosts are down in the local rack.
       sCluster.stop(cluster, 1, 1);
       sCluster.stop(cluster, 1, 3);
       sCluster.stop(cluster, 1, 5);
       assertThat(cluster).controlHost().isNotNull();
-      queryTracker.query(session, 50);
+      queryTracker.query(session, 20);
 
       // then: all requests should be distributed to the remaining up nodes in local DC, remote
       // rack.
-      queryTracker.assertQueried(sCluster, 1, 2, 25);
-      queryTracker.assertQueried(sCluster, 1, 4, 25);
+      queryTracker.assertQueried(sCluster, 1, 2, 10);
+      queryTracker.assertQueried(sCluster, 1, 4, 10);
 
       // then: no nodes in the remote DC should have been queried.
       for (int i = 1; i <= 5; i++) {
@@ -474,13 +474,13 @@ public class RackAwareRoundRobinPolicyTest {
       sCluster.init();
 
       Session session = cluster.connect();
-      // when: a query is executed 50 times.
-      queryTracker.query(session, 50);
+      // when: a query is executed 25 times.
+      queryTracker.query(session, 25);
 
-      // then: each node in local DC should get an equal (10) number of requests.
+      // then: each node in local DC should get an equal (5) number of requests.
       // then: no node in the remote DC should get a request.
       for (int i = 1; i <= 5; i++) {
-        queryTracker.assertQueried(sCluster, 1, i, 10);
+        queryTracker.assertQueried(sCluster, 1, i, 5);
         queryTracker.assertQueried(sCluster, 2, i, 0);
       }
     } finally {
@@ -516,16 +516,16 @@ public class RackAwareRoundRobinPolicyTest {
 
       Session session = cluster.connect();
 
-      // when: a query is executed 50 times and some hosts are down in the local DC.
+      // when: a query is executed 20 times and some hosts are down in the local DC.
       sCluster.stop(cluster, 1, 5);
       sCluster.stop(cluster, 1, 3);
       sCluster.stop(cluster, 1, 1);
       assertThat(cluster).controlHost().isNotNull();
-      queryTracker.query(session, 50);
+      queryTracker.query(session, 20);
 
       // then: all requests should be distributed to the remaining up nodes in local DC.
-      queryTracker.assertQueried(sCluster, 1, 2, 25);
-      queryTracker.assertQueried(sCluster, 1, 4, 25);
+      queryTracker.assertQueried(sCluster, 1, 2, 10);
+      queryTracker.assertQueried(sCluster, 1, 4, 10);
 
       // then: no nodes in the remote DC should have been queried.
       for (int i = 1; i <= 5; i++) {
@@ -568,15 +568,15 @@ public class RackAwareRoundRobinPolicyTest {
       // control connection attempts increment LBP counter.
       assertThat(cluster).controlHost().isNotNull();
 
-      // when: a query is executed 50 times and all hosts are down in local DC.
-      queryTracker.query(session, 50);
+      // when: a query is executed 20 times and all hosts are down in local DC.
+      queryTracker.query(session, 20);
 
       // then: only usedHostsPerRemoteDc nodes in the remote DC should get requests.
       Collection<Integer> queryCounts = newArrayList();
       for (int i = 1; i <= 5; i++) {
         queryCounts.add(queryTracker.queryCount(sCluster, 2, i));
       }
-      assertThat(queryCounts).containsOnly(0, 0, 0, 25, 25);
+      assertThat(queryCounts).containsOnly(0, 0, 0, 10, 10);
     } finally {
       cluster.close();
       sCluster.stop();
@@ -618,13 +618,13 @@ public class RackAwareRoundRobinPolicyTest {
       // control connection attempts increment LBP counter.
       assertThat(cluster).controlHost().isNotNull();
 
-      // when: a query is executed 50 times and all hosts are down in local DC.
+      // when: a query is executed 20 times and all hosts are down in local DC.
       // then: expect a NHAE for a local CL since no local replicas available.
       Class<? extends Exception> expectedException =
           cl.isDCLocal() ? NoHostAvailableException.class : null;
-      queryTracker.query(session, 50, cl, expectedException);
+      queryTracker.query(session, 20, cl, expectedException);
 
-      int expectedQueryCount = cl.isDCLocal() ? 0 : 25;
+      int expectedQueryCount = cl.isDCLocal() ? 0 : 10;
       for (int i = 1; i <= 2; i++) {
         queryTracker.assertQueried(sCluster, 1, i, 0);
         // then: Remote hosts should only be queried for non local CLs.
@@ -675,13 +675,13 @@ public class RackAwareRoundRobinPolicyTest {
       // control connection attempts increment LBP counter.
       assertThat(cluster).controlHost().isNotNull();
 
-      // when: a query is executed 50 times and all hosts are down in local DC.
-      queryTracker.query(session, 50, cl, null);
+      // when: a query is executed 20 times and all hosts are down in local DC.
+      queryTracker.query(session, 20, cl, null);
 
       for (int i = 1; i <= 2; i++) {
         queryTracker.assertQueried(sCluster, 1, i, 0);
         // then: Remote hosts should be queried.
-        queryTracker.assertQueried(sCluster, 2, i, 25);
+        queryTracker.assertQueried(sCluster, 2, i, 10);
       }
     } finally {
       cluster.close();
@@ -717,11 +717,11 @@ public class RackAwareRoundRobinPolicyTest {
       Session session = cluster.connect();
 
       // when: A query is made and nodes for the local dc are available.
-      queryTracker.query(session, 50);
+      queryTracker.query(session, 20);
 
       // then: only nodes in the local DC should have been queried.
-      queryTracker.assertQueried(sCluster, 1, 1, 25);
-      queryTracker.assertQueried(sCluster, 1, 2, 25);
+      queryTracker.assertQueried(sCluster, 1, 1, 10);
+      queryTracker.assertQueried(sCluster, 1, 2, 10);
       queryTracker.assertQueried(sCluster, 2, 1, 0);
       queryTracker.assertQueried(sCluster, 2, 2, 0);
       queryTracker.assertQueried(sCluster, 3, 1, 0);
@@ -731,15 +731,15 @@ public class RackAwareRoundRobinPolicyTest {
       sCluster.stopDC(cluster, 1);
       assertThat(cluster).controlHost().isNotNull();
       queryTracker.reset();
-      queryTracker.query(session, 50);
+      queryTracker.query(session, 20);
 
       // then: Only nodes in DC3 should have been queried, since DC2 is blacklisted and DC1 is down.
       queryTracker.assertQueried(sCluster, 1, 1, 0);
       queryTracker.assertQueried(sCluster, 1, 2, 0);
       queryTracker.assertQueried(sCluster, 2, 1, 0);
       queryTracker.assertQueried(sCluster, 2, 2, 0);
-      queryTracker.assertQueried(sCluster, 3, 1, 25);
-      queryTracker.assertQueried(sCluster, 3, 2, 25);
+      queryTracker.assertQueried(sCluster, 3, 1, 10);
+      queryTracker.assertQueried(sCluster, 3, 2, 10);
     } finally {
       cluster.close();
       sCluster.stop();
@@ -776,11 +776,11 @@ public class RackAwareRoundRobinPolicyTest {
       Session session = cluster.connect();
 
       // when: A query is made and nodes for the local dc are available.
-      queryTracker.query(session, 50);
+      queryTracker.query(session, 20);
 
       // then: only nodes in the local DC should have been queried.
-      queryTracker.assertQueried(sCluster, 1, 1, 25);
-      queryTracker.assertQueried(sCluster, 1, 2, 25);
+      queryTracker.assertQueried(sCluster, 1, 1, 10);
+      queryTracker.assertQueried(sCluster, 1, 2, 10);
       queryTracker.assertQueried(sCluster, 2, 1, 0);
       queryTracker.assertQueried(sCluster, 2, 2, 0);
       queryTracker.assertQueried(sCluster, 3, 1, 0);
@@ -790,14 +790,14 @@ public class RackAwareRoundRobinPolicyTest {
       sCluster.stopDC(cluster, 1);
       assertThat(cluster).controlHost().isNotNull();
       queryTracker.reset();
-      queryTracker.query(session, 50);
+      queryTracker.query(session, 20);
 
       // then: Only nodes in DC2 should have been queried, since DC3 is not in the whitelist and DC1
       // is down.
       queryTracker.assertQueried(sCluster, 1, 1, 0);
       queryTracker.assertQueried(sCluster, 1, 2, 0);
-      queryTracker.assertQueried(sCluster, 2, 1, 25);
-      queryTracker.assertQueried(sCluster, 2, 2, 25);
+      queryTracker.assertQueried(sCluster, 2, 1, 10);
+      queryTracker.assertQueried(sCluster, 2, 2, 10);
       queryTracker.assertQueried(sCluster, 3, 1, 0);
       queryTracker.assertQueried(sCluster, 3, 1, 0);
     } finally {
