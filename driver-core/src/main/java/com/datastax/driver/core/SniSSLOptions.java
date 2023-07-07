@@ -31,7 +31,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLParameters;
 
-@IgnoreJDK6Requirement
 @SuppressWarnings("deprecation")
 public class SniSSLOptions extends JdkSSLOptions implements ExtendedRemoteEndpointAwareSslOptions {
 

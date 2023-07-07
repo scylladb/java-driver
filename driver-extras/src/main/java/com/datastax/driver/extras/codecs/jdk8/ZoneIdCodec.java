@@ -16,7 +16,6 @@
 package com.datastax.driver.extras.codecs.jdk8;
 
 import com.datastax.driver.core.DataType;
-import com.datastax.driver.core.IgnoreJDK6Requirement;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
@@ -24,7 +23,6 @@ import java.nio.ByteBuffer;
 import java.time.DateTimeException;
 
 /** {@link TypeCodec} that maps {@link java.time.ZoneId} to CQL {@code varchar}. */
-@IgnoreJDK6Requirement
 @SuppressWarnings("Since15")
 public class ZoneIdCodec extends TypeCodec<java.time.ZoneId> {
 

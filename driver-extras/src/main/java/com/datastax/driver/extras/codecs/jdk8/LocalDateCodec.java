@@ -25,14 +25,12 @@ import static com.datastax.driver.core.ParseUtils.unquote;
 import static java.lang.Long.parseLong;
 
 import com.datastax.driver.core.DataType;
-import com.datastax.driver.core.IgnoreJDK6Requirement;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.core.exceptions.InvalidTypeException;
 import java.nio.ByteBuffer;
 
 /** {@link TypeCodec} that maps {@link java.time.LocalDate} to CQL {@code date}. */
-@IgnoreJDK6Requirement
 @SuppressWarnings("Since15")
 public class LocalDateCodec extends TypeCodec<java.time.LocalDate> {
 

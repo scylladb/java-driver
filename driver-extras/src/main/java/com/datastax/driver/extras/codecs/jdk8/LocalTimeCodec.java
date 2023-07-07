@@ -18,7 +18,6 @@ package com.datastax.driver.extras.codecs.jdk8;
 import static com.datastax.driver.core.ParseUtils.quote;
 
 import com.datastax.driver.core.DataType;
-import com.datastax.driver.core.IgnoreJDK6Requirement;
 import com.datastax.driver.core.ParseUtils;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.TypeCodec;
@@ -29,7 +28,6 @@ import java.nio.ByteBuffer;
  * {@link TypeCodec} that maps {@link java.time.LocalTime} to CQL {@code time} (long representing
  * nanoseconds since midnight).
  */
-@IgnoreJDK6Requirement
 @SuppressWarnings("Since15")
 public class LocalTimeCodec extends TypeCodec<java.time.LocalTime> {
 

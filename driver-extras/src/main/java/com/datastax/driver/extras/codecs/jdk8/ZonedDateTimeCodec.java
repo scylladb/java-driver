@@ -20,7 +20,6 @@ import static com.datastax.driver.core.ParseUtils.quote;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import com.datastax.driver.core.DataType;
-import com.datastax.driver.core.IgnoreJDK6Requirement;
 import com.datastax.driver.core.ParseUtils;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.TupleType;
@@ -50,7 +49,6 @@ import java.util.List;
  * @see <a href="https://cassandra.apache.org/doc/cql3/CQL-2.2.html#usingtimestamps">'Working with
  *     timestamps' section of CQL specification</a>
  */
-@IgnoreJDK6Requirement
 @SuppressWarnings("Since15")
 public class ZonedDateTimeCodec extends TypeCodec.AbstractTupleCodec<java.time.ZonedDateTime> {
 

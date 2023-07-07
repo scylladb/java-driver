@@ -15,7 +15,6 @@
  */
 package com.datastax.driver.extras.codecs.jdk8;
 
-import com.datastax.driver.core.IgnoreJDK6Requirement;
 import com.datastax.driver.core.TypeCodec;
 import com.datastax.driver.extras.codecs.MappingCodec;
 import com.google.common.reflect.TypeParameter;
@@ -28,7 +27,6 @@ import java.util.Map;
  *
  * @param <T> The wrapped Java type
  */
-@IgnoreJDK6Requirement
 @SuppressWarnings({"Since15", "OptionalUsedAsFieldOrParameterType"})
 public class OptionalCodec<T> extends MappingCodec<java.util.Optional<T>, T> {
 

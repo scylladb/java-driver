@@ -100,7 +100,7 @@ UDT and tuple support is available only when using Apache Cassandra 2.1 or highe
 Other features are available only when using Apache Cassandra 2.0 or higher (e.g. result set paging,
 [lightweight transactions](https://docs.scylladb.com/using-scylla/lwt/))
 
-The java driver supports Java JDK versions 6 and above.
+The java driver supports Java JDK versions 8 and above.
 
 
 

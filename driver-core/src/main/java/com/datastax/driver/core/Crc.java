@@ -138,7 +138,6 @@ class Crc {
     }
   }
 
-  @IgnoreJDK6Requirement
   private static class Java8CrcUpdater implements CrcUpdater {
     @Override
     public void update(CRC32 crc, ByteBuf buffer) {
