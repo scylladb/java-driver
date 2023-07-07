@@ -33,10 +33,6 @@ package com.datastax.driver.core;
  */
 public interface ResultSet extends PagingIterable<ResultSet, Row> {
 
-  // redeclared only to make clirr happy
-  @Override
-  Row one();
-
   /**
    * Returns the columns returned in this ResultSet.
    *

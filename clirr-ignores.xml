@@ -403,4 +403,10 @@
         <to>*com.datastax.driver.core.EndPoint*</to>
         <justification>JAVA-2355: Abstract connection information into new EndPoint type for sni support</justification>
     </difference>
+    <difference>
+        <differenceType>7002</differenceType> <!-- method removed -->
+        <className>com/datastax/driver/core/ResultSet</className>
+        <method>*one*</method>
+        <justification>False positive. Method is still present in parent interface (and was only introduced in ResultSet as a workaround for another clirr false positive)</justification>
+    </difference>
 </differences>
