@@ -733,13 +733,22 @@ class SessionManager extends AbstractSession {
       if (entry.getKey().getEndPoint().equals(toExclude)) continue;
 
       try {
+        ColumnDefinitions defs = statement.getVariables();
+        String statementTable = (defs != null && defs.size() > 0 ? defs.getTable(0) : null);
         // Preparing is not critical: if it fails, it will fix itself later when the user tries to
         // execute
         // the prepared query. So don't wait if no connection is available, simply abort.
         ListenableFuture<Connection> connectionFuture =
             entry
                 .getValue()
-                .borrowConnection(0, TimeUnit.MILLISECONDS, 0, null, statement.getRoutingKey());
+                .borrowConnection(
+                    0,
+                    TimeUnit.MILLISECONDS,
+                    0,
+                    null,
+                    statement.getRoutingKey(),
+                    statement.getQueryKeyspace(),
+                    statementTable);
         ListenableFuture<Response> prepareFuture =
             GuavaCompatibility.INSTANCE.transformAsync(
                 connectionFuture,

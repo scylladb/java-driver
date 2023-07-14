@@ -70,6 +70,23 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
       switch (response.type) {
         case RESULT:
           Responses.Result rm = (Responses.Result) response;
+
+          if (rm.getCustomPayload() != null
+              && rm.getCustomPayload().containsKey(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY)
+              && (statement instanceof BoundStatement)) {
+            BoundStatement st = (BoundStatement) statement;
+            String keyspace = statement.getKeyspace();
+            String table =
+                st.preparedStatement().getPreparedId().boundValuesMetadata.variables.getTable(0);
+            session
+                .getCluster()
+                .getMetadata()
+                .getTabletMap()
+                .processTabletsRoutingV1Payload(
+                    keyspace,
+                    table,
+                    rm.getCustomPayload().get(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY));
+          }
           switch (rm.kind) {
             case SET_KEYSPACE:
               // propagate the keyspace change to other connections

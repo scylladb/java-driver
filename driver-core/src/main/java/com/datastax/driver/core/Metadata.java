@@ -21,6 +21,7 @@
  */
 package com.datastax.driver.core;
 
+import com.google.common.annotations.Beta;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -35,6 +36,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -42,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,8 +63,8 @@ public class Metadata {
   final ConcurrentMap<String, KeyspaceMetadata> keyspaces =
       new ConcurrentHashMap<String, KeyspaceMetadata>();
   private volatile TokenMap tokenMap;
-
   final ReentrantLock lock = new ReentrantLock();
+  private final TabletMap tabletMap;
 
   // See https://github.com/apache/cassandra/blob/trunk/doc/cql3/CQL.textile#appendixA
   private static final IntObjectHashMap<List<char[]>> RESERVED_KEYWORDS =
@@ -146,6 +149,7 @@ public class Metadata {
 
   Metadata(Cluster.Manager cluster) {
     this.cluster = cluster;
+    this.tabletMap = TabletMap.emptyMap(cluster);
   }
 
   // rebuilds the token map with the current hosts, typically when refreshing schema metadata
@@ -514,6 +518,54 @@ public class Metadata {
   }
 
   /**
+   * Extension of legacy method {@link Metadata#getReplicas(String, Token.Factory, ByteBuffer)}.
+   * Tablets model requires knowledge of the table name to determine the replicas. This method will
+   * first try to lookup replicas through known tablets metadata. It will default to TokenMap lookup
+   * if either {@code null} was passed as table name or the tablet lookup is unsuccessful for any
+   * other reason.
+   *
+   * <p>Returns the set of hosts that are replica for a given partition key. Partitioner can be
+   * {@code null} and then a cluster-wide partitioner will be invoked.
+   *
+   * <p>Note that this information is refreshed asynchronously by the control connection, when
+   * schema or ring topology changes. It might occasionally be stale (or even empty).
+   *
+   * @param keyspace the name of the keyspace to get replicas for.
+   * @param table the name of the table to get replicas for. Necessary for distinction for tablets.
+   *     Unnecessary for regular TokenMap
+   * @param partitioner the partitioner to use or @{code null} for cluster-wide partitioner.
+   * @param partitionKey the partition key for which to find the set of replica.
+   * @return the (immutable) set of replicas for {@code partitionKey} as known by the driver. Note
+   *     that the result might be stale or empty if metadata was explicitly disabled with {@link
+   *     QueryOptions#setMetadataEnabled(boolean)}.
+   */
+  @Beta
+  public Set<Host> getReplicas(
+      String keyspace, String table, Token.Factory partitioner, ByteBuffer partitionKey) {
+    keyspace = handleId(keyspace);
+    TokenMap current = tokenMap;
+    if (current == null) {
+      return Collections.emptySet();
+    } else {
+      if (partitioner == null) {
+        partitioner = current.factory;
+      }
+      // If possible, try tablet lookup first
+      if (keyspace != null && table != null) {
+        Token token = partitioner.hash(partitionKey);
+        assert (token instanceof Token.TokenLong64);
+        Set<UUID> hostUuids = tabletMap.getReplicas(keyspace, table, (long) token.getValue());
+        if (!hostUuids.isEmpty()) {
+          return hostUuids.stream().map(this::getHost).collect(Collectors.toSet());
+        }
+      }
+      // Fall back to tokenMap
+      Set<Host> hosts = current.getReplicas(keyspace, partitioner.hash(partitionKey));
+      return hosts == null ? Collections.<Host>emptySet() : hosts;
+    }
+  }
+
+  /**
    * Returns the set of hosts that are replica for a given partition key. Partitioner can be {@code
    * null} and then a cluster-wide partitioner will be invoked.
    *
@@ -529,17 +581,7 @@ public class Metadata {
    */
   public Set<Host> getReplicas(
       String keyspace, Token.Factory partitioner, ByteBuffer partitionKey) {
-    keyspace = handleId(keyspace);
-    TokenMap current = tokenMap;
-    if (current == null) {
-      return Collections.emptySet();
-    } else {
-      if (partitioner == null) {
-        partitioner = current.factory;
-      }
-      Set<Host> hosts = current.getReplicas(keyspace, partitioner.hash(partitionKey));
-      return hosts == null ? Collections.<Host>emptySet() : hosts;
-    }
+    return getReplicas(keyspace, null, partitioner, partitionKey);
   }
 
   /**
@@ -858,6 +900,58 @@ public class Metadata {
     for (SchemaChangeListener listener : cluster.schemaChangeListeners) {
       listener.onMaterializedViewRemoved(view);
     }
+  }
+
+  @Beta
+  public int getShardForTabletToken(
+      String keyspace, String table, Token.TokenLong64 token, Host host) {
+    if (tabletMap == null) {
+      logger.trace(
+          "Could not determine shard for token {} on host {} because tablets metadata is currently null. "
+              + "Returning -1.",
+          token,
+          host);
+      return -1;
+    }
+    UUID targetHostUuid = host.getHostId();
+    long tokenValue = (long) token.getValue();
+    TabletMap.KeyspaceTableNamePair key = new TabletMap.KeyspaceTableNamePair(keyspace, table);
+    NavigableSet<TabletMap.Tablet> targetTablets = tabletMap.getMapping().get(key);
+    if (targetTablets == null) {
+      logger.trace(
+          "Could not determine shard for token {} on host {} because table {}.{} is not present in tablets "
+              + "metadata. Returning -1.",
+          token,
+          host,
+          keyspace,
+          table);
+      return -1;
+    }
+    TabletMap.Tablet row = targetTablets.ceiling(TabletMap.Tablet.malformedTablet(tokenValue));
+    if (row != null && row.getFirstToken() < tokenValue) {
+      for (TabletMap.HostShardPair hostShardPair : row.getReplicas()) {
+        if (hostShardPair.getHost().equals(targetHostUuid)) {
+          return hostShardPair.getShard();
+        }
+      }
+    }
+    logger.trace(
+        "Could not find tablet corresponding to token {} on host {} for table {} in keyspace {}. Returning -1.",
+        token,
+        host,
+        table,
+        keyspace);
+    return -1;
+  }
+
+  /**
+   * Getter for current {@link TabletMap}.
+   *
+   * @return current {@link TabletMap}
+   */
+  @Beta
+  public TabletMap getTabletMap() {
+    return tabletMap;
   }
 
   private static class TokenMap {

@@ -474,6 +474,8 @@ class Connection {
             if (lwt != null) {
               getHost().setLwtInfo(lwt);
             }
+            TabletInfo tabletInfo = TabletInfo.parseTabletInfo(msg.supported);
+            getHost().setTabletInfo(tabletInfo);
             return MoreFutures.VOID_SUCCESS;
           case ERROR:
             Responses.Error error = (Responses.Error) response;
@@ -506,6 +508,13 @@ class Connection {
         LwtInfo lwtInfo = getHost().getLwtInfo();
         if (lwtInfo != null) {
           lwtInfo.addOption(extraOptions);
+        }
+        TabletInfo tabletInfo = getHost().getTabletInfo();
+        if (tabletInfo != null
+            && tabletInfo.isEnabled()
+            && ProtocolFeature.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)) {
+          logger.debug("Enabling tablet support in OPTIONS message");
+          TabletInfo.addOption(extraOptions);
         }
         Future startupResponseFuture =
             write(

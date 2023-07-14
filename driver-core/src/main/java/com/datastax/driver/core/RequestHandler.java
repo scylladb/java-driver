@@ -110,11 +110,22 @@ class RequestHandler {
     }
 
     Token.Factory partitioner = statement.getPartitioner();
+    String tableName = null;
+    ColumnDefinitions defs = null;
+    if (statement instanceof BoundStatement) {
+      defs = ((BoundStatement) statement).preparedStatement().getVariables();
+    } else if (statement instanceof PreparedStatement) {
+      defs = ((PreparedStatement) statement).getVariables();
+    }
+    if (defs != null && defs.size() > 0) {
+      tableName = defs.getTable(0);
+    }
+
     final Set<Host> replicas =
         manager
             .cluster
             .getMetadata()
-            .getReplicas(Metadata.quote(keyspace), partitioner, partitionKey);
+            .getReplicas(Metadata.quote(keyspace), tableName, partitioner, partitionKey);
 
     // replicas are stored in the right order starting with the primary replica
     return replicas.iterator();
@@ -437,13 +448,28 @@ class RequestHandler {
       ByteBuffer routingKey = statement.getRoutingKey(protocolVersion, codecRegistry);
 
       PoolingOptions poolingOptions = manager.configuration().getPoolingOptions();
+      String statementKeyspace = statement.getKeyspace();
+      String statementTable = null;
+      ColumnDefinitions defs = null;
+      if (statement instanceof PreparedStatement) {
+        defs = ((PreparedStatement) statement).getVariables();
+      }
+      if (statement instanceof BoundStatement) {
+        defs = ((BoundStatement) statement).statement.getVariables();
+      }
+      if (defs != null && defs.size() > 0) {
+        statementTable = defs.getTable(0);
+      }
+
       ListenableFuture<Connection> connectionFuture =
           pool.borrowConnection(
               poolingOptions.getPoolTimeoutMillis(),
               TimeUnit.MILLISECONDS,
               poolingOptions.getMaxQueueSize(),
               statement.getPartitioner(),
-              routingKey);
+              routingKey,
+              statementKeyspace,
+              statementTable);
       GuavaCompatibility.INSTANCE.addCallback(
           connectionFuture,
           new FutureCallback<Connection>() {
