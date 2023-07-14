@@ -21,11 +21,14 @@
  */
 package com.datastax.driver.core.policies;
 
+import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Metadata;
+import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.Statement;
 import com.google.common.collect.AbstractIterator;
@@ -185,9 +188,20 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     if (partitionKey == null || keyspace == null)
       return childPolicy.newQueryPlan(keyspace, statement);
 
+    String tableName = null;
+    ColumnDefinitions defs = null;
+    if (statement instanceof BoundStatement) {
+      defs = ((BoundStatement) statement).preparedStatement().getVariables();
+    } else if (statement instanceof PreparedStatement) {
+      defs = ((PreparedStatement) statement).getVariables();
+    }
+    if (defs != null && defs.size() > 0) {
+      tableName = defs.getTable(0);
+    }
+
     final Set<Host> replicas =
         clusterMetadata.getReplicas(
-            Metadata.quote(keyspace), statement.getPartitioner(), partitionKey);
+            Metadata.quote(keyspace), tableName, statement.getPartitioner(), partitionKey);
     if (replicas.isEmpty()) return childPolicy.newQueryPlan(loggedKeyspace, statement);
 
     if (replicaOrdering == ReplicaOrdering.NEUTRAL) {

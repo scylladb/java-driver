@@ -89,7 +89,7 @@ public class TokenAwarePolicyTest {
     when(configuration.getProtocolOptions()).thenReturn(protocolOptions);
     when(protocolOptions.getProtocolVersion()).thenReturn(ProtocolVersion.DEFAULT);
     when(cluster.getMetadata()).thenReturn(metadata);
-    when(metadata.getReplicas(Metadata.quote("keyspace"), null, routingKey))
+    when(metadata.getReplicas(Metadata.quote("keyspace"), null, null, routingKey))
         .thenReturn(Sets.newLinkedHashSet(host1, host2));
     when(childPolicy.newQueryPlan("keyspace", statement))
         .thenReturn(Sets.newLinkedHashSet(host4, host3, host2, host1).iterator());

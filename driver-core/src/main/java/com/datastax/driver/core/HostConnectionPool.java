@@ -504,7 +504,9 @@ class HostConnectionPool implements Connection.Owner {
       TimeUnit unit,
       int maxQueueSize,
       Token.Factory partitioner,
-      ByteBuffer routingKey) {
+      ByteBuffer routingKey,
+      String keyspace,
+      String table) {
     Phase phase = this.phase.get();
     if (phase != Phase.READY)
       return Futures.immediateFailedFuture(
@@ -515,7 +517,17 @@ class HostConnectionPool implements Connection.Owner {
       if (routingKey != null) {
         Metadata metadata = manager.cluster.getMetadata();
         Token t = metadata.newToken(partitioner, routingKey);
-        shardId = host.getShardingInfo().shardId(t);
+        shardId = -1;
+        if (keyspace != null && table != null) {
+          assert t instanceof Token.TokenLong64;
+          shardId =
+              Integer.min(
+                  metadata.getShardForTabletToken(keyspace, table, (Token.TokenLong64) t, host),
+                  host.getShardingInfo().getShardsCount());
+        }
+        if (shardId == -1) { // means that tablet lookup failed
+          shardId = host.getShardingInfo().shardId(t);
+        }
       } else {
         shardId = RAND.nextInt(host.getShardingInfo().getShardsCount());
       }

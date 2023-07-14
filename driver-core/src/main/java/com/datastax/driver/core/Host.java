@@ -70,6 +70,9 @@ public class Host {
   // Can be set concurrently but the value should always be the same.
   private volatile LwtInfo lwtInfo = null;
 
+  // Whether host supports TABLETS_ROUTING_V1
+  private volatile TabletInfo tabletInfo = null;
+
   enum State {
     ADDED,
     DOWN,
@@ -448,6 +451,14 @@ public class Host {
 
   public void setLwtInfo(LwtInfo lwtInfo) {
     this.lwtInfo = lwtInfo;
+  }
+
+  public TabletInfo getTabletInfo() {
+    return tabletInfo;
+  }
+
+  public void setTabletInfo(TabletInfo tabletInfo) {
+    this.tabletInfo = tabletInfo;
   }
 
   /**
