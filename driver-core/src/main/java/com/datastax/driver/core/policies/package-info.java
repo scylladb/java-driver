@@ -16,4 +16,5 @@
  * limitations under the License.
  */
 /** Policies that allow to control some of the behavior of the ScyllaDB Java driver. */
+/** Policies that allow to control some of the behavior of the ScyllaDB Java driver. */
 package com.datastax.driver.core.policies;
