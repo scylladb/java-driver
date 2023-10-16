@@ -59,7 +59,7 @@
         <netty-tcnative.artifact>netty-tcnative</netty-tcnative.artifact>
         <netty-tcnative.version>2.0.61.Final</netty-tcnative.version>
         <metrics.version>3.2.2</metrics.version>
-        <snappy.version>1.1.2.6</snappy.version>
+        <snappy.version>1.1.10.5</snappy.version>
         <lz4.version>1.4.1</lz4.version>
         <hdr.version>2.1.10</hdr.version>
         <jackson.version>2.15.2</jackson.version>
