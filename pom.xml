@@ -55,7 +55,7 @@
         <slf4j.version>1.7.25</slf4j.version>
         <slf4j-log4j12.version>1.7.25</slf4j-log4j12.version>
         <guava.version>19.0</guava.version>
-        <netty.version>4.1.94.Final</netty.version>
+        <netty.version>4.1.100.Final</netty.version>
         <netty-tcnative.artifact>netty-tcnative</netty-tcnative.artifact>
         <netty-tcnative.version>2.0.61.Final</netty-tcnative.version>
         <metrics.version>3.2.2</metrics.version>
