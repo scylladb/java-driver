@@ -1020,16 +1020,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </properties>
     </profile>
   </profiles>
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <repository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-    </repository>
-  </distributionManagement>
   <licenses>
     <license>
       <name>Apache 2</name>
