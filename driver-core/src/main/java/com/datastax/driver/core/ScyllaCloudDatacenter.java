@@ -74,7 +74,8 @@ class ScyllaCloudDatacenter {
 
   public InetSocketAddress getServer() {
     HostAndPort parsedServer = HostAndPort.fromString(server);
-    return InetSocketAddress.createUnresolved(parsedServer.getHostText(), parsedServer.getPort());
+    return InetSocketAddress.createUnresolved(
+        GuavaCompatibility.INSTANCE.getHost(parsedServer), parsedServer.getPort());
   }
 
   public String getNodeDomain() {
