@@ -560,8 +560,9 @@ public class MapperUDTTest extends CCMTestsSupport {
     } catch (InvalidQueryException e) {
       // Error message varies by C* version.
       assertThat(e.getMessage())
+          // "Unrecognized name mainaddress" since scylla-5.4.0-rc0 and scylla-2024.1.0-rc1
           .matches(
-              "(Undefined name mainaddress in selection clause|Undefined column name mainaddress.*)");
+              "(Unrecognized name mainaddress|Undefined name mainaddress in selection clause|Undefined column name mainaddress.*)");
     }
     // trying to use a new mapper
     try {
