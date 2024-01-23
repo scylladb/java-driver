@@ -262,12 +262,6 @@ public enum DefaultDriverOption implements DriverOption {
    */
   SSL_KEYSTORE_PASSWORD("advanced.ssl-engine-factory.keystore-password"),
   /**
-   * The duration between attempts to reload the keystore.
-   *
-   * <p>Value-type: {@link java.time.Duration}
-   */
-  SSL_KEYSTORE_RELOAD_INTERVAL("advanced.ssl-engine-factory.keystore-reload-interval"),
-  /**
    * The location of the truststore file.
    *
    * <p>Value-type: {@link String}
@@ -988,6 +982,12 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: boolean
    */
   METRICS_GENERATE_AGGREGABLE_HISTOGRAMS("advanced.metrics.histograms.generate-aggregable"),
+  /**
+   * The duration between attempts to reload the keystore.
+   *
+   * <p>Value-type: {@link java.time.Duration}
+   */
+  SSL_KEYSTORE_RELOAD_INTERVAL("advanced.ssl-engine-factory.keystore-reload-interval"),
   ;
 
   private final String path;
