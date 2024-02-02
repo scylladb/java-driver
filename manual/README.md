@@ -306,7 +306,7 @@ simply navigate to each sub-directory.
 [NoHostAvailableException]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/exceptions/NoHostAvailableException.html
 [LocalDate]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/LocalDate.html
 
-```eval_rst
+```{eval-rst}
 .. toctree::
    :hidden:
    :glob:

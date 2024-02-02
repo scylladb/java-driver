@@ -9,7 +9,7 @@ See the child pages for more information:
 * [Migrating Astyanax configurations to DataStax Java driver configurations](configuration/)
 * [Querying and retrieving results comparisons.](queries_and_results/)
 
-```eval_rst
+```{eval-rst}
 .. toctree::
    :hidden:
    :glob:

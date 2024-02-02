@@ -41,7 +41,7 @@ wrap your statements in a custom [StatementWrapper] implementation.
 [execute]:                    https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/Session.html#execute-com.datastax.driver.core.Statement-
 [executeAsync]:               https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/Session.html#executeAsync-com.datastax.driver.core.Statement-
 
-```eval_rst
+```{eval-rst}
 .. toctree::
    :hidden:
    :glob:

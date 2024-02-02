@@ -827,7 +827,7 @@ exhaustive list of new features in 2.0.
       (`ResultSet#getAvailableWithoutFetching` and `ResultSet#isFullyFetched`)
       as well as a mean to force the pre-fetching of the next page (`ResultSet#fetchMoreResults`).
 
-```eval_rst
+```{eval-rst}
 .. toctree::
    :hidden:
    :glob:
