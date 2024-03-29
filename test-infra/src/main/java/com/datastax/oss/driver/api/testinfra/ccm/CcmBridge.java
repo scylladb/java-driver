@@ -327,23 +327,39 @@ public class CcmBridge implements AutoCloseable {
       // Collect all cassandraConfiguration (and others) into a single "ccm updateconf" call.
       // Works around the behavior introduced in https://github.com/scylladb/scylla-ccm/pull/410
       StringBuilder updateConfArguments = new StringBuilder();
+      Version cassandraVersion = getCassandraVersion();
 
       for (Map.Entry<String, Object> conf : cassandraConfiguration.entrySet()) {
-        updateConfArguments.append(conf.getKey()).append(':').append(conf.getValue()).append(' ');
+        String originalKey = conf.getKey();
+        Object originalValue = conf.getValue();
+        updateConfArguments.append(
+            String.join(
+                    ":",
+                    getConfigKey(originalKey, originalValue, cassandraVersion),
+                    getConfigValue(originalKey, originalValue, cassandraVersion))
+                + " ");
       }
-      if (getCassandraVersion().compareTo(Version.V2_2_0) >= 0 && !SCYLLA_ENABLEMENT) {
-        // @IntegrationTestDisabledScyllaJVMArgs @IntegrationTestDisabledScyllaUDF
-        if (getCassandraVersion().compareTo(Version.V4_1_0) >= 0) {
-          updateConfArguments.append("user_defined_functions_enabled:true").append(' ');
 
-        } else {
-          updateConfArguments.append("enable_user_defined_functions:true").append(' ');
+      if (!SCYLLA_ENABLEMENT) {
+        // If we're dealing with anything more recent than 2.2 explicitly enable UDF... but run it
+        // through our conversion process to make
+        // sure more recent versions don't have a problem.
+        if (getCassandraVersion().compareTo(Version.V2_2_0) >= 0) {
+          String originalKey = "enable_user_defined_functions";
+          Object originalValue = "true";
+          updateConfArguments.append(
+              String.join(
+                  ":",
+                  getConfigKey(originalKey, originalValue, cassandraVersion),
+                  getConfigValue(originalKey, originalValue, cassandraVersion)));
         }
       }
 
       if (updateConfArguments.length() > 0) {
         execute("updateconf", updateConfArguments.toString());
       }
+
+      // Note that we aren't performing any substitution on DSE key/value props (at least for now)
       if (DSE_ENABLEMENT) {
         for (Map.Entry<String, Object> conf : dseConfiguration.entrySet()) {
           execute("updatedseconf", String.format("%s:%s", conf.getKey(), conf.getValue()));
@@ -515,6 +531,79 @@ public class CcmBridge implements AutoCloseable {
       LOG.warn("Failure to write keystore, SSL-enabled servers may fail to start.", e);
     }
     return f;
+  }
+
+  /**
+   * Get the current JVM major version (1.8.0_372 -> 8, 11.0.19 -> 11)
+   *
+   * @return major version of current JVM
+   */
+  private static int getCurrentJvmMajorVersion() {
+    String version = System.getProperty("java.version");
+    if (version.startsWith("1.")) {
+      version = version.substring(2, 3);
+    } else {
+      int dot = version.indexOf(".");
+      if (dot != -1) {
+        version = version.substring(0, dot);
+      }
+    }
+    return Integer.parseInt(version);
+  }
+
+  @SuppressWarnings("UnusedMethod")
+  private Optional<Integer> overrideJvmVersionForDseWorkloads() {
+    if (getCurrentJvmMajorVersion() <= 8) {
+      return Optional.empty();
+    }
+
+    if (!DSE_ENABLEMENT || !getDseVersion().isPresent()) {
+      return Optional.empty();
+    }
+
+    if (getDseVersion().get().compareTo(Version.parse("6.8.19")) < 0) {
+      return Optional.empty();
+    }
+
+    if (dseWorkloads.contains("graph")) {
+      return Optional.of(8);
+    }
+
+    return Optional.empty();
+  }
+
+  private static String IN_MS_STR = "_in_ms";
+  private static int IN_MS_STR_LENGTH = IN_MS_STR.length();
+  private static String ENABLE_STR = "enable_";
+  private static int ENABLE_STR_LENGTH = ENABLE_STR.length();
+  private static String IN_KB_STR = "_in_kb";
+  private static int IN_KB_STR_LENGTH = IN_KB_STR.length();
+
+  @SuppressWarnings("unused")
+  private String getConfigKey(String originalKey, Object originalValue, Version cassandraVersion) {
+
+    // At least for now we won't support substitutions on nested keys.  This requires an extra
+    // traversal of the string
+    // but we'll live with that for now
+    if (originalKey.contains(".")) return originalKey;
+    if (cassandraVersion.compareTo(Version.V4_1_0) < 0) return originalKey;
+    if (originalKey.endsWith(IN_MS_STR))
+      return originalKey.substring(0, originalKey.length() - IN_MS_STR_LENGTH);
+    if (originalKey.startsWith(ENABLE_STR))
+      return originalKey.substring(ENABLE_STR_LENGTH) + "_enabled";
+    if (originalKey.endsWith(IN_KB_STR))
+      return originalKey.substring(0, originalKey.length() - IN_KB_STR_LENGTH);
+    return originalKey;
+  }
+
+  private String getConfigValue(
+      String originalKey, Object originalValue, Version cassandraVersion) {
+
+    String originalValueStr = originalValue.toString();
+    if (cassandraVersion.compareTo(Version.V4_1_0) < 0) return originalValueStr;
+    if (originalKey.endsWith(IN_MS_STR)) return originalValueStr + "ms";
+    if (originalKey.endsWith(IN_KB_STR)) return originalValueStr + "KiB";
+    return originalValueStr;
   }
 
   public static Builder builder() {
