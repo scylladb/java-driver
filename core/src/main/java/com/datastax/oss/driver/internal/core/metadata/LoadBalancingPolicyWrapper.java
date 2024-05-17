@@ -71,7 +71,7 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
 
   private final InternalDriverContext context;
   private final Set<LoadBalancingPolicy> policies;
-  private final Map<String, LoadBalancingPolicy> policiesPerProfile;
+  public final Map<String, LoadBalancingPolicy> policiesPerProfile;
   private final Map<LoadBalancingPolicy, SinglePolicyDistanceReporter> reporters;
 
   private final Lock distancesLock = new ReentrantLock();

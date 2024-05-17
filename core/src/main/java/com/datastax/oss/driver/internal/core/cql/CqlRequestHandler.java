@@ -33,6 +33,7 @@ import com.datastax.oss.driver.api.core.connection.FrameTooLongException;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
@@ -61,6 +62,7 @@ import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.token.DefaultTokenMap;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
@@ -87,11 +89,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.AbstractMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -99,6 +97,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,6 +139,12 @@ public class CqlRequestHandler implements Throttled {
   // The errors on the nodes that were already tried (lazily initialized on the first error).
   // We don't use a map because nodes can appear multiple times.
   private volatile List<Map.Entry<Node, Throwable>> errors;
+
+  // Additional logging data
+  private List<Node> originalQueryPlan;
+  private final AtomicInteger sendRequestExecutions = new AtomicInteger();
+
+  private LoadBalancingPolicy policyUsed;
 
   protected CqlRequestHandler(
       Statement<?> statement,
@@ -216,6 +221,20 @@ public class CqlRequestHandler implements Throttled {
               .newQueryPlan(initialStatement, executionProfile.getName(), session);
     }
 
+    LoadBalancingPolicy policy = null;
+    Map<String, LoadBalancingPolicy> policiesPerProfile =
+        this.context.getLoadBalancingPolicyWrapper().policiesPerProfile;
+    if (policiesPerProfile != null) {
+      policy = policiesPerProfile.get(executionProfile.getName());
+      if (policy == null) {
+        policy = policiesPerProfile.get(DriverExecutionProfile.DEFAULT_NAME);
+      }
+    }
+
+    this.policyUsed = policy;
+
+    this.originalQueryPlan = new ArrayList<>(queryPlan);
+
     sendRequest(initialStatement, null, queryPlan, 0, 0, true);
   }
 
@@ -284,6 +303,65 @@ public class CqlRequestHandler implements Throttled {
     return tokenMap == null ? null : ((DefaultTokenMap) tokenMap).getTokenFactory().hash(key);
   }
 
+  private void additionalDebug() {
+    List<Map.Entry<Node, Throwable>> errors = this.errors;
+    if (errors == null) {
+      errors = new ArrayList<>();
+    }
+
+    Map<UUID, Node> metadataNodes = null;
+    try {
+      metadataNodes = this.context.getMetadataManager().getMetadata().getNodes();
+    } catch (NullPointerException ignored) {
+    }
+    if (metadataNodes == null) {
+      metadataNodes = new HashMap<>();
+    }
+
+    Map<Node, ChannelPool> pools = null;
+    try {
+      pools = this.session.getPools();
+    } catch (NullPointerException ignored) {
+    }
+    if (pools == null) {
+      pools = new HashMap<>();
+    }
+
+    LOG.warn(
+        "[{}] (NONODEAVAIL_LOG) CqlRequestHandler: AllNodesFailedException. Initial Plan: ({}), executions: {}, speculative executions started: {}, errors: {}, isLWT: {}, getNode: {}, "
+            + "LBP: {}, metadata nodes: ({}), pools: ({})",
+        this.logPrefix,
+        this.originalQueryPlan.stream().map(Object::toString).collect(Collectors.joining(", ")),
+        sendRequestExecutions.get(),
+        startedSpeculativeExecutionsCount.get(),
+        errors.stream()
+            .map(entry -> entry.getKey() + " " + entry.getValue().toString())
+            .collect(Collectors.joining(", ")),
+        this.initialStatement.isLWT(),
+        this.initialStatement.getNode(),
+        this.policyUsed,
+        metadataNodes.entrySet().stream()
+            .map(e -> "(" + e.getKey() + ": " + e.getValue() + ")")
+            .collect(Collectors.joining(", ")),
+        pools.entrySet().stream()
+            .map(
+                e -> {
+                  ChannelPool pool = e.getValue();
+                  return "("
+                      + e.getKey()
+                      + ": "
+                      + String.format(
+                          "{Node: %s, size: %s, availableIds: %s, inFlight: %s, orphaned: %s, }",
+                          pool.getNode(),
+                          pool.size(),
+                          pool.getAvailableIds(),
+                          pool.getInFlight(),
+                          pool.getOrphanedIds())
+                      + ")";
+                })
+            .collect(Collectors.joining(", ")));
+  }
+
   /**
    * Sends the request to the next available node.
    *
@@ -303,6 +381,7 @@ public class CqlRequestHandler implements Throttled {
       int currentExecutionIndex,
       int retryCount,
       boolean scheduleNextExecution) {
+    sendRequestExecutions.incrementAndGet();
     if (result.isDone()) {
       return;
     }
@@ -322,6 +401,7 @@ public class CqlRequestHandler implements Throttled {
     if (channel == null) {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
+        additionalDebug();
         // We're the last execution so fail the result
         setFinalError(statement, AllNodesFailedException.fromErrors(this.errors), null, -1);
       }

@@ -125,7 +125,14 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   @Override
   public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
     if (!avoidSlowReplicas) {
-      return super.newQueryPlan(request, session);
+      Queue<Node> plan = super.newQueryPlan(request, session);
+      if (plan.isEmpty()) {
+        LOG.warn(
+            "[{}] (NONODEAVAIL_LOG) Returning empty plan from BasicLoadBalancingPolicy for request: {}",
+            logPrefix,
+            request);
+      }
+      return plan;
     }
 
     // Take a snapshot since the set is concurrent:
@@ -245,7 +252,14 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
         roundRobinAmount.getAndUpdate(INCREMENT));
 
     QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
-    return maybeAddDcFailover(request, plan);
+    Queue<Node> finalPlan = maybeAddDcFailover(request, plan);
+    if (finalPlan.isEmpty()) {
+      LOG.warn(
+          "[{}] (NONODEAVAIL_LOG) Returning empty plan from DefaultLoadBalancingPolicy for request: {}",
+          logPrefix,
+          request);
+    }
+    return finalPlan;
   }
 
   @Override

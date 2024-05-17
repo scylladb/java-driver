@@ -186,7 +186,8 @@ public class DefaultNode implements Node, Serializable {
   public String toString() {
     // Include the hash code because this class uses reference equality
     return String.format(
-        "Node(endPoint=%s, hostId=%s, hashCode=%x)", getEndPoint(), getHostId(), hashCode());
+        "Node(endPoint=%s, hostId=%s, hashCode=%x, state=%s)",
+        getEndPoint(), getHostId(), hashCode(), getState());
   }
 
   /** Note: deliberately not exposed by the public interface. */

@@ -25,6 +25,7 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.PrepareRequest;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
@@ -43,6 +44,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.ThrottledAdminRequestH
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
@@ -59,16 +61,14 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,6 +96,12 @@ public class CqlPrepareHandler implements Throttled {
   // We don't use a map because nodes can appear multiple times.
   private volatile List<Map.Entry<Node, Throwable>> errors;
 
+  // Additional logging data
+  private final List<Node> originalQueryPlan;
+  private final AtomicInteger sendRequestExecutions = new AtomicInteger();
+
+  private final LoadBalancingPolicy policyUsed;
+
   protected CqlPrepareHandler(
       PrepareRequest request,
       DefaultSession session,
@@ -114,6 +120,19 @@ public class CqlPrepareHandler implements Throttled {
         context
             .getLoadBalancingPolicyWrapper()
             .newQueryPlan(request, executionProfile.getName(), session);
+
+    this.originalQueryPlan = new ArrayList<>(queryPlan);
+
+    LoadBalancingPolicy policy = null;
+    Map<String, LoadBalancingPolicy> policiesPerProfile =
+        this.context.getLoadBalancingPolicyWrapper().policiesPerProfile;
+    if (policiesPerProfile != null) {
+      policy = policiesPerProfile.get(executionProfile.getName());
+      if (policy == null) {
+        policy = policiesPerProfile.get(DriverExecutionProfile.DEFAULT_NAME);
+      }
+    }
+    this.policyUsed = policy;
 
     this.result = new CompletableFuture<>();
     this.result.exceptionally(
@@ -179,7 +198,65 @@ public class CqlPrepareHandler implements Throttled {
     }
   }
 
+  private void additionalDebug() {
+    List<Map.Entry<Node, Throwable>> errors = this.errors;
+    if (errors == null) {
+      errors = new ArrayList<>();
+    }
+
+    Map<UUID, Node> metadataNodes = null;
+    try {
+      metadataNodes = this.context.getMetadataManager().getMetadata().getNodes();
+    } catch (NullPointerException ignored) {
+    }
+    if (metadataNodes == null) {
+      metadataNodes = new HashMap<>();
+    }
+
+    Map<Node, ChannelPool> pools = null;
+    try {
+      pools = this.session.getPools();
+    } catch (NullPointerException ignored) {
+    }
+    if (pools == null) {
+      pools = new HashMap<>();
+    }
+
+    LOG.warn(
+        "[{}] (NONODEAVAIL_LOG) CqlPrepareHandler: AllNodesFailedException. Initial Plan: ({}), executions: {}, errors: {}, "
+            + "prepareonAllNodes: {}, LBP: {}, metadata nodes: ({}), pools: ({})",
+        this.logPrefix,
+        this.originalQueryPlan.stream().map(Object::toString).collect(Collectors.joining(", ")),
+        sendRequestExecutions.get(),
+        errors.stream()
+            .map(entry -> entry.getKey() + " " + entry.getValue().toString())
+            .collect(Collectors.joining(", ")),
+        this.prepareOnAllNodes,
+        this.policyUsed,
+        metadataNodes.entrySet().stream()
+            .map(e -> "(" + e.getKey() + ": " + e.getValue() + ")")
+            .collect(Collectors.joining(", ")),
+        pools.entrySet().stream()
+            .map(
+                e -> {
+                  ChannelPool pool = e.getValue();
+                  return "("
+                      + e.getKey()
+                      + ": "
+                      + String.format(
+                          "{Node: %s, size: %s, availableIds: %s, inFlight: %s, orphaned: %s, }",
+                          pool.getNode(),
+                          pool.size(),
+                          pool.getAvailableIds(),
+                          pool.getInFlight(),
+                          pool.getOrphanedIds())
+                      + ")";
+                })
+            .collect(Collectors.joining(", ")));
+  }
+
   private void sendRequest(PrepareRequest request, Node node, int retryCount) {
+    sendRequestExecutions.incrementAndGet();
     if (result.isDone()) {
       return;
     }
@@ -195,6 +272,7 @@ public class CqlPrepareHandler implements Throttled {
       }
     }
     if (channel == null) {
+      additionalDebug();
       setFinalError(AllNodesFailedException.fromErrors(this.errors));
     } else {
       InitialPrepareCallback initialPrepareCallback =

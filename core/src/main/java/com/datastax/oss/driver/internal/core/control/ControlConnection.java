@@ -20,7 +20,9 @@ import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
 import com.datastax.oss.driver.api.core.auth.AuthenticationException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
+import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
@@ -34,6 +36,7 @@ import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
@@ -48,17 +51,13 @@ import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.util.concurrent.EventExecutor;
+import java.util.*;
 import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Queue;
-import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -299,6 +298,12 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                 .build();
 
         Queue<Node> nodes = context.getLoadBalancingPolicyWrapper().newQueryPlan();
+        LoadBalancingPolicy policy = null;
+        Map<String, LoadBalancingPolicy> policiesPerProfile =
+            this.context.getLoadBalancingPolicyWrapper().policiesPerProfile;
+        if (policiesPerProfile != null) {
+          policy = policiesPerProfile.get(DriverExecutionProfile.DEFAULT_NAME);
+        }
 
         connect(
             nodes,
@@ -326,7 +331,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                 }
                 initFuture.completeExceptionally(error);
               }
-            });
+            },
+            new ArrayList<>(nodes),
+            policy);
       } catch (Throwable t) {
         initFuture.completeExceptionally(t);
       }
@@ -335,6 +342,13 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     private CompletionStage<Boolean> reconnect() {
       assert adminExecutor.inEventLoop();
       Queue<Node> nodes = context.getLoadBalancingPolicyWrapper().newQueryPlan();
+      LoadBalancingPolicy policy = null;
+      Map<String, LoadBalancingPolicy> policiesPerProfile =
+          this.context.getLoadBalancingPolicyWrapper().policiesPerProfile;
+      if (policiesPerProfile != null) {
+        policy = policiesPerProfile.get(DriverExecutionProfile.DEFAULT_NAME);
+      }
+
       CompletableFuture<Boolean> result = new CompletableFuture<>();
       connect(
           nodes,
@@ -343,18 +357,82 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             result.complete(true);
             onSuccessfulReconnect();
           },
-          error -> result.complete(false));
+          error -> result.complete(false),
+          new ArrayList<>(nodes),
+          policy);
       return result;
+    }
+
+    private void additionalDebug(
+        List<Entry<Node, Throwable>> errors,
+        List<Node> originalQueryPlan,
+        LoadBalancingPolicy policyUsed) {
+
+      List<Entry<Node, Throwable>> received_errors = errors;
+      if (received_errors == null) {
+        received_errors = new ArrayList<>();
+      }
+
+      Map<UUID, Node> metadataNodes = null;
+      try {
+        metadataNodes = this.context.getMetadataManager().getMetadata().getNodes();
+      } catch (NullPointerException ignored) {
+      }
+      if (metadataNodes == null) {
+        metadataNodes = new HashMap<>();
+      }
+
+      Map<Node, ChannelPool> pools = null;
+      try {
+        pools = this.context.getPoolManager().getPools();
+      } catch (NullPointerException ignored) {
+      }
+      if (pools == null) {
+        pools = new HashMap<>();
+      }
+
+      LOG.warn(
+          "[{}] (NONODEAVAIL_LOG) ControlConnection: AllNodesFailedException. Initial Plan: ({}),  errors: {}, "
+              + "LBP: {}, metadata nodes: ({}), pools: ({})",
+          logPrefix,
+          originalQueryPlan.stream().map(Object::toString).collect(Collectors.joining(", ")),
+          received_errors.stream()
+              .map(entry -> entry.getKey() + " " + entry.getValue().toString())
+              .collect(Collectors.joining(", ")),
+          policyUsed,
+          metadataNodes.entrySet().stream()
+              .map(e -> "(" + e.getKey() + ": " + e.getValue() + ")")
+              .collect(Collectors.joining(", ")),
+          pools.entrySet().stream()
+              .map(
+                  e -> {
+                    ChannelPool pool = e.getValue();
+                    return "("
+                        + e.getKey()
+                        + ": "
+                        + String.format(
+                            "{Node: %s, size: %s, availableIds: %s, inFlight: %s, orphaned: %s, }",
+                            pool.getNode(),
+                            pool.size(),
+                            pool.getAvailableIds(),
+                            pool.getInFlight(),
+                            pool.getOrphanedIds())
+                        + ")";
+                  })
+              .collect(Collectors.joining(", ")));
     }
 
     private void connect(
         Queue<Node> nodes,
         List<Entry<Node, Throwable>> errors,
         Runnable onSuccess,
-        Consumer<Throwable> onFailure) {
+        Consumer<Throwable> onFailure,
+        List<Node> originalQueryPlan,
+        LoadBalancingPolicy policyUsed) {
       assert adminExecutor.inEventLoop();
       Node node = nodes.poll();
       if (node == null) {
+        additionalDebug(errors, originalQueryPlan, policyUsed);
         onFailure.accept(AllNodesFailedException.fromErrors(errors));
       } else {
         LOG.debug("[{}] Trying to establish a connection to {}", logPrefix, node);
@@ -395,7 +473,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                             (errors == null) ? new ArrayList<>() : errors;
                         newErrors.add(new SimpleEntry<>(node, error));
                         context.getEventBus().fire(ChannelEvent.controlConnectionFailed(node));
-                        connect(nodes, newErrors, onSuccess, onFailure);
+                        connect(
+                            nodes, newErrors, onSuccess, onFailure, originalQueryPlan, policyUsed);
                       }
                     } else if (closeWasCalled || initFuture.isCancelled()) {
                       LOG.debug(
@@ -412,7 +491,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                           logPrefix,
                           channel);
                       channel.forceClose();
-                      connect(nodes, errors, onSuccess, onFailure);
+                      connect(nodes, errors, onSuccess, onFailure, originalQueryPlan, policyUsed);
                     } else if (lastStateEvent != null
                         && (lastStateEvent.newState == null /*(removed)*/
                             || lastStateEvent.newState == NodeState.FORCED_DOWN)) {
@@ -422,7 +501,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                           logPrefix,
                           channel);
                       channel.forceClose();
-                      connect(nodes, errors, onSuccess, onFailure);
+                      connect(nodes, errors, onSuccess, onFailure, originalQueryPlan, policyUsed);
                     } else {
                       LOG.debug("[{}] New channel opened {}", logPrefix, channel);
                       DriverChannel previousChannel = ControlConnection.this.channel;

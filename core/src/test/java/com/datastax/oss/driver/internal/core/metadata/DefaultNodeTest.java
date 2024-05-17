@@ -37,8 +37,8 @@ public class DefaultNodeTest {
 
     String expected =
         String.format(
-            "Node(endPoint=localhost/127.0.0.1:9042, hostId=1e4687e6-f94e-432e-a792-216f89ef265f, hashCode=%x)",
-            node.hashCode());
+            "Node(endPoint=localhost/127.0.0.1:9042, hostId=1e4687e6-f94e-432e-a792-216f89ef265f, hashCode=%x, state=%s)",
+            node.hashCode(), node.getState());
     assertThat(node.toString()).isEqualTo(expected);
   }
 
@@ -50,7 +50,8 @@ public class DefaultNodeTest {
 
     String expected =
         String.format(
-            "Node(endPoint=localhost/127.0.0.1:9042, hostId=null, hashCode=%x)", node.hashCode());
+            "Node(endPoint=localhost/127.0.0.1:9042, hostId=null, hashCode=%x, state=%s)",
+            node.hashCode(), node.getState());
     assertThat(node.toString()).isEqualTo(expected);
   }
 }
