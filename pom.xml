@@ -89,6 +89,7 @@
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
+        <pushChanges>false</pushChanges>
         <test.osgi.skip>true</test.osgi.skip>
         <javadoc.opts />
         <!-- Append "-fedora" to os.detected.classifier for Fedora systems
@@ -621,7 +622,7 @@
                         <!-- useReleaseProfile>false</useReleaseProfile>
                         <releaseProfiles>release</releaseProfiles>
                         <goals>deploy</goals-->
-                        <pushChanges>true</pushChanges>
+                        <pushChanges>${pushChanges}</pushChanges>
                         <mavenExecutorId>forked-path</mavenExecutorId>
                         <arguments>-Dgpg.passphrase=${gpg.passphrase}</arguments>
                     </configuration>
