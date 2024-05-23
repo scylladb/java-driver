@@ -622,6 +622,8 @@
                         <!-- useReleaseProfile>false</useReleaseProfile>
                         <releaseProfiles>release</releaseProfiles>
                         <goals>deploy</goals-->
+                        <localCheckout>true</localCheckout>
+                        <deployAtEnd>true</deployAtEnd>
                         <pushChanges>${pushChanges}</pushChanges>
                         <mavenExecutorId>forked-path</mavenExecutorId>
                         <arguments>-Dgpg.passphrase=${gpg.passphrase}</arguments>
