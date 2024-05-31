@@ -6,7 +6,7 @@ on:
   push:
     branches:
     - scylla-3.x
-    - 'branch-**'
+    - 'scylla-**'
     paths:
     - 'docs/**'
     - 'faq/**'
