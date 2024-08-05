@@ -1,0 +1,1305 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Integration | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/core/integration/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Core driver
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Integration</span>
+</div>
+                    </div>
+                
+                <section id="integration">
+<h1>Integration<a class="headerlink" href="#integration" title="Link to this heading">¶</a></h1>
+<section id="quick-overview">
+<h2>Quick overview<a class="headerlink" href="#quick-overview" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>sample project structures for Maven and Gradle.</p></li>
+<li><p>explanations about <a class="reference external" href="#driver-dependencies">driver dependencies</a> and when they can be manually
+excluded.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="which-artifact-s-should-i-use">
+<h2>Which artifact(s) should I use?<a class="headerlink" href="#which-artifact-s-should-i-use" title="Link to this heading">¶</a></h2>
+<p>There are multiple driver artifacts under the group id
+<a class="reference external" href="https://search.maven.org/search?q=g:com.datastax.oss">com.datastax.oss</a>. Here’s how to pick the
+right dependencies:</p>
+<table>
+<tr><th>Feature</th><th>Artifact(s)</th><th>Comments</th></tr>
+<tr>
+  <td>
+    Core functionality: executing queries with <code>CqlSession.execute()</code>, processing the
+    results with <code>ResultSet</code>, etc.
+  </td>
+  <td><code>java&#8209;driver&#8209;core</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>
+    Same as the above, but without explicit dependencies to <a href="#netty">Netty</a>,
+    <a href="#jackson">Jackson</a> or <a href="#esri">ESRI</a>. 
+  </td>
+  <td><code>java&#8209;driver&#8209;core&#8209;shaded</code></td>
+  <td>
+    Replaces <code>java&#8209;driver&#8209;core</code>.<br/>
+    See <a href="../shaded_jar/">this page</a>.
+  </td>
+</tr>
+<tr>
+  <td>
+    <a href="../../query_builder">Query builder</a>: generating CQL query strings programmatically. 
+  </td>
+  <td><code>java&#8209;driver&#8209;query&#8209;builder</code></td>
+  <td></td>
+</tr>
+<tr>
+  <td>
+    <a href="../../mapper">Object mapper</a>: generating the boilerplate to execute queries and
+    convert the results into your own domain classes.
+  </td>
+  <td>
+    <code>java&#8209;driver&#8209;mapper&#8209;processor</code><br/>
+    <code>java&#8209;driver&#8209;mapper&#8209;runtime</code>
+  </td>
+  <td>
+    Both artifacts are needed.<br/>
+    See <a href="../../mapper/config/">this page</a>.
+  </td>
+</tr>
+<tr>
+  <td>
+    "Bill Of Materials": can help manage versions if you use multiple driver artifacts.
+  </td>
+  <td><code>java&#8209;driver&#8209;bom</code></td>
+  <td>See <a href="../bom/">this page</a>.</td>
+</tr>
+<tr>
+  <td>
+    Writing integration tests that run the driver against Cassandra or <a
+    href="https://github.com/datastax/simulacron">Simulacron</a>.
+  </td>
+  <td><code>java&#8209;driver&#8209;test&#8209;infra</code></td>
+  <td>
+    Those APIs are not covered in this manual, but you can look at the driver's <a
+    href="https://github.com/datastax/java-driver/blob/4.x/CONTRIBUTING.md#integration-tests">contribution
+    guidelines</a> and <a
+    href="https://github.com/datastax/java-driver/tree/4.x/integration-tests">internal tests</a> for
+    guidance.
+  </td>
+</tr>
+</table></section>
+<section id="minimal-project-structure">
+<h2>Minimal project structure<a class="headerlink" href="#minimal-project-structure" title="Link to this heading">¶</a></h2>
+<p>We publish the driver to <a class="reference external" href="https://search.maven.org/#search%7Cga%7C1%7Ccom.datastax.oss">Maven central</a>. Most modern build tools can download the
+dependency automatically.</p>
+<section id="maven">
+<h3>Maven<a class="headerlink" href="#maven" title="Link to this heading">¶</a></h3>
+<p>Create the following 4 files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ find . -type f
+./pom.xml
+./src/main/resources/application.conf
+./src/main/resources/logback.xml
+./src/main/java/Main.java
+</pre></div>
+</div>
+<section id="project-descriptor">
+<h4>Project descriptor<a class="headerlink" href="#project-descriptor" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">pom.xml</span></code> is the <a class="reference external" href="https://maven.apache.org/guides/introduction/introduction-to-the-pom.html">Project Object Model</a> that describes your application. We declare the
+dependencies, and tell Maven that we’re going to use Java 8:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+<span class="nt">&lt;project</span><span class="w"> </span><span class="na">xmlns=</span><span class="s">&quot;http://maven.apache.org/POM/4.0.0&quot;</span>
+<span class="w">         </span><span class="na">xmlns:xsi=</span><span class="s">&quot;http://www.w3.org/2001/XMLSchema-instance&quot;</span>
+<span class="w">         </span><span class="na">xsi:schemaLocation=</span><span class="s">&quot;http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd&quot;</span><span class="nt">&gt;</span>
+<span class="w">  </span><span class="nt">&lt;modelVersion&gt;</span>4.0.0<span class="nt">&lt;/modelVersion&gt;</span>
+
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.example.yourcompany<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>yourapp<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>1.0.0-SNAPSHOT<span class="nt">&lt;/version&gt;</span>
+
+<span class="w">  </span><span class="nt">&lt;dependencies&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>ch.qos.logback<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>logback-classic<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;version&gt;</span>1.2.3<span class="nt">&lt;/version&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/dependencies&gt;</span>
+
+<span class="w">  </span><span class="nt">&lt;build&gt;</span>
+<span class="w">    </span><span class="nt">&lt;plugins&gt;</span>
+<span class="w">      </span><span class="nt">&lt;plugin&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>maven-compiler-plugin<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;configuration&gt;</span>
+<span class="w">          </span><span class="nt">&lt;source&gt;</span>1.8<span class="nt">&lt;/source&gt;</span>
+<span class="w">          </span><span class="nt">&lt;target&gt;</span>1.8<span class="nt">&lt;/target&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/configuration&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/plugin&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/plugins&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/build&gt;</span>
+<span class="nt">&lt;/project&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="application-configuration">
+<h4>Application configuration<a class="headerlink" href="#application-configuration" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">application.conf</span></code> is not stricly necessary, but it illustrates an important point about the
+driver’s <a class="reference external" href="../configuration/">configuration</a>: you override any of the driver’s default options here.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span> <span class="p">{</span>
+  <span class="n">basic</span><span class="o">.</span><span class="n">session</span><span class="o">-</span><span class="n">name</span> <span class="o">=</span> <span class="n">poc</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>In this case, we just specify a custom name for our session, it will appear in the logs.</p>
+</section>
+<section id="logging-configuration">
+<h4>Logging configuration<a class="headerlink" href="#logging-configuration" title="Link to this heading">¶</a></h4>
+<p>For this example, we choose Logback as our <a class="reference external" href="../logging/">logging framework</a> (we added the dependency
+in <code class="docutils literal notranslate"><span class="pre">pom.xml</span></code>). <code class="docutils literal notranslate"><span class="pre">logback.xml</span></code> configures it to send the driver’s <code class="docutils literal notranslate"><span class="pre">INFO</span></code> logs to the console.</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;configuration&gt;</span>
+<span class="w">  </span><span class="nt">&lt;appender</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;STDOUT&quot;</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;ch.qos.logback.core.ConsoleAppender&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;encoder&gt;</span>
+<span class="w">      </span><span class="nt">&lt;pattern&gt;</span>%d{HH:mm:ss.SSS}<span class="w"> </span>[%thread]<span class="w"> </span>%-5level<span class="w"> </span>%logger{36}<span class="w"> </span>-<span class="w"> </span>%msg%n<span class="nt">&lt;/pattern&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/encoder&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/appender&gt;</span>
+<span class="w">  </span><span class="nt">&lt;root</span><span class="w"> </span><span class="na">level=</span><span class="s">&quot;WARN&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;appender-ref</span><span class="w"> </span><span class="na">ref=</span><span class="s">&quot;STDOUT&quot;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/root&gt;</span>
+<span class="w">  </span><span class="nt">&lt;logger</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;com.datastax.oss.driver&quot;</span><span class="w"> </span><span class="na">level=</span><span class="w"> </span><span class="s">&quot;INFO&quot;</span><span class="nt">/&gt;</span>
+<span class="nt">&lt;/configuration&gt;</span>
+</pre></div>
+</div>
+<p>Again, this is not strictly necessary: a truly minimal example could run without the Logback
+dependency, or this file; but the default behavior is a bit verbose.</p>
+</section>
+<section id="main-class">
+<h4>Main class<a class="headerlink" href="#main-class" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Main.java</span></code> is the canonical example introduced in our <a class="reference external" href="../#quick-start">quick start</a>; it connects
+to Cassandra, queries the server version and prints it:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.core.CqlSession</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.core.cql.ResultSet</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">Main</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">String</span><span class="o">[]</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">(</span><span class="n">CqlSession</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CqlSession</span><span class="p">.</span><span class="na">builder</span><span class="p">().</span><span class="na">build</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;SELECT release_version FROM system.local&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="n">rs</span><span class="p">.</span><span class="na">one</span><span class="p">().</span><span class="na">getString</span><span class="p">(</span><span class="mi">0</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Make sure you have a Cassandra instance running on 127.0.0.1:9042 (otherwise, you use
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.7.2.x/api/com/datastax/oss/driver/api/core/session/SessionBuilder.html#addContactPoint-java.net.InetSocketAddress-">CqlSession.builder().addContactPoint()</a> to use a different
+address).</p>
+</section>
+<section id="running">
+<h4>Running<a class="headerlink" href="#running" title="Link to this heading">¶</a></h4>
+<p>To launch the program from the command line, use:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ mvn compile exec:java -Dexec.mainClass=Main
+</pre></div>
+</div>
+<p>You should see output similar to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>...
+[INFO] ------------------------------------------------------------------------
+[INFO] Building yourapp 1.0.0-SNAPSHOT
+[INFO] ------------------------------------------------------------------------
+... (at this point, Maven will download the dependencies the first time) 
+[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ yourapp ---
+[WARNING] Using platform encoding (UTF-8 actually) to copy filtered resources, i.e. build is platform dependent!
+[INFO] Copying 1 resource
+[INFO]
+[INFO] --- maven-compiler-plugin:2.5.1:compile (default-compile) @ yourapp ---
+[INFO] Nothing to compile - all classes are up to date
+[INFO]
+[INFO] --- exec-maven-plugin:1.3.1:java (default-cli) @ yourapp ---
+11:39:45.355 [Main.main()] INFO  c.d.o.d.i.c.DefaultMavenCoordinates - DataStax Java driver for Apache Cassandra(R) (com.datastax.oss:java-driver-core) version 4.0.1
+11:39:45.648 [poc-admin-0] INFO  c.d.o.d.internal.core.time.Clock - Using native clock for microsecond precision
+11:39:45.649 [poc-admin-0] INFO  c.d.o.d.i.c.metadata.MetadataManager - [poc] No contact points provided, defaulting to /127.0.0.1:9042
+3.11.2
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time: 11.777 s
+[INFO] Finished at: 2018-06-18T11:32:49-08:00
+[INFO] Final Memory: 16M/277M
+[INFO] ------------------------------------------------------------------------
+</pre></div>
+</div>
+</section>
+</section>
+<section id="gradle">
+<h3>Gradle<a class="headerlink" href="#gradle" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://guides.gradle.org/creating-new-gradle-builds/">Initialize a new project</a> with Gradle.</p>
+<p>Modify <code class="docutils literal notranslate"><span class="pre">build.gradle</span></code> to add the dependencies:</p>
+<div class="highlight-groovy notranslate"><div class="highlight"><pre><span></span><span class="n">group</span><span class="w"> </span><span class="s1">&#39;com.example.yourcompany&#39;</span>
+<span class="n">version</span><span class="w"> </span><span class="s1">&#39;1.0.0-SNAPSHOT&#39;</span>
+
+<span class="n">apply</span><span class="w"> </span><span class="nl">plugin:</span><span class="w"> </span><span class="s1">&#39;java&#39;</span>
+
+<span class="n">sourceCompatibility</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.8</span>
+
+<span class="n">repositories</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">mavenCentral</span><span class="o">()</span>
+<span class="o">}</span>
+
+<span class="n">dependencies</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">compile</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;com.datastax.oss&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;java-driver-core&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="s1">&#39;${driver.version}&#39;</span>
+<span class="w">    </span><span class="n">compile</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;ch.qos.logback&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;logback-classic&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="s1">&#39;1.2.3&#39;</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>Then place <a class="reference external" href="#application-configuration">application.conf</a>, <a class="reference external" href="#logging-configuration">logback.xml</a> and
+<a class="reference external" href="#main-class">Main.java</a> in the same locations, and with the same contents, as in the Maven example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">./</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">application</span><span class="o">.</span><span class="n">conf</span>
+<span class="o">./</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">resources</span><span class="o">/</span><span class="n">logback</span><span class="o">.</span><span class="n">xml</span>
+<span class="o">./</span><span class="n">src</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">java</span><span class="o">/</span><span class="n">Main</span><span class="o">.</span><span class="n">java</span>
+</pre></div>
+</div>
+<p>Optionally, if you want to run from the command line, add the following at the end of
+<code class="docutils literal notranslate"><span class="pre">build.gradle</span></code>:</p>
+<div class="highlight-groovy notranslate"><div class="highlight"><pre><span></span><span class="n">task</span><span class="w"> </span><span class="nf">execute</span><span class="o">(</span><span class="nl">type:</span><span class="n">JavaExec</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">main</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;Main&#39;</span>
+<span class="w">    </span><span class="n">classpath</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sourceSets</span><span class="o">.</span><span class="na">main</span><span class="o">.</span><span class="na">runtimeClasspath</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>Then launch with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ ./gradlew execute
+</pre></div>
+</div>
+<p>You should see output similar to:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ ./gradlew execute
+:compileJava
+:processResources
+:classes
+:execute
+13:32:25.339 [main] INFO  c.d.o.d.i.c.DefaultMavenCoordinates - DataStax Java driver for Apache Cassandra(R) (com.datastax.oss:java-driver-core) version 4.0.1-alpha4-SNAPSHOT
+13:32:25.682 [poc-admin-0] INFO  c.d.o.d.internal.core.time.Clock - Using native clock for microsecond precision
+13:32:25.683 [poc-admin-0] INFO  c.d.o.d.i.c.metadata.MetadataManager - [poc] No contact points provided, defaulting to /127.0.0.1:9042
+3.11.2
+
+BUILD SUCCESSFUL
+</pre></div>
+</div>
+</section>
+<section id="manually-from-the-binary-tarball">
+<h3>Manually (from the binary tarball)<a class="headerlink" href="#manually-from-the-binary-tarball" title="Link to this heading">¶</a></h3>
+<p>If your build tool can’t fetch dependencies from Maven central, we publish a binary tarball on the
+<a class="reference external" href="http://downloads.datastax.com/java-driver/">DataStax download server</a>.</p>
+<p>The driver and its dependencies must be in the compile-time classpath. Application resources, such
+as <code class="docutils literal notranslate"><span class="pre">application.conf</span></code> and <code class="docutils literal notranslate"><span class="pre">logback.xml</span></code> in our previous examples, must be in the runtime classpath.</p>
+</section>
+</section>
+<section id="jpms-support">
+<h2>JPMS support<a class="headerlink" href="#jpms-support" title="Link to this heading">¶</a></h2>
+<p>All the driver’s artifacts are JPMS automatic modules.</p>
+<p>Note that TinkerPop cannot currently be used in a JPMS application. You will get the following
+error:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Error</span> <span class="n">occurred</span> <span class="n">during</span> <span class="n">initialization</span> <span class="n">of</span> <span class="n">boot</span> <span class="n">layer</span>
+<span class="n">java</span><span class="o">.</span><span class="n">lang</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">FindException</span><span class="p">:</span> <span class="n">Unable</span> <span class="n">to</span> <span class="n">derive</span> <span class="n">module</span> <span class="n">descriptor</span> <span class="k">for</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">gremlin</span><span class="o">-</span><span class="n">shaded</span><span class="o">-</span><span class="mf">3.4.5</span><span class="o">.</span><span class="n">jar</span>
+<span class="n">Caused</span> <span class="n">by</span><span class="p">:</span> <span class="n">java</span><span class="o">.</span><span class="n">lang</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">InvalidModuleDescriptorException</span><span class="p">:</span> <span class="n">Provider</span> <span class="k">class</span> <span class="nc">com</span><span class="o">.</span><span class="n">fasterxml</span><span class="o">.</span><span class="n">jackson</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">JsonFactory</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">module</span>
+</pre></div>
+</div>
+<p>This is a known issue that will be resolved in TinkerPop 3.4.7. The driver will upgrade as soon as
+possible, see <a class="reference external" href="https://datastax-oss.atlassian.net/browse/JAVA-2726">JAVA-2726</a>.</p>
+<p>Unfortunately, the only workaround in the meantime is to exclude TinkerPop dependencies, as
+explained <a class="reference external" href="#tinker-pop">here</a>. Graph functionality won’t be available.</p>
+</section>
+<section id="driver-dependencies">
+<h2>Driver dependencies<a class="headerlink" href="#driver-dependencies" title="Link to this heading">¶</a></h2>
+<p>The driver depends on a number of third-party libraries; some of those dependencies are opt-in,
+while others are present by default, but may be excluded under specific circumstances.</p>
+<p>Here’s a rundown of what you can customize:</p>
+<section id="netty">
+<h3>Netty<a class="headerlink" href="#netty" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://netty.io/">Netty</a> is the NIO framework that powers the driver’s networking layer.</p>
+<p>It is a required dependency, but we provide a a <a class="reference external" href="../shaded_jar/">shaded JAR</a> that relocates it to a
+different Java package; this is useful to avoid dependency hell if you already use Netty in another
+part of your application.</p>
+</section>
+<section id="typesafe-config">
+<h3>Typesafe config<a class="headerlink" href="#typesafe-config" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://lightbend.github.io/config/">Typesafe config</a> is used for our file-based
+<a class="reference external" href="../configuration/">configuration</a>.</p>
+<p>It is a required dependency if you use the driver’s built-in configuration loader, but this can be
+<a class="reference external" href="../configuration/#bypassing-typesafe-config">completely overridden</a> with your own implementation,
+that could use a different framework or an ad-hoc solution.</p>
+<p>In that case, you can exclude the dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>com.typesafe<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>config<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="native-libraries">
+<h3>Native libraries<a class="headerlink" href="#native-libraries" title="Link to this heading">¶</a></h3>
+<p>The driver performs native calls with <a class="reference external" href="https://github.com/jnr">JNR</a>. This is used in two cases:</p>
+<ul class="simple">
+<li><p>to access a microsecond-precision clock in <a class="reference external" href="../query_timestamps/">timestamp generators</a>;</p></li>
+<li><p>to get the process ID when generating <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.7.2.x/api/com/datastax/oss/driver/api/core/uuid/Uuids.html">UUIDs</a>.</p></li>
+</ul>
+<p>In both cases, this is completely optional; if system calls are not available on the current
+platform, or the library fails to load for any reason, the driver falls back to pure Java
+workarounds.</p>
+<p>If you don’t want to use system calls, or already know (from looking at the driver’s logs) that they
+are not available on your platform, you can exclude the following dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>com.github.jnr<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>jnr-posix<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="compression-libraries">
+<h3>Compression libraries<a class="headerlink" href="#compression-libraries" title="Link to this heading">¶</a></h3>
+<p>The driver supports compression with either <a class="reference external" href="https://github.com/jpountz/lz4-java">LZ4</a> or
+<a class="reference external" href="http://google.github.io/snappy/">Snappy</a>.</p>
+<p>These dependencies are optional; you have to add them explicitly in your application in order to
+enable compression. See the <a class="reference external" href="../compression/">Compression</a> page for more details.</p>
+</section>
+<section id="metrics">
+<h3>Metrics<a class="headerlink" href="#metrics" title="Link to this heading">¶</a></h3>
+<p>The driver exposes <a class="reference external" href="../metrics/">metrics</a> through the
+<a class="reference external" href="http://metrics.dropwizard.io/4.0.0/manual/index.html">Dropwizard</a> library.</p>
+<p>The dependency is declared as required, but metrics are optional. If you’ve disabled all metrics,
+and never call <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.7.2.x/api/com/datastax/oss/driver/api/core/session/Session.html#getMetrics--">Session.getMetrics</a> anywhere in your application, you can remove the dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>io.dropwizard.metrics<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>metrics-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<p>In addition, “timer” metrics use <a class="reference external" href="http://hdrhistogram.github.io/HdrHistogram/">HdrHistogram</a> to
+record latency percentiles. At the time of writing, these metrics are: <code class="docutils literal notranslate"><span class="pre">cql-requests</span></code>,
+<code class="docutils literal notranslate"><span class="pre">throttling.delay</span></code> and <code class="docutils literal notranslate"><span class="pre">cql-messages</span></code>; you can also identify them by reading the comments in the
+<a class="reference external" href="../configuration/reference/">configuration reference</a> (look for “exposed as a Timer”).</p>
+<p>If all of these metrics are disabled, you can remove the dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>org.hdrhistogram<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>HdrHistogram<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="jackson">
+<h3>Jackson<a class="headerlink" href="#jackson" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://github.com/FasterXML/jackson">Jackson</a> is used:</p>
+<ul class="simple">
+<li><p>when Insights monitoring is enabled.</p></li>
+</ul>
+<p>If you don’t use either of those features, you can safely exclude the dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>com.fasterxml.jackson.core<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>jackson-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>com.fasterxml.jackson.core<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>jackson-databind<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="esri">
+<h3>Esri<a class="headerlink" href="#esri" title="Link to this heading">¶</a></h3>
+<p>The geospatial types implementation is based on the <a class="reference external" href="https://github.com/Esri/geometry-api-java">Esri Geometry
+API</a>.</p>
+<p>If you don’t use geospatial types anywhere in your application, you can exclude the dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">   </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">     </span><span class="nt">&lt;groupId&gt;</span>com.esri.geometry<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">     </span><span class="nt">&lt;artifactId&gt;</span>esri-geometry-api<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">   </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="tinkerpop">
+<h3>TinkerPop<a class="headerlink" href="#tinkerpop" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="http://tinkerpop.apache.org/">Apache TinkerPop™</a> is used in the graph API.</p>
+<p>If you don’t use DSE graph at all, you can exclude the dependencies:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>org.apache.tinkerpop<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>gremlin-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>org.apache.tinkerpop<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>tinkergraph-gremlin<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="reactive-streams">
+<h3>Reactive Streams<a class="headerlink" href="#reactive-streams" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://www.reactive-streams.org/">Reactive Streams</a> types are referenced in our <a class="reference external" href="../reactive/">reactive
+API</a>.</p>
+<p>If you never call any of the <code class="docutils literal notranslate"><span class="pre">executeReactive</span></code> methods, you can exclude the dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>org.reactivestreams<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>reactive-streams<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="documenting-annotations">
+<h3>Documenting annotations<a class="headerlink" href="#documenting-annotations" title="Link to this heading">¶</a></h3>
+<p>The driver team uses annotations to document certain aspects of the code:</p>
+<ul class="simple">
+<li><p>thread safety with <a class="reference external" href="http://jcip.net/annotations/doc/index.html">Java Concurrency in Practice</a>
+annotations <code class="docutils literal notranslate"><span class="pre">&#64;Immutable</span></code>, <code class="docutils literal notranslate"><span class="pre">&#64;ThreadSafe</span></code>, <code class="docutils literal notranslate"><span class="pre">&#64;NotThreadSafe</span></code> and <code class="docutils literal notranslate"><span class="pre">&#64;GuardedBy</span></code>;</p></li>
+<li><p>nullability with <a class="reference external" href="https://spotbugs.github.io/">SpotBugs</a> annotations <code class="docutils literal notranslate"><span class="pre">&#64;Nullable</span></code> and <code class="docutils literal notranslate"><span class="pre">&#64;NonNull</span></code>.</p></li>
+</ul>
+<p>This is mostly used during development; while these annotations are retained in class files, they
+serve no purpose at runtime. If you want to minimize the number of JARs in your classpath, you can
+exclude them:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>com.github.stephenc.jcip<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>jcip-annotations<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">    </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">      </span><span class="nt">&lt;groupId&gt;</span>com.github.spotbugs<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>spotbugs-annotations<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<p>However, there is one case when excluding those dependencies won’t work: if you use <a class="reference external" href="https://docs.oracle.com/javase/8/docs/technotes/tools/windows/javac.html#sthref65">annotation
+processing</a> in your build, the Java compiler scans the entire classpath – including the driver’s
+classes – and tries to load all declared annotations. If it can’t find the class for an annotation,
+you’ll get a compiler error:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">error</span><span class="p">:</span> <span class="n">cannot</span> <span class="n">access</span> <span class="n">ThreadSafe</span>
+  <span class="k">class</span> <span class="nc">file</span> <span class="k">for</span> <span class="n">net</span><span class="o">.</span><span class="n">jcip</span><span class="o">.</span><span class="n">annotations</span><span class="o">.</span><span class="n">ThreadSafe</span> <span class="ow">not</span> <span class="n">found</span>
+<span class="mi">1</span> <span class="n">error</span>
+</pre></div>
+</div>
+<p>The workaround is to keep the dependencies.</p>
+<p>Sometimes annotation scanning can be triggered involuntarily, if one of your dependencies declares
+a processor via the service provider mechanism (check the <code class="docutils literal notranslate"><span class="pre">META-INF/services</span></code> directory in the
+JARs). If you are sure that you don’t need any annotation processing, you can compile with the
+<code class="docutils literal notranslate"><span class="pre">-proc:none</span></code> option and still exclude the dependencies.</p>
+</section>
+<section id="mandatory-dependencies">
+<h3>Mandatory dependencies<a class="headerlink" href="#mandatory-dependencies" title="Link to this heading">¶</a></h3>
+<p>The remaining core driver dependencies are the only ones that are truly mandatory:</p>
+<ul class="simple">
+<li><p>the <a class="reference external" href="https://github.com/datastax/native-protocol">native protocol</a> layer. This is essentially part
+of the driver code, but was externalized for reuse in other projects;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">java-driver-shaded-guava</span></code>, a shaded version of <a class="reference external" href="https://github.com/google/guava">Guava</a>. It is
+relocated to a different package, and only used by internal driver code, so it should be
+completely transparent to third-party code;</p></li>
+<li><p>the <a class="reference external" href="https://www.slf4j.org/">SLF4J</a> API for <a class="reference external" href="../logging/">logging</a>.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Integration&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.7.2.x/manual/core/integration/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../idempotence/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Query idempotence
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../load_balancing/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Load balancing
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                4.7.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api_conventions/index.html">API conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../case_sensitivity/index.html">Case sensitivity</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Core driver</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../authentication/index.html">Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../bom/index.html">Bill of Materials (BOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../configuration/index.html">Configuration</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../configuration/reference/README.html">Reference configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../custom_codecs/index.html">Custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../detachable_types/index.html">Detachable types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../metadata/index.html">Metadata</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/node/index.html">Node metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/schema/index.html">Schema metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/token/index.html">Token metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance/index.html">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reactive/index.html">Reactive Style Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../request_tracker/index.html">Request tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/per_query_keyspace/index.html">Per-query keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../temporal_types/index.html">Temporal types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../throttling/index.html">Request throttling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tracing/index.html">Query tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tuples/index.html">Tuples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../developer/index.html">Developer docs</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/><label for="toctree-checkbox-6"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/admin/index.html">Administrative tasks</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../developer/common/index.html">Common infrastructure</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/><label for="toctree-checkbox-7"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/context/index.html">Driver context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/event_bus/index.html">Event bus</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/native_protocol/index.html">Native protocol layer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/netty_pipeline/index.html">Netty pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/request_execution/index.html">Request execution</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../mapper/index.html">Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/><label for="toctree-checkbox-8"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/config/index.html">Integration</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label for="toctree-checkbox-9"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/daos/index.html">DAOs</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label for="toctree-checkbox-10"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/custom_types/index.html">Custom result types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/delete/index.html">Delete methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/getentity/index.html">GetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/insert/index.html">Insert methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/null_saving/index.html">Null saving strategy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/query/index.html">Query methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/queryprovider/index.html">Query provider methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/select/index.html">Select methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/setentity/index.html">SetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/statement_attributes/index.html">Statement attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/update/index.html">Update methods</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/entities/index.html">Entities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/mapper/index.html">Mapper interface</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../query_builder/index.html">Query builder</a><input class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" type="checkbox"/><label for="toctree-checkbox-11"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/condition/index.html">Conditions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/delete/index.html">DELETE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/idempotence/index.html">Idempotence in the query builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/insert/index.html">INSERT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/relation/index.html">Relations</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../query_builder/schema/index.html">Schema builder</a><input class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" type="checkbox"/><label for="toctree-checkbox-12"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/aggregate/index.html">Aggregate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/function/index.html">Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/index/index.html">Index</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/keyspace/index.html">Keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/materialized_view/index.html">Materialized View</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/table/index.html">Table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/type/index.html">Type</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/select/index.html">SELECT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/term/index.html">Terms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/truncate/index.html">TRUNCATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/update/index.html">UPDATE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Integration&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.7.2.x/manual/core/integration/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/core/integration/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Integration</a><ul>
+<li><a class="reference internal" href="#quick-overview">Quick overview</a></li>
+<li><a class="reference internal" href="#which-artifact-s-should-i-use">Which artifact(s) should I use?</a></li>
+<li><a class="reference internal" href="#minimal-project-structure">Minimal project structure</a><ul>
+<li><a class="reference internal" href="#maven">Maven</a><ul>
+<li><a class="reference internal" href="#project-descriptor">Project descriptor</a></li>
+<li><a class="reference internal" href="#application-configuration">Application configuration</a></li>
+<li><a class="reference internal" href="#logging-configuration">Logging configuration</a></li>
+<li><a class="reference internal" href="#main-class">Main class</a></li>
+<li><a class="reference internal" href="#running">Running</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#gradle">Gradle</a></li>
+<li><a class="reference internal" href="#manually-from-the-binary-tarball">Manually (from the binary tarball)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#jpms-support">JPMS support</a></li>
+<li><a class="reference internal" href="#driver-dependencies">Driver dependencies</a><ul>
+<li><a class="reference internal" href="#netty">Netty</a></li>
+<li><a class="reference internal" href="#typesafe-config">Typesafe config</a></li>
+<li><a class="reference internal" href="#native-libraries">Native libraries</a></li>
+<li><a class="reference internal" href="#compression-libraries">Compression libraries</a></li>
+<li><a class="reference internal" href="#metrics">Metrics</a></li>
+<li><a class="reference internal" href="#jackson">Jackson</a></li>
+<li><a class="reference internal" href="#esri">Esri</a></li>
+<li><a class="reference internal" href="#tinkerpop">TinkerPop</a></li>
+<li><a class="reference internal" href="#reactive-streams">Reactive Streams</a></li>
+<li><a class="reference internal" href="#documenting-annotations">Documenting annotations</a></li>
+<li><a class="reference internal" href="#mandatory-dependencies">Mandatory dependencies</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

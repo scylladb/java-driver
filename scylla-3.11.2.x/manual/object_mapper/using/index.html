@@ -1,0 +1,963 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Using the mapper | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/object_mapper/using/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Object Mapper
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Using the mapper</span>
+</div>
+                    </div>
+                
+                <section id="using-the-mapper">
+<h1>Using the mapper<a class="headerlink" href="#using-the-mapper" title="Link to this heading">¶</a></h1>
+<p>First, create a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/MappingManager.html">MappingManager</a>. It wraps an existing <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Session.html">Session</a>
+instance:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">MappingManager</span><span class="w"> </span><span class="n">manager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">MappingManager</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">MappingManager</span></code> is thread-safe and can be safely shared throughout your
+application. You would typically create one instance at startup, right
+after your <code class="docutils literal notranslate"><span class="pre">Session</span></code>.</p>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">MappingManager</span></code> will initialize the <code class="docutils literal notranslate"><span class="pre">Session</span></code> if not
+previously done (this was not the case in previous driver versions; if
+this is a problem for you, see <code class="docutils literal notranslate"><span class="pre">MappingManager(session,</span> <span class="pre">protocolVersion)</span></code>).</p>
+<section id="entity-mappers">
+<h2>Entity mappers<a class="headerlink" href="#entity-mappers" title="Link to this heading">¶</a></h2>
+<p>Each entity class (annotated with <code class="docutils literal notranslate"><span class="pre">&#64;Table</span></code>) is managed by a dedicated
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/Mapper.html">Mapper</a> object. You obtain this object from the <code class="docutils literal notranslate"><span class="pre">MappingManager</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Mapper</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;</span><span class="w"> </span><span class="n">mapper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">manager</span><span class="p">.</span><span class="na">mapper</span><span class="p">(</span><span class="n">User</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Mapper</span></code> objects are thread-safe. The manager caches them internally, so
+calling <code class="docutils literal notranslate"><span class="pre">manager#mapper</span></code> more than once for the same class will return
+the previously generated mapper.</p>
+<section id="basic-crud-operations">
+<h3>Basic CRUD operations<a class="headerlink" href="#basic-crud-operations" title="Link to this heading">¶</a></h3>
+<p>To save an object, use <code class="docutils literal notranslate"><span class="pre">Mapper#save</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">UUID</span><span class="w"> </span><span class="n">userId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+<span class="n">User</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">User</span><span class="p">(</span><span class="n">userId</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;John Doe&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Address</span><span class="p">(</span><span class="s">&quot;street&quot;</span><span class="p">,</span><span class="w"> </span><span class="mo">01000</span><span class="p">));</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">save</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+</pre></div>
+</div>
+<hr class="docutils" />
+<p>To retrieve an object, use <code class="docutils literal notranslate"><span class="pre">Mapper#get</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">UUID</span><span class="w"> </span><span class="n">userId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+<span class="n">User</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mapper</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="n">userId</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">get</span></code>’s arguments must match the primary key components (number of
+arguments, their types, and order).</p>
+<hr class="docutils" />
+<p>To delete a row in a table, use <code class="docutils literal notranslate"><span class="pre">Mapper#delete</span></code>. This method support
+deleting a row given either its primary keys, or the object to delete:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">UUID</span><span class="w"> </span><span class="n">userId</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">delete</span><span class="p">(</span><span class="n">userId</span><span class="p">);</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">delete</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+</pre></div>
+</div>
+<hr class="docutils" />
+<p>All these CRUD operations are synchronous, but the <code class="docutils literal notranslate"><span class="pre">Mapper</span></code> provides
+their asynchronous equivalents:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ListenableFuture</span><span class="o">&lt;</span><span class="n">Void</span><span class="o">&gt;</span><span class="w"> </span><span class="n">saveFuture</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mapper</span><span class="p">.</span><span class="na">saveAsync</span><span class="p">(</span><span class="n">u</span><span class="p">);</span>
+<span class="n">ListenableFuture</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;</span><span class="w"> </span><span class="n">userFuture</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mapper</span><span class="p">.</span><span class="na">getAsync</span><span class="p">(</span><span class="n">userId</span><span class="p">);</span>
+<span class="n">ListenableFuture</span><span class="o">&lt;</span><span class="n">Void</span><span class="o">&gt;</span><span class="w"> </span><span class="n">deleteFuture</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mapper</span><span class="p">.</span><span class="na">deleteAsync</span><span class="p">(</span><span class="n">userId</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="mapper-options">
+<h3>Mapper options<a class="headerlink" href="#mapper-options" title="Link to this heading">¶</a></h3>
+<p>The basic CRUD operations accept additional options to customize the
+underlying query:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ttl</span></code>: add a time-to-live value for the operation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">timestamp</span></code>: add a timestamp value for the operation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">consistencyLevel</span></code>: specify a consistency level.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tracing</span></code>: set tracing flag for the query.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">saveNullFields</span></code>: if set to true, fields with value <code class="docutils literal notranslate"><span class="pre">null</span></code> in an
+instance that is to be persisted will be explicitly written as <code class="docutils literal notranslate"><span class="pre">null</span></code>
+in the query. If set to false, fields with null value won’t be included
+in the write query (thus avoiding tombstones), or if using Protocol V4+
+unset() will be used for null values.  If not specified, the
+default behavior is to persist <code class="docutils literal notranslate"><span class="pre">null</span></code> fields.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ifNotExists</span></code>: if set to true, adds an <code class="docutils literal notranslate"><span class="pre">IF</span> <span class="pre">NOT</span> <span class="pre">EXISTS</span></code> clause to the
+save operation (use <code class="docutils literal notranslate"><span class="pre">ifNotExists(false)</span></code> if you enabled the option by
+default and need to disable it for a specific operation).</p></li>
+</ul>
+<p>To use options, add them to the mapper call after regular parameters:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import static</span><span class="w"> </span><span class="nn">com.datastax.driver.mapping.Mapper.Option.*</span><span class="p">;</span>
+
+<span class="n">mapper</span><span class="p">.</span><span class="na">save</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">User</span><span class="p">(</span><span class="n">userId</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;helloworld&quot;</span><span class="p">),</span>
+<span class="w">            </span><span class="n">timestamp</span><span class="p">(</span><span class="mi">123456L</span><span class="p">),</span><span class="w"> </span><span class="n">tracing</span><span class="p">(</span><span class="kc">true</span><span class="p">),</span><span class="w"> </span><span class="n">ttl</span><span class="p">(</span><span class="mi">42</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Some options don’t apply to all operations:</p>
+<table border="1" style="text-align:center; width:100%;margin-bottom:1em;">
+    <tr> <td><b>Option</b></td>         <td><b>save/saveQuery</b></td> <td><b>get/getQuery</b></td> <td><b>delete/deleteQuery</b></td></tr>
+    <tr> <td>Ttl</td>                   <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
+    <tr> <td>Timestamp</td>             <td>yes</td>                   <td>no</td>                  <td>yes</td> </tr>
+    <tr> <td>ConsistencyLevel</td>      <td>yes</td>                   <td>yes</td>                 <td>yes</td> </tr>
+    <tr> <td>Tracing</td>               <td>yes</td>                   <td>yes</td>                 <td>yes</td> </tr>
+    <tr> <td>SaveNullFields</td>        <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
+    <tr> <td>IfNotExists</td>           <td>yes</td>                   <td>no</td>                  <td>no</td> </tr>
+</table><p>Note that <code class="docutils literal notranslate"><span class="pre">Option.consistencyLevel</span></code> is redundant with the consistency
+level defined by <a class="reference external" href="../creating/#creating-a-table-entity">&#64;Table</a>.
+If both are defined, the option will take precedence over the
+annotation.</p>
+<p>Default options can be defined for each type of operation:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">mapper</span><span class="p">.</span><span class="na">setDefaultGetOption</span><span class="p">(</span><span class="n">tracing</span><span class="p">(</span><span class="kc">true</span><span class="p">),</span><span class="w"> </span><span class="n">consistencyLevel</span><span class="p">(</span><span class="n">QUORUM</span><span class="p">));</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">setDefaultSaveOption</span><span class="p">(</span><span class="n">saveNullFields</span><span class="p">(</span><span class="kc">false</span><span class="p">));</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">setDefaultDeleteOption</span><span class="p">(</span><span class="n">consistencyLevel</span><span class="p">(</span><span class="n">ONE</span><span class="p">));</span>
+
+<span class="c1">// Given the defaults above, this will use tracing(true), consistencyLevel(ONE)</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="n">uuid</span><span class="p">,</span><span class="w"> </span><span class="n">consistencyLevel</span><span class="p">(</span><span class="n">ONE</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>To reset default options, use the following methods:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">mapper</span><span class="p">.</span><span class="na">resetDefaultGetOption</span><span class="p">();</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">resetDefaultSaveOption</span><span class="p">();</span>
+<span class="n">mapper</span><span class="p">.</span><span class="na">resetDefaultDeleteOption</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="access-to-underlying-statements">
+<h3>Access to underlying <code class="docutils literal notranslate"><span class="pre">Statement</span></code>s<a class="headerlink" href="#access-to-underlying-statements" title="Link to this heading">¶</a></h3>
+<p>Instead of performing an operation directly, it’s possible to ask the
+<code class="docutils literal notranslate"><span class="pre">Mapper</span></code> to just return the corresponding <code class="docutils literal notranslate"><span class="pre">Statement</span></code> object. This gives
+the client a chance to customize the statement before executing it.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Mapper.saveQuery(entity)</span></code>: returns a statement generated by the
+mapper to save <code class="docutils literal notranslate"><span class="pre">entity</span></code> into the database.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Mapper.getQuery(userId)</span></code>: returns a statement to select a row in the
+database, selected on the given <code class="docutils literal notranslate"><span class="pre">userId</span></code>, and matching the mapped
+object structure.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Mapper.deleteQuery(userID)</span></code>: returns a statement to delete a row in the
+database given the <code class="docutils literal notranslate"><span class="pre">userId</span></code> provided. This method can also accept a
+mapped object instance.</p></li>
+</ul>
+</section>
+<section id="manual-mapping">
+<h3>Manual mapping<a class="headerlink" href="#manual-mapping" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Mapper#map</span></code> provides a way to convert the results of a regular query:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ResultSet</span><span class="w"> </span><span class="n">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;SELECT * FROM user&quot;</span><span class="p">);</span>
+<span class="n">Result</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;</span><span class="w"> </span><span class="n">users</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mapper</span><span class="p">.</span><span class="na">map</span><span class="p">(</span><span class="n">results</span><span class="p">);</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">User</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">users</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="s">&quot;User : &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="na">getUserId</span><span class="p">());</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This method will ignore:</p>
+<ul class="simple">
+<li><p>extra columns in the <code class="docutils literal notranslate"><span class="pre">ResultSet</span></code> that are not mapped for this entity.</p></li>
+<li><p>mapped fields that are not present in the <code class="docutils literal notranslate"><span class="pre">ResultSet</span></code> (setters won’t
+be called so the value will be the one after invocation of the class’s
+default constructor).</p></li>
+</ul>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/Result.html">Result</a> is similar to <code class="docutils literal notranslate"><span class="pre">ResultSet</span></code> but for a given mapped class.
+It provides methods <code class="docutils literal notranslate"><span class="pre">one()</span></code>, <code class="docutils literal notranslate"><span class="pre">all()</span></code>, <code class="docutils literal notranslate"><span class="pre">iterator()</span></code>, <code class="docutils literal notranslate"><span class="pre">getExecutionInfo()</span></code>
+and <code class="docutils literal notranslate"><span class="pre">isExhausted()</span></code>. Note that iterating the <code class="docutils literal notranslate"><span class="pre">Result</span></code> will consume the
+<code class="docutils literal notranslate"><span class="pre">ResultSet</span></code>, and vice-versa.</p>
+</section>
+</section>
+<section id="accessors">
+<h2>Accessors<a class="headerlink" href="#accessors" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Accessor</span></code>s provide a way to map custom queries not supported by the
+default entity mappers.</p>
+<p>To create an accessor, define a Java interface and annotate each method
+to provide the corresponding CQL query:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Accessor</span>
+<span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">UserAccessor</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nd">@Query</span><span class="p">(</span><span class="s">&quot;SELECT * FROM user&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="n">Result</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">getAll</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">MappingManager</span></code> can then process this interface and automatically generate an
+implementation for it:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">UserAccessor</span><span class="w"> </span><span class="n">userAccessor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">manager</span><span class="p">.</span><span class="na">createAccessor</span><span class="p">(</span><span class="n">UserAccessor</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="n">Result</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;</span><span class="w"> </span><span class="n">users</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">userAccessor</span><span class="p">.</span><span class="na">getAll</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Like mappers, accessors are cached at the manager level and thus, are
+thread-safe/sharable.</p>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<p>A query can have bind markers, that will be set with the method’s
+arguments.</p>
+<p>With unnamed markers, the order of the arguments must match the order of
+the markers:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Query</span><span class="p">(</span><span class="s">&quot;insert into user (id, name) values (?, ?)&quot;</span><span class="p">)</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="nf">insert</span><span class="p">(</span><span class="n">UUID</span><span class="w"> </span><span class="n">userId</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">name</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>With named markers, use <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/annotations/Param.html">&#64;Param</a> to indicate which parameter
+corresponds to which marker:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Query</span><span class="p">(</span><span class="s">&quot;insert into user (userId, name) values (:u, :n)&quot;</span><span class="p">)</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="nf">insert</span><span class="p">(</span><span class="nd">@Param</span><span class="p">(</span><span class="s">&quot;u&quot;</span><span class="p">)</span><span class="w"> </span><span class="n">UUID</span><span class="w"> </span><span class="n">userId</span><span class="p">,</span><span class="w"> </span><span class="nd">@Param</span><span class="p">(</span><span class="s">&quot;n&quot;</span><span class="p">)</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">name</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>If a method argument is a Java enumeration, it must be annotated with
+<code class="docutils literal notranslate"><span class="pre">&#64;Enumerated</span></code> to indicate how to convert it to a CQL type (the rules are
+the same as in <a class="reference external" href="../creating/#enumerations">mapping definition</a>):</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Query</span><span class="p">(</span><span class="s">&quot;insert into user (key, gender) values (?,?)&quot;</span><span class="p">)</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="nf">addUser</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="nd">@Enumerated</span><span class="p">(</span><span class="n">EnumType</span><span class="p">.</span><span class="na">ORDINAL</span><span class="p">)</span><span class="w"> </span><span class="n">Enum</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="return-type">
+<h3>Return type<a class="headerlink" href="#return-type" title="Link to this heading">¶</a></h3>
+<p>The declared return type of each method affects how the query will get
+executed:</p>
+<table border="1" style="text-align:center; width:100%;margin-bottom:1em;">
+    <tr> <td><b>Return type</b></td>            <td><b>Effect</b></td> </tr>
+    <tr>
+      <td><code>void</code></td>
+      <td>Synchronous execution, discards the results of the query.</td>
+    </tr>
+    <tr>
+      <td><code>ResultSet</code></td>
+      <td>Synchronous execution, returns unmapped results.</td>
+    </tr>
+    <tr>
+      <td><code>T</code></td>
+      <td><code>T</code> must be a mapped class.<br/>Synchronous execution, returns the first row (or <code>null</code> if there are no results).</td>
+    </tr>
+    <tr>
+      <td><code>Result&lt;T&gt;</code></td>
+      <td><code>T</code> must be a mapped class.<br/>Synchronous execution, returns a list of mapped objects.</td>
+    </tr>
+    <tr>
+      <td><code>ResultSetFuture</code></td>
+      <td>Asynchronous execution, returns unmapped results.</td>
+    </tr>
+    <tr>
+      <td><code>ListenableFuture&lt;T&gt;</code></td>
+      <td><code>T</code> must be a mapped class.<br/>Asynchronous execution, returns the first row (or <code>null</code> if there are no results).</td>
+    </tr>
+    <tr>
+      <td><code>ListenableFuture&lt;Result&lt;T&gt;&gt;</code></td>
+      <td><code>T</code> must be a mapped class.<br/>Asynchronous execution, returns a list of mapped objects.</td>
+    </tr>
+    <tr>
+      <td><code>Statement</code></td>
+      <td>Object mapper doesn't execute query, but returns an instance of <code>BoundStatement</code> that could be executed via <code>Session</code> object. </td>
+    </tr>
+</table><p>Example:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Query</span><span class="p">(</span><span class="s">&quot;SELECT * FROM user&quot;</span><span class="p">)</span>
+<span class="kd">public</span><span class="w"> </span><span class="n">ListenableFuture</span><span class="o">&lt;</span><span class="n">Result</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="nf">getAllAsync</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="customizing-the-statement">
+<h3>Customizing the statement<a class="headerlink" href="#customizing-the-statement" title="Link to this heading">¶</a></h3>
+<p>It is possible to customize query parameters to include in a <code class="docutils literal notranslate"><span class="pre">Accessor</span></code>
+query with the annotation <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/annotations/QueryParameters.html">&#64;QueryParameters</a>. Then, options like
+<em>consistency level</em>, <em>fetchsize</em> or <em>tracing</em> are settable:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@Query</span><span class="p">(</span><span class="s">&quot;SELECT * FROM ks.users&quot;</span><span class="p">)</span>
+<span class="nd">@QueryParameters</span><span class="p">(</span><span class="n">consistency</span><span class="o">=</span><span class="s">&quot;QUORUM&quot;</span><span class="p">)</span>
+<span class="kd">public</span><span class="w"> </span><span class="n">ListenableFuture</span><span class="o">&lt;</span><span class="n">Result</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="nf">getAllAsync</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="mapping-configuration">
+<h2>Mapping configuration<a class="headerlink" href="#mapping-configuration" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/MappingConfiguration.html">MappingConfiguration</a> lets you configure low-level aspects of the object mapper. It is configured
+when initializing the mapping manager:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PropertyMapper</span><span class="w"> </span><span class="n">propertyMapper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">;</span><span class="w"> </span><span class="c1">// see examples below</span>
+<span class="n">MappingConfiguration</span><span class="w"> </span><span class="n">configuration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>
+<span class="w">        </span><span class="n">MappingConfiguration</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">                </span><span class="p">.</span><span class="na">withPropertyMapper</span><span class="p">(</span><span class="n">propertyMapper</span><span class="p">)</span>
+<span class="w">                </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+<span class="n">MappingManager</span><span class="w"> </span><span class="n">manager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">MappingManager</span><span class="p">(</span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">configuration</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The main component in the configuration is <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/PropertyMapper.html">PropertyMapper</a>, which controls how annotated classes
+will relate to database objects. The best way to plug in specific behavior is to create an instance of
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/mapping/DefaultPropertyMapper.html">DefaultPropertyMapper</a> and customize it.</p>
+<p>For example, the mapper’s default behavior is to try to map all the properties of your Java objects.
+You might want to take the opposite approach and only map the ones that are specifically annotated
+with <code class="docutils literal notranslate"><span class="pre">&#64;Column</span></code> or <code class="docutils literal notranslate"><span class="pre">&#64;Field</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PropertyMapper</span><span class="w"> </span><span class="n">propertyMapper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">DefaultPropertyMapper</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setPropertyTransienceStrategy</span><span class="p">(</span><span class="n">PropertyTransienceStrategy</span><span class="p">.</span><span class="na">OPT_IN</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Another common need is to customize the way Cassandra column names are inferred. Out of the box, Java
+property names are simply lowercased, so a <code class="docutils literal notranslate"><span class="pre">userName</span></code> property would be mapped to the <code class="docutils literal notranslate"><span class="pre">username</span></code> column.
+To map to <code class="docutils literal notranslate"><span class="pre">user_name</span></code> instead, use the following:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PropertyMapper</span><span class="w"> </span><span class="n">propertyMapper</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">DefaultPropertyMapper</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setNamingStrategy</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">DefaultNamingStrategy</span><span class="p">(</span>
+<span class="w">                </span><span class="n">NamingConventions</span><span class="p">.</span><span class="na">LOWER_CAMEL_CASE</span><span class="p">,</span><span class="w"> </span>
+<span class="w">                </span><span class="n">NamingConventions</span><span class="p">.</span><span class="na">LOWER_SNAKE_CASE</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>There is more to <code class="docutils literal notranslate"><span class="pre">DefaultPropertyMapper</span></code>; see the Javadocs and implementation for details.</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Using the mapper&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/object_mapper/using/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../custom_codecs/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Using custom codecs
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../../osgi/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />OSGi
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.11.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../serverless/index.html">Connecting to ScyllaDB Cloud Serverless</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Object Mapper</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Using the mapper&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/object_mapper/using/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/object_mapper/using/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Using the mapper</a><ul>
+<li><a class="reference internal" href="#entity-mappers">Entity mappers</a><ul>
+<li><a class="reference internal" href="#basic-crud-operations">Basic CRUD operations</a></li>
+<li><a class="reference internal" href="#mapper-options">Mapper options</a></li>
+<li><a class="reference internal" href="#access-to-underlying-statements">Access to underlying <code class="docutils literal notranslate"><span class="pre">Statement</span></code>s</a></li>
+<li><a class="reference internal" href="#manual-mapping">Manual mapping</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#accessors">Accessors</a><ul>
+<li><a class="reference internal" href="#parameters">Parameters</a></li>
+<li><a class="reference internal" href="#return-type">Return type</a></li>
+<li><a class="reference internal" href="#customizing-the-statement">Customizing the statement</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#mapping-configuration">Mapping configuration</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

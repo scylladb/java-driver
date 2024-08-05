@@ -1,0 +1,798 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Retries | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/retries/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Retries</span>
+</div>
+                    </div>
+                
+                <section id="retries">
+<h1>Retries<a class="headerlink" href="#retries" title="Link to this heading">¶</a></h1>
+<p>When a query fails, it sometimes makes sense to retry it: the error might be temporary, or the query might work on a
+different host, or with different options.</p>
+<p>The driver uses a configurable set of rules to determine when and how to retry.</p>
+<section id="concepts">
+<h2>Concepts<a class="headerlink" href="#concepts" title="Link to this heading">¶</a></h2>
+<p>When the driver executes a statement, it first obtains a <a class="reference external" href="../load_balancing/#query-plan">query plan</a> (a list of hosts) from the load balancing policy.
+Then it picks the first host and sends it the request; this host acts as the <strong>coordinator</strong> for the query, it will
+communicate with the rest of the cluster and reply to the client.</p>
+<p>If the coordinator can’t be reached or replies with an error, there are various things that the driver can do; they are
+expressed as <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html">RetryDecision</a> objects:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#retry-com.datastax.driver.core.ConsistencyLevel-">retry()</a>: retry the query on the same host. It’s possible to retry with a different consistency level than the one
+that was originally requested;</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#tryNextHost-com.datastax.driver.core.ConsistencyLevel-">tryNextHost()</a>: retry on the next host in the query plan. Again, it can be with a different CL;</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#rethrow--">rethrow()</a>: rethrow the exception to the user code. This means it will be thrown from the <code class="docutils literal notranslate"><span class="pre">session.execute</span></code> call (or
+returned as a failed future if <code class="docutils literal notranslate"><span class="pre">executeAsync</span></code> was used);</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/RetryPolicy.RetryDecision.html#ignore--">ignore()</a>: mark the request as successful, and return an empty result set.</p></li>
+</ul>
+<p>If the driver retries on every host and reaches the end of the query plan, a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/NoHostAvailableException.html">NoHostAvailableException</a> is thrown to the
+user code. You can use its <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/NoHostAvailableException.html#getErrors--">getErrors()</a> method to find out what went wrong on each host.</p>
+</section>
+<section id="retry-policy">
+<h2>Retry policy<a class="headerlink" href="#retry-policy" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/RetryPolicy.html">RetryPolicy</a> is a pluggable component that determines the retry decisions for various types of errors. It is configured
+when initializing the cluster:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withRetryPolicy</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">MyCustomPolicy</span><span class="p">())</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Once the cluster has been built, you can’t change the policy, but you may inspect it at runtime:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">RetryPolicy</span><span class="w"> </span><span class="n">policy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getPolicies</span><span class="p">().</span><span class="na">getRetryPolicy</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>If you don’t explicitly configure it, you get a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/DefaultRetryPolicy.html">DefaultRetryPolicy</a>.</p>
+<p>The policy’s methods cover different types of errors:</p>
+<section id="onunavailable">
+<h3><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onUnavailable-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-int-int-int-">onUnavailable</a><a class="headerlink" href="#onunavailable" title="Link to this heading">¶</a></h3>
+<p>A request reached the coordinator, but there weren’t enough live replicas to achieve the requested consistency level.
+The coordinator replied with an <code class="docutils literal notranslate"><span class="pre">UNAVAILABLE</span></code> error.</p>
+<p>If the policy rethrows the error, the user code will get an <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/UnavailableException.html">UnavailableException</a>. You can inspect the exception’s
+fields to get the amount of replicas that were <em>known</em> to be alive when the error was triggered, as well as the amount
+of replicas that where <em>required</em> by the requested consistency level.</p>
+</section>
+<section id="onreadtimeout">
+<h3><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onReadTimeout-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-int-int-boolean-int-">onReadTimeout</a><a class="headerlink" href="#onreadtimeout" title="Link to this heading">¶</a></h3>
+<p>A read request reached the coordinator, which initially believed that there were enough live replicas to process it.
+But, for some reason, one or several replicas were too slow to answer within the predefined timeout
+(<code class="docutils literal notranslate"><span class="pre">read_request_timeout_in_ms</span></code> in <code class="docutils literal notranslate"><span class="pre">cassandra.yaml</span></code>), and the coordinator replied to the client with a <code class="docutils literal notranslate"><span class="pre">READ_TIMEOUT</span></code>
+error.</p>
+<p>This could be due to a temporary overloading of these replicas, or even
+that they just failed or were turned off. During reads, Cassandra doesn’t request data from every replica to minimize
+internal network traffic; instead, some replicas are only asked for a checksum of the data. A read timeout may occur
+even if enough replicas responded to fulfill the consistency level, but only checksum responses were received (the
+method’s <code class="docutils literal notranslate"><span class="pre">dataRetrieved</span></code> parameter allow you to check if you’re in that situation).</p>
+<p>If the policy rethrows the error, the user code will get a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/ReadTimeoutException.html">ReadTimeoutException</a>.</p>
+<p>Note: do not confuse this error with a <a class="reference external" href="../socket_options/#driver-read-timeout">driver read timeout</a>, which happens when the coordinator didn’t reply at all to
+the client.</p>
+</section>
+<section id="onwritetimeout">
+<h3><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onWriteTimeout-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-com.datastax.driver.core.WriteType-int-int-int-">onWriteTimeout</a><a class="headerlink" href="#onwritetimeout" title="Link to this heading">¶</a></h3>
+<p>This is similar to <code class="docutils literal notranslate"><span class="pre">onReadTimeout</span></code>, but for write operations. The reason reads and writes are handled separately is
+because a read is obviously a non mutating operation, whereas a write is likely to be. If a write times out at the
+coordinator level, there is no way to know whether the mutation was applied or not on the non-answering replica.</p>
+<p>If the policy rethrows the error, the user code will get a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/WriteTimeoutException.html">WriteTimeoutException</a>.</p>
+</section>
+<section id="onrequesterror">
+<h3><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/policies/DefaultRetryPolicy.html#onRequestError-com.datastax.driver.core.Statement-com.datastax.driver.core.ConsistencyLevel-com.datastax.driver.core.exceptions.DriverException-int-">onRequestError</a><a class="headerlink" href="#onrequesterror" title="Link to this heading">¶</a></h3>
+<p>This gets called for any other error occurring after the request was sent.</p>
+<p>The method receives the exception as a parameter, so that implementations can refine their decision based on what
+happened. The possible exceptions are:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/ServerError.html">ServerError</a>: thrown by the coordinator when an unexpected error occurs. This is generally a Cassandra bug;</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/OperationTimedOutException.html">OperationTimedOutException</a>: thrown by the client when it didn’t hear back from the coordinator within the
+<a class="reference external" href="../socket_options/#driver-read-timeout">driver read timeout</a>;</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/ConnectionException.html">ConnectionException</a>: thrown by the client for any network issue while or after the request was written;</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/OverloadedException.html">OverloadedException</a>: thrown by the coordinator when replicas are down and the number of hinted handoffs gets too
+high; the coordinator temporarily refuses writes for these replicas (see <a class="reference external" href="https://docs.datastax.com/en/cassandra/2.1/cassandra/dml/dml_about_hh_c.html?scroll=concept_ds_ifg_jqx_zj__performance">hinted handoffs</a> in the Cassandra
+documentation).</p></li>
+</ul>
+</section>
+</section>
+<section id="hard-coded-rules">
+<h2>Hard-coded rules<a class="headerlink" href="#hard-coded-rules" title="Link to this heading">¶</a></h2>
+<p>There are a few cases where retrying is always the right thing to do. These are not covered by <code class="docutils literal notranslate"><span class="pre">RetryPolicy</span></code>, but
+hard-coded in the driver:</p>
+<ul class="simple">
+<li><p><strong>any error before a network write was attempted</strong>: to send a query, the driver selects a host, borrows a connection
+from the host’s <a class="reference external" href="../pooling/">connection pool</a>, and then writes the message to the connection.
+Errors can occur before the write was even attempted, for example if the connection pool is saturated, or if the
+host went down right after we borrowed. In those cases, it is always safe to retry since the request wasn’t sent, so
+the driver will transparently move to the next host in the query plan.</p></li>
+<li><p><strong>re-preparing a statement</strong>: when the driver executes a prepared statement, it may find out that the coordinator
+doesn’t know about it, and need to re-prepare it on the fly (this is described in detail <a class="reference external" href="../statements/prepared/#preparing-on-multiple-nodes">here</a>). The query
+is then retried on the same host.</p></li>
+<li><p><strong>trying to communicate with a host that is bootstrapping</strong>: this is a rare edge case, as in practice the driver
+should never try to communicate with a bootstrapping host (the only way is if it was specified as a contact point).
+Anyway, it is again safe to assume that the query was not executed at all, so the driver moves to the next host.</p></li>
+</ul>
+<p>Similarly, some errors have no chance of being solved by a retry. They will always be rethrown directly to the user.
+These include:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/QueryValidationException.html">QueryValidationException</a> and any of its subclasses (<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/InvalidQueryException.html">InvalidQueryException</a>, <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/InvalidConfigurationInQueryException.html">InvalidConfigurationInQueryException</a>,
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/UnauthorizedException.html">UnauthorizedException</a>, <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/SyntaxError.html">SyntaxError</a>, <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/AlreadyExistsException.html">AlreadyExistsException</a>);</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/exceptions/TruncateException.html">TruncateException</a>.</p></li>
+</ul>
+</section>
+<section id="retries-and-idempotence">
+<h2>Retries and idempotence<a class="headerlink" href="#retries-and-idempotence" title="Link to this heading">¶</a></h2>
+<p>If a query is <a class="reference external" href="../idempotence/">not idempotent</a>, the driver will not retry it if that could produce inconsistent results:</p>
+<ul class="simple">
+<li><p>retrying in <code class="docutils literal notranslate"><span class="pre">onReadTimeout</span></code> is always safe, since by definition this error indicates that the query was a read, which
+didn’t mutate any data;</p></li>
+<li><p>similarly, <code class="docutils literal notranslate"><span class="pre">onUnavailable</span></code> is safe: the coordinator is telling us that it didn’t find enough replicas, so we know that
+it didn’t try to apply the query.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">onWriteTimeout</span></code> is <strong>not safe</strong>: some replicas failed to reply to the coordinator in time, but they might still have
+applied the mutation;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">onRequestError</span></code> is <strong>not safe</strong> either: the query might have been applied before the error occurred. In particular,
+an <code class="docutils literal notranslate"><span class="pre">OperationTimedOutException</span></code> could be caused by a network issue that prevented a successful response to come back
+to the client.</p></li>
+</ul>
+<p>Therefore, the driver does not retry after a write timeout or request error if the statement is not idempotent. This is
+handled internally, the retry policy methods are not even invoked in those cases.</p>
+<p>Note that this behavior was introduced in version 3.1.0 of the driver. In previous versions, it was up to retry policy
+implementations to handle idempotence (the new behavior is equivalent to what you achieved with
+<code class="docutils literal notranslate"><span class="pre">IdempotenceAwareRetryPolicy</span></code> before).</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Retries&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.0.x/manual/retries/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../reconnection/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Reconnection
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../shaded_jar/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Using the shaded JAR
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.11.0.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Retries&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.0.x/manual/retries/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/retries/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Retries</a><ul>
+<li><a class="reference internal" href="#concepts">Concepts</a></li>
+<li><a class="reference internal" href="#retry-policy">Retry policy</a><ul>
+<li><a class="reference internal" href="#onunavailable">onUnavailable</a></li>
+<li><a class="reference internal" href="#onreadtimeout">onReadTimeout</a></li>
+<li><a class="reference internal" href="#onwritetimeout">onWriteTimeout</a></li>
+<li><a class="reference internal" href="#onrequesterror">onRequestError</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#hard-coded-rules">Hard-coded rules</a></li>
+<li><a class="reference internal" href="#retries-and-idempotence">Retries and idempotence</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

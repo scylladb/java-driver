@@ -1,0 +1,1048 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             GraalVM native images | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/core/graalvm/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Core driver
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">GraalVM native images</span>
+</div>
+                    </div>
+                
+                <section id="graalvm-native-images">
+<h1>GraalVM native images<a class="headerlink" href="#graalvm-native-images" title="Link to this heading">¶</a></h1>
+<section id="quick-overview">
+<h2>Quick overview<a class="headerlink" href="#quick-overview" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.graalvm.org/reference-manual/native-image/">GraalVM native images</a> can be built with
+no additional configuration starting with driver 4.13.0.</p></li>
+<li><p>But extra configurations are required in a few cases:</p>
+<ul>
+<li><p>When using <a class="reference external" href="../reactive">reactive programming</a>;</p></li>
+<li><p>When using <a class="reference external" href="../integration#Jackson">Jackson</a>;</p></li>
+<li><p>When using LZ4 <a class="reference external" href="../compression/">compression</a>;</p></li>
+<li><p>Depending on the <a class="reference external" href="../logging">logging backend</a> in use.</p></li>
+</ul>
+</li>
+<li><p>DSE-specific features:</p>
+<ul>
+<li><p><a class="reference external" href="../dse/geotypes">Geospatial types</a> are supported.</p></li>
+<li><p><a class="reference external" href="../dse/graph">DSE Graph</a> is not officially supported, although it may work.</p></li>
+</ul>
+</li>
+<li><p>The <a class="reference external" href="../shaded_jar">shaded jar</a> is not officially supported, although it may work.</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="concepts">
+<h2>Concepts<a class="headerlink" href="#concepts" title="Link to this heading">¶</a></h2>
+<p>Starting with version 4.13.0, the driver ships with <a class="reference external" href="https://www.graalvm.org/reference-manual/native-image/BuildConfiguration/#embedding-a-configuration-file">embedded GraalVM configuration files</a> that
+allow GraalVM native images including the driver to be built without hassle, barring a few
+exceptions and caveats listed below.</p>
+</section>
+<section id="classes-instantiated-by-reflection">
+<h2>Classes instantiated by reflection<a class="headerlink" href="#classes-instantiated-by-reflection" title="Link to this heading">¶</a></h2>
+<p>The driver instantiates its components by reflection. The actual classes that will be instantiated
+in this way need to be registered for reflection. All built-in implementations of various driver
+components, such as <code class="docutils literal notranslate"><span class="pre">LoadBalancingPolicy</span></code> or <code class="docutils literal notranslate"><span class="pre">TimestampGenerator</span></code>, are automatically registered for
+reflection, along with a few other internal components tha are also instantiated by reflection.
+<em>You don’t need to manually register any of these built-in implementations</em>.</p>
+<p>But if you intend to use a custom implementation in lieu of a driver built-in class, then it is your
+responsibility to register that custom implementation for reflection.</p>
+<p>For example, assuming that you have the following load balancing policy implementation:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">package</span><span class="w"> </span><span class="nn">com.example.app</span><span class="p">;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.core.context.DriverContext</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.core.metadata.Node</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.Map</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.Optional</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.UUID</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">CustomLoadBalancingPolicy</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">DefaultLoadBalancingPolicy</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="nf">CustomLoadBalancingPolicy</span><span class="p">(</span><span class="n">DriverContext</span><span class="w"> </span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">profileName</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">super</span><span class="p">(</span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">profileName</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="c1">// rest of class omitted for brevity</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>And assuming that you declared the above class in your application.conf file as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>datastax-java-driver.basic{
+  load-balancing-policy.class = com.example.app.CustomLoadBalancingPolicy
+}
+</pre></div>
+</div>
+<p>Then you will have to register that class for reflection:</p>
+<ol class="simple">
+<li><p>Create the following reflection.json file, or add the entry to an existing file:</p></li>
+</ol>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;com.example.app.CustomLoadBalancingPolicy&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;allPublicConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w"> </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>When invoking the native image builder, add a <code class="docutils literal notranslate"><span class="pre">-H:ReflectionConfigurationFiles=reflection.json</span></code>
+flag and point it to the file created above.</p></li>
+</ol>
+<p>Note: some frameworks allow you to simplify the registration process. For example, Quarkus offers
+the <code class="docutils literal notranslate"><span class="pre">io.quarkus.runtime.annotations.RegisterForReflection</span></code> annotation that you can use to annotate
+your class:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="nd">@RegisterForReflection</span>
+<span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">CustomLoadBalancingPolicy</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">DefaultLoadBalancingPolicy</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">//...</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>In this case, no other manual configuration is required for the above class to be correctly
+registered for reflection.</p>
+</section>
+<section id="configuration-resources">
+<h2>Configuration resources<a class="headerlink" href="#configuration-resources" title="Link to this heading">¶</a></h2>
+<p>The default driver <a class="reference external" href="../configuration">configuration</a> mechanism is based on the TypeSafe Config
+library. TypeSafe Config looks for a few classpath resources when initializing the configuration:
+<code class="docutils literal notranslate"><span class="pre">reference.conf</span></code>, <code class="docutils literal notranslate"><span class="pre">application.conf</span></code>, <code class="docutils literal notranslate"><span class="pre">application.json</span></code>, <code class="docutils literal notranslate"><span class="pre">application.properties</span></code>. <em>These classpath
+resources are all automatically included in the native image: you should not need to do it
+manually</em>. See <a class="reference external" href="https://www.graalvm.org/reference-manual/native-image/Resources/">Accessing Resources in Native Images</a> for more information on how classpath
+resources are handled in native images.</p>
+</section>
+<section id="configuring-the-logging-backend">
+<h2>Configuring the logging backend<a class="headerlink" href="#configuring-the-logging-backend" title="Link to this heading">¶</a></h2>
+<p>When configuring <a class="reference external" href="../logging">logging</a>, the choice of a backend must be considered carefully, as
+most logging backends resort to reflection during their configuration phase.</p>
+<p>By default, GraalVM native images provide support for the java.util.logging (JUL) backend. See
+<a class="reference external" href="https://www.graalvm.org/reference-manual/native-image/Logging/">this page</a> for more information.</p>
+<p>For other logging backends, please refer to the logging library documentation to find out if GraalVM
+native images are supported.</p>
+</section>
+<section id="using-reactive-style-programming">
+<h2>Using reactive-style programming<a class="headerlink" href="#using-reactive-style-programming" title="Link to this heading">¶</a></h2>
+<p>The <a class="reference external" href="../reactive">reactive execution model</a> is compatible with GraalVM native images, but the
+following configurations must be added:</p>
+<ol class="simple">
+<li><p>Create the following reflection.json file, or add the entry to an existing file:</p></li>
+</ol>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;org.reactivestreams.Publisher&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>When invoking the native image builder, add a <code class="docutils literal notranslate"><span class="pre">-H:ReflectionConfigurationFiles=reflection.json</span></code>
+flag and point it to the file created above.</p></li>
+</ol>
+</section>
+<section id="using-the-jackson-json-library">
+<h2>Using the Jackson JSON library<a class="headerlink" href="#using-the-jackson-json-library" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://github.com/FasterXML/jackson">Jackson</a> is used in <a class="reference external" href="../integration#jackson">a few places</a> in
+the driver, but is an optional dependency; if you intend to use Jackson, the following
+configurations must be added:</p>
+<ol class="simple">
+<li><p>Create the following reflection.json file, or add these entries to an existing file:</p></li>
+</ol>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;com.fasterxml.jackson.core.JsonParser&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;com.fasterxml.jackson.databind.ObjectMapper&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p><strong>Important</strong>: when using the shaded jar – which is not officially supported on GraalVM native
+images, see below for more details – replace the above entries with the below ones:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;com.datastax.oss.driver.shaded.fasterxml.jackson.core.JsonParser&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;com.datastax.oss.driver.shaded.fasterxml.jackson.databind.ObjectMapper&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>When invoking the native image builder, add a <code class="docutils literal notranslate"><span class="pre">-H:ReflectionConfigurationFiles=reflection.json</span></code>
+flag and point it to the file created above.</p></li>
+</ol>
+</section>
+<section id="enabling-compression">
+<h2>Enabling compression<a class="headerlink" href="#enabling-compression" title="Link to this heading">¶</a></h2>
+<p>When using <a class="reference external" href="../compression/">compression</a>, only LZ4 can be enabled in native images. <strong>Snappy
+compression is not supported.</strong></p>
+<p>In order for LZ4 compression to work in a native image, the following additional GraalVM
+configuration is required:</p>
+<ol class="simple">
+<li><p>Create the following reflection.json file, or add these entries to an existing file:</p></li>
+</ol>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4Compressor&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4JNICompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4JavaSafeCompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4JavaUnsafeCompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4HCJavaSafeCompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4HCJavaUnsafeCompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4JavaSafeSafeDecompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4JavaSafeFastDecompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4JavaUnsafeSafeDecompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;net.jpountz.lz4.LZ4JavaUnsafeFastDecompressor&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicFields&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>When invoking the native image builder, add a <code class="docutils literal notranslate"><span class="pre">-H:ReflectionConfigurationFiles=reflection.json</span></code>
+flag and point it to the file created above.</p></li>
+</ol>
+</section>
+<section id="native-calls">
+<h2>Native calls<a class="headerlink" href="#native-calls" title="Link to this heading">¶</a></h2>
+<p>The driver performs a few <a class="reference external" href="../integration#native-libraries">native calls</a> using
+<a class="reference external" href="https://github.com/jnr">JNR</a>.</p>
+<p>Starting with driver 4.7.0, native calls are also possible in a GraalVM native image, without any
+extra configuration.</p>
+</section>
+<section id="using-datastax-enterprise-dse-features">
+<h2>Using DataStax Enterprise (DSE) features<a class="headerlink" href="#using-datastax-enterprise-dse-features" title="Link to this heading">¶</a></h2>
+<section id="dse-geospatial-types">
+<h3>DSE Geospatial types<a class="headerlink" href="#dse-geospatial-types" title="Link to this heading">¶</a></h3>
+<p>DSE <a class="reference external" href="../dse/geotypes">Geospatial types</a> are supported on GraalVM native images; the following
+configurations must be added:</p>
+<ol class="simple">
+<li><p>Create the following reflection.json file, or add the entry to an existing file:</p></li>
+</ol>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;com.esri.core.geometry.ogc.OGCGeometry&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p><strong>Important</strong>: when using the shaded jar – which is not officially supported on GraalVM native
+images, as stated above – replace the above entry with the below one:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;com.datastax.oss.driver.shaded.esri.core.geometry.ogc.OGCGeometry&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>When invoking the native image builder, add a <code class="docutils literal notranslate"><span class="pre">-H:ReflectionConfigurationFiles=reflection.json</span></code>
+flag and point it to the file created above.</p></li>
+</ol>
+</section>
+<section id="dse-graph">
+<h3>DSE Graph<a class="headerlink" href="#dse-graph" title="Link to this heading">¶</a></h3>
+<p><strong><a class="reference external" href="../dse/graph">DSE Graph</a> is not officially supported on GraalVM native images.</strong></p>
+<p>The following configuration can be used as a starting point for users wishing to build a native
+image for a DSE Graph application. DataStax does not guarantee however that the below configuration
+will work in all cases. If the native image build fails, a good option is to use GraalVM’s
+<a class="reference external" href="https://www.graalvm.org/reference-manual/native-image/Agent/">Tracing Agent</a> to understand why.</p>
+<ol class="simple">
+<li><p>Create the following reflection.json file, or add these entries to an existing file:</p></li>
+</ol>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;org.apache.tinkerpop.gremlin.structure.Graph&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot; org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicConstructors&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allDeclaredMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;allPublicMethods&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>When invoking the native image builder, add the following flags:</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">H</span><span class="p">:</span><span class="n">ReflectionConfigurationFiles</span><span class="o">=</span><span class="n">reflection</span><span class="o">.</span><span class="n">json</span>
+<span class="o">--</span><span class="n">initialize</span><span class="o">-</span><span class="n">at</span><span class="o">-</span><span class="n">build</span><span class="o">-</span><span class="n">time</span><span class="o">=</span><span class="n">org</span><span class="o">.</span><span class="n">apache</span><span class="o">.</span><span class="n">tinkerpop</span><span class="o">.</span><span class="n">gremlin</span><span class="o">.</span><span class="n">tinkergraph</span><span class="o">.</span><span class="n">structure</span><span class="o">.</span><span class="n">TinkerIoRegistryV3d0</span>
+<span class="o">--</span><span class="n">initialize</span><span class="o">-</span><span class="n">at</span><span class="o">-</span><span class="n">build</span><span class="o">-</span><span class="n">time</span><span class="o">=</span><span class="n">org</span><span class="o">.</span><span class="n">apache</span><span class="o">.</span><span class="n">tinkerpop</span><span class="o">.</span><span class="n">shaded</span><span class="o">.</span><span class="n">jackson</span><span class="o">.</span><span class="n">databind</span><span class="o">.</span><span class="n">deser</span><span class="o">.</span><span class="n">std</span><span class="o">.</span><span class="n">StdDeserializer</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="using-the-shaded-jar">
+<h2>Using the shaded jar<a class="headerlink" href="#using-the-shaded-jar" title="Link to this heading">¶</a></h2>
+<p><strong>The <a class="reference external" href="../shaded_jar">shaded jar</a> is not officially supported in a GraalVM native image.</strong></p>
+<p>However, it has been reported that the shaded jar can be included in a GraalVM native image as a
+drop-in replacement for the regular driver jar for simple applications, without any extra GraalVM
+configuration.</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page GraalVM native images&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.15.0.x/manual/core/graalvm/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../detachable_types/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Detachable types
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../idempotence/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Query idempotence
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                4.15.0.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api_conventions/index.html">API conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../case_sensitivity/index.html">Case sensitivity</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Core driver</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../authentication/index.html">Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../bom/index.html">Bill of Materials (BOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../configuration/index.html">Configuration</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../configuration/reference/README.html">Reference configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../custom_codecs/index.html">Custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../detachable_types/index.html">Detachable types</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">GraalVM native images</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../integration/index.html">Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../metadata/index.html">Metadata</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/node/index.html">Node metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/schema/index.html">Schema metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/token/index.html">Token metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../non_blocking/index.html">Non-blocking programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance/index.html">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reactive/index.html">Reactive Style Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../request_tracker/index.html">Request tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/per_query_keyspace/index.html">Per-query keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../temporal_types/index.html">Temporal types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../throttling/index.html">Request throttling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tracing/index.html">Query tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tuples/index.html">Tuples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../developer/index.html">Developer docs</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/><label for="toctree-checkbox-6"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/admin/index.html">Administrative tasks</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../developer/common/index.html">Common infrastructure</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/><label for="toctree-checkbox-7"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/context/index.html">Driver context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/event_bus/index.html">Event bus</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/native_protocol/index.html">Native protocol layer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/netty_pipeline/index.html">Netty pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/request_execution/index.html">Request execution</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../mapper/index.html">Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/><label for="toctree-checkbox-8"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/config/index.html">Integration</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label for="toctree-checkbox-9"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/kotlin/index.html">Kotlin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/lombok/index.html">Lombok</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/record/index.html">Java 14 Records</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/scala/index.html">Scala</a></li>
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/daos/index.html">DAOs</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label for="toctree-checkbox-10"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/custom_types/index.html">Custom result types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/delete/index.html">Delete methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/getentity/index.html">GetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/increment/index.html">Increment methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/insert/index.html">Insert methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/null_saving/index.html">Null saving strategy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/query/index.html">Query methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/queryprovider/index.html">Query provider methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/select/index.html">Select methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/setentity/index.html">SetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/statement_attributes/index.html">Statement attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/update/index.html">Update methods</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/entities/index.html">Entities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/mapper/index.html">Mapper interface</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../query_builder/index.html">Query builder</a><input class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" type="checkbox"/><label for="toctree-checkbox-11"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/condition/index.html">Conditions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/delete/index.html">DELETE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/idempotence/index.html">Idempotence in the query builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/insert/index.html">INSERT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/relation/index.html">Relations</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../query_builder/schema/index.html">Schema builder</a><input class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" type="checkbox"/><label for="toctree-checkbox-12"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/aggregate/index.html">Aggregate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/function/index.html">Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/index/index.html">Index</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/keyspace/index.html">Keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/materialized_view/index.html">Materialized View</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/table/index.html">Table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/type/index.html">Type</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/select/index.html">SELECT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/term/index.html">Terms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/truncate/index.html">TRUNCATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/update/index.html">UPDATE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html#id30">3.11.1</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html#id31">3.11.0</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page GraalVM native images&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.15.0.x/manual/core/graalvm/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/core/graalvm/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">GraalVM native images</a><ul>
+<li><a class="reference internal" href="#quick-overview">Quick overview</a></li>
+<li><a class="reference internal" href="#concepts">Concepts</a></li>
+<li><a class="reference internal" href="#classes-instantiated-by-reflection">Classes instantiated by reflection</a></li>
+<li><a class="reference internal" href="#configuration-resources">Configuration resources</a></li>
+<li><a class="reference internal" href="#configuring-the-logging-backend">Configuring the logging backend</a></li>
+<li><a class="reference internal" href="#using-reactive-style-programming">Using reactive-style programming</a></li>
+<li><a class="reference internal" href="#using-the-jackson-json-library">Using the Jackson JSON library</a></li>
+<li><a class="reference internal" href="#enabling-compression">Enabling compression</a></li>
+<li><a class="reference internal" href="#native-calls">Native calls</a></li>
+<li><a class="reference internal" href="#using-datastax-enterprise-dse-features">Using DataStax Enterprise (DSE) features</a><ul>
+<li><a class="reference internal" href="#dse-geospatial-types">DSE Geospatial types</a></li>
+<li><a class="reference internal" href="#dse-graph">DSE Graph</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#using-the-shaded-jar">Using the shaded jar</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

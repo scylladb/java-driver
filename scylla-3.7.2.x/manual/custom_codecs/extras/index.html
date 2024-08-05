@@ -1,0 +1,991 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Optional codecs | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/custom_codecs/extras/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=86e43a22"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+    <span class="bread__item bread__item--last">Optional codecs</span>
+</div>
+                    </div>
+                
+                <section id="optional-codecs">
+<h1>Optional codecs<a class="headerlink" href="#optional-codecs" title="Link to this heading">¶</a></h1>
+<p>The driver’s “extras” module provides additional <a class="reference external" href="../">codec</a> implementations: these codecs are not required by core
+driver features, but will probably prove useful in a lot of client applications. You can also study their source code as
+a reference to write your own.</p>
+<p>The module is published as a separate Maven artifact:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>scylla-driver-extras<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>3.7.2.0<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<p>It also declares a number of optional dependencies, that you’ll need to explicitly re-declare in your application
+depending on which codecs you plan to use (this will be covered for each case below).</p>
+<section id="temporal-types">
+<h2>Temporal types<a class="headerlink" href="#temporal-types" title="Link to this heading">¶</a></h2>
+<p>JDK 8 and Joda Time support have often been requested; they’re not in the core module because we want to preserve
+compatibility with older JDKs and avoid extra dependencies.</p>
+<section id="jdk-8">
+<h3>JDK 8<a class="headerlink" href="#jdk-8" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/jdk8/InstantCodec.html">InstantCodec</a> maps <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/Instant.html">Instant</a> to CQL’s <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.driver.extras.codecs.jdk8.InstantCodec</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.time.Instant</span><span class="p">;</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="n">InstantCodec</span><span class="p">.</span><span class="na">instance</span><span class="p">);</span>
+
+<span class="c1">// schema: CREATE TABLE example(id int PRIMARY KEY, t timestamp)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;INSERT INTO example (id, t) VALUES (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">Instant</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">&quot;2010-06-30T01:20:30Z&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Similarly:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/jdk8/LocalDateCodec.html">LocalDateCodec</a> maps <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/LocalDate.html">LocalDate</a> to <code class="docutils literal notranslate"><span class="pre">date</span></code>;</p></li>
+<li><p>[LocalDateTimeCodec] maps [LocalDateTime] to <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>;</p></li>
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/jdk8/LocalTimeCodec.html">LocalTimeCodec</a> maps <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/LocalTime.html">LocalTime</a> to <code class="docutils literal notranslate"><span class="pre">time</span></code>.</p></li>
+</ul>
+<p>One problem with <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> is that it does not store time zones. <a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/jdk8/ZonedDateTimeCodec.html">ZonedDateTimeCodec</a> addresses that, by mapping a
+<a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/ZonedDateTime.html">ZonedDateTime</a> to a <code class="docutils literal notranslate"><span class="pre">tuple&lt;timestamp,varchar&gt;</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Due to internal implementation details, you have to retrieve the tuple type from a live cluster:</span>
+<span class="n">TupleType</span><span class="w"> </span><span class="n">tupleType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getMetadata</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">newTupleType</span><span class="p">(</span><span class="n">DataType</span><span class="p">.</span><span class="na">timestamp</span><span class="p">(),</span><span class="w"> </span><span class="n">DataType</span><span class="p">.</span><span class="na">varchar</span><span class="p">());</span>
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">ZonedDateTimeCodec</span><span class="p">(</span><span class="n">tupleType</span><span class="p">));</span>
+
+<span class="c1">// schema: CREATE TABLE example(id int PRIMARY KEY, t tuple&lt;timestamp,varchar&gt;)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;INSERT INTO example (id, t) VALUES (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">ZonedDateTime</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">&quot;2010-06-30T01:20:47.999+01:00&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>[ZoneIdCodec] maps <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/ZoneId.html">ZoneId</a> to CQL’s <code class="docutils literal notranslate"><span class="pre">varchar</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.driver.extras.codecs.jdk8.ZoneIdCodec</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.time.ZoneId</span><span class="p">;</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="n">ZoneIdCodec</span><span class="p">.</span><span class="na">instance</span><span class="p">);</span>
+
+<span class="c1">// schema: CREATE TABLE example(id int PRIMARY KEY, t varchar)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;INSERT INTO example (id, t) VALUES (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">ZoneId</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="s">&quot;GMT+07:00&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+</section>
+<section id="joda-time">
+<h3>Joda time<a class="headerlink" href="#joda-time" title="Link to this heading">¶</a></h3>
+<p>These codecs require an explicit dependency on Joda Time in your application:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>joda-time<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>joda-time<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>2.9.1<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<p>Like for JDK8, there is a codec for each time type:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/joda/InstantCodec.html">InstantCodec</a>: maps <a class="reference external" href="http://www.joda.org/joda-time/apidocs/org/joda/time/Instant.html">Instant</a> to <code class="docutils literal notranslate"><span class="pre">timestamp</span></code>;</p></li>
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/joda/LocalDateCodec.html">LocalDateCodec</a>: maps <a class="reference external" href="http://www.joda.org/joda-time/apidocs/org/joda/time/LocalDate.html">LocalDate</a> to <code class="docutils literal notranslate"><span class="pre">date</span></code>;</p></li>
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/joda/LocalTimeCodec.html">LocalTimeCodec</a>: maps <a class="reference external" href="http://www.joda.org/joda-time/apidocs/org/joda/time/LocalTime.html">LocalTime</a> to <code class="docutils literal notranslate"><span class="pre">time</span></code>.</p></li>
+</ul>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.driver.extras.codecs.joda.InstantCodec</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">org.joda.time.Instant</span><span class="p">;</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="n">InstantCodec</span><span class="p">.</span><span class="na">instance</span><span class="p">);</span>
+
+<span class="c1">// schema: CREATE TABLE example(id int PRIMARY KEY, t timestamp)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;INSERT INTO example (id, t) VALUES (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">Instant</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">&quot;2010-06-30T01:20:30Z&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>And <a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/joda/DateTimeCodec.html">DateTimeCodec</a> can save <a class="reference external" href="http://www.joda.org/joda-time/apidocs/org/joda/time/DateTime.html">DateTime</a> instances with a time zone:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">TupleType</span><span class="w"> </span><span class="n">tupleType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getMetadata</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">newTupleType</span><span class="p">(</span><span class="n">DataType</span><span class="p">.</span><span class="na">timestamp</span><span class="p">(),</span><span class="w"> </span><span class="n">DataType</span><span class="p">.</span><span class="na">varchar</span><span class="p">());</span>
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">DateTimeCodec</span><span class="p">(</span><span class="n">tupleType</span><span class="p">));</span>
+
+<span class="c1">// schema: CREATE TABLE example(id int PRIMARY KEY, t tuple&lt;timestamp,varchar&gt;)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;INSERT INTO example (id, t) VALUES (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">DateTime</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="s">&quot;2010-06-30T01:20:47.999+01:00&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+</section>
+<section id="primitive-types">
+<h3>Primitive types<a class="headerlink" href="#primitive-types" title="Link to this heading">¶</a></h3>
+<p>Time can also be expressed as simple durations:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/date/SimpleTimestampCodec.html">SimpleTimestampCodec</a> maps <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> to a primitive Java <code class="docutils literal notranslate"><span class="pre">long</span></code> representing the number of milliseconds since the
+Epoch;</p></li>
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/date/SimpleDateCodec.html">SimpleDateCodec</a> maps <code class="docutils literal notranslate"><span class="pre">date</span></code> to a primitive Java <code class="docutils literal notranslate"><span class="pre">int</span></code> representing the number of days since the Epoch.</p></li>
+</ul>
+<p>There is no extra codec for <code class="docutils literal notranslate"><span class="pre">time</span></code>, because by default the driver already maps that type to a <code class="docutils literal notranslate"><span class="pre">long</span></code> representing the
+number of nanoseconds since midnight.</p>
+</section>
+</section>
+<section id="enums">
+<h2>Enums<a class="headerlink" href="#enums" title="Link to this heading">¶</a></h2>
+<p>Enums can be mapped in two different ways:</p>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/enums/EnumNameCodec.html">EnumNameCodec</a> stores enum constants as a <code class="docutils literal notranslate"><span class="pre">varchar</span></code> representing their <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html#name--">name</a>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">enum</span><span class="w"> </span><span class="n">State</span><span class="w"> </span><span class="p">{</span><span class="n">INIT</span><span class="p">,</span><span class="w"> </span><span class="n">RUNNING</span><span class="p">,</span><span class="w"> </span><span class="n">STOPPING</span><span class="p">,</span><span class="w"> </span><span class="n">STOPPED</span><span class="p">}</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">EnumNameCodec</span><span class="o">&lt;</span><span class="n">State</span><span class="o">&gt;</span><span class="p">(</span><span class="n">State</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+
+<span class="c1">// schema: create table name_example(id int PRIMARY KEY, state text)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;insert into name_example (id, state) values (1, ?)&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">State</span><span class="p">.</span><span class="na">INIT</span><span class="p">);</span>
+<span class="c1">// state is saved as &#39;INIT&#39;</span>
+</pre></div>
+</div>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/enums/EnumOrdinalCodec.html">EnumOrdinalCodec</a> stores enum constants as an <code class="docutils literal notranslate"><span class="pre">int</span></code> representing their <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html#ordinal--">ordinal</a>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">enum</span><span class="w"> </span><span class="n">State</span><span class="w"> </span><span class="p">{</span><span class="n">INIT</span><span class="p">,</span><span class="w"> </span><span class="n">RUNNING</span><span class="p">,</span><span class="w"> </span><span class="n">STOPPING</span><span class="p">,</span><span class="w"> </span><span class="n">STOPPED</span><span class="p">}</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">EnumOrdinalCodec</span><span class="o">&lt;</span><span class="n">State</span><span class="o">&gt;</span><span class="p">(</span><span class="n">State</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+
+<span class="c1">// schema: create table ordinal_example(id int PRIMARY KEY, state int)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;insert into ordinal_example (id, state) values (1, ?)&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">State</span><span class="p">.</span><span class="na">INIT</span><span class="p">);</span>
+<span class="c1">// state saved as 0</span>
+</pre></div>
+</div>
+<p>Note that if you registered an <code class="docutils literal notranslate"><span class="pre">EnumNameCodec</span></code> and an <code class="docutils literal notranslate"><span class="pre">EnumOrdinalCodec</span></code> <em>for the same enum</em> at the same time, there could be a problem when executing <a class="reference external" href="../../statements/simple/">simple statements</a>, because in a simple statement, the target CQL type of a given query parameter is not known in advance, so the driver, on a best-effort attempt, will pick one or the other, whichever was registered first. If the chosen codec proves to be the wrong one, the request would fail on the server side.</p>
+<p>In practice, this is unlikely to happen, because you’ll probably stick to a single CQL type for a given enum type;
+however, if you ever run into that issue, the workaround is to use <a class="reference external" href="../../statements/prepared/">prepared statements</a>, for which the driver knows the CQL type and can pick the exact codec.</p>
+</section>
+<section id="json">
+<h2>JSON<a class="headerlink" href="#json" title="Link to this heading">¶</a></h2>
+<section id="jackson">
+<h3>Jackson<a class="headerlink" href="#jackson" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/json/JacksonJsonCodec.html">JacksonJsonCodec</a> maps a Java object to a JSON string stored into a <code class="docutils literal notranslate"><span class="pre">varchar</span></code> column, using the popular <a class="reference external" href="https://github.com/FasterXML/jackson">Jackson</a>
+library.</p>
+<p>It requires an explicit dependency on Jackson in your application:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>com.fasterxml.jackson.core<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>jackson-databind<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>2.6.3<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">User</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">id</span><span class="p">;</span>
+<span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">name</span><span class="p">;</span>
+
+<span class="w">    </span><span class="nd">@JsonCreator</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="nf">User</span><span class="p">(</span><span class="nd">@JsonProperty</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">)</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="nd">@JsonProperty</span><span class="p">(</span><span class="s">&quot;name&quot;</span><span class="p">)</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">name</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">id</span><span class="p">;</span>
+<span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">name</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="p">...</span><span class="w"> </span><span class="c1">// getters and setters</span>
+<span class="p">}</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">JacksonJsonCodec</span><span class="o">&lt;</span><span class="n">User</span><span class="o">&gt;</span><span class="p">(</span><span class="n">User</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+
+<span class="c1">// schema: create table example(id int primary key, owner varchar);</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;insert into example (id, owner) values (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="k">new</span><span class="w"> </span><span class="n">User</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;root&quot;</span><span class="p">));</span>
+<span class="c1">// owner saved as &#39;{&quot;id&quot;:1,&quot;name&quot;:&quot;root&quot;}&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="jsr-353">
+<h3>JSR 353<a class="headerlink" href="#jsr-353" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/json/Jsr353JsonCodec.html">Jsr353JsonCodec</a> maps a <a class="reference external" href="https://docs.oracle.com/javaee/7/tutorial/jsonp002.htm">JsonStructure</a> to a JSON string stored into a <code class="docutils literal notranslate"><span class="pre">varchar</span></code> column, using the JSR-353 standard.</p>
+<p>It requires an explicit dependency on the JSR-353 API and an implementation:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>javax.json<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>javax.json-api<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>1.0<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+
+<span class="cm">&lt;!-- Reference implementation --&gt;</span>
+<span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>org.glassfish<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>javax.json<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>1.0.4<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">Jsr353JsonCodec</span><span class="p">());</span>
+
+<span class="c1">// schema: create table example(id int primary key, owner varchar);</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;insert into example (id, owner) values (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="n">javax</span><span class="p">.</span><span class="na">json</span><span class="p">.</span><span class="na">Json</span><span class="p">.</span><span class="na">createObjectBuilder</span><span class="p">()</span>
+<span class="w">                </span><span class="p">.</span><span class="na">add</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="w">                </span><span class="p">.</span><span class="na">add</span><span class="p">(</span><span class="s">&quot;name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;root&quot;</span><span class="p">)</span>
+<span class="w">                </span><span class="p">.</span><span class="na">build</span><span class="p">());</span>
+<span class="c1">// owner saved as &#39;{&quot;id&quot;:1,&quot;name&quot;:&quot;root&quot;}&#39;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="optional">
+<h2>Optional<a class="headerlink" href="#optional" title="Link to this heading">¶</a></h2>
+<p>“Optional” types provide an alternate way to represent missing values, in an attempt to avoid null pointer errors. With
+these codecs, missing values will be mapped to <code class="docutils literal notranslate"><span class="pre">NULL</span></code> in the database.</p>
+<section id="jdk8">
+<h3>JDK8<a class="headerlink" href="#jdk8" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/jdk8/OptionalCodec.html">OptionalCodec</a> transforms another codec to wrap its Java type in a JDK8 <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/util/Optional.html">Optional</a>.</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.driver.extras.codecs.jdk8.OptionalCodec</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.google.common.reflect.TypeToken</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.Optional</span><span class="p">;</span>
+
+<span class="c1">// The built-in driver codec, that maps CQL&#39;s int to Java&#39;s Integer</span>
+<span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">intCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TypeCodec</span><span class="p">.</span><span class="na">cint</span><span class="p">();</span>
+
+<span class="c1">// A codec that maps CQL&#39;s int to Java&#39;s Optional&lt;Integer&gt;</span>
+<span class="n">OptionalCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">optionalIntCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">OptionalCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">intCodec</span><span class="p">);</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="n">optionalIntCodec</span><span class="p">);</span>
+
+<span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">optionalIntToken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;&gt;</span><span class="p">()</span><span class="w"> </span><span class="p">{};</span>
+
+<span class="c1">// schema: create table example (id int primary key, v int);</span>
+<span class="n">PreparedStatement</span><span class="w"> </span><span class="n">pst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="s">&quot;insert into example (id, v) values (?, ?)&quot;</span><span class="p">);</span>
+
+<span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Optional</span><span class="p">.</span><span class="na">empty</span><span class="p">();</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">pst</span><span class="p">.</span><span class="na">bind</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setInt</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v1</span><span class="p">,</span><span class="w"> </span><span class="n">optionalIntToken</span><span class="p">));</span>
+<span class="c1">// v1 saved as NULL</span>
+
+<span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Optional</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="mi">12</span><span class="p">);</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">pst</span><span class="p">.</span><span class="na">bind</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setInt</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v2</span><span class="p">,</span><span class="w"> </span><span class="n">optionalIntToken</span><span class="p">));</span>
+<span class="c1">// v2 saved as 12</span>
+</pre></div>
+</div>
+<p>This example is a bit more complex: <code class="docutils literal notranslate"><span class="pre">Optional&lt;Integer&gt;</span></code> is a generic type, so we can’t use simple statements, because
+they select codecs according to the runtime types of their values (and we would lose the <code class="docutils literal notranslate"><span class="pre">&lt;Integer&gt;</span></code> part with type
+erasure).</p>
+<p>For the same reason, we need to give a type hint when setting “v”, in the form of a <a class="reference external" href="http://google.github.io/guava/releases/19.0/api/docs/com/google/common/reflect/TypeToken.html">TypeToken</a>. Note that this is an
+anonymous inner class; we recommend storing these tokens as constants in a utility class, to avoid creating them too
+often.</p>
+</section>
+<section id="guava">
+<h3>Guava<a class="headerlink" href="#guava" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/guava/OptionalCodec.html">OptionalCodec</a> transforms another codec to wrap its Java type in a Guava
+<a class="reference external" href="http://google.github.io/guava/releases/19.0/api/docs/com/google/common/base/Optional.html">Optional</a>.</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.driver.extras.codecs.guava.OptionalCodec</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.google.common.base.Optional</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.google.common.reflect.TypeToken</span><span class="p">;</span>
+
+<span class="c1">// The built-in driver codec, that maps CQL&#39;s int to Java&#39;s Integer</span>
+<span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">intCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TypeCodec</span><span class="p">.</span><span class="na">cint</span><span class="p">();</span>
+
+<span class="c1">// A codec that maps CQL&#39;s int to Guava&#39;s Optional&lt;Integer&gt;</span>
+<span class="n">OptionalCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">optionalIntCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">OptionalCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">intCodec</span><span class="p">);</span>
+
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="n">optionalIntCodec</span><span class="p">);</span>
+
+<span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">optionalIntToken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;&gt;</span><span class="p">()</span><span class="w"> </span><span class="p">{};</span>
+
+<span class="c1">// schema: create table example (id int primary key, v int);</span>
+<span class="n">PreparedStatement</span><span class="w"> </span><span class="n">pst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="s">&quot;insert into example (id, v) values (?, ?)&quot;</span><span class="p">);</span>
+
+<span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Optional</span><span class="p">.</span><span class="na">absent</span><span class="p">();</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">pst</span><span class="p">.</span><span class="na">bind</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setInt</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v1</span><span class="p">,</span><span class="w"> </span><span class="n">optionalIntToken</span><span class="p">));</span>
+<span class="c1">// v1 saved as NULL</span>
+
+<span class="n">Optional</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Optional</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="mi">12</span><span class="p">);</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">pst</span><span class="p">.</span><span class="na">bind</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setInt</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v2</span><span class="p">,</span><span class="w"> </span><span class="n">optionalIntToken</span><span class="p">));</span>
+<span class="c1">// v2 saved as 12</span>
+</pre></div>
+</div>
+<p>See the JDK8 Optional section above for explanations about <a class="reference external" href="http://google.github.io/guava/releases/19.0/api/docs/com/google/common/reflect/TypeToken.html">TypeToken</a>.</p>
+</section>
+</section>
+<section id="arrays">
+<h2>Arrays<a class="headerlink" href="#arrays" title="Link to this heading">¶</a></h2>
+<p>By default, the driver maps CQL lists to collections of Java objects. For high-performance scenarios, and when the
+element type maps to a Java primitive, you might want to map to an array instead, to avoid unnecessary boxing and
+unboxing.</p>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/arrays/IntArrayCodec.html">IntArrayCodec</a> allows you to do that for lists of integers:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">IntArrayCodec</span><span class="p">());</span>
+
+<span class="c1">// schema: create table example (i int primary key, l list&lt;int&gt;)</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;insert into example (i, l) values (1, ?)&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="k">new</span><span class="w"> </span><span class="kt">int</span><span class="o">[]</span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">});</span>
+<span class="c1">// array saved as [1,2,3]</span>
+</pre></div>
+</div>
+<p>Package <a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/arrays/package-summary.html">com.datastax.driver.extras.codecs.arrays</a> contains similar codecs for all primitive types, and
+<a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/arrays/ObjectArrayCodec.html">ObjectArrayCodec</a> to map arrays of objects.</p>
+</section>
+<section id="abstract-utilities">
+<h2>Abstract utilities<a class="headerlink" href="#abstract-utilities" title="Link to this heading">¶</a></h2>
+<p>The module provides two abstract classes that act as building blocks for your own codecs:</p>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/MappingCodec.html">MappingCodec</a> is useful when you can easily convert your Java type to another type that already has a codec.
+For example, if you have a <code class="docutils literal notranslate"><span class="pre">Price</span></code> object that translates to a plain <code class="docutils literal notranslate"><span class="pre">Integer</span></code>, you can piggyback on the built-in
+integer codec, and you’ll only have to write two simple conversion methods:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kd">class</span> <span class="nc">PriceCodec</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">MappingCodec</span><span class="o">&lt;</span><span class="n">Price</span><span class="p">,</span><span class="w"> </span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="nf">PriceCodec</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="kd">super</span><span class="p">(</span><span class="n">TypeCodec</span><span class="p">.</span><span class="na">cint</span><span class="p">(),</span><span class="w"> </span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">protected</span><span class="w"> </span><span class="n">Integer</span><span class="w"> </span><span class="nf">serialize</span><span class="p">(</span><span class="n">Price</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">protected</span><span class="w"> </span><span class="n">Price</span><span class="w"> </span><span class="nf">deserialize</span><span class="p">(</span><span class="n">Integer</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>For a more detailed example, you can look at the <code class="docutils literal notranslate"><span class="pre">OptionalCodec</span></code> implementations in the source code.</p>
+<p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/extras/codecs/ParsingCodec.html">ParsingCodec</a> is similar, but specialized for text columns. See <code class="docutils literal notranslate"><span class="pre">EnumNameCodec</span></code> for an example.</p>
+<p>These two classes are convenient, but since they perform conversions in two steps, extending them is not necessarily the
+optimal approach. If performance is paramount, it’s better to start from scratch and convert your objects to
+<code class="docutils literal notranslate"><span class="pre">ByteBuffer</span></code> directly.</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Optional codecs&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.7.2.x/manual/custom_codecs/extras/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.7.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../index.html">Manual</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Optional codecs&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.7.2.x/manual/custom_codecs/extras/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/custom_codecs/extras/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Optional codecs</a><ul>
+<li><a class="reference internal" href="#temporal-types">Temporal types</a><ul>
+<li><a class="reference internal" href="#jdk-8">JDK 8</a></li>
+<li><a class="reference internal" href="#joda-time">Joda time</a></li>
+<li><a class="reference internal" href="#primitive-types">Primitive types</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#enums">Enums</a></li>
+<li><a class="reference internal" href="#json">JSON</a><ul>
+<li><a class="reference internal" href="#jackson">Jackson</a></li>
+<li><a class="reference internal" href="#jsr-353">JSR 353</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#optional">Optional</a><ul>
+<li><a class="reference internal" href="#jdk8">JDK8</a></li>
+<li><a class="reference internal" href="#guava">Guava</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#arrays">Arrays</a></li>
+<li><a class="reference internal" href="#abstract-utilities">Abstract utilities</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

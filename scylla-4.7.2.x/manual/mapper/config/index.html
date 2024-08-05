@@ -1,0 +1,996 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Integration | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/mapper/config/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Mapper
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Integration</span>
+</div>
+                    </div>
+                
+                <section id="integration">
+<h1>Integration<a class="headerlink" href="#integration" title="Link to this heading">¶</a></h1>
+<section id="builds-tools">
+<h2>Builds tools<a class="headerlink" href="#builds-tools" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">java-driver-mapper-processor</span></code> artifact contains the annotation processor. It hooks into the
+Java compiler, and generates additional source files from your annotated classes before the main
+compilation happens. It is only required in the compile classpath.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">java-driver-mapper-runtime</span></code> artifact contains the annotations and a few utility classes. It is
+a regular dependency, required at runtime.</p>
+<section id="maven">
+<h3>Maven<a class="headerlink" href="#maven" title="Link to this heading">¶</a></h3>
+<p>The best approach is to add the <code class="docutils literal notranslate"><span class="pre">annotationProcessorPaths</span></code> option to the compiler plugin’s
+configuration (make sure you use version 3.5 or higher):</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;properties&gt;</span>
+<span class="w">  </span><span class="nt">&lt;java-driver.version&gt;</span>...<span class="nt">&lt;/java-driver.version&gt;</span>
+<span class="nt">&lt;/properties&gt;</span>
+
+<span class="nt">&lt;dependencies&gt;</span>
+<span class="w">  </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;groupId&gt;</span>com.datastax.oss<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;artifactId&gt;</span>java-driver-mapper-runtime<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;version&gt;</span>${java-driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+
+<span class="nt">&lt;build&gt;</span>
+<span class="w">  </span><span class="nt">&lt;plugins&gt;</span>
+<span class="w">    </span><span class="nt">&lt;plugin&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>maven-compiler-plugin<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;version&gt;</span>3.8.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">      </span><span class="nt">&lt;configuration&gt;</span>
+<span class="w">        </span><span class="nt">&lt;source&gt;</span>1.8<span class="nt">&lt;/source&gt;</span><span class="w"> </span><span class="cm">&lt;!-- (or higher) --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;target&gt;</span>1.8<span class="nt">&lt;/target&gt;</span><span class="w"> </span><span class="cm">&lt;!-- (or higher) --&gt;</span>
+<span class="w">        </span><span class="nt">&lt;annotationProcessorPaths&gt;</span>
+<span class="w">          </span><span class="nt">&lt;path&gt;</span>
+<span class="w">            </span><span class="nt">&lt;groupId&gt;</span>com.datastax.oss<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;artifactId&gt;</span>java-driver-mapper-processor<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;version&gt;</span>${java-driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">          </span><span class="nt">&lt;/path&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/annotationProcessorPaths&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/configuration&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/plugin&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/plugins&gt;</span>
+<span class="nt">&lt;/build&gt;</span>
+</pre></div>
+</div>
+<p>Alternatively (e.g. if you are using the <a class="reference external" href="../../core/bom/">BOM</a>), you may also declare the processor
+as a regular dependency in the “provided” scope:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependencies&gt;</span>
+<span class="w">  </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;groupId&gt;</span>com.datastax.oss<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;artifactId&gt;</span>java-driver-mapper-processor<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;version&gt;</span>${java-driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">    </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;groupId&gt;</span>com.datastax.oss<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;artifactId&gt;</span>java-driver-mapper-runtime<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;version&gt;</span>${java-driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+</pre></div>
+</div>
+<p>The processor runs every time you execute the <code class="docutils literal notranslate"><span class="pre">mvn</span> <span class="pre">compile</span></code> phase. It normally supports incremental
+builds, but if something looks off you can try a full rebuild with <code class="docutils literal notranslate"><span class="pre">mvn</span> <span class="pre">clean</span> <span class="pre">compile</span></code>.</p>
+<p>One of the advantages of annotation processing is that the generated code is produced as regular
+source files, that you can read and debug like the rest of your application. With the above
+configuration, these files are in <code class="docutils literal notranslate"><span class="pre">target/generated-sources/annotations</span></code>. Make sure that
+directory is marked as a source folder in your IDE (for example, in IntelliJ IDEA, this might
+require right-clicking on your <code class="docutils literal notranslate"><span class="pre">pom.xml</span></code> and selecting “Maven &gt; Reimport”).</p>
+<p>Generated sources follow the same package structure as your annotated types. Most end in a special
+<code class="docutils literal notranslate"><span class="pre">__MapperGenerated</span></code> suffix, in order to clearly identify them in stack traces (one exception is the
+mapper builder, because it is referenced directly from your code).</p>
+<p>Do not edit those files files directly: your changes would be overwritten during the next full
+rebuild.</p>
+</section>
+<section id="gradle">
+<h3>Gradle<a class="headerlink" href="#gradle" title="Link to this heading">¶</a></h3>
+<p>Use the following configuration (Gradle 4.6 and above):</p>
+<div class="highlight-groovy notranslate"><div class="highlight"><pre><span></span><span class="n">apply</span><span class="w"> </span><span class="nl">plugin:</span><span class="w"> </span><span class="s1">&#39;java&#39;</span>
+
+<span class="kt">def</span><span class="w"> </span><span class="n">javaDriverVersion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;...&#39;</span>
+
+<span class="n">dependencies</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">annotationProcessor</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;com.datastax.oss&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;java-driver-mapper-processor&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">javaDriverVersion</span>
+<span class="w">    </span><span class="n">compile</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;com.datastax.oss&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;java-driver-mapper-runtime&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">javaDriverVersion</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>You will find the generated files in <code class="docutils literal notranslate"><span class="pre">build/generated/sources/annotationProcessor</span></code>.</p>
+</section>
+</section>
+<section id="integration-with-other-languages-and-libraries">
+<h2>Integration with other languages and libraries<a class="headerlink" href="#integration-with-other-languages-and-libraries" title="Link to this heading">¶</a></h2>
+<section id="lombok">
+<h3>Lombok<a class="headerlink" href="#lombok" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://projectlombok.org/">Lombok</a> is a popular library that automates boilerplate code, such as
+getters and setters. This can be convenient for mapped entities:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.mapper.annotations.Entity</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.mapper.annotations.PartitionKey</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">lombok.EqualsAndHashCode</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">lombok.Getter</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">lombok.Setter</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">lombok.ToString</span><span class="p">;</span>
+
+<span class="nd">@Entity</span>
+<span class="nd">@EqualsAndHashCode</span>
+<span class="nd">@ToString</span>
+<span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">Product</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nd">@PartitionKey</span><span class="w"> </span><span class="nd">@Getter</span><span class="w"> </span><span class="nd">@Setter</span><span class="w"> </span><span class="kd">private</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">id</span><span class="p">;</span>
+<span class="w">  </span><span class="nd">@Getter</span><span class="w"> </span><span class="nd">@Setter</span><span class="w"> </span><span class="kd">private</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">description</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The mapper can process Lombok-annotated classes just like regular code. The only requirement is that
+Lombok’s annotation processor must run <em>before</em> the mapper’s.</p>
+<p>With Maven, declaring Lombok as a provided dependency is not enough; you must also redeclare it in
+the <code class="docutils literal notranslate"><span class="pre">&lt;annotationProcessorPaths&gt;</span></code> section, before the mapper:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;properties&gt;</span>
+<span class="w">  </span><span class="nt">&lt;java-driver.version&gt;</span>...<span class="nt">&lt;/java-driver.version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;lombok.version&gt;</span>...<span class="nt">&lt;/lombok.version&gt;</span>
+<span class="nt">&lt;/properties&gt;</span>
+
+<span class="nt">&lt;dependencies&gt;</span>
+<span class="w">  </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;groupId&gt;</span>com.datastax.oss<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;artifactId&gt;</span>java-driver-mapper-runtime<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;version&gt;</span>${java-driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">    </span><span class="nt">&lt;groupId&gt;</span>org.projectlombok<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;artifactId&gt;</span>lombok<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">    </span><span class="nt">&lt;version&gt;</span>${lombok.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">    </span><span class="nt">&lt;scope&gt;</span>provided<span class="nt">&lt;/scope&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+
+<span class="nt">&lt;build&gt;</span>
+<span class="w">  </span><span class="nt">&lt;plugins&gt;</span>
+<span class="w">    </span><span class="nt">&lt;plugin&gt;</span>
+<span class="w">      </span><span class="nt">&lt;artifactId&gt;</span>maven-compiler-plugin<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">      </span><span class="nt">&lt;version&gt;</span>3.8.1<span class="nt">&lt;/version&gt;</span>
+<span class="w">      </span><span class="nt">&lt;configuration&gt;</span>
+<span class="w">        </span><span class="nt">&lt;source&gt;</span>1.8<span class="nt">&lt;/source&gt;</span>
+<span class="w">        </span><span class="nt">&lt;target&gt;</span>1.8<span class="nt">&lt;/target&gt;</span>
+<span class="w">        </span><span class="nt">&lt;annotationProcessorPaths&gt;</span>
+<span class="w">          </span><span class="nt">&lt;path&gt;</span>
+<span class="w">            </span><span class="nt">&lt;groupId&gt;</span>org.projectlombok<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;artifactId&gt;</span>lombok<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;version&gt;</span>${lombok.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">          </span><span class="nt">&lt;/path&gt;</span>
+<span class="w">          </span><span class="nt">&lt;path&gt;</span>
+<span class="w">            </span><span class="nt">&lt;groupId&gt;</span>com.datastax.oss<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;artifactId&gt;</span>java-driver-mapper-processor<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;version&gt;</span>${java-driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">          </span><span class="nt">&lt;/path&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/annotationProcessorPaths&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/configuration&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/plugin&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/plugins&gt;</span>
+<span class="nt">&lt;/build&gt;</span>
+</pre></div>
+</div>
+<p>With Gradle, a similar result can be achieved with:</p>
+<div class="highlight-groovy notranslate"><div class="highlight"><pre><span></span><span class="n">apply</span><span class="w"> </span><span class="nl">plugin:</span><span class="w"> </span><span class="s1">&#39;java&#39;</span>
+
+<span class="kt">def</span><span class="w"> </span><span class="n">javaDriverVersion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;...&#39;</span>
+<span class="kt">def</span><span class="w"> </span><span class="n">lombokVersion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;...&#39;</span>
+
+<span class="n">dependencies</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">annotationProcessor</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;org.projectlombok&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;lombok&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">lombokVersion</span>
+<span class="w">    </span><span class="n">annotationProcessor</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;com.datastax.oss&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;java-driver-mapper-processor&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">javaDriverVersion</span>
+<span class="w">    </span><span class="n">compile</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;com.datastax.oss&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;java-driver-mapper-runtime&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">javaDriverVersion</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;org.projectlombok&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;lombok&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">lombokVersion</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+<p>You’ll also need to install a Lombok plugin in your IDE (for IntelliJ IDEA, <a class="reference external" href="https://plugins.jetbrains.com/plugin/6317-lombok">this
+one</a> is available in the marketplace).</p>
+</section>
+<section id="kotlin">
+<h3>Kotlin<a class="headerlink" href="#kotlin" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://kotlinlang.org/">Kotlin</a> is an alternative language for the JVM. Its compact syntax and
+native support for annotation processing make it a good fit for the mapper.</p>
+<p>To set up your project, refer to the Kotlin website:</p>
+<ul>
+<li><p>Maven: configure <a class="reference external" href="https://kotlinlang.org/docs/reference/using-maven.html#compiling-kotlin-and-java-sources">dual compilation</a> of Kotlin and Java sources. In addition,
+you’ll need an additional execution of the <a class="reference external" href="https://kotlinlang.org/docs/reference/kapt.html#using-in-maven">kotlin-maven-plugin:kapt</a> goal with the
+mapper processor before compilation:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;plugin&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>org.jetbrains.kotlin<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>kotlin-maven-plugin<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>${kotlin.version}<span class="nt">&lt;/version&gt;</span><span class="w">  </span>
+<span class="w">  </span><span class="nt">&lt;executions&gt;</span><span class="w">  </span>
+<span class="w">    </span><span class="nt">&lt;execution&gt;</span>
+<span class="w">      </span><span class="nt">&lt;id&gt;</span>kapt<span class="nt">&lt;/id&gt;</span>
+<span class="w">      </span><span class="nt">&lt;goals&gt;&lt;goal&gt;</span>kapt<span class="nt">&lt;/goal&gt;&lt;/goals&gt;</span>
+<span class="w">      </span><span class="nt">&lt;configuration&gt;</span>
+<span class="w">        </span><span class="nt">&lt;sourceDirs&gt;</span>
+<span class="w">          </span><span class="nt">&lt;sourceDir&gt;</span>src/main/kotlin<span class="nt">&lt;/sourceDir&gt;</span>
+<span class="w">          </span><span class="nt">&lt;sourceDir&gt;</span>src/main/java<span class="nt">&lt;/sourceDir&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/sourceDirs&gt;</span>
+<span class="w">        </span><span class="nt">&lt;annotationProcessorPaths&gt;</span>
+<span class="w">          </span><span class="nt">&lt;annotationProcessorPath&gt;</span>
+<span class="w">            </span><span class="nt">&lt;groupId&gt;</span>com.datastax.oss<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;artifactId&gt;</span>java-driver-mapper-processor<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;version&gt;</span>${java-driver.version}<span class="nt">&lt;/version&gt;</span>
+<span class="w">          </span><span class="nt">&lt;/annotationProcessorPath&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/annotationProcessorPaths&gt;</span>
+<span class="w">      </span><span class="nt">&lt;/configuration&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/execution&gt;</span>
+<span class="w">    </span><span class="nt">&lt;execution&gt;</span>
+<span class="w">      </span><span class="nt">&lt;id&gt;</span>compile<span class="nt">&lt;/id&gt;</span>
+<span class="w">      </span><span class="nt">&lt;goals&gt;&lt;goal&gt;</span>compile<span class="nt">&lt;/goal&gt;&lt;/goals&gt;</span>
+<span class="w">      </span>...
+<span class="w">    </span><span class="nt">&lt;/execution&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/executions&gt;</span>
+<span class="nt">&lt;/plugin&gt;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Gradle: configure the <a class="reference external" href="https://kotlinlang.org/docs/reference/using-gradle.html">kotlin</a> and <a class="reference external" href="https://kotlinlang.org/docs/reference/kapt.html#using-in-gradle">kotlin_kapt</a> plugins in your build
+script. In addition, declare the dependency to the mapper processor with <code class="docutils literal notranslate"><span class="pre">kapt</span></code> instead of
+<code class="docutils literal notranslate"><span class="pre">annotationProcessor</span></code>:</p>
+<div class="highlight-groovy notranslate"><div class="highlight"><pre><span></span><span class="n">apply</span><span class="w"> </span><span class="nl">plugin:</span><span class="w"> </span><span class="s1">&#39;kotlin&#39;</span>
+<span class="n">apply</span><span class="w"> </span><span class="nl">plugin:</span><span class="w"> </span><span class="s1">&#39;kotlin-kapt&#39;</span>
+
+<span class="n">dependencies</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">kapt</span><span class="w"> </span><span class="nl">group:</span><span class="w"> </span><span class="s1">&#39;com.datastax.oss&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">name:</span><span class="w"> </span><span class="s1">&#39;java-driver-mapper-processor&#39;</span><span class="o">,</span><span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">javaDriverVersion</span>
+<span class="w">    </span><span class="o">...</span>
+<span class="o">}</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>You can use Kotlin <a class="reference external" href="https://kotlinlang.org/docs/reference/data-classes.html">data classes</a> for your entities. Just keep in mind that the mapper expects a
+no-arg constructor, which means that you must define default values; and setters, which means that
+properties must be declared with <code class="docutils literal notranslate"><span class="pre">var</span></code>, not <code class="docutils literal notranslate"><span class="pre">val</span></code>.</p>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="nd">@Entity</span>
+<span class="kd">data</span><span class="w"> </span><span class="kd">class</span><span class="w"> </span><span class="nc">Product</span><span class="p">(</span><span class="nd">@PartitionKey</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">id</span><span class="p">:</span><span class="w"> </span><span class="kt">Int?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="nv">description</span><span class="p">:</span><span class="w"> </span><span class="kt">String?</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>All of the <a class="reference external" href="../entities/#property-annotations">property annotations</a> can be declared directly on the
+constructor properties.</p>
+<p>If you want to take advantage of <a class="reference external" href="../daos/null_saving/">null saving strategies</a>, your properties
+should be nullable.</p>
+<p>The other mapper interfaces are pretty similar to the Java versions:</p>
+<div class="highlight-kotlin notranslate"><div class="highlight"><pre><span></span><span class="nd">@Dao</span>
+<span class="kd">interface</span><span class="w"> </span><span class="nc">ProductDao</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nd">@Insert</span>
+<span class="w">  </span><span class="kd">fun</span><span class="w"> </span><span class="nf">insert</span><span class="p">(</span><span class="n">product</span><span class="p">:</span><span class="w"> </span><span class="n">Product</span><span class="p">)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Integration&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.7.2.x/manual/mapper/config/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Mapper
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../daos/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />DAOs
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                4.7.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api_conventions/index.html">API conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../case_sensitivity/index.html">Case sensitivity</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../core/index.html">Core driver</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../core/address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/authentication/index.html">Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/bom/index.html">Bill of Materials (BOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/compression/index.html">Compression</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../core/configuration/index.html">Configuration</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../core/configuration/reference/README.html">Reference configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/control_connection/index.html">Control connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/custom_codecs/index.html">Custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/detachable_types/index.html">Detachable types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/integration/index.html">Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/logging/index.html">Logging</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../core/metadata/index.html">Metadata</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../core/metadata/node/index.html">Node metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/metadata/schema/index.html">Schema metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/metadata/token/index.html">Token metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/metrics/index.html">Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/paging/index.html">Paging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/performance/index.html">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/reactive/index.html">Reactive Style Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/request_tracker/index.html">Request tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/retries/index.html">Retries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/ssl/index.html">SSL</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../core/statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/batch/index.html">Batch statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/per_query_keyspace/index.html">Per-query keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/simple/index.html">Simple statements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/temporal_types/index.html">Temporal types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/throttling/index.html">Request throttling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/tracing/index.html">Query tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/tuples/index.html">Tuples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../developer/index.html">Developer docs</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/><label for="toctree-checkbox-6"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/admin/index.html">Administrative tasks</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../developer/common/index.html">Common infrastructure</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/><label for="toctree-checkbox-7"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/context/index.html">Driver context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/event_bus/index.html">Event bus</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/native_protocol/index.html">Native protocol layer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/netty_pipeline/index.html">Netty pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/request_execution/index.html">Request execution</a></li>
+</ul>
+</li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Mapper</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/><label for="toctree-checkbox-8"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3 current has-children current-page"><a class="current reference internal" href="#">Integration</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label for="toctree-checkbox-9"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="simple">
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../daos/index.html">DAOs</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label for="toctree-checkbox-10"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../daos/custom_types/index.html">Custom result types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/delete/index.html">Delete methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/getentity/index.html">GetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/insert/index.html">Insert methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/null_saving/index.html">Null saving strategy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/query/index.html">Query methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/queryprovider/index.html">Query provider methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/select/index.html">Select methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/setentity/index.html">SetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/statement_attributes/index.html">Statement attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../daos/update/index.html">Update methods</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../entities/index.html">Entities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../mapper/index.html">Mapper interface</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../query_builder/index.html">Query builder</a><input class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" type="checkbox"/><label for="toctree-checkbox-11"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/condition/index.html">Conditions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/delete/index.html">DELETE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/idempotence/index.html">Idempotence in the query builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/insert/index.html">INSERT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/relation/index.html">Relations</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../query_builder/schema/index.html">Schema builder</a><input class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" type="checkbox"/><label for="toctree-checkbox-12"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/aggregate/index.html">Aggregate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/function/index.html">Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/index/index.html">Index</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/keyspace/index.html">Keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/materialized_view/index.html">Materialized View</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/table/index.html">Table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/type/index.html">Type</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/select/index.html">SELECT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/term/index.html">Terms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/truncate/index.html">TRUNCATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/update/index.html">UPDATE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Integration&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.7.2.x/manual/mapper/config/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/mapper/config/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Integration</a><ul>
+<li><a class="reference internal" href="#builds-tools">Builds tools</a><ul>
+<li><a class="reference internal" href="#maven">Maven</a></li>
+<li><a class="reference internal" href="#gradle">Gradle</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#integration-with-other-languages-and-libraries">Integration with other languages and libraries</a><ul>
+<li><a class="reference internal" href="#lombok">Lombok</a></li>
+<li><a class="reference internal" href="#kotlin">Kotlin</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

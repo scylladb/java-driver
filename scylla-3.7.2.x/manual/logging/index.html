@@ -1,0 +1,1047 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Logging | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/logging/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../_static/documentation_options.js?v=86e43a22"></script>
+            
+        
+            
+                <script src="../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Logging</span>
+</div>
+                    </div>
+                
+                <section id="logging">
+<h1>Logging<a class="headerlink" href="#logging" title="Link to this heading">¶</a></h1>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading">¶</a></h2>
+<p>DataStax Java driver uses the popular <a class="reference external" href="http://www.slf4j.org">SLF4J</a> library to emit log messages;
+SLF4J has the advantage of providing a logging API that is entirely decoupled from concrete
+implementations, letting client applications free to seamlessly connect SLF4J to their preferred logging backend.</p>
+<p>The driver itself does not attempt to configure any concrete logging framework.
+It is up to client applications using the driver to correctly set up their classpath and
+runtime configuration to be able to capture log messages emitted by the driver.
+Concretely, client applications need to provide, at runtime, a <em>binding</em> to any logging framework
+of their choice that is <a class="reference external" href="http://www.slf4j.org/manual.html#swapping">compatible with SLF4J</a>.</p>
+<p>If your application is built with Maven, this usually involves adding one (runtime) dependency to your POM file.
+For example, if you intend to use <a class="reference external" href="http://logback.qos.ch">Logback</a>, add the following dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">	</span><span class="nt">&lt;groupId&gt;</span>ch.qos.logback<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">	</span><span class="nt">&lt;artifactId&gt;</span>logback-classic<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">	</span><span class="nt">&lt;version&gt;</span>1.2.3<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<p>If you are using Log4J 1.2 instead, add the following dependency:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">  </span><span class="nt">&lt;groupId&gt;</span>org.slf4j<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;artifactId&gt;</span>slf4j-log4j12<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">  </span><span class="nt">&lt;version&gt;</span>1.7.25<span class="nt">&lt;/version&gt;</span>
+<span class="nt">&lt;/dependency&gt;</span>
+</pre></div>
+</div>
+<p>Check <a class="reference external" href="http://www.slf4j.org/manual.html#projectDep">SLF4J’s documentation</a> for examples for
+other logging frameworks, and for troubleshooting dependency resolution problems.</p>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h2>
+<p>Each logging framework has its own configuration rules, but all of them provide
+different levels (DEBUG, INFO, WARN, ERROR…), different <em>loggers</em> or <em>categories</em>
+(messages from different categories or loggers can be filtered out separately or printed out
+differently), and different <em>appenders</em> (message receptacles such as the standard console,
+the error console, a file on disk, a socket…).</p>
+<p>Check your logging framework documentation for more information about how to properly configure it.
+You can also find some configuration examples below.</p>
+</section>
+<section id="useful-loggers">
+<h2>Useful loggers<a class="headerlink" href="#useful-loggers" title="Link to this heading">¶</a></h2>
+<p>When debugging the Java driver, the following loggers could be particularly useful
+and provide hints about what’s going wrong.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.Cluster</span></code></p>
+<ul>
+<li><p>ERROR</p>
+<ul>
+<li><p>Authentication errors</p></li>
+<li><p>Unexpected errors when handling events, reconnecting, refreshing schemas</p></li>
+<li><p>Unexpected events</p></li>
+</ul>
+</li>
+<li><p>WARN</p>
+<ul>
+<li><p>Cluster name mismatches</p></li>
+<li><p>Unreachable contact points</p></li>
+<li><p>Unsupported protocol versions</p></li>
+<li><p>Schema disagreements</p></li>
+<li><p>Ignored notifications due to high contention</p></li>
+</ul>
+</li>
+<li><p>INFO</p>
+<ul>
+<li><p>Hosts added or removed</p></li>
+</ul>
+</li>
+<li><p>DEBUG</p>
+<ul>
+<li><p>Cluster lifecycle (start, shutdown)</p></li>
+<li><p>Event delivery notifications (schema changes, topology changes)</p></li>
+<li><p>Topology change events: hosts Up / Down / Added / Removed</p></li>
+<li><p>Hosts being ignored</p></li>
+<li><p>Protocol version negotiation</p></li>
+<li><p>Reconnection attempts</p></li>
+<li><p>Schema metadata refreshes</p></li>
+</ul>
+</li>
+<li><p>TRACE</p>
+<ul>
+<li><p>Connection pools lifecycle (create, renew, refresh)</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.Session</span></code></p>
+<ul>
+<li><p>ERROR</p>
+<ul>
+<li><p>Errors related to connection pools</p></li>
+</ul>
+</li>
+<li><p>WARN</p>
+<ul>
+<li><p>Problems related to connection pools</p></li>
+</ul>
+</li>
+<li><p>DEBUG</p>
+<ul>
+<li><p>Connection pools lifecycle (create, renew, refresh)</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.RequestHandler</span></code></p>
+<ul>
+<li><p>ERROR</p>
+<ul>
+<li><p>Unexpected errors preparing queries</p></li>
+<li><p>Queries sent to a bootstrapping host</p></li>
+<li><p>Unexpected server errors</p></li>
+</ul>
+</li>
+<li><p>WARN</p>
+<ul>
+<li><p>Queries sent to an overloaded host</p></li>
+</ul>
+</li>
+<li><p>INFO</p>
+<ul>
+<li><p>Unprepared queries</p></li>
+</ul>
+</li>
+<li><p>DEBUG</p>
+<ul>
+<li><p>Retry attempts</p></li>
+</ul>
+</li>
+<li><p>TRACE</p>
+<ul>
+<li><p>Host currently being queried</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.Connection</span></code></p>
+<ul>
+<li><p>WARN</p>
+<ul>
+<li><p>Problem setting keyspace</p></li>
+<li><p>Errors closing Netty channel</p></li>
+</ul>
+</li>
+<li><p>DEBUG</p>
+<ul>
+<li><p>Connection lifecycle (open, close, defunct)</p></li>
+<li><p>Error connecting or writing requests</p></li>
+<li><p>Heartbeats</p></li>
+</ul>
+</li>
+<li><p>TRACE</p>
+<ul>
+<li><p>Authentication progress</p></li>
+<li><p>Sending requests</p></li>
+<li><p>Receiving responses</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.Message</span></code></p>
+<ul>
+<li><p>TRACE</p>
+<ul>
+<li><p>Custom payloads</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="logging-query-latencies">
+<h2>Logging query latencies<a class="headerlink" href="#logging-query-latencies" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> provides clients with the ability to log queries
+executed by the driver, and especially, it allows client to track slow
+queries, i.e. queries that take longer to complete than a configured
+threshold in milliseconds.</p>
+<p>To turn on this feature, you first need to instantiate and register a <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> instance:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...</span>
+<span class="n">QueryLogger</span><span class="w"> </span><span class="n">queryLogger</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryLogger</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">withConstantThreshold</span><span class="p">(...)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">withMaxQueryStringLength</span><span class="p">(...)</span>
+<span class="p">.</span><span class="na">build</span><span class="p">();</span>
+<span class="n">cluster</span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="n">queryLogger</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> instances are thread-safe and can be shared cluster-wide.
+Besides, you can adjust several parameters such as the maximum query string length to be printed,
+the maximum number of parameters to print, etc. Refer to the
+<code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> <a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/QueryLogger.html">API docs</a> for more information.</p>
+<p>Secondly, you need to adjust your logging framework to accept log messages from the <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code>. The <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code>
+uses 3 different loggers:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.QueryLogger.NORMAL</span></code> : Used to log normal queries, i.e., queries that completed successfully within a configurable threshold in milliseconds.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.QueryLogger.SLOW</span></code> : Used to log slow queries, i.e., queries that completed successfully but that took longer than a configurable threshold in milliseconds to complete.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.QueryLogger.ERROR</span></code>: Used to log unsuccessful queries, i.e., queries that did not complete normally and threw an exception. Note this this logger will also print the full stack trace of the reported exception.</p></li>
+</ul>
+<p>You need to set the above loggers to DEBUG level to turn them on. E.g. to track queries
+that take more than 300 ms to complete, configure your <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> with that threshold (see above),
+then set the <code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.QueryLogger.SLOW</span></code> logger to DEBUG, e.g. with Log4J:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;logger</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;com.datastax.driver.core.QueryLogger.SLOW&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;level</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;DEBUG&quot;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/logger&gt;</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> would then print messages such as this for every slow query:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>DEBUG [cluster1] [/127.0.0.1:9042] Query too slow, took 329 ms: SELECT * FROM users WHERE user_id=?;
+</pre></div>
+</div>
+<p>As you can see, actual query parameters are not logged; if you want them to be printed as well, set the <code class="docutils literal notranslate"><span class="pre">com.datastax.driver.core.QueryLogger.SLOW</span></code> logger
+to TRACE instead, e.g. with Log4J:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">&lt;logger</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;com.datastax.driver.core.QueryLogger.SLOW&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;level</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;TRACE&quot;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/logger&gt;</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> would then print messages such as this for every slow query:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>TRACE [cluster1] [/127.0.0.1:9042] Query too slow, took 329 ms: SELECT * FROM users WHERE user_id=? [user_id=42];
+</pre></div>
+</div>
+<p>Be careful when logging large query strings (specially batches) and/or queries with considerable amounts of parameters.
+See the <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> <a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/QueryLogger.html">API docs</a> for examples of how to truncate the printed message when necessary.</p>
+<section id="constant-vs-dynamic-thresholds">
+<h3>Constant vs Dynamic thresholds<a class="headerlink" href="#constant-vs-dynamic-thresholds" title="Link to this heading">¶</a></h3>
+<p>Currently the <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> can be configured to track slow queries using either
+a constant threshold in milliseconds (which is the default behavior), or
+a dynamic threshold based on per-host latency percentiles, as computed by a <code class="docutils literal notranslate"><span class="pre">PercentileTracker</span></code>.</p>
+<p>Refer to the <code class="docutils literal notranslate"><span class="pre">QueryLogger</span></code> <a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/QueryLogger.html">API docs</a> for an example of usage.</p>
+</section>
+</section>
+<section id="performance-tips">
+<h2>Performance Tips<a class="headerlink" href="#performance-tips" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Use asynchronous appenders; both <a class="reference external" href="http://logging.apache.org/log4j/1.2/apidocs/org/apache/log4j/AsyncAppender.html">Log4J</a>
+and <a class="reference external" href="http://logback.qos.ch/manual/appenders.html#AsyncAppender">Logback</a> provide asynchronous appenders
+that can significantly boost latencies when writing log messages.</p></li>
+<li><p>While the driver does not provide such capability, it is possible for client applications to hot-reload the log configuration
+without stopping the application. This usually involves JMX and is available for <a class="reference external" href="http://logback.qos.ch/manual/jmxConfig.html">Logback</a>;
+Log4J provides a <code class="docutils literal notranslate"><span class="pre">configureAndWatch()</span></code> method but it is not recommended to use it inside J2EE containers (see <a class="reference external" href="https://logging.apache.org/log4j/1.2/faq.html#a3.6">FAQ</a>).</p></li>
+</ul>
+</section>
+<section id="server-side-warnings">
+<h2>Server Side Warnings<a class="headerlink" href="#server-side-warnings" title="Link to this heading">¶</a></h2>
+<p>When using the driver to execute queries, it is possible that the server will generate warnings and
+return them along with the results. Consider the following query:</p>
+<div class="highlight-sql notranslate"><div class="highlight"><pre><span></span><span class="k">SELECT</span><span class="w"> </span><span class="k">count</span><span class="p">(</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">cycling</span><span class="p">.</span><span class="n">cyclist_name</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>Executing this query would generate a warning in Cassandra:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Aggregation</span> <span class="n">query</span> <span class="n">used</span> <span class="n">without</span> <span class="n">partition</span> <span class="n">key</span>
+</pre></div>
+</div>
+<p>These
+<a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/ExecutionInfo.html#getWarnings--">query warnings</a>
+are available programmatically from the
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/ExecutionInfo.html">ExecutionInfo</a>
+via
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/ResultSet.html">ResultSet</a>’s
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/PagingIterable.html#getExecutionInfo--">getExecutionInfo()</a>
+method. They are also logged by the driver:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">WARN</span>  <span class="n">com</span><span class="o">.</span><span class="n">datastax</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">RequestHandler</span> <span class="o">-</span> <span class="n">Query</span> <span class="s1">&#39;SELECT count(*) FROM cycling.cyclist_name&#39;</span> <span class="n">generated</span> <span class="n">server</span> <span class="n">side</span> <span class="n">warning</span><span class="p">(</span><span class="n">s</span><span class="p">):</span> <span class="n">Aggregation</span> <span class="n">query</span> <span class="n">used</span> <span class="n">without</span> <span class="n">partition</span> <span class="n">key</span>
+</pre></div>
+</div>
+<p>Sometimes, it is not desirable for the driver to log server-side warnings. In such cases, logging
+these warnings can be disabled in the driver by setting the system property <code class="docutils literal notranslate"><span class="pre">com.datastax.driver.DISABLE_QUERY_WARNING_LOGS</span></code>
+to “true”. This can be done at application startup (<code class="docutils literal notranslate"><span class="pre">-Dcom.datastax.driver.DISABLE_QUERY_WARNING_LOGS=true</span></code>)
+or it can be toggled programmatically in application code:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// disable driver logging of server-side warnings</span>
+<span class="n">System</span><span class="p">.</span><span class="na">setProperty</span><span class="p">(</span><span class="s">&quot;com.datastax.driver.DISABLE_QUERY_WARNING_LOGS&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;true&quot;</span><span class="p">);</span>
+<span class="p">....</span>
+<span class="c1">// enable driver logging of server-side warnings</span>
+<span class="n">System</span><span class="p">.</span><span class="na">setProperty</span><span class="p">(</span><span class="s">&quot;com.datastax.driver.DISABLE_QUERY_WARNING_LOGS&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;false&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="logback-example">
+<h2>Logback Example<a class="headerlink" href="#logback-example" title="Link to this heading">¶</a></h2>
+<p>Here is a typical example configuration for Logback. <em>Please adapt it to your specific needs before using it!</em></p>
+<p>It logs messages to the console with levels equal to or higher than INFO, and logs all messages to a rolling file.
+By default, only messages with ERROR level or higher are logged.</p>
+<p>It also turns on slow query tracing as described above.</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="cp">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span>
+<span class="nt">&lt;configuration&gt;</span>
+<span class="w"> </span>
+<span class="w">    </span><span class="cm">&lt;!-- log INFO or higher messages to the console --&gt;</span>
+<span class="w">	</span><span class="nt">&lt;appender</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;console&quot;</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;ch.qos.logback.core.ConsoleAppender&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;encoder&gt;</span>
+<span class="w">            </span><span class="nt">&lt;pattern&gt;</span>%-5p<span class="w"> </span>%msg%n<span class="nt">&lt;/pattern&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/encoder&gt;</span>
+<span class="w">	</span><span class="nt">&lt;/appender&gt;</span>
+<span class="w"> </span>
+<span class="w">    </span><span class="cm">&lt;!-- log everything to a rolling file --&gt;</span>
+<span class="w">	</span><span class="nt">&lt;appender</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;file&quot;</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;ch.qos.logback.core.rolling.RollingFileAppender&quot;</span><span class="nt">&gt;</span>
+<span class="w">		</span><span class="nt">&lt;file&gt;</span>driver.log<span class="nt">&lt;/file&gt;</span>
+<span class="w">		</span><span class="nt">&lt;encoder&gt;</span>
+<span class="w">			</span><span class="nt">&lt;pattern&gt;</span>%-5p<span class="w"> </span>[%d{ISO8601}]<span class="w"> </span>[%t]<span class="w"> </span>%F:%L<span class="w"> </span>-<span class="w"> </span>%msg%n<span class="nt">&lt;/pattern&gt;</span>
+<span class="w">		</span><span class="nt">&lt;/encoder&gt;</span>
+<span class="w">        </span><span class="nt">&lt;rollingPolicy</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;ch.qos.logback.core.rolling.TimeBasedRollingPolicy&quot;</span><span class="nt">&gt;</span>
+<span class="w">            </span><span class="cm">&lt;!-- daily rollover --&gt;</span>
+<span class="w">            </span><span class="nt">&lt;fileNamePattern&gt;</span>driver.%d{yyyy-MM-dd}.log<span class="nt">&lt;/fileNamePattern&gt;</span>
+<span class="w">            </span><span class="cm">&lt;!-- keep 30 days&#39; worth of history --&gt;</span>
+<span class="w">            </span><span class="nt">&lt;maxHistory&gt;</span>30<span class="nt">&lt;/maxHistory&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/rollingPolicy&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/appender&gt;</span>
+<span class="w"> </span>
+<span class="w">    </span><span class="cm">&lt;!-- use AsyncAppender for lower latencies --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;appender</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;async&quot;</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;ch.qos.logback.classic.AsyncAppender&quot;</span><span class="nt">&gt;</span>
+<span class="w">        </span><span class="nt">&lt;appender-ref</span><span class="w"> </span><span class="na">ref=</span><span class="s">&quot;console&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">        </span><span class="nt">&lt;appender-ref</span><span class="w"> </span><span class="na">ref=</span><span class="s">&quot;file&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/appender&gt;</span>
+<span class="w">   </span>
+<span class="w">    </span><span class="cm">&lt;!--</span>
+<span class="cm">    Turn on slow query logging by setting this logger to DEBUG; </span>
+<span class="cm">    set level to TRACE to also log query parameters </span>
+<span class="cm">    --&gt;</span>
+<span class="w">    </span><span class="nt">&lt;logger</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;com.datastax.driver.core.QueryLogger.SLOW&quot;</span><span class="w"> </span><span class="na">level=</span><span class="s">&quot;DEBUG&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+
+<span class="w">	</span><span class="nt">&lt;root</span><span class="w"> </span><span class="na">level=</span><span class="s">&quot;ERROR&quot;</span><span class="nt">&gt;</span>
+<span class="w">		</span><span class="nt">&lt;appender-ref</span><span class="w"> </span><span class="na">ref=</span><span class="s">&quot;async&quot;</span><span class="w"> </span><span class="nt">/&gt;</span>
+<span class="w">	</span><span class="nt">&lt;/root&gt;</span>
+<span class="w"> </span>
+<span class="nt">&lt;/configuration&gt;</span>
+</pre></div>
+</div>
+</section>
+<section id="log4j-example">
+<h2>Log4J Example<a class="headerlink" href="#log4j-example" title="Link to this heading">¶</a></h2>
+<p>Here is a typical example configuration for Log4J. <em>Please adapt it to your specific needs before using it!</em></p>
+<p>It logs messages to the console with levels equal to or higher than INFO, and logs all messages to a rolling file.
+By default, only messages with ERROR level or higher are logged.</p>
+<p>It also turns on slow query tracing as described above.</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;log4j:configuration&gt;</span>
+
+<span class="w">  </span><span class="cm">&lt;!-- log INFO or higher messages to the console --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;appender</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;console&quot;</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;org.apache.log4j.ConsoleAppender&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;threshold&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;INFO&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;layout</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;org.apache.log4j.PatternLayout&quot;</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;ConversionPattern&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;%-5p %m%n&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/layout&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/appender&gt;</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="cm">&lt;!-- log everything to a rolling file --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;appender</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;file&quot;</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;org.apache.log4j.RollingFileAppender&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;file&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;driver.log&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;append&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;false&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;maxFileSize&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;1GB&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;maxBackupIndex&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;10&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;layout</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;org.apache.log4j.PatternLayout&quot;</span><span class="nt">&gt;</span>
+<span class="w">      </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;ConversionPattern&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;%-5p [%d{ISO8601}] [%t] %F:%L - %m%n&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/layout&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/appender&gt;</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="cm">&lt;!-- use AsyncAppender for lower latencies --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;appender</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;async&quot;</span><span class="w"> </span><span class="na">class=</span><span class="s">&quot;org.apache.log4j.AsyncAppender&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;param</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;BufferSize&quot;</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;500&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;appender-ref</span><span class="w"> </span><span class="na">ref=</span><span class="s">&quot;file&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;appender-ref</span><span class="w"> </span><span class="na">ref=</span><span class="s">&quot;console&quot;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/appender&gt;</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="cm">&lt;!--</span>
+<span class="cm">   Turn on slow query logging by setting this logger to DEBUG; </span>
+<span class="cm">   set level to TRACE to also log query parameters </span>
+<span class="cm">  --&gt;</span>
+<span class="w">  </span><span class="nt">&lt;logger</span><span class="w"> </span><span class="na">name=</span><span class="s">&quot;com.datastax.driver.core.QueryLogger.SLOW&quot;</span><span class="nt">&gt;</span>
+<span class="w">    </span><span class="nt">&lt;level</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;DEBUG&quot;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/logger&gt;</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="nt">&lt;root&gt;</span>
+<span class="w">    </span><span class="nt">&lt;priority</span><span class="w"> </span><span class="na">value=</span><span class="s">&quot;ERROR&quot;</span><span class="nt">/&gt;</span>
+<span class="w">    </span><span class="nt">&lt;appender-ref</span><span class="w"> </span><span class="na">ref=</span><span class="s">&quot;async&quot;</span><span class="nt">/&gt;</span>
+<span class="w">  </span><span class="nt">&lt;/root&gt;</span>
+<span class="w">  </span>
+<span class="nt">&lt;/log4j:configuration&gt;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Logging&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.7.2.x/manual/logging/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../load_balancing/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Load balancing
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../metadata/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Metadata
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.7.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Logging&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.7.2.x/manual/logging/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/logging/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Logging</a><ul>
+<li><a class="reference internal" href="#setup">Setup</a></li>
+<li><a class="reference internal" href="#configuration">Configuration</a></li>
+<li><a class="reference internal" href="#useful-loggers">Useful loggers</a></li>
+<li><a class="reference internal" href="#logging-query-latencies">Logging query latencies</a><ul>
+<li><a class="reference internal" href="#constant-vs-dynamic-thresholds">Constant vs Dynamic thresholds</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#performance-tips">Performance Tips</a></li>
+<li><a class="reference internal" href="#server-side-warnings">Server Side Warnings</a></li>
+<li><a class="reference internal" href="#logback-example">Logback Example</a></li>
+<li><a class="reference internal" href="#log4j-example">Log4J Example</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

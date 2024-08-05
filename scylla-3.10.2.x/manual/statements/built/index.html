@@ -1,0 +1,895 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Built statements | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/statements/built/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Statements
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Built statements</span>
+</div>
+                    </div>
+                
+                <section id="built-statements">
+<h1>Built statements<a class="headerlink" href="#built-statements" title="Link to this heading">¶</a></h1>
+<p>Built statements are generated via <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/querybuilder/QueryBuilder.html">QueryBuilder</a>’s Fluent API.  Use of Fluent API allows
+easier build of complex queries, as opposed to use of hardcoded query strings.</p>
+<p>Note: The provided builders perform very little validation of the built query. There is
+no guarantee that a built query is valid, and it is definitively possible to create
+invalid queries.</p>
+<p>Queries built with <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code> are executed the same way as other queries–via
+<code class="docutils literal notranslate"><span class="pre">execute</span></code> or <code class="docutils literal notranslate"><span class="pre">executeAsync</span></code>.  When a query is built with inlined values, then it doesn’t
+differ much from a statement specified as a string.  But it’s also possible to build
+the query with bind markers inside it, and then convert it into a <a class="reference external" href="../prepared/">prepared statement</a>.</p>
+<section id="basics">
+<h2>Basics<a class="headerlink" href="#basics" title="Link to this heading">¶</a></h2>
+<p>Generation of <code class="docutils literal notranslate"><span class="pre">BuiltStatement</span></code> is easy–start by calling of one of the
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/querybuilder/QueryBuilder.html">QueryBuilder</a>’s methods that represent the CQL’s “verb”: <code class="docutils literal notranslate"><span class="pre">select</span></code>, <code class="docutils literal notranslate"><span class="pre">update</span></code>, <code class="docutils literal notranslate"><span class="pre">delete</span></code>,
+<code class="docutils literal notranslate"><span class="pre">insertInto</span></code>, or <code class="docutils literal notranslate"><span class="pre">truncate</span></code>, provide required parameters, and then call “verb”-specific
+functions to form a complete CQL statement (like, <code class="docutils literal notranslate"><span class="pre">where</span></code>, <code class="docutils literal notranslate"><span class="pre">from</span></code>, etc.).  The statement’s
+target table can be specified as a simple table name (if a default keyspace has been set
+when creating the <code class="docutils literal notranslate"><span class="pre">Session</span></code> object), as a combination of keyspace name and table name, or as
+a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/TableMetadata.html">TableMetadata</a> object.</p>
+<p>Note: The <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code> doesn’t provide support for the full set of CQL.  For
+most of DDL operations (<code class="docutils literal notranslate"><span class="pre">CREATE</span> <span class="pre">TABLE</span></code>, etc.) you can use the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/schemabuilder/SchemaBuilder.html">SchemaBuilder</a>.  To perform other
+operations, for example, for role management, you still need to use <a class="reference external" href="../simple/">simple statements</a>.</p>
+</section>
+<section id="selecting-data">
+<h2>Selecting data<a class="headerlink" href="#selecting-data" title="Link to this heading">¶</a></h2>
+<p>Selection of data is quite simple–at minimum you need to provide a list of columns to
+select, and then specify  from which table to select these columns (you can also optionally
+specify a condition, as described in the next section):</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">selectAll1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;t&quot;</span><span class="p">).</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">);</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">selectAll1</span><span class="p">);</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="p">:</span><span class="w"> </span><span class="n">rs</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">   </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="n">row</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note: The call <code class="docutils literal notranslate"><span class="pre">select(&quot;column1&quot;,</span> <span class="pre">&quot;column2&quot;)</span></code> is really a shortcut for a chain of calls
+<code class="docutils literal notranslate"><span class="pre">select().column(&quot;column1&quot;).column(&quot;column2&quot;)</span></code>.</p>
+<p>Please note that you can’t pass the <code class="docutils literal notranslate"><span class="pre">*</span></code> as column name to select all columns–if you do
+this, you’ll get an exception about unknown column. To select all columns you either need to use
+<code class="docutils literal notranslate"><span class="pre">select</span></code> in combination with <code class="docutils literal notranslate"><span class="pre">all</span></code> function, or simply don’t specify a list of columns:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">selectAll2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">all</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">);</span>
+<span class="n">BuiltStatement</span><span class="w"> </span><span class="n">selectAll3</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Besides selection of the specific columns, it’s also possible to call arbitrary CQL
+function by using the <code class="docutils literal notranslate"><span class="pre">fcall</span></code> method (this is just example, don’t do this on real data):</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">sum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">fcall</span><span class="p">(</span><span class="s">&quot;sum&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">column</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">)).</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;sum_id&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note: When using functions, Cassandra will generate aliases for you, but you can provide
+explicit aliases by using <code class="docutils literal notranslate"><span class="pre">as</span></code> right after a given selector.</p>
+<p>For often used functions, there are shortcuts, such as, <code class="docutils literal notranslate"><span class="pre">countAll</span></code>, <code class="docutils literal notranslate"><span class="pre">ttl</span></code>, <code class="docutils literal notranslate"><span class="pre">writeTime</span></code>,
+<code class="docutils literal notranslate"><span class="pre">uuid</span></code>, <code class="docutils literal notranslate"><span class="pre">now</span></code>, <code class="docutils literal notranslate"><span class="pre">toJson</span></code>, etc.:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span> <span class="n">count</span> <span class="o">=</span> <span class="n">QueryBuilder</span><span class="o">.</span><span class="n">select</span><span class="p">()</span><span class="o">.</span><span class="n">countAll</span><span class="p">()</span>
+        <span class="o">.</span><span class="n">from</span><span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="s2">&quot;test&quot;</span><span class="p">);</span>
+
+<span class="n">BuiltStatement</span> <span class="n">ttlAndWriteTime</span> <span class="o">=</span> <span class="n">QueryBuilder</span><span class="o">.</span><span class="n">select</span><span class="p">()</span><span class="o">.</span><span class="n">column</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">column</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">ttl</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span><span class="o">.</span><span class="k">as</span><span class="p">(</span><span class="s2">&quot;id_ttl&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">writeTime</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">from</span><span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="s2">&quot;test&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>You can also cast the value of the given column to another type by using the <code class="docutils literal notranslate"><span class="pre">cast</span></code> function,
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/querybuilder/QueryBuilder.html#cast-java.lang.Object-com.datastax.driver.core.DataType-">specifying</a>
+the column for which it should be performed, and to what type it should be casted.</p>
+<section id="specifying-conditions">
+<h3>Specifying conditions<a class="headerlink" href="#specifying-conditions" title="Link to this heading">¶</a></h3>
+<p>Selection of data rarely happen on the whole table–in most cases, people are interested
+in particular rows, located in one or several partitions.  Conditions are specified by
+using the <code class="docutils literal notranslate"><span class="pre">where</span></code> call, like this:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">selectOne</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">where</span></code> function accepts the <code class="docutils literal notranslate"><span class="pre">Clause</span></code> object that is generated by calling
+<code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code>’s
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/querybuilder/QueryBuilder.html#eq-java.lang.Iterable-java.lang.Iterable-">functions</a>,
+such as, <code class="docutils literal notranslate"><span class="pre">eq</span></code>, <code class="docutils literal notranslate"><span class="pre">ne</span></code>, <code class="docutils literal notranslate"><span class="pre">lt</span></code>, <code class="docutils literal notranslate"><span class="pre">in</span></code>, <code class="docutils literal notranslate"><span class="pre">contains</span></code>, <code class="docutils literal notranslate"><span class="pre">notNull</span></code>, etc.  In most cases, these
+functions receive 2 arguments: the name of the column, and the value to compare, but there
+are also variants that receive 2 iterables for columns and values correspondingly.</p>
+<p>Note: as queries are becoming more and more complex, repeating <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code> at all
+places will make code less readable.  In this case to simplify the code you can import all
+(or only required) static functions of the <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code> class (this is the same example
+from above):</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import static</span><span class="w"> </span><span class="nn">com.datastax.driver.core.querybuilder.QueryBuilder.*</span><span class="p">;</span>
+
+<span class="c1">//...</span>
+
+<span class="n">BuiltStatement</span><span class="w"> </span><span class="n">selectOne</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>In case if you need to specify complex conditions,  you can chain additional clauses
+together with the <code class="docutils literal notranslate"><span class="pre">and</span></code> operator, that accepts the same clauses as <code class="docutils literal notranslate"><span class="pre">where</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">select</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="p">)).</span><span class="na">and</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;txt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+</section>
+<section id="other-selection-options">
+<h3>Other selection options<a class="headerlink" href="#other-selection-options" title="Link to this heading">¶</a></h3>
+<p>For <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> statements you can also specify a lot of different options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">allowFiltering</span></code> generates a corresponding <code class="docutils literal notranslate"><span class="pre">ALLOW</span> <span class="pre">FILTERING</span></code> part of query (<em><strong>only use if you know what you’re doing!</strong></em>);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">limit</span></code> and <code class="docutils literal notranslate"><span class="pre">perPartitionLimit</span></code> allows to specify the amount of data to fetch;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">groupBy</span></code> performs grouping of data;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">orderBy</span></code> allows to specify sorting direction for specified clustering columns;</p></li>
+</ul>
+<p>This very “artificial” example shows the use for some of them:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">selectOne</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)).</span><span class="na">limit</span><span class="p">(</span><span class="mi">1</span><span class="p">).</span><span class="na">allowFiltering</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">perPartitionLimit</span><span class="p">(</span><span class="mi">1</span><span class="p">).</span><span class="na">orderBy</span><span class="p">(</span><span class="n">desc</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="inserting-data">
+<h2>Inserting data<a class="headerlink" href="#inserting-data" title="Link to this heading">¶</a></h2>
+<p>Insertion of data is straightforward–you specify the target table in a call to
+<code class="docutils literal notranslate"><span class="pre">insertInto</span></code>, and then provide values to insert either by chaining several calls to the
+<code class="docutils literal notranslate"><span class="pre">value</span></code> function, or by using the <code class="docutils literal notranslate"><span class="pre">values</span></code> function and passing lists or arrays of column
+names and their corresponding values. The following 2 examples are equivalent:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">insertInto</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">value</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">).</span><span class="na">value</span><span class="p">(</span><span class="s">&quot;t&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test 4&quot;</span><span class="p">);</span>
+<span class="n">QueryBuilder</span><span class="p">.</span><span class="na">insertInto</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">values</span><span class="p">(</span><span class="n">Arrays</span><span class="p">.</span><span class="na">asList</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;t&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Arrays</span><span class="p">.</span><span class="na">asList</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test 4&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>You can also insert JSON-formatted data by calling the <code class="docutils literal notranslate"><span class="pre">json</span></code> function &amp; passing the data:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">insertInto</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">json</span><span class="p">(</span><span class="s">&quot;{\&quot;id\&quot;:4, \&quot;t\&quot;:\&quot;test 4\&quot;}&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code> also allows generation of the statement that use lightweight
+transactions (LWT) to check that inserted data doesn’t exist yet.  You just need to add
+the call to <code class="docutils literal notranslate"><span class="pre">ifNotExists</span></code> to the statement:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">insertInto</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">value</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">).</span><span class="na">ifNotExists</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>It is also possible to specify additional metadata for inserted data, such as TTL (time to live) or
+timestamp.  This is achieved with the <code class="docutils literal notranslate"><span class="pre">using</span></code> method and providing the <code class="docutils literal notranslate"><span class="pre">Using</span></code>
+object that is generated either by <code class="docutils literal notranslate"><span class="pre">ttl</span></code>, or <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> functions of the <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code> class. If
+you want to specify both, you need to chain them together with the <code class="docutils literal notranslate"><span class="pre">and</span></code> operator:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">insertInto</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">value</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">).</span><span class="na">using</span><span class="p">(</span><span class="n">ttl</span><span class="p">(</span><span class="mi">10</span><span class="p">)).</span><span class="na">and</span><span class="p">(</span><span class="n">timestamp</span><span class="p">(</span><span class="mi">1000</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Besides this, for newer versions of Cassandra it’s possible to specify additional
+parameters, such as <code class="docutils literal notranslate"><span class="pre">DEFAULT</span> <span class="pre">UNSET</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">DEFAULT</span> <span class="pre">NULL</span></code> in the <code class="docutils literal notranslate"><span class="pre">INSERT</span> <span class="pre">INTO</span> <span class="pre">...</span> <span class="pre">JSON</span></code>
+statements, by using <code class="docutils literal notranslate"><span class="pre">defaultUnset</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">defaultNull</span></code> correspondingly.</p>
+</section>
+<section id="update-statements">
+<h2>Update statements<a class="headerlink" href="#update-statements" title="Link to this heading">¶</a></h2>
+<p>Updating the data is also relatively straightforward: you specify the data to update,
+condition, and additional options if necessary:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">updateStatement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">update</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">with</span><span class="p">(</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>The first update operation is passed as an argument to the <code class="docutils literal notranslate"><span class="pre">with</span></code> function, and additional
+operations could be chained via <code class="docutils literal notranslate"><span class="pre">and</span></code> calls:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">updateStatement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">update</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">with</span><span class="p">(</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;t&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test 1&quot;</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">and</span><span class="p">(</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">)).</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Besides the most often used <code class="docutils literal notranslate"><span class="pre">set</span></code> operation, there is a lot of operations for work with
+all types of collections (lists, maps &amp; sets): <code class="docutils literal notranslate"><span class="pre">add</span></code>, <code class="docutils literal notranslate"><span class="pre">discard</span></code>, <code class="docutils literal notranslate"><span class="pre">prepend</span></code>, <code class="docutils literal notranslate"><span class="pre">put</span></code>,
+<code class="docutils literal notranslate"><span class="pre">remove</span></code>, <code class="docutils literal notranslate"><span class="pre">setIdx</span></code>, etc.  For the full list of operations, see the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/querybuilder/QueryBuilder.html">QueryBuilder</a>’s documentation.</p>
+<p>To update counters you can use the <code class="docutils literal notranslate"><span class="pre">incr</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">decr</span></code> functions that take the column name,
+and the value by which column will be increased or decreased:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">update</span><span class="p">(</span><span class="s">&quot;counters&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">with</span><span class="p">(</span><span class="n">incr</span><span class="p">(</span><span class="s">&quot;counter&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)).</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Similarly to insert statements, it’s also possible to perform conditional updates by
+calling either <code class="docutils literal notranslate"><span class="pre">ifExists</span></code> (to perform the update only if the entry exists), or by calling
+<code class="docutils literal notranslate"><span class="pre">onlyIf</span></code> with a <code class="docutils literal notranslate"><span class="pre">Clause</span></code> object–in this case the row will be updated only if the clause
+returns true:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Statement</span><span class="w"> </span><span class="n">updateStatement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">update</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">).</span><span class="na">with</span><span class="p">(</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;t&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test 1&quot;</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)).</span><span class="na">ifExists</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Setting the TTL &amp; write timestamp is done the same way as for insert statements.</p>
+</section>
+<section id="deleting-data">
+<h2>Deleting data<a class="headerlink" href="#deleting-data" title="Link to this heading">¶</a></h2>
+<p>You can delete either the whole row matching your condition:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">deleteStmt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">delete</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">)</span>
+<span class="w">                              </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="p">)).</span><span class="na">and</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;txt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>or specify a list of columns to delete:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">deleteStmt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">delete</span><span class="p">(</span><span class="s">&quot;col1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;col2&quot;</span><span class="p">).</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">)</span>
+<span class="w">                              </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;1&quot;</span><span class="p">)).</span><span class="na">and</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;txt&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Specification of conditions is similar to the other operations described above, including
+conditional deletes with <code class="docutils literal notranslate"><span class="pre">ifExists</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">onlyIf</span></code>.</p>
+</section>
+<section id="prepared-statements">
+<h2>Prepared statements<a class="headerlink" href="#prepared-statements" title="Link to this heading">¶</a></h2>
+<p>If you’re repeating the same operation very often, the more effective way will be to
+create a <a class="reference external" href="../prepared/">prepared statement</a> from the <code class="docutils literal notranslate"><span class="pre">BuiltStatement</span></code>. To do this, instead
+of the real values, use bind markers created either by calling <code class="docutils literal notranslate"><span class="pre">bindMarker</span></code> (which generates
+a positional placeholder), or by calling <code class="docutils literal notranslate"><span class="pre">bindMarker(&quot;name&quot;)</span></code> (which creates a named
+placeholder).  After the statement is generated, just prepare it as usual, then bind, and
+execute:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BuiltStatement</span><span class="w"> </span><span class="n">selectOne2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;test&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;test&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">bindMarker</span><span class="p">()));</span>
+<span class="n">PreparedStatement</span><span class="w"> </span><span class="n">preparedStatement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="n">selectOne2</span><span class="p">);</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">preparedStatement</span><span class="p">.</span><span class="na">bind</span><span class="p">(</span><span class="mi">1</span><span class="p">));</span>
+</pre></div>
+</div>
+</section>
+<section id="setting-additional-options">
+<h2>Setting additional options<a class="headerlink" href="#setting-additional-options" title="Link to this heading">¶</a></h2>
+<p>As in the case of regular statements, you can also set options on built statements,
+such as the consistency level (with <code class="docutils literal notranslate"><span class="pre">setConsistencyLevel</span></code>), enable/disable tracing
+(with <code class="docutils literal notranslate"><span class="pre">enableTracing</span></code>/<code class="docutils literal notranslate"><span class="pre">disableTracing</span></code>), specify retry policy (with <code class="docutils literal notranslate"><span class="pre">setRetryPolicy</span></code>), etc.</p>
+<p>Note: the call to these functions changes the object type from <code class="docutils literal notranslate"><span class="pre">BuiltStatement</span></code> to
+<code class="docutils literal notranslate"><span class="pre">Statement</span></code> or <code class="docutils literal notranslate"><span class="pre">RegularStatement</span></code>, so you won’t be able to use functions specific to
+<code class="docutils literal notranslate"><span class="pre">BuiltStatement</span></code> without explicit casting.</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Built statements&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.10.2.x/manual/statements/built/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../prepared/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Prepared statements
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../batch/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Batch statements
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.10.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Statements</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Built statements&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.10.2.x/manual/statements/built/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/statements/built/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Built statements</a><ul>
+<li><a class="reference internal" href="#basics">Basics</a></li>
+<li><a class="reference internal" href="#selecting-data">Selecting data</a><ul>
+<li><a class="reference internal" href="#specifying-conditions">Specifying conditions</a></li>
+<li><a class="reference internal" href="#other-selection-options">Other selection options</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#inserting-data">Inserting data</a></li>
+<li><a class="reference internal" href="#update-statements">Update statements</a></li>
+<li><a class="reference internal" href="#deleting-data">Deleting data</a></li>
+<li><a class="reference internal" href="#prepared-statements">Prepared statements</a></li>
+<li><a class="reference internal" href="#setting-additional-options">Setting additional options</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

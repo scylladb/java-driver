@@ -1,0 +1,1228 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Configuration | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/core/configuration/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Core driver
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Configuration</span>
+</div>
+                    </div>
+                
+                <section id="configuration">
+<h1>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h1>
+<section id="quick-overview">
+<h2>Quick overview<a class="headerlink" href="#quick-overview" title="Link to this heading">¶</a></h2>
+<p>The driver’s configuration is composed of options, organized in a hierarchical manner. Optionally,
+it can define <em>profiles</em> that customize a set of options for a particular kind of request.</p>
+<ul class="simple">
+<li><p>the default implementation is based on the Typesafe Config framework:</p>
+<ul>
+<li><p>the driver JAR comes with a <a class="reference external" href="reference/">reference.conf</a> file that defines the defaults.</p></li>
+<li><p>you can add an <code class="docutils literal notranslate"><span class="pre">application.conf</span></code> file in the classpath (or an absolute path, or an URL). It
+only needs to contain the options that you override.</p></li>
+<li><p>hot reloading is supported out of the box.</p></li>
+</ul>
+</li>
+<li><p>the config mechanism can be completely overridden by implementing a set of driver interfaces
+(<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfig.html">DriverConfig</a>, <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverExecutionProfile.html">DriverExecutionProfile</a> and <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html">DriverConfigLoader</a>)</p></li>
+</ul>
+</section>
+<hr class="docutils" />
+<section id="concepts">
+<h2>Concepts<a class="headerlink" href="#concepts" title="Link to this heading">¶</a></h2>
+<section id="options">
+<h3>Options<a class="headerlink" href="#options" title="Link to this heading">¶</a></h3>
+<p>Essentially, an option is a path in the configuration with an expected type, for example
+<code class="docutils literal notranslate"><span class="pre">basic.request.timeout</span></code>, representing a duration.</p>
+</section>
+<section id="execution-profiles">
+<h3>Execution profiles<a class="headerlink" href="#execution-profiles" title="Link to this heading">¶</a></h3>
+<p>Imagine an application that does both transactional and analytical requests. Transactional requests
+are simpler and must return quickly, so they will typically use a short timeout, let’s say 100
+milliseconds; analytical requests are more complex and less frequent so a higher SLA is acceptable,
+for example 5 seconds. In addition, maybe you want to use a different consistency level.</p>
+<p>Instead of manually adjusting the options on every request, you can create execution profiles:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span> <span class="p">{</span>
+  <span class="n">profiles</span> <span class="p">{</span>
+    <span class="n">oltp</span> <span class="p">{</span>
+      <span class="n">basic</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="mi">100</span> <span class="n">milliseconds</span>
+      <span class="n">basic</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">consistency</span> <span class="o">=</span> <span class="n">ONE</span>
+    <span class="p">}</span>
+    <span class="n">olap</span> <span class="p">{</span>
+      <span class="n">basic</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="mi">5</span> <span class="n">seconds</span>
+      <span class="n">basic</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">consistency</span> <span class="o">=</span> <span class="n">QUORUM</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Now each request only needs a profile name:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">SimpleStatement</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span>
+<span class="w">  </span><span class="n">SimpleStatement</span><span class="p">.</span><span class="na">builder</span><span class="p">(</span><span class="s">&quot;SELECT name FROM user WHERE id = 1&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="na">setExecutionProfileName</span><span class="p">(</span><span class="s">&quot;oltp&quot;</span><span class="p">)</span>
+<span class="w">      </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The configuration has an anonymous <em>default profile</em> that is always present. It can define an
+arbitrary number of named profiles. They inherit from the default profile, so you only need to
+override the options that have a different value.</p>
+</section>
+</section>
+<section id="default-implementation-typesafe-config">
+<h2>Default implementation: Typesafe Config<a class="headerlink" href="#default-implementation-typesafe-config" title="Link to this heading">¶</a></h2>
+<p>Out of the box, the driver uses <a class="reference external" href="https://github.com/typesafehub/config">Typesafe Config</a>.</p>
+<p>It looks at the following locations, according to the <a class="reference external" href="https://github.com/typesafehub/config#standard-behavior">standard behavior</a>
+of that library:</p>
+<ul class="simple">
+<li><p>system properties</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">application.conf</span></code> (all resources on the classpath with this name)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">application.json</span></code> (all resources on the classpath with this name)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">application.properties</span></code> (all resources on the classpath with this name)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reference.conf</span></code> (all resources on the classpath with this name)</p></li>
+</ul>
+<p>The driver ships with a <a class="reference external" href="reference/">reference.conf</a> that defines sensible defaults for all the options. That
+file is heavily documented, so refer to it for details about each option. It is included in the core
+driver JAR, so it is in your application’s classpath. If you need to customize something, add an
+<code class="docutils literal notranslate"><span class="pre">application.conf</span></code> to the classpath. There are various ways to do it:</p>
+<ul class="simple">
+<li><p>place the file in a directory that is on your application or application server’s classpath
+(<a class="reference external" href="https://stackoverflow.com/questions/1300780/adding-a-directory-to-tomcat-classpath">example for Apache Tomcat</a>);</p></li>
+<li><p>if you use Maven, place it in the <code class="docutils literal notranslate"><span class="pre">src/main/resources</span></code> directory.</p></li>
+</ul>
+<p>Since <code class="docutils literal notranslate"><span class="pre">application.conf</span></code> inherits from <code class="docutils literal notranslate"><span class="pre">reference.conf</span></code>, you only need to redeclare what you
+override:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Sample application.conf: overrides one option and adds a profile</span>
+<span class="n">datastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span> <span class="p">{</span>
+  <span class="n">advanced</span><span class="o">.</span><span class="n">protocol</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="n">V4</span>
+  <span class="n">profiles</span> <span class="p">{</span>
+    <span class="n">slow</span> <span class="p">{</span>
+      <span class="n">basic</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="mi">10</span> <span class="n">seconds</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">.conf</span></code> files are in the <em>HOCON</em> format, an improved superset of JSON; refer to the
+<a class="reference external" href="https://github.com/typesafehub/config/blob/master/HOCON.md">HOCON spec</a> for details.</p>
+<p>By default, configuration files are reloaded regularly, and the driver will adjust to the new values
+(on a “best effort” basis: some options, like protocol version and policy configurations, cannot be
+changed at runtime and will be ignored). The reload interval is defined in the configuration:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># To disable periodic reloading, set this to 0.</span>
+<span class="n">datastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span><span class="o">.</span><span class="n">basic</span><span class="o">.</span><span class="n">config</span><span class="o">-</span><span class="n">reload</span><span class="o">-</span><span class="n">interval</span> <span class="o">=</span> <span class="mi">5</span> <span class="n">minutes</span>
+</pre></div>
+</div>
+<p>As mentioned previously, system properties can also be used to override individual options. This is
+great for temporary changes, for example in your development environment:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># Increase heartbeat interval to limit the amount of debug logs:</span>
+<span class="n">java</span> <span class="o">-</span><span class="n">Ddatastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span><span class="o">.</span><span class="n">advanced</span><span class="o">.</span><span class="n">heartbeat</span><span class="o">.</span><span class="n">interval</span><span class="o">=</span><span class="s2">&quot;5 minutes&quot;</span> <span class="o">...</span>
+</pre></div>
+</div>
+<p>For array options, provide each element separately by appending an index to the path:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">Ddatastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span><span class="o">.</span><span class="n">basic</span><span class="o">.</span><span class="n">contact</span><span class="o">-</span><span class="n">points</span><span class="mf">.0</span><span class="o">=</span><span class="s2">&quot;127.0.0.1:9042&quot;</span>
+<span class="o">-</span><span class="n">Ddatastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span><span class="o">.</span><span class="n">basic</span><span class="o">.</span><span class="n">contact</span><span class="o">-</span><span class="n">points</span><span class="mf">.1</span><span class="o">=</span><span class="s2">&quot;127.0.0.2:9042&quot;</span>
+</pre></div>
+</div>
+<p>We recommend reserving system properties for the early phases of the project; in production, having
+all the configuration in one place will make it easier to manage and review.</p>
+<p>As shown so far, all options live under a <code class="docutils literal notranslate"><span class="pre">datastax-java-driver</span></code> prefix. This can be changed, for
+example if you need multiple driver instances in the same VM with different configurations. See the
+<a class="reference external" href="#changing-the-config-prefix">Advanced topics</a> section.</p>
+<section id="alternate-application-config-locations">
+<h3>Alternate application config locations<a class="headerlink" href="#alternate-application-config-locations" title="Link to this heading">¶</a></h3>
+<p>If loading <code class="docutils literal notranslate"><span class="pre">application.conf</span></code> from the classpath doesn’t work for you, other loader implementations
+are available:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html#fromClasspath-java.lang.String-">DriverConfigLoader.fromClasspath</a>: still load from the classpath, but use a different resource
+name. For example “config” will try to load <code class="docutils literal notranslate"><span class="pre">config.conf</span></code>, <code class="docutils literal notranslate"><span class="pre">config.json</span></code> or <code class="docutils literal notranslate"><span class="pre">config.properties</span></code>.</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html#fromFile-java.io.File-">DriverConfigLoader.fromFile</a>: load from a file on the local filesystem.</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html#fromUrl-java.net.URL-">DriverConfigLoader.fromUrl</a>: load from a URL.</p></li>
+</ul>
+<p>To use any of those loaders, pass it to the session builder:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">File</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">File</span><span class="p">(</span><span class="s">&quot;/path/to/application.conf&quot;</span><span class="p">);</span>
+<span class="n">CqlSession</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CqlSession</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">withConfigLoader</span><span class="p">(</span><span class="n">DriverConfigLoader</span><span class="p">.</span><span class="na">fromFile</span><span class="p">(</span><span class="n">file</span><span class="p">))</span>
+<span class="w">    </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Apart from application-specific configuration, they work exactly like the default loader: they
+fall back to the driver’s built-in <code class="docutils literal notranslate"><span class="pre">reference.conf</span></code> for defaults, accept overrides via system
+properties, and reload at the interval specified by the <code class="docutils literal notranslate"><span class="pre">basic.config-reload-interval</span></code> option.</p>
+</section>
+<section id="programmatic-application-config">
+<h3>Programmatic application config<a class="headerlink" href="#programmatic-application-config" title="Link to this heading">¶</a></h3>
+<p>Alternatively, you can use <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html#programmaticBuilder--">DriverConfigLoader.programmaticBuilder</a> to specify configuration options
+programmatically instead of loading them from a static resource:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">DriverConfigLoader</span><span class="w"> </span><span class="n">loader</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">DriverConfigLoader</span><span class="p">.</span><span class="na">programmaticBuilder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withDuration</span><span class="p">(</span><span class="n">DefaultDriverOption</span><span class="p">.</span><span class="na">REQUEST_TIMEOUT</span><span class="p">,</span><span class="w"> </span><span class="n">Duration</span><span class="p">.</span><span class="na">ofSeconds</span><span class="p">(</span><span class="mi">5</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">startProfile</span><span class="p">(</span><span class="s">&quot;slow&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withDuration</span><span class="p">(</span><span class="n">DefaultDriverOption</span><span class="p">.</span><span class="na">REQUEST_TIMEOUT</span><span class="p">,</span><span class="w"> </span><span class="n">Duration</span><span class="p">.</span><span class="na">ofSeconds</span><span class="p">(</span><span class="mi">30</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">endProfile</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+<span class="n">CqlSession</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CqlSession</span><span class="p">.</span><span class="na">builder</span><span class="p">().</span><span class="na">withConfigLoader</span><span class="p">(</span><span class="n">loader</span><span class="p">).</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This is useful for frameworks and tools that already have their own configuration mechanism.</p>
+</section>
+</section>
+<section id="the-configuration-api">
+<h2>The configuration API<a class="headerlink" href="#the-configuration-api" title="Link to this heading">¶</a></h2>
+<p>You don’t need the configuration API for everyday usage of the driver, but it can be useful if:</p>
+<ul class="simple">
+<li><p>you’re writing custom policies or a custom config implementation;</p></li>
+<li><p>use dynamic profiles (see below);</p></li>
+<li><p>or simply want to read configuration options at runtime.</p></li>
+</ul>
+<section id="basics">
+<h3>Basics<a class="headerlink" href="#basics" title="Link to this heading">¶</a></h3>
+<p>The driver’s context exposes a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfig.html">DriverConfig</a> instance:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">DriverConfig</span><span class="w"> </span><span class="n">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getConfig</span><span class="p">();</span>
+<span class="n">DriverExecutionProfile</span><span class="w"> </span><span class="n">defaultProfile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="na">getDefaultProfile</span><span class="p">();</span>
+<span class="n">DriverExecutionProfile</span><span class="w"> </span><span class="n">olapProfile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="na">getProfile</span><span class="p">(</span><span class="s">&quot;olap&quot;</span><span class="p">);</span>
+
+<span class="n">config</span><span class="p">.</span><span class="na">getProfiles</span><span class="p">().</span><span class="na">forEach</span><span class="p">((</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="n">profile</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">...);</span>
+</pre></div>
+</div>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverExecutionProfile.html">DriverExecutionProfile</a> has typed option getters:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Duration</span><span class="w"> </span><span class="n">requestTimeout</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">defaultProfile</span><span class="p">.</span><span class="na">getDuration</span><span class="p">(</span><span class="n">DefaultDriverOption</span><span class="p">.</span><span class="na">REQUEST_TIMEOUT</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">maxRequestsPerConnection</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">defaultProfile</span><span class="p">.</span><span class="na">getInt</span><span class="p">(</span><span class="n">DefaultDriverOption</span><span class="p">.</span><span class="na">CONNECTION_MAX_REQUESTS</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="manual-reloading">
+<h3>Manual reloading<a class="headerlink" href="#manual-reloading" title="Link to this heading">¶</a></h3>
+<p>In addition to periodic reloading, you can trigger a reload programmatically. This returns a
+<code class="docutils literal notranslate"><span class="pre">CompletionStage</span></code> that you can use for example to register a callback when the reload is complete:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">DriverConfigLoader</span><span class="w"> </span><span class="n">loader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getConfigLoader</span><span class="p">();</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">loader</span><span class="p">.</span><span class="na">supportsReloading</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">CompletionStage</span><span class="o">&lt;</span><span class="n">Boolean</span><span class="o">&gt;</span><span class="w"> </span><span class="n">reloaded</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loader</span><span class="p">.</span><span class="na">reload</span><span class="p">();</span>
+<span class="w">  </span><span class="n">reloaded</span><span class="p">.</span><span class="na">whenComplete</span><span class="p">(</span>
+<span class="w">      </span><span class="p">(</span><span class="n">configChanged</span><span class="p">,</span><span class="w"> </span><span class="n">error</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">error</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="c1">// handle error</span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">configChanged</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="c1">// do something after the config change</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">});</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Manual reloading is optional, this can be checked with <code class="docutils literal notranslate"><span class="pre">supportsReloading()</span></code>; the driver’s built-in
+loader supports it.</p>
+</section>
+<section id="derived-profiles">
+<h3>Derived profiles<a class="headerlink" href="#derived-profiles" title="Link to this heading">¶</a></h3>
+<p>Execution profiles are hard-coded in the configuration, and can’t be changed at runtime (except
+by modifying and reloading the files). What if you want to adjust an option for a single request,
+without having a dedicated profile for it?</p>
+<p>To allow this, you start from an existing profile in the configuration and build a <em>derived profile</em>
+that overrides a subset of options:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">DriverExecutionProfile</span><span class="w"> </span><span class="n">defaultProfile</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getConfig</span><span class="p">().</span><span class="na">getDefaultProfile</span><span class="p">();</span>
+<span class="n">DriverExecutionProfile</span><span class="w"> </span><span class="n">dynamicProfile</span><span class="w"> </span><span class="o">=</span>
+<span class="w">  </span><span class="n">defaultProfile</span><span class="p">.</span><span class="na">withString</span><span class="p">(</span>
+<span class="w">      </span><span class="n">DefaultDriverOption</span><span class="p">.</span><span class="na">REQUEST_CONSISTENCY</span><span class="p">,</span><span class="w"> </span><span class="n">DefaultConsistencyLevel</span><span class="p">.</span><span class="na">EACH_QUORUM</span><span class="p">.</span><span class="na">name</span><span class="p">());</span>
+<span class="n">SimpleStatement</span><span class="w"> </span><span class="n">s</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">SimpleStatement</span><span class="p">.</span><span class="na">builder</span><span class="p">(</span><span class="s">&quot;SELECT name FROM user WHERE id = 1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setExecutionProfile</span><span class="p">(</span><span class="n">dynamicProfile</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">s</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>A derived profile keeps a reference to its base profile, and reflects the change if the
+configuration gets reloaded.</p>
+<p>Do not overuse derived profiles, as they can have an impact on performance: each <code class="docutils literal notranslate"><span class="pre">withXxx</span></code> method
+creates a new copy, and propagating the changes from the base profile also has an overhead. We
+strongly suggest defining all your profiles ahead of time in the configuration file; at the very
+least, try to cache derived profiles if you reuse them multiple times.</p>
+</section>
+</section>
+<section id="advanced-topics">
+<h2>Advanced topics<a class="headerlink" href="#advanced-topics" title="Link to this heading">¶</a></h2>
+<p><em>Note: all the features described in this section use the driver’s internal API, which is subject to
+the restrictions explained in <a class="reference external" href="../../api_conventions">API conventions</a></em>.</p>
+<section id="changing-the-config-prefix">
+<h3>Changing the config prefix<a class="headerlink" href="#changing-the-config-prefix" title="Link to this heading">¶</a></h3>
+<p>As mentioned earlier, all configuration options are looked up under the <code class="docutils literal notranslate"><span class="pre">datastax-java-driver</span></code>
+prefix. This might be a problem if you have multiple instances of the driver executing in the same
+VM, but with different configurations. What you want instead is separate option trees, like this:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># application.conf</span>
+<span class="n">session1</span> <span class="p">{</span>
+  <span class="n">basic</span><span class="o">.</span><span class="n">session</span><span class="o">-</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;session1&quot;</span>
+  <span class="n">advanced</span><span class="o">.</span><span class="n">protocol</span><span class="o">-</span><span class="n">version</span> <span class="o">=</span> <span class="n">V4</span>
+  <span class="o">//</span> <span class="n">etc</span><span class="o">.</span>
+<span class="p">}</span>
+<span class="n">session2</span> <span class="p">{</span>
+  <span class="n">basic</span><span class="o">.</span><span class="n">session</span><span class="o">-</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;session2&quot;</span>
+  <span class="n">advanced</span><span class="o">.</span><span class="n">protocol</span><span class="o">-</span><span class="n">version</span> <span class="o">=</span> <span class="n">V3</span>
+  <span class="o">//</span> <span class="n">etc</span><span class="o">.</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>To achieve that, first write a method that loads the configuration under your prefix, and uses the
+driver’s <code class="docutils literal notranslate"><span class="pre">reference.conf</span></code> as a fallback:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.typesafe.config.Config</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.typesafe.config.ConfigFactory</span><span class="p">;</span>
+
+<span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="n">Config</span><span class="w"> </span><span class="nf">loadConfig</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">prefix</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Make sure we see the changes when reloading: </span>
+<span class="w">  </span><span class="n">ConfigFactory</span><span class="p">.</span><span class="na">invalidateCaches</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// Every config file in the classpath, without stripping the prefixes </span>
+<span class="w">  </span><span class="n">Config</span><span class="w"> </span><span class="n">root</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ConfigFactory</span><span class="p">.</span><span class="na">load</span><span class="p">();</span>
+
+<span class="w">  </span><span class="c1">// The driver&#39;s built-in defaults, under the default prefix in reference.conf:</span>
+<span class="w">  </span><span class="n">Config</span><span class="w"> </span><span class="n">reference</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="na">getConfig</span><span class="p">(</span><span class="s">&quot;datastax-java-driver&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Everything under your custom prefix in application.conf:</span>
+<span class="w">  </span><span class="n">Config</span><span class="w"> </span><span class="n">application</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">root</span><span class="p">.</span><span class="na">getConfig</span><span class="p">(</span><span class="n">prefix</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">application</span><span class="p">.</span><span class="na">withFallback</span><span class="p">(</span><span class="n">reference</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Next, create a <code class="docutils literal notranslate"><span class="pre">DriverConfigLoader</span></code>. This is the component that abstracts the configuration
+implementation to the rest of the driver. Here we use the built-in class, but tell it to load the
+Typesafe Config object with the previous method:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.core.config.DefaultDriverOption</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.core.config.DriverConfigLoader</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfigLoader</span><span class="p">;</span>
+
+<span class="n">DriverConfigLoader</span><span class="w"> </span><span class="n">session1ConfigLoader</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="k">new</span><span class="w"> </span><span class="n">DefaultDriverConfigLoader</span><span class="p">(</span>
+<span class="w">        </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">loadConfig</span><span class="p">(</span><span class="s">&quot;session1&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">DefaultDriverOption</span><span class="p">.</span><span class="na">values</span><span class="p">());</span>
+</pre></div>
+</div>
+<p>Finally, pass the config loader when building the driver:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">CqlSession</span><span class="w"> </span><span class="n">session1</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">CqlSession</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withConfigLoader</span><span class="p">(</span><span class="n">session1ConfigLoader</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="loading-from-a-different-source">
+<h3>Loading from a different source<a class="headerlink" href="#loading-from-a-different-source" title="Link to this heading">¶</a></h3>
+<p>If you don’t want to use a config file, you can write custom code to create the Typesafe <code class="docutils literal notranslate"><span class="pre">Config</span></code>
+object (refer to the <a class="reference external" href="https://github.com/typesafehub/config">documentation</a> for more details).</p>
+<p>Then reuse the examples from the previous section to merge it with the driver’s reference file, and
+pass it to the driver. Here’s a contrived example that loads the configuration from a string:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">String</span><span class="w"> </span><span class="n">configSource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;protocol.version = V3&quot;</span><span class="p">;</span>
+<span class="n">DriverConfigLoader</span><span class="w"> </span><span class="n">loader</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="k">new</span><span class="w"> </span><span class="n">DefaultDriverConfigLoader</span><span class="p">(</span>
+<span class="w">        </span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="n">ConfigFactory</span><span class="p">.</span><span class="na">invalidateCaches</span><span class="p">();</span>
+<span class="w">          </span><span class="n">Config</span><span class="w"> </span><span class="n">reference</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ConfigFactory</span><span class="p">.</span><span class="na">load</span><span class="p">().</span><span class="na">getConfig</span><span class="p">(</span><span class="s">&quot;datastax-java-driver&quot;</span><span class="p">);</span>
+<span class="w">          </span><span class="n">Config</span><span class="w"> </span><span class="n">application</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ConfigFactory</span><span class="p">.</span><span class="na">parseString</span><span class="p">(</span><span class="n">configSource</span><span class="p">);</span>
+<span class="w">          </span><span class="k">return</span><span class="w"> </span><span class="n">application</span><span class="p">.</span><span class="na">withFallback</span><span class="p">(</span><span class="n">reference</span><span class="p">);</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="n">DefaultDriverOption</span><span class="p">.</span><span class="na">values</span><span class="p">());</span>
+
+<span class="n">CqlSession</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CqlSession</span><span class="p">.</span><span class="na">builder</span><span class="p">().</span><span class="na">withConfigLoader</span><span class="p">(</span><span class="n">loader</span><span class="p">).</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="bypassing-typesafe-config">
+<h3>Bypassing Typesafe Config<a class="headerlink" href="#bypassing-typesafe-config" title="Link to this heading">¶</a></h3>
+<p>If Typesafe Config doesn’t work for you, it is possible to get rid of it entirely.</p>
+<p>Start by excluding Typesafe Config from the list of dependencies required by the driver; if you are
+using Maven, this can be achieved as follows:</p>
+<div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;dependencies&gt;</span>
+<span class="w">    </span><span class="nt">&lt;dependency&gt;</span>
+<span class="w">        </span><span class="nt">&lt;groupId&gt;</span>com.scylladb<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;artifactId&gt;</span>java-driver-core<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">        </span><span class="nt">&lt;version&gt;</span>...<span class="nt">&lt;/version&gt;</span>
+<span class="w">        </span><span class="nt">&lt;exclusions&gt;</span>
+<span class="w">            </span><span class="nt">&lt;exclusion&gt;</span>
+<span class="w">                </span><span class="nt">&lt;groupId&gt;</span>com.typesafe<span class="nt">&lt;/groupId&gt;</span>
+<span class="w">                </span><span class="nt">&lt;artifactId&gt;</span>config<span class="nt">&lt;/artifactId&gt;</span>
+<span class="w">            </span><span class="nt">&lt;/exclusion&gt;</span>
+<span class="w">        </span><span class="nt">&lt;/exclusions&gt;</span>
+<span class="w">    </span><span class="nt">&lt;/dependency&gt;</span>
+<span class="nt">&lt;/dependencies&gt;</span>
+</pre></div>
+</div>
+<p>Next, you will need to provide your own implementations of <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfig.html">DriverConfig</a> and
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverExecutionProfile.html">DriverExecutionProfile</a>. Then write a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html">DriverConfigLoader</a> and pass it to the session at
+initialization, as shown in the previous sections. Study the built-in implementation (package
+<code class="docutils literal notranslate"><span class="pre">com.datastax.oss.driver.internal.core.config.typesafe</span></code>) for reference.</p>
+<p>Reloading is not mandatory: you can choose not to implement it, and the driver will simply keep
+using the initial configuration.</p>
+<p>Note that the option getters (<code class="docutils literal notranslate"><span class="pre">DriverExecutionProfile.getInt</span></code> and similar) are invoked very
+frequently on the hot code path; if your implementation is slow, consider caching the results
+between reloads.</p>
+</section>
+<section id="configuration-change-event">
+<h3>Configuration change event<a class="headerlink" href="#configuration-change-event" title="Link to this heading">¶</a></h3>
+<p>If you’re writing your own policies, you might want them to be reactive to configuration changes.
+You can register a callback to <code class="docutils literal notranslate"><span class="pre">ConfigChangeEvent</span></code>, which gets emitted any time a manual or periodic
+reload detects changes since the last reload:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.internal.core.context.InternalDriverContext</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.internal.core.config.ConfigChangeEvent</span><span class="p">;</span>
+
+<span class="n">InternalDriverContext</span><span class="w"> </span><span class="n">context</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">InternalDriverContext</span><span class="p">)</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">();</span>
+
+<span class="n">Object</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">eventBus</span><span class="p">.</span><span class="na">register</span><span class="p">(</span>
+<span class="w">        </span><span class="n">ConfigChangeEvent</span><span class="p">.</span><span class="na">class</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="s">&quot;The configuration changed&quot;</span><span class="p">);</span>
+<span class="w">          </span><span class="c1">// re-read the config option(s) you&#39;re interested in, and apply changes if needed</span>
+<span class="w">        </span><span class="p">});</span>
+
+<span class="c1">// If your component has a shorter lifecycle than the driver, make sure to unregister when it closes</span>
+<span class="n">eventBus</span><span class="p">.</span><span class="na">unregister</span><span class="p">(</span><span class="n">key</span><span class="p">,</span><span class="w"> </span><span class="n">ConfigChangeEvent</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>For example, the driver uses this mechanism internally to resize connection pools if you change the
+options in <code class="docutils literal notranslate"><span class="pre">advanced.connection.pool</span></code>.</p>
+<p>The event is emitted by the config loader. If you write a custom loader, study the source of
+<code class="docutils literal notranslate"><span class="pre">DefaultDriverConfigLoader</span></code> to reproduce the behavior.</p>
+</section>
+<section id="policies">
+<h3>Policies<a class="headerlink" href="#policies" title="Link to this heading">¶</a></h3>
+<p>The preferred way to instantiate policies (load balancing policy, retry policy, etc.) is via the
+configuration:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>datastax-java-driver {
+  basic.load-balancing-policy.class = DefaultLoadBalancingPolicy
+  advanced.reconnection-policy {
+    class = ExponentialReconnectionPolicy
+    base-delay = 1 second
+    max-delay = 60 seconds
+  }
+}
+</pre></div>
+</div>
+<p>When the driver encounters such a declaration, it will load the class and use reflection to invoke a
+constructor with the following signature:</p>
+<ul>
+<li><p>for policies that can be overridden in a profile (load balancing policy, retry policy, speculative
+execution policy):</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="nf">DefaultLoadBalancingPolicy</span><span class="p">(</span><span class="n">DriverContext</span><span class="w"> </span><span class="n">context</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">profileName</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p>for session-wide policies (all the others):</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="nf">ExponentialReconnectionPolicy</span><span class="p">(</span><span class="n">DriverContext</span><span class="w"> </span><span class="n">context</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Where <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/context/DriverContext.html">DriverContext</a> is the object returned by <code class="docutils literal notranslate"><span class="pre">session.getContext()</span></code>, which allows the policy to
+access other driver components (for example the configuration).</p>
+<p>If you write custom policy implementations, you should follow that same pattern; it provides an
+elegant way to switch policies without having to recompile the application (if your policy needs
+custom options, see the next section). Study the built-in implementations for reference.</p>
+<p>If for some reason you really can’t use reflection, there is a way out; subclass
+<code class="docutils literal notranslate"><span class="pre">DefaultDriverContext</span></code> and override the corresponding method:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.internal.core.context.DefaultDriverContext</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">MyDriverContext</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">DefaultDriverContext</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="nf">MyDriverContext</span><span class="p">(</span><span class="n">DriverConfigLoader</span><span class="w"> </span><span class="n">configLoader</span><span class="p">,</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">TypeCodec</span><span class="o">&lt;?&gt;&gt;</span><span class="w"> </span><span class="n">typeCodecs</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">super</span><span class="p">(</span><span class="n">configLoader</span><span class="p">,</span><span class="w"> </span><span class="n">typeCodecs</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">protected</span><span class="w"> </span><span class="n">ReconnectionPolicy</span><span class="w"> </span><span class="nf">buildReconnectionPolicy</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">myReconnectionPolicy</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Then you’ll need to pass an instance of this context to <code class="docutils literal notranslate"><span class="pre">DefaultSession.init</span></code>. You can either do so
+directly, or subclass <code class="docutils literal notranslate"><span class="pre">SessionBuilder</span></code> and override the <code class="docutils literal notranslate"><span class="pre">buildContext</span></code> method.</p>
+</section>
+<section id="custom-options">
+<h3>Custom options<a class="headerlink" href="#custom-options" title="Link to this heading">¶</a></h3>
+<p>You can add your own options to the configuration. This is useful for custom components, or even as
+a way to associate arbitrary key/value pairs with the session instance.</p>
+<p>First, write an enum that implements <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverOption.html">DriverOption</a>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">MyCustomOption</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">DriverOption</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="n">ADMIN_NAME</span><span class="p">(</span><span class="s">&quot;admin.name&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="n">ADMIN_EMAIL</span><span class="p">(</span><span class="s">&quot;admin.email&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="n">AWESOMENESS_FACTOR</span><span class="p">(</span><span class="s">&quot;awesomeness-factor&quot;</span><span class="p">),</span>
+<span class="w">  </span><span class="p">;</span>
+
+<span class="w">  </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">path</span><span class="p">;</span>
+
+<span class="w">  </span><span class="n">MyCustomOption</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">path</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">this</span><span class="p">.</span><span class="na">path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">path</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">getPath</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">path</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can now add the options to your configuration:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">datastax</span><span class="o">-</span><span class="n">java</span><span class="o">-</span><span class="n">driver</span> <span class="p">{</span>
+  <span class="n">admin</span> <span class="p">{</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;Bob&quot;</span>
+    <span class="n">email</span> <span class="o">=</span> <span class="s2">&quot;bob@example.com&quot;</span>
+  <span class="p">}</span>
+  <span class="n">awesomeness</span><span class="o">-</span><span class="n">factor</span> <span class="o">=</span> <span class="mi">11</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>And access them from the code:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">DriverConfig</span><span class="w"> </span><span class="n">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getConfig</span><span class="p">();</span>
+<span class="n">config</span><span class="p">.</span><span class="na">getDefaultProfile</span><span class="p">().</span><span class="na">getString</span><span class="p">(</span><span class="n">MyCustomOption</span><span class="p">.</span><span class="na">ADMIN_EMAIL</span><span class="p">);</span>
+<span class="n">config</span><span class="p">.</span><span class="na">getDefaultProfile</span><span class="p">().</span><span class="na">getInt</span><span class="p">(</span><span class="n">MyCustomOption</span><span class="p">.</span><span class="na">AWESOMENESS_FACTOR</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Configuration&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.11.1.x/manual/core/configuration/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../compression/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Compression
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="reference/README.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Reference configuration
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                4.11.1.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api_conventions/index.html">API conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../case_sensitivity/index.html">Case sensitivity</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Core driver</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../authentication/index.html">Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../bom/index.html">Bill of Materials (BOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l3 current has-children current-page"><a class="current reference internal" href="#">Configuration</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="reference/README.html">Reference configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../custom_codecs/index.html">Custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../detachable_types/index.html">Detachable types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../integration/index.html">Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../metadata/index.html">Metadata</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/node/index.html">Node metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/schema/index.html">Schema metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/token/index.html">Token metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../non_blocking/index.html">Non-blocking programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance/index.html">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reactive/index.html">Reactive Style Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../request_tracker/index.html">Request tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/per_query_keyspace/index.html">Per-query keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../temporal_types/index.html">Temporal types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../throttling/index.html">Request throttling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tracing/index.html">Query tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tuples/index.html">Tuples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../developer/index.html">Developer docs</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/><label for="toctree-checkbox-6"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/admin/index.html">Administrative tasks</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../developer/common/index.html">Common infrastructure</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/><label for="toctree-checkbox-7"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/context/index.html">Driver context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/event_bus/index.html">Event bus</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/native_protocol/index.html">Native protocol layer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/netty_pipeline/index.html">Netty pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/request_execution/index.html">Request execution</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../mapper/index.html">Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/><label for="toctree-checkbox-8"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/config/index.html">Integration</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label for="toctree-checkbox-9"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/kotlin/index.html">Kotlin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/lombok/index.html">Lombok</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/record/index.html">Java 14 Records</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/scala/index.html">Scala</a></li>
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/daos/index.html">DAOs</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label for="toctree-checkbox-10"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/custom_types/index.html">Custom result types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/delete/index.html">Delete methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/getentity/index.html">GetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/increment/index.html">Increment methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/insert/index.html">Insert methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/null_saving/index.html">Null saving strategy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/query/index.html">Query methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/queryprovider/index.html">Query provider methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/select/index.html">Select methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/setentity/index.html">SetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/statement_attributes/index.html">Statement attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/update/index.html">Update methods</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/entities/index.html">Entities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/mapper/index.html">Mapper interface</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../query_builder/index.html">Query builder</a><input class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" type="checkbox"/><label for="toctree-checkbox-11"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/condition/index.html">Conditions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/delete/index.html">DELETE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/idempotence/index.html">Idempotence in the query builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/insert/index.html">INSERT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/relation/index.html">Relations</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../query_builder/schema/index.html">Schema builder</a><input class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" type="checkbox"/><label for="toctree-checkbox-12"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/aggregate/index.html">Aggregate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/function/index.html">Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/index/index.html">Index</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/keyspace/index.html">Keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/materialized_view/index.html">Materialized View</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/table/index.html">Table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/type/index.html">Type</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/select/index.html">SELECT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/term/index.html">Terms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/truncate/index.html">TRUNCATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/update/index.html">UPDATE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Configuration&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.11.1.x/manual/core/configuration/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/core/configuration/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Configuration</a><ul>
+<li><a class="reference internal" href="#quick-overview">Quick overview</a></li>
+<li><a class="reference internal" href="#concepts">Concepts</a><ul>
+<li><a class="reference internal" href="#options">Options</a></li>
+<li><a class="reference internal" href="#execution-profiles">Execution profiles</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#default-implementation-typesafe-config">Default implementation: Typesafe Config</a><ul>
+<li><a class="reference internal" href="#alternate-application-config-locations">Alternate application config locations</a></li>
+<li><a class="reference internal" href="#programmatic-application-config">Programmatic application config</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-configuration-api">The configuration API</a><ul>
+<li><a class="reference internal" href="#basics">Basics</a></li>
+<li><a class="reference internal" href="#manual-reloading">Manual reloading</a></li>
+<li><a class="reference internal" href="#derived-profiles">Derived profiles</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#advanced-topics">Advanced topics</a><ul>
+<li><a class="reference internal" href="#changing-the-config-prefix">Changing the config prefix</a></li>
+<li><a class="reference internal" href="#loading-from-a-different-source">Loading from a different source</a></li>
+<li><a class="reference internal" href="#bypassing-typesafe-config">Bypassing Typesafe Config</a></li>
+<li><a class="reference internal" href="#configuration-change-event">Configuration change event</a></li>
+<li><a class="reference internal" href="#policies">Policies</a></li>
+<li><a class="reference internal" href="#custom-options">Custom options</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

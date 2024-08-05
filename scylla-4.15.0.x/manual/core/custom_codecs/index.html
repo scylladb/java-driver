@@ -1,0 +1,1427 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Custom codecs | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/core/custom_codecs/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Core driver
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Custom codecs</span>
+</div>
+                    </div>
+                
+                <section id="custom-codecs">
+<h1>Custom codecs<a class="headerlink" href="#custom-codecs" title="Link to this heading">¶</a></h1>
+<section id="quick-overview">
+<h2>Quick overview<a class="headerlink" href="#quick-overview" title="Link to this heading">¶</a></h2>
+<p>Define custom Java to CQL mappings.</p>
+<ul>
+<li><p>implement the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/TypeCodec.html">TypeCodec</a> interface, or use one of the alternative codecs in <code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs</span></code>.</p></li>
+<li><p>registering a codec:</p>
+<ul>
+<li><p>at init time: <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/session/SessionBuilder.html#addTypeCodecs-com.datastax.oss.driver.api.core.type.codec.TypeCodec...-">CqlSession.builder().addTypeCodecs()</a></p></li>
+<li><p>at runtime:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">MutableCodecRegistry</span><span class="w"> </span><span class="n">registry</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="p">(</span><span class="n">MutableCodecRegistry</span><span class="p">)</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">();</span><span class="w">    </span>
+<span class="n">registry</span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="n">myCodec</span><span class="p">);</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p>using a codec:</p>
+<ul class="simple">
+<li><p>if already registered: <code class="docutils literal notranslate"><span class="pre">row.get(&quot;columnName&quot;,</span> <span class="pre">MyCustomType.class)</span></code></p></li>
+<li><p>otherwise: <code class="docutils literal notranslate"><span class="pre">row.get(&quot;columnName&quot;,</span> <span class="pre">myCodec)</span></code></p></li>
+</ul>
+</li>
+</ul>
+<hr class="docutils" />
+<p>Out of the box, the driver comes with <a class="reference external" href="../#cql-to-java-type-mapping">default CQL to Java mappings</a>.
+For example, if you read a CQL <code class="docutils literal notranslate"><span class="pre">text</span></code> column, it is mapped to its natural counterpart
+<code class="docutils literal notranslate"><span class="pre">java.lang.String</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// cqlsh:ks&gt; desc table test;</span>
+<span class="c1">// CREATE TABLE ks.test (k int PRIMARY KEY, v text)...</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;SELECT * FROM ks.test WHERE k = 1&quot;</span><span class="p">);</span>
+<span class="n">String</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="na">one</span><span class="p">().</span><span class="na">getString</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Sometimes you might want to use different mappings, for example:</p>
+<ul class="simple">
+<li><p>read a text column as a Java enum;</p></li>
+<li><p>map an <code class="docutils literal notranslate"><span class="pre">address</span></code> UDT to a custom <code class="docutils literal notranslate"><span class="pre">Address</span></code> class in your application;</p></li>
+<li><p>manipulate CQL collections as arrays in performance-intensive applications.</p></li>
+</ul>
+<p>Custom codecs allow you to define those dedicated mappings, and plug them into your session.</p>
+</section>
+<section id="using-alternative-codecs-provided-by-the-driver">
+<h2>Using alternative codecs provided by the driver<a class="headerlink" href="#using-alternative-codecs-provided-by-the-driver" title="Link to this heading">¶</a></h2>
+<p>The first thing you can do is use one of the many alternative codecs shipped with the driver. They
+are exposed on the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html">ExtraTypeCodecs</a> class. In this section we are going to introduce these codecs,
+then you will see how to register and use them in the next sections.</p>
+<section id="mapping-cql-blobs-to-java-arrays">
+<h3>Mapping CQL blobs to Java arrays<a class="headerlink" href="#mapping-cql-blobs-to-java-arrays" title="Link to this heading">¶</a></h3>
+<p>The driver default is <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/TypeCodecs.html#BLOB">TypeCodecs.BLOB</a>, which maps CQL <code class="docutils literal notranslate"><span class="pre">blob</span></code> to Java’s <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html">java.nio.ByteBuffer</a>.
+Check out our <a class="reference external" href="https://github.com/datastax/java-driver/blob/4.x/examples/src/main/java/com/datastax/oss/driver/examples/datatypes/Blobs.java">CQL blob example</a> to understand how to manipulate the <code class="docutils literal notranslate"><span class="pre">ByteBuffer</span></code> API correctly.</p>
+<p>If the <code class="docutils literal notranslate"><span class="pre">ByteBuffer</span></code> API is too cumbersome for you, an alternative is to use
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#BLOB_TO_ARRAY">ExtraTypeCodecs.BLOB_TO_ARRAY</a> which maps CQL blobs to Java’s <code class="docutils literal notranslate"><span class="pre">byte[]</span></code>.</p>
+</section>
+<section id="mapping-cql-lists-to-java-arrays">
+<h3>Mapping CQL lists to Java arrays<a class="headerlink" href="#mapping-cql-lists-to-java-arrays" title="Link to this heading">¶</a></h3>
+<p>By default, the driver maps CQL <code class="docutils literal notranslate"><span class="pre">list</span></code> to Java’s <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/util/List.html">java.util.List</a>. If you prefer to deal with
+arrays, the driver offers the following codecs:</p>
+<ol class="simple">
+<li><p>For primitive types:</p></li>
+</ol>
+<pre><code>| Codec | CQL type | Java type |
+|---|---|---|
+| [ExtraTypeCodecs.BOOLEAN_LIST_TO_ARRAY] | `list&lt;boolean&gt;` | `boolean[]` |
+| [ExtraTypeCodecs.BYTE_LIST_TO_ARRAY] | `list&lt;tinyint&gt;` | `byte[]` |
+| [ExtraTypeCodecs.SHORT_LIST_TO_ARRAY] | `list&lt;smallint&gt;` | `short[]` |
+| [ExtraTypeCodecs.INT_LIST_TO_ARRAY] | `list&lt;int&gt;` | `int[]` |
+| [ExtraTypeCodecs.LONG_LIST_TO_ARRAY] | `list&lt;bigint&gt;` | `long[]` |
+| [ExtraTypeCodecs.FLOAT_LIST_TO_ARRAY] | `list&lt;float&gt;` | `float[]` |
+| [ExtraTypeCodecs.DOUBLE_LIST_TO_ARRAY] | `list&lt;double&gt;` | `double[]` |
+</code></pre><ol>
+<li>For other types, you should use [ExtraTypeCodecs.listToArrayOf(TypeCodec)]; for example, to map
+   CQL <code>list&lt;text&gt;</code> to <code>String[]</code>:</li>
+</ol><div class="highlight-default notranslate"><div class="highlight"><pre><span></span>```java
+TypeCodec&lt;String[]&gt; stringArrayCodec = ExtraTypeCodecs.listToArrayOf(TypeCodecs.TEXT);
+```
+</pre></div>
+</div>
+</section>
+<section id="mapping-cql-timestamps-to-java-instant-types">
+<h3>Mapping CQL timestamps to Java “instant” types<a class="headerlink" href="#mapping-cql-timestamps-to-java-instant-types" title="Link to this heading">¶</a></h3>
+<p>By default, the driver maps CQL <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> to Java’s <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/Instant.html">java.time.Instant</a> (using
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/TypeCodecs.html#TIMESTAMP">TypeCodecs.TIMESTAMP</a>). This is the most natural mapping, since neither type contains any time zone
+information: they just represent absolute points in time.</p>
+<p>The driver also provides codecs to map to a Java <code class="docutils literal notranslate"><span class="pre">long</span></code> representing the number of milliseconds
+since the epoch (this is the raw form return by <code class="docutils literal notranslate"><span class="pre">Instant.toEpochMilli</span></code>, and also how Cassandra
+stores the value internally).</p>
+<p>In either case, you can pick the time zone that the codec will use for its <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/TypeCodec.html#format-JavaTypeT-">format()</a> and <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/TypeCodec.html#parse-java.lang.String-">parse()</a>
+methods. Note that this is only relevant for these two methods (follow the links for more
+explanations on how the driver uses them); for regular encoding and decoding, like setting a value
+on a bound statement or reading a column from a row, the time zone does not matter.</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Codec</th>
+<th>CQL type</th>
+<th>Java type</th>
+<th>Time zone used by <code>format()</code> and <code>parse()</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[TypeCodecs.TIMESTAMP]</td>
+<td><code>timestamp</code></td>
+<td><code>Instant</code></td>
+<td>System default</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.TIMESTAMP_UTC]</td>
+<td><code>timestamp</code></td>
+<td><code>Instant</code></td>
+<td>UTC</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.timestampAt(ZoneId)]</td>
+<td><code>timestamp</code></td>
+<td><code>Instant</code></td>
+<td>User-provided</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.TIMESTAMP_MILLIS_SYSTEM]</td>
+<td><code>timestamp</code></td>
+<td><code>long</code></td>
+<td>System default</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.TIMESTAMP_MILLIS_UTC]</td>
+<td><code>timestamp</code></td>
+<td><code>long</code></td>
+<td>UTC</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.timestampMillisAt(ZoneId)]</td>
+<td><code>timestamp</code></td>
+<td><code>long</code></td>
+<td>User-provided</td>
+</tr>
+</tbody>
+</table><p>For example, given the schema:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">TABLE</span> <span class="n">example</span> <span class="p">(</span><span class="n">k</span> <span class="nb">int</span> <span class="n">PRIMARY</span> <span class="n">KEY</span><span class="p">,</span> <span class="n">ts</span> <span class="n">timestamp</span><span class="p">);</span>
+<span class="n">INSERT</span> <span class="n">INTO</span> <span class="n">example</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">ts</span><span class="p">)</span> <span class="n">VALUES</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>When reading column <code class="docutils literal notranslate"><span class="pre">ts</span></code>, all <code class="docutils literal notranslate"><span class="pre">Instant</span></code> codecs return <code class="docutils literal notranslate"><span class="pre">Instant.ofEpochMilli(0)</span></code>. But if asked to
+format it, they behave differently:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs.TIMESTAMP_UTC</span></code> returns <code class="docutils literal notranslate"><span class="pre">'1970-01-01T00:00:00.000Z'</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs.timestampAt(ZoneId.of(&quot;Europe/Paris&quot;)</span></code> returns <code class="docutils literal notranslate"><span class="pre">'1970-01-01T01:00:00.000+01:00'</span></code></p></li>
+</ul>
+</section>
+<section id="mapping-cql-timestamps-to-zoneddatetime">
+<h3>Mapping CQL timestamps to <code class="docutils literal notranslate"><span class="pre">ZonedDateTime</span></code><a class="headerlink" href="#mapping-cql-timestamps-to-zoneddatetime" title="Link to this heading">¶</a></h3>
+<p>If your application works with one single, pre-determined time zone, then you probably would like
+the driver to map <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> to <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/ZonedDateTime.html">java.time.ZonedDateTime</a> with a fixed zone. Use one of the
+following codecs:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Codec</th>
+<th>CQL type</th>
+<th>Java type</th>
+<th>Time zone used by all codec operations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[ExtraTypeCodecs.ZONED_TIMESTAMP_SYSTEM]</td>
+<td><code>timestamp</code></td>
+<td><code>ZonedDateTime</code></td>
+<td>System default</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.ZONED_TIMESTAMP_UTC]</td>
+<td><code>timestamp</code></td>
+<td><code>ZonedDateTime</code></td>
+<td>UTC</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.zonedTimestampAt(ZoneId)]</td>
+<td><code>timestamp</code></td>
+<td><code>ZonedDateTime</code></td>
+<td>User-provided</td>
+</tr>
+</tbody>
+</table><p>This time, the zone matters for all codec operations, including encoding and decoding. For example,
+given the schema:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">TABLE</span> <span class="n">example</span> <span class="p">(</span><span class="n">k</span> <span class="nb">int</span> <span class="n">PRIMARY</span> <span class="n">KEY</span><span class="p">,</span> <span class="n">ts</span> <span class="n">timestamp</span><span class="p">);</span>
+<span class="n">INSERT</span> <span class="n">INTO</span> <span class="n">example</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">ts</span><span class="p">)</span> <span class="n">VALUES</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>When reading column <code class="docutils literal notranslate"><span class="pre">ts</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs.ZONED_TIMESTAMP_UTC</span></code> returns the same value as
+<code class="docutils literal notranslate"><span class="pre">ZonedDateTime.parse(&quot;1970-01-01T00:00Z&quot;)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs.zonedTimestampAt(ZoneId.of(&quot;Europe/Paris&quot;))</span></code> returns the same value as
+<code class="docutils literal notranslate"><span class="pre">ZonedDateTime.parse(&quot;1970-01-01T01:00+01:00[Europe/Paris]&quot;)</span></code></p></li>
+</ul>
+<p>These are two distinct <code class="docutils literal notranslate"><span class="pre">ZonedDateTime</span></code> instances: although they represent the same absolute point in
+time, they do not compare as equal.</p>
+</section>
+<section id="mapping-cql-timestamps-to-localdatetime">
+<h3>Mapping CQL timestamps to <code class="docutils literal notranslate"><span class="pre">LocalDateTime</span></code><a class="headerlink" href="#mapping-cql-timestamps-to-localdatetime" title="Link to this heading">¶</a></h3>
+<p>If your application works with one single, pre-determined time zone, but only exposes local
+date-times, then you probably would like the driver to map timestamps to <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/LocalDateTime.html">java.time.LocalDateTime</a>
+obtained from a fixed zone. Use one of the following codecs:</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>Codec</th>
+<th>CQL type</th>
+<th>Java type</th>
+<th>Time zone used by all codec operations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>[ExtraTypeCodecs.LOCAL_TIMESTAMP_SYSTEM]</td>
+<td><code>timestamp</code></td>
+<td><code>LocalDateTime</code></td>
+<td>System default</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.LOCAL_TIMESTAMP_UTC]</td>
+<td><code>timestamp</code></td>
+<td><code>LocalDateTime</code></td>
+<td>UTC</td>
+</tr>
+<tr>
+<td>[ExtraTypeCodecs.localTimestampAt(ZoneId)]</td>
+<td><code>timestamp</code></td>
+<td><code>LocalDateTime</code></td>
+<td>User-provided</td>
+</tr>
+</tbody>
+</table><p>Again, the zone matters for all codec operations, including encoding and decoding. For example,
+given the schema:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">TABLE</span> <span class="n">example</span> <span class="p">(</span><span class="n">k</span> <span class="nb">int</span> <span class="n">PRIMARY</span> <span class="n">KEY</span><span class="p">,</span> <span class="n">ts</span> <span class="n">timestamp</span><span class="p">);</span>
+<span class="n">INSERT</span> <span class="n">INTO</span> <span class="n">example</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">ts</span><span class="p">)</span> <span class="n">VALUES</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>When reading column <code class="docutils literal notranslate"><span class="pre">ts</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs.LOCAL_TIMESTAMP_UTC</span></code> returns <code class="docutils literal notranslate"><span class="pre">LocalDateTime.of(1970,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">0,</span> <span class="pre">0)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs.localTimestampAt(ZoneId.of(&quot;Europe/Paris&quot;))</span></code> returns <code class="docutils literal notranslate"><span class="pre">LocalDateTime.of(1970,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">0)</span></code></p></li>
+</ul>
+</section>
+<section id="storing-the-time-zone-in-cassandra">
+<h3>Storing the time zone in Cassandra<a class="headerlink" href="#storing-the-time-zone-in-cassandra" title="Link to this heading">¶</a></h3>
+<p>If your application needs to remember the time zone that each date was entered with, you need to
+store it in the database. We suggest using a <code class="docutils literal notranslate"><span class="pre">tuple&lt;timestamp,</span> <span class="pre">text&gt;</span></code>, where the second component
+holds the <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/ZoneId.html">zone id</a>.</p>
+<p>If you follow this guideline, then you can use <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#ZONED_TIMESTAMP_PERSISTED">ExtraTypeCodecs.ZONED_TIMESTAMP_PERSISTED</a> to map
+the CQL tuple to <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/time/ZonedDateTime.html">java.time.ZonedDateTime</a>.</p>
+<p>For example, given the schema:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">TABLE</span> <span class="n">example</span><span class="p">(</span><span class="n">k</span> <span class="nb">int</span> <span class="n">PRIMARY</span> <span class="n">KEY</span><span class="p">,</span> <span class="n">zts</span> <span class="nb">tuple</span><span class="o">&lt;</span><span class="n">timestamp</span><span class="p">,</span> <span class="n">text</span><span class="o">&gt;</span><span class="p">);</span>
+<span class="n">INSERT</span> <span class="n">INTO</span> <span class="n">example</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">zts</span><span class="p">)</span> <span class="n">VALUES</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;Z&#39;</span><span class="p">));</span>
+<span class="n">INSERT</span> <span class="n">INTO</span> <span class="n">example</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">zts</span><span class="p">)</span> <span class="n">VALUES</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">3600000</span><span class="p">,</span> <span class="s1">&#39;Europe/Paris&#39;</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>When reading column <code class="docutils literal notranslate"><span class="pre">zts</span></code>, <code class="docutils literal notranslate"><span class="pre">ExtraTypeCodecs.ZONED_TIMESTAMP_PERSISTED</span></code> returns:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ZonedDateTime.parse(&quot;1970-01-01T00:00Z&quot;)</span></code> for the first row</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ZonedDateTime.parse(&quot;1970-01-01T00:00+01:00[Europe/Paris]&quot;)</span></code> for the second row</p></li>
+</ul>
+<p>Each value is read back in the time zone that it was written with. But note that you can still
+compare rows on a absolute timeline with the <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> component of the tuple.</p>
+</section>
+<section id="mapping-to-optional-instead-of-null">
+<h3>Mapping to <code class="docutils literal notranslate"><span class="pre">Optional</span></code> instead of <code class="docutils literal notranslate"><span class="pre">null</span></code><a class="headerlink" href="#mapping-to-optional-instead-of-null" title="Link to this heading">¶</a></h3>
+<p>If you prefer to deal with <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/util/Optional.html">java.util.Optional</a> in your application instead of nulls, then you can
+use <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#optionalOf-com.datastax.oss.driver.api.core.type.codec.TypeCodec-">ExtraTypeCodecs.optionalOf(TypeCodec)</a>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">Optional</span><span class="o">&lt;</span><span class="n">UUID</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">optionalUuidCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">optionalOf</span><span class="p">(</span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">UUID</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note that because the CQL native protocol does not distinguish empty collections from null
+collection references, this codec will also map empty collections to <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/util/Optional.html#empty--">Optional.empty()</a>.</p>
+</section>
+<section id="mapping-java-enums">
+<h3>Mapping Java Enums<a class="headerlink" href="#mapping-java-enums" title="Link to this heading">¶</a></h3>
+<p>Java <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html">Enums</a> can be mapped to CQL in two ways:</p>
+<ol>
+<li><p>By name: <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#enumNamesOf-java.lang.Class-">ExtraTypeCodecs.enumNamesOf(Class)</a> will create a codec for a given <code class="docutils literal notranslate"><span class="pre">Enum</span></code> class that
+maps its constants to their <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html#name--">programmatic names</a>. The corresponding CQL column must be
+of type <code class="docutils literal notranslate"><span class="pre">text</span></code>. Note that this codec relies on the enum constant names; it is therefore vital that
+enum names never change.</p></li>
+<li><p>By ordinal: <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#enumOrdinalsOf-java.lang.Class-">ExtraTypeCodecs.enumOrdinalsOf(Class)</a> will create a codec for a given <code class="docutils literal notranslate"><span class="pre">Enum</span></code> class
+that maps its constants to their <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html#ordinal--">ordinal value</a>. The corresponding CQL column must
+be of type <code class="docutils literal notranslate"><span class="pre">int</span></code>.</p>
+<p><strong>We strongly recommend against this approach.</strong> It is provided for compatibility with driver 3,
+but relying on ordinals is a bad practice: any reordering of the enum constants, or insertion
+of a new constant before the end, will change the ordinals. The codec won’t fail, but it will
+insert different codes and corrupt your data.</p>
+<p>If you really want to use integer codes for storage efficiency, implement an explicit mapping
+(for example with a <code class="docutils literal notranslate"><span class="pre">toCode()</span></code> method on your enum type). It is then fairly straightforward to
+implement a codec with <a class="reference external" href="#creating-custom-java-to-cql-mappings-with-mapping-codec">MappingCodec</a>,
+using <code class="docutils literal notranslate"><span class="pre">TypeCodecs#INT</span></code> as the “inner” codec.</p>
+</li>
+</ol>
+<p>For example, assuming the following enum:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">WeekDay</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">MONDAY</span><span class="p">,</span><span class="w"> </span><span class="n">TUESDAY</span><span class="p">,</span><span class="w"> </span><span class="n">WEDNESDAY</span><span class="p">,</span><span class="w"> </span><span class="n">THURSDAY</span><span class="p">,</span><span class="w"> </span><span class="n">FRIDAY</span><span class="p">,</span><span class="w"> </span><span class="n">SATURDAY</span><span class="p">,</span><span class="w"> </span><span class="n">SUNDAY</span><span class="w"> </span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>You can define codecs for it the following ways:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// MONDAY will be persisted as &quot;MONDAY&quot;, TUESDAY as &quot;TUESDAY&quot;, etc.</span>
+<span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">weekDaysByNameCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">enumNamesOf</span><span class="p">(</span><span class="n">WeekDay</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+
+<span class="c1">// MONDAY will be persisted as 0, TUESDAY as 1, etc.</span>
+<span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="o">&gt;</span><span class="w"> </span><span class="n">weekDaysByNameCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">enumOrdinalsOf</span><span class="p">(</span><span class="n">WeekDay</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="mapping-json">
+<h3>Mapping Json<a class="headerlink" href="#mapping-json" title="Link to this heading">¶</a></h3>
+<p>The driver provides out-of-the-box support for mapping Java objects to CQL <code class="docutils literal notranslate"><span class="pre">text</span></code> using the popular
+Jackson library. The method <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#json-java.lang.Class-">ExtraTypeCodecs.json(Class)</a> will create a codec for a given Java class
+that maps instances of that class to Json strings, using a newly-allocated, default <a class="reference external" href="http://fasterxml.github.io/jackson-databind/javadoc/2.10/com/fasterxml/jackson/databind/ObjectMapper.html">ObjectMapper</a>.
+It is also possible to pass a custom <code class="docutils literal notranslate"><span class="pre">ObjectMapper</span></code> instance using <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#json-java.lang.Class-com.fasterxml.jackson.databind.ObjectMapper-">ExtraTypeCodecs.json(Class,
+ObjectMapper)</a> instead.</p>
+</section>
+</section>
+<section id="writing-codecs">
+<h2>Writing codecs<a class="headerlink" href="#writing-codecs" title="Link to this heading">¶</a></h2>
+<p>If none of the driver built-in codecs above suits you, it is also possible to roll your own.</p>
+<p>To write a custom codec, implement the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/TypeCodec.html">TypeCodec</a> interface. Here is an example that maps a CQL
+<code class="docutils literal notranslate"><span class="pre">int</span></code> to a Java string containing its textual representation:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">CqlIntToStringCodec</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="n">GenericType</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">getJavaType</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">STRING</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="n">DataType</span><span class="w"> </span><span class="nf">getCqlType</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">DataTypes</span><span class="p">.</span><span class="na">INT</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="n">ByteBuffer</span><span class="w"> </span><span class="nf">encode</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">value</span><span class="p">,</span><span class="w"> </span><span class="n">ProtocolVersion</span><span class="w"> </span><span class="n">protocolVersion</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="kt">int</span><span class="w"> </span><span class="n">intValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Integer</span><span class="p">.</span><span class="na">parseInt</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">INT</span><span class="p">.</span><span class="na">encode</span><span class="p">(</span><span class="n">intValue</span><span class="p">,</span><span class="w"> </span><span class="n">protocolVersion</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">decode</span><span class="p">(</span><span class="n">ByteBuffer</span><span class="w"> </span><span class="n">bytes</span><span class="p">,</span><span class="w"> </span><span class="n">ProtocolVersion</span><span class="w"> </span><span class="n">protocolVersion</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Integer</span><span class="w"> </span><span class="n">intValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">INT</span><span class="p">.</span><span class="na">decode</span><span class="p">(</span><span class="n">bytes</span><span class="p">,</span><span class="w"> </span><span class="n">protocolVersion</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">intValue</span><span class="p">.</span><span class="na">toString</span><span class="p">();</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">format</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">intValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Integer</span><span class="p">.</span><span class="na">parseInt</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">INT</span><span class="p">.</span><span class="na">format</span><span class="p">(</span><span class="n">intValue</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">Integer</span><span class="w"> </span><span class="n">intValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">INT</span><span class="p">.</span><span class="na">parse</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">intValue</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">intValue</span><span class="p">.</span><span class="na">toString</span><span class="p">();</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Admittedly, this is a trivial – and maybe not very realistic – example, but it illustrates a few
+important points:</p>
+<ul class="simple">
+<li><p>which methods to override. Refer to the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/TypeCodec.html">TypeCodec</a> javadocs for additional information about each
+of them;</p></li>
+<li><p>how to piggyback on a built-in codec, in this case <code class="docutils literal notranslate"><span class="pre">TypeCodecs.INT</span></code>. Very often, this is the best
+approach to keep the code simple. If you want to handle the binary encoding yourself (maybe to
+squeeze the last bit of performance), study the driver’s
+<a class="reference external" href="https://github.com/datastax/java-driver/tree/4.x/core/src/main/java/com/datastax/oss/driver/internal/core/type/codec">built-in codec implementations</a>.</p></li>
+</ul>
+</section>
+<section id="using-codecs">
+<h2>Using codecs<a class="headerlink" href="#using-codecs" title="Link to this heading">¶</a></h2>
+<p>Once you have your codec, register it when building your session. The following example registers
+<code class="docutils literal notranslate"><span class="pre">CqlIntToStringCodec</span></code> along with a few driver-supplied alternative codecs:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">enum</span><span class="w"> </span><span class="n">WeekDay</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">MONDAY</span><span class="p">,</span><span class="w"> </span><span class="n">TUESDAY</span><span class="p">,</span><span class="w"> </span><span class="n">WEDNESDAY</span><span class="p">,</span><span class="w"> </span><span class="n">THURSDAY</span><span class="p">,</span><span class="w"> </span><span class="n">FRIDAY</span><span class="p">,</span><span class="w"> </span><span class="n">SATURDAY</span><span class="p">,</span><span class="w"> </span><span class="n">SUNDAY</span><span class="w"> </span><span class="p">};</span>
+<span class="kd">class</span> <span class="nc">Price</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="p">...</span><span class="w"> </span><span class="c1">// a custom POJO that will be serialized as JSON</span>
+<span class="p">}</span>
+
+<span class="n">CqlSession</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span>
+<span class="w">  </span><span class="n">CqlSession</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">addTypeCodecs</span><span class="p">(</span>
+<span class="w">      </span><span class="k">new</span><span class="w"> </span><span class="n">CqlIntToStringCodec</span><span class="p">(),</span><span class="w">                  </span><span class="c1">// user-created codec</span>
+<span class="w">      </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">ZONED_TIMESTAMP_PERSISTED</span><span class="p">,</span><span class="w">  </span><span class="c1">// tuple&lt;timestamp,text&gt; &lt;-&gt; ZonedDateTime</span>
+<span class="w">      </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">BLOB_TO_ARRAY</span><span class="p">,</span><span class="w">              </span><span class="c1">// blob &lt;-&gt; byte[]</span>
+<span class="w">      </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">arrayOf</span><span class="p">(</span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">TEXT</span><span class="p">),</span><span class="w">   </span><span class="c1">// list&lt;text&gt; &lt;-&gt; String[]</span>
+<span class="w">      </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">enumNamesOf</span><span class="p">(</span><span class="n">WeekDay</span><span class="p">.</span><span class="na">class</span><span class="p">),</span><span class="w"> </span><span class="c1">// text &lt;-&gt; WeekDay</span>
+<span class="w">      </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">json</span><span class="p">(</span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">),</span><span class="w">          </span><span class="c1">// text &lt;-&gt; MyJsonPojo</span>
+<span class="w">      </span><span class="n">ExtraTypeCodecs</span><span class="p">.</span><span class="na">optionalOf</span><span class="p">(</span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">UUID</span><span class="p">)</span><span class="w"> </span><span class="c1">// uuid &lt;-&gt; Optional&lt;UUID&gt;</span>
+<span class="w">    </span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>You may also add codecs to an existing session at runtime:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// The cast is required for backward compatibility reasons (registry mutability was introduced in</span>
+<span class="c1">// 4.3.0). It is safe as long as you didn&#39;t write a custom registry implementation.</span>
+<span class="n">MutableCodecRegistry</span><span class="w"> </span><span class="n">registry</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="p">(</span><span class="n">MutableCodecRegistry</span><span class="p">)</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">();</span>
+
+<span class="n">registry</span><span class="p">.</span><span class="na">register</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">CqlIntToStringCodec</span><span class="p">());</span>
+</pre></div>
+</div>
+<p>You can now use the new mappings in your code:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// cqlsh:ks&gt; desc table test2;</span>
+<span class="c1">// CREATE TABLE ks.test2 (k int PRIMARY KEY, v int)...</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;SELECT * FROM ks.test2 WHERE k = 1&quot;</span><span class="p">);</span>
+<span class="n">String</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="na">one</span><span class="p">().</span><span class="na">getString</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// read a CQL int as a java.lang.String</span>
+
+<span class="n">PreparedStatement</span><span class="w"> </span><span class="n">ps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="s">&quot;INSERT INTO ks.test2 (k, v) VALUES (?, ?)&quot;</span><span class="p">);</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span>
+<span class="w">    </span><span class="n">ps</span><span class="p">.</span><span class="na">boundStatementBuilder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setInt</span><span class="p">(</span><span class="s">&quot;k&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">setString</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;12&quot;</span><span class="p">)</span><span class="w"> </span><span class="c1">// write a java.lang.String as a CQL int</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">());</span>
+</pre></div>
+</div>
+<p>In the above example, the driver will look up in the codec registry a codec for CQL <code class="docutils literal notranslate"><span class="pre">int</span></code> and Java
+String, and will transparently pick <code class="docutils literal notranslate"><span class="pre">CqlIntToStringCodec</span></code> for that.</p>
+<p>So far our examples have used a Java type with dedicated accessors in the driver: <code class="docutils literal notranslate"><span class="pre">getString</span></code> and
+<code class="docutils literal notranslate"><span class="pre">setString</span></code>. But sometimes you won’t find suitable accessor methods; for example, there is no
+accessor for <code class="docutils literal notranslate"><span class="pre">ZonedDateTime</span></code> or for <code class="docutils literal notranslate"><span class="pre">Optional&lt;UUID&gt;</span></code>, and yet we registered codecs for these types.</p>
+<p>When you want to retrieve such objects, you need a way to tell the driver which Java type you want.
+You do so by using one of the generic <code class="docutils literal notranslate"><span class="pre">get</span></code> and <code class="docutils literal notranslate"><span class="pre">set</span></code> methods:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming that ExtraTypeCodecs.ZONED_TIMESTAMP_PERSISTED was registered</span>
+<span class="c1">// Assuming that ExtraTypeCodecs.BLOB_TO_ARRAY was registered</span>
+<span class="c1">// Assuming that ExtraTypeCodecs.arrayOf(TypeCodecs.TEXT) was registered</span>
+
+<span class="c1">// Reading</span>
+<span class="n">ZonedDateTime</span><span class="w"> </span><span class="n">v1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ZonedDateTime</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"> </span><span class="c1">// assuming column is of type timestamp</span>
+<span class="kt">byte</span><span class="o">[]</span><span class="w"> </span><span class="n">v2</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v2&quot;</span><span class="p">,</span><span class="w"> </span><span class="kt">byte</span><span class="o">[]</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w">        </span><span class="c1">// assuming column is of type blob</span>
+<span class="n">String</span><span class="o">[]</span><span class="w"> </span><span class="n">v3</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v3&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="o">[]</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w">      </span><span class="c1">// assuming column is of type list&lt;text&gt;</span>
+
+
+<span class="c1">// Writing</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v1</span><span class="p">,</span><span class="w"> </span><span class="n">ZonedDateTime</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v2&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v2</span><span class="p">,</span><span class="w"> </span><span class="kt">byte</span><span class="o">[]</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v3&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v3</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="o">[]</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>This is also valid for arbitrary Java types. This is particularly useful when dealing with Enums and
+JSON mappings, for example our <code class="docutils literal notranslate"><span class="pre">WeekDay</span></code> and <code class="docutils literal notranslate"><span class="pre">Price</span></code> types:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming that TypeCodecs.enumNamesOf(WeekDay.class) was registered</span>
+<span class="c1">// Assuming that TypeCodecs.json(Price.class) was registered</span>
+
+<span class="c1">// Reading</span>
+<span class="n">WeekDay</span><span class="w"> </span><span class="n">v1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">WeekDay</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"> </span><span class="c1">// assuming column is of type text</span>
+<span class="n">Price</span><span class="w"> </span><span class="n">v2</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v2&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w">   </span><span class="c1">// assuming column is of type text</span>
+
+<span class="c1">// Writing</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v1</span><span class="p">,</span><span class="w"> </span><span class="n">WeekDay</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v2&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">v2</span><span class="p">,</span><span class="w"> </span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note that, because the underlying CQL type is <code class="docutils literal notranslate"><span class="pre">text</span></code> you can still retrieve the column’s contents
+as a plain string:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Reading</span>
+<span class="n">String</span><span class="w"> </span><span class="n">enumName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getString</span><span class="p">(</span><span class="s">&quot;v1&quot;</span><span class="p">);</span>
+<span class="n">String</span><span class="w"> </span><span class="n">priceJson</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getString</span><span class="p">(</span><span class="s">&quot;v2&quot;</span><span class="p">);</span>
+
+<span class="c1">// Writing</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">setString</span><span class="p">(</span><span class="s">&quot;v1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">enumName</span><span class="p">);</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">setString</span><span class="p">(</span><span class="s">&quot;v2&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">priceJson</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>And finally, for <code class="docutils literal notranslate"><span class="pre">Optional&lt;UUID&gt;</span></code>, you will need the <code class="docutils literal notranslate"><span class="pre">get</span></code> and <code class="docutils literal notranslate"><span class="pre">set</span></code> methods with an extra <em>type
+token</em> argument, because <code class="docutils literal notranslate"><span class="pre">Optional&lt;UUID&gt;</span></code> is a parameterized type:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming that TypeCodecs.optionalOf(TypeCodecs.UUID) was registered</span>
+
+<span class="c1">// Reading</span>
+<span class="n">Optional</span><span class="o">&lt;</span><span class="n">UUID</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">optionalOf</span><span class="p">(</span><span class="n">UUID</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+
+<span class="c1">// Writing</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">opt</span><span class="p">,</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">optionalOf</span><span class="p">(</span><span class="n">UUID</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Type tokens are instances of <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/reflect/GenericType.html">GenericType</a>. They are immutable and thread-safe, you should store
+them as reusable constants. The <code class="docutils literal notranslate"><span class="pre">GenericType</span></code> class itself has constants and factory methods to help
+creating <code class="docutils literal notranslate"><span class="pre">GenericType</span></code> objects for common types. If you don’t see the type you are looking for, a
+type token for any Java type can be created using the following pattern:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Notice the &#39;{}&#39;: this is an anonymous inner class</span>
+<span class="n">GenericType</span><span class="o">&lt;</span><span class="n">Foo</span><span class="o">&lt;</span><span class="n">Bar</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">fooBarType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">GenericType</span><span class="o">&lt;</span><span class="n">Foo</span><span class="o">&lt;</span><span class="n">Bar</span><span class="o">&gt;&gt;</span><span class="p">(){};</span>
+
+<span class="n">Foo</span><span class="o">&lt;</span><span class="n">Bar</span><span class="o">&gt;</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">fooBarType</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Custom codecs are used not only for their base type, but also recursively in collections, tuples and
+UDTs. For example, once your Json codec for the <code class="docutils literal notranslate"><span class="pre">Price</span></code> class is registered, you can also read a CQL
+<code class="docutils literal notranslate"><span class="pre">list&lt;text&gt;</span></code> as a Java <code class="docutils literal notranslate"><span class="pre">List&lt;Price&gt;</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming that TypeCodecs.json(Price.class) was registered</span>
+<span class="c1">// Assuming that each element of the list&lt;text&gt; column is a valid Json string</span>
+
+<span class="c1">// Reading</span>
+<span class="n">List</span><span class="o">&lt;</span><span class="n">Price</span><span class="o">&gt;</span><span class="w"> </span><span class="n">prices1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getList</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="c1">// alternative method using the generic get method with type token argument:</span>
+<span class="n">List</span><span class="o">&lt;</span><span class="n">Price</span><span class="o">&gt;</span><span class="w"> </span><span class="n">prices2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">listOf</span><span class="p">(</span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+
+<span class="c1">// Writing</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">setList</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">prices1</span><span class="p">,</span><span class="w"> </span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+<span class="c1">// alternative method using the generic set method with type token argument:</span>
+<span class="n">boundStatement</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;v&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">prices2</span><span class="p">,</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">listOf</span><span class="p">(</span><span class="n">Price</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>Whenever you read or write a value, the driver tries all the built-in mappings first, followed by
+custom codecs. If two codecs can process the same mapping, the one that was registered first is
+used. Note that this means that built-in mappings can’t be overridden.</p>
+<p>In rare cases, you might have a codec registered in your application, but have a legitimate reason
+to use a different mapping in one particular place. In that case, you can pass a codec instance
+to <code class="docutils literal notranslate"><span class="pre">get</span></code> / <code class="docutils literal notranslate"><span class="pre">set</span></code> instead of a type token:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">defaultCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">CqlIntToStringCodec</span><span class="p">();</span>
+<span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">specialCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w"> </span><span class="c1">// a different implementation</span>
+
+<span class="n">CqlSession</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">CqlSession</span><span class="p">.</span><span class="na">builder</span><span class="p">().</span><span class="na">addTypeCodecs</span><span class="p">(</span><span class="n">defaultCodec</span><span class="p">).</span><span class="na">build</span><span class="p">();</span>
+
+<span class="n">String</span><span class="w"> </span><span class="n">s1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getString</span><span class="p">(</span><span class="s">&quot;anIntColumn&quot;</span><span class="p">);</span><span class="w">         </span><span class="c1">// int -&gt; String, will decode with defaultCodec</span>
+<span class="n">String</span><span class="w"> </span><span class="n">s2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;anIntColumn&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">specialCodec</span><span class="p">);</span><span class="w"> </span><span class="c1">// int -&gt; String, will decode with specialCodec</span>
+</pre></div>
+</div>
+<p>By doing so, you bypass the codec registry completely and instruct the driver to use the given
+codec. Note that it is your responsibility to ensure that the codec can handle the underlying CQL
+type (this cannot be enforced at compile-time).</p>
+</section>
+<section id="creating-custom-java-to-cql-mappings-with-mappingcodec">
+<h2>Creating custom Java-to-CQL mappings with <code class="docutils literal notranslate"><span class="pre">MappingCodec</span></code><a class="headerlink" href="#creating-custom-java-to-cql-mappings-with-mappingcodec" title="Link to this heading">¶</a></h2>
+<p>The above example, <code class="docutils literal notranslate"><span class="pre">CqlIntToStringCodec</span></code>, could be rewritten to leverage <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/MappingCodec.html">MappingCodec</a>, an abstract
+class that ships with the driver. This class has been designed for situations where we want to
+represent a CQL type with a different Java type than the Java type natively supported by the driver,
+and the conversion between the former and the latter is straightforward.</p>
+<p>All you have to do is extend <code class="docutils literal notranslate"><span class="pre">MappingCodec</span></code> and implement two methods that perform the conversion
+between the supported Java type – or “inner” type – and the target Java type – or “outer” type:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">CqlIntToStringCodec</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">MappingCodec</span><span class="o">&lt;</span><span class="n">Integer</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="nf">CqlIntToStringCodec</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">super</span><span class="p">(</span><span class="n">TypeCodecs</span><span class="p">.</span><span class="na">INT</span><span class="p">,</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">STRING</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Nullable</span>
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">protected</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">innerToOuter</span><span class="p">(</span><span class="nd">@Nullable</span><span class="w"> </span><span class="n">Integer</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="na">toString</span><span class="p">();</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Nullable</span>
+<span class="w">  </span><span class="nd">@Override</span>
+<span class="w">  </span><span class="kd">protected</span><span class="w"> </span><span class="n">Integer</span><span class="w"> </span><span class="nf">outerToInner</span><span class="p">(</span><span class="nd">@Nullable</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">Integer</span><span class="p">.</span><span class="na">parseInt</span><span class="p">(</span><span class="n">value</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This technique is especially useful when mapping user-defined types to Java objects. For example,
+let’s assume the following user-defined type:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">TYPE</span> <span class="n">coordinates</span> <span class="p">(</span><span class="n">x</span> <span class="nb">int</span><span class="p">,</span> <span class="n">y</span> <span class="nb">int</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>And let’s suppose that we want to map it to the following Java class:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">Coordinates</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">y</span><span class="p">;</span>
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="nf">Coordinates</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">x</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">y</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="na">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="p">;</span><span class="w"> </span><span class="k">this</span><span class="p">.</span><span class="na">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">y</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>All  you have to do is create a <code class="docutils literal notranslate"><span class="pre">MappingCodec</span></code> subclass that piggybacks on an existing
+<code class="docutils literal notranslate"><span class="pre">TypeCodec&lt;UdtValue&gt;</span></code> for the above user-defined type:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">CoordinatesCodec</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">MappingCodec</span><span class="o">&lt;</span><span class="n">UdtValue</span><span class="p">,</span><span class="w"> </span><span class="n">Coordinates</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">  </span><span class="kd">public</span><span class="w"> </span><span class="nf">CoordinatesCodec</span><span class="p">(</span><span class="nd">@NonNull</span><span class="w"> </span><span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">UdtValue</span><span class="o">&gt;</span><span class="w"> </span><span class="n">innerCodec</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">super</span><span class="p">(</span><span class="n">innerCodec</span><span class="p">,</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">of</span><span class="p">(</span><span class="n">Coordinates</span><span class="p">.</span><span class="na">class</span><span class="p">));</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@NonNull</span><span class="w"> </span><span class="nd">@Override</span><span class="w"> </span><span class="kd">public</span><span class="w"> </span><span class="n">UserDefinedType</span><span class="w"> </span><span class="nf">getCqlType</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="n">UserDefinedType</span><span class="p">)</span><span class="w"> </span><span class="kd">super</span><span class="p">.</span><span class="na">getCqlType</span><span class="p">();</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Nullable</span><span class="w"> </span><span class="nd">@Override</span><span class="w"> </span><span class="kd">protected</span><span class="w"> </span><span class="n">Coordinates</span><span class="w"> </span><span class="nf">innerToOuter</span><span class="p">(</span><span class="nd">@Nullable</span><span class="w"> </span><span class="n">UdtValue</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Coordinates</span><span class="p">(</span><span class="n">value</span><span class="p">.</span><span class="na">getInt</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="na">getInt</span><span class="p">(</span><span class="s">&quot;y&quot;</span><span class="p">));</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="nd">@Nullable</span><span class="w"> </span><span class="nd">@Override</span><span class="w"> </span><span class="kd">protected</span><span class="w"> </span><span class="n">UdtValue</span><span class="w"> </span><span class="nf">outerToInner</span><span class="p">(</span><span class="nd">@Nullable</span><span class="w"> </span><span class="n">Coordinates</span><span class="w"> </span><span class="n">value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">getCqlType</span><span class="p">().</span><span class="na">newValue</span><span class="p">().</span><span class="na">setInt</span><span class="p">(</span><span class="s">&quot;x&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="na">x</span><span class="p">).</span><span class="na">setInt</span><span class="p">(</span><span class="s">&quot;y&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">.</span><span class="na">y</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Then the new mapping codec could be registered as follows:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">CqlSession</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...</span>
+<span class="n">CodecRegistry</span><span class="w"> </span><span class="n">codecRegistry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">();</span>
+<span class="c1">// The target user-defined type</span>
+<span class="n">UserDefinedType</span><span class="w"> </span><span class="n">coordinatesUdt</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">session</span>
+<span class="w">        </span><span class="p">.</span><span class="na">getMetadata</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">getKeyspace</span><span class="p">(</span><span class="s">&quot;...&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">flatMap</span><span class="p">(</span><span class="n">ks</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">ks</span><span class="p">.</span><span class="na">getUserDefinedType</span><span class="p">(</span><span class="s">&quot;coordinates&quot;</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">orElseThrow</span><span class="p">(</span><span class="n">IllegalStateException</span><span class="p">::</span><span class="k">new</span><span class="p">);</span>
+<span class="c1">// The &quot;inner&quot; codec that handles the conversions from CQL from/to UdtValue</span>
+<span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">UdtValue</span><span class="o">&gt;</span><span class="w"> </span><span class="n">innerCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">codecRegistry</span><span class="p">.</span><span class="na">codecFor</span><span class="p">(</span><span class="n">coordinatesUdt</span><span class="p">);</span>
+<span class="c1">// The mapping codec that will handle the conversions from/to UdtValue and Coordinates</span>
+<span class="n">CoordinatesCodec</span><span class="w"> </span><span class="n">coordinatesCodec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">CoordinatesCodec</span><span class="p">(</span><span class="n">innerCodec</span><span class="p">);</span>
+<span class="c1">// Register the new codec</span>
+<span class="p">((</span><span class="n">MutableCodecRegistry</span><span class="p">)</span><span class="w"> </span><span class="n">codecRegistry</span><span class="p">).</span><span class="na">register</span><span class="p">(</span><span class="n">coordinatesCodec</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>…and used just like explained above:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BoundStatement</span><span class="w"> </span><span class="n">stmt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+<span class="n">stmt</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;coordinates&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Coordinates</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">20</span><span class="p">),</span><span class="w"> </span><span class="n">Coordinates</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+
+<span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
+<span class="n">Coordinates</span><span class="w"> </span><span class="n">coordinates</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="s">&quot;coordinates&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Coordinates</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note: if you need even more advanced mapping capabilities, consider adopting
+the driver’s <a class="reference external" href="../../mapper/">object mapping framework</a>.</p>
+</section>
+<section id="subtype-polymorphism">
+<h2>Subtype polymorphism<a class="headerlink" href="#subtype-polymorphism" title="Link to this heading">¶</a></h2>
+<p>Suppose the following class hierarchy:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">class</span> <span class="nc">Animal</span><span class="w"> </span><span class="p">{}</span>
+<span class="kd">class</span> <span class="nc">Cat</span><span class="w"> </span><span class="kd">extends</span><span class="w"> </span><span class="n">Animal</span><span class="w"> </span><span class="p">{}</span>
+</pre></div>
+</div>
+<p>By default, a codec will accept to serialize any object that extends or implements its declared Java
+type: a codec such as <code class="docutils literal notranslate"><span class="pre">AnimalCodec</span> <span class="pre">extends</span> <span class="pre">TypeCodec&lt;Animal&gt;</span></code> will accept <code class="docutils literal notranslate"><span class="pre">Cat</span></code> instances as well.</p>
+<p>This allows a codec to handle interfaces and superclasses in a generic way, regardless of the actual
+implementation being used by client code; for example, the driver has a built-in codec that handles
+<code class="docutils literal notranslate"><span class="pre">List</span></code> instances, and this codec is capable of serializing any concrete <code class="docutils literal notranslate"><span class="pre">List</span></code> implementation.</p>
+<p>But this has one caveat: when setting or retrieving values with <code class="docutils literal notranslate"><span class="pre">get()</span></code> and <code class="docutils literal notranslate"><span class="pre">set()</span></code>, <em>you must pass
+the exact Java type the codec handles</em>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">BoundStatement</span><span class="w"> </span><span class="n">bs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...</span>
+<span class="n">bs</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Cat</span><span class="p">(),</span><span class="w"> </span><span class="n">Animal</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"> </span><span class="c1">// works</span>
+<span class="n">bs</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Cat</span><span class="p">(),</span><span class="w">    </span><span class="n">Cat</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"> </span><span class="c1">// throws CodecNotFoundException</span>
+
+<span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...</span>
+<span class="n">Animal</span><span class="w"> </span><span class="n">animal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">Animal</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"> </span><span class="c1">// works</span>
+<span class="n">Cat</span><span class="w">    </span><span class="n">cat</span><span class="w">    </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">get</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w">    </span><span class="n">Cat</span><span class="p">.</span><span class="na">class</span><span class="p">);</span><span class="w"> </span><span class="c1">// throws CodecNotFoundException</span>
+</pre></div>
+</div>
+</section>
+<section id="the-codec-registry">
+<h2>The codec registry<a class="headerlink" href="#the-codec-registry" title="Link to this heading">¶</a></h2>
+<p>The driver stores all codecs (built-in and custom) in an internal <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/core/type/codec/registry/CodecRegistry.html">CodecRegistry</a>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">CodecRegistry</span><span class="w"> </span><span class="n">getCodecRegistry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getContext</span><span class="p">().</span><span class="na">getCodecRegistry</span><span class="p">();</span>
+
+<span class="c1">// Get the custom codec we registered earlier:</span>
+<span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cqlIntToString</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">codecRegistry</span><span class="p">.</span><span class="na">codecFor</span><span class="p">(</span><span class="n">DataTypes</span><span class="p">.</span><span class="na">INT</span><span class="p">,</span><span class="w"> </span><span class="n">GenericType</span><span class="p">.</span><span class="na">STRING</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>If all you’re doing is executing requests and reading responses, you probably won’t ever need to
+access the registry directly. But it’s useful if you do some kind of generic processing, for
+example printing out an arbitrary row when the schema is not known at compile time:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">private</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">formatRow</span><span class="p">(</span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">StringBuilder</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">StringBuilder</span><span class="p">();</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">size</span><span class="p">();</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getColumnDefinitions</span><span class="p">().</span><span class="na">get</span><span class="p">(</span><span class="n">i</span><span class="p">).</span><span class="na">getName</span><span class="p">().</span><span class="na">asCql</span><span class="p">(</span><span class="kc">true</span><span class="p">);</span>
+<span class="w">    </span><span class="n">Object</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getObject</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+<span class="w">    </span><span class="n">DataType</span><span class="w"> </span><span class="n">cqlType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getType</span><span class="p">(</span><span class="n">i</span><span class="p">);</span>
+<span class="w">    </span>
+<span class="w">    </span><span class="c1">// Find the best codec to format this CQL type: </span>
+<span class="w">    </span><span class="n">TypeCodec</span><span class="o">&lt;</span><span class="n">Object</span><span class="o">&gt;</span><span class="w"> </span><span class="n">codec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">codecRegistry</span><span class="p">().</span><span class="na">codecFor</span><span class="p">(</span><span class="n">cqlType</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">result</span><span class="p">.</span><span class="na">append</span><span class="p">(</span><span class="s">&quot;, &quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">result</span><span class="p">.</span><span class="na">append</span><span class="p">(</span><span class="n">name</span><span class="p">).</span><span class="na">append</span><span class="p">(</span><span class="s">&quot; = &quot;</span><span class="p">).</span><span class="na">append</span><span class="p">(</span><span class="n">codec</span><span class="p">.</span><span class="na">format</span><span class="p">(</span><span class="n">value</span><span class="p">));</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">result</span><span class="p">.</span><span class="na">toString</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Custom codecs&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.15.0.x/manual/core/custom_codecs/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../control_connection/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Control connection
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../detachable_types/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Detachable types
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                4.15.0.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api_conventions/index.html">API conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../case_sensitivity/index.html">Case sensitivity</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Core driver</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../authentication/index.html">Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../bom/index.html">Bill of Materials (BOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../configuration/index.html">Configuration</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../configuration/reference/README.html">Reference configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../detachable_types/index.html">Detachable types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../graalvm/index.html">GraalVM native images</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../integration/index.html">Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../metadata/index.html">Metadata</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/node/index.html">Node metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/schema/index.html">Schema metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/token/index.html">Token metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../non_blocking/index.html">Non-blocking programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance/index.html">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reactive/index.html">Reactive Style Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../request_tracker/index.html">Request tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/per_query_keyspace/index.html">Per-query keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../temporal_types/index.html">Temporal types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../throttling/index.html">Request throttling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tracing/index.html">Query tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tuples/index.html">Tuples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../developer/index.html">Developer docs</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/><label for="toctree-checkbox-6"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/admin/index.html">Administrative tasks</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../developer/common/index.html">Common infrastructure</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/><label for="toctree-checkbox-7"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/context/index.html">Driver context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/event_bus/index.html">Event bus</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/native_protocol/index.html">Native protocol layer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/netty_pipeline/index.html">Netty pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/request_execution/index.html">Request execution</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../mapper/index.html">Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/><label for="toctree-checkbox-8"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/config/index.html">Integration</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label for="toctree-checkbox-9"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/kotlin/index.html">Kotlin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/lombok/index.html">Lombok</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/record/index.html">Java 14 Records</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/scala/index.html">Scala</a></li>
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/daos/index.html">DAOs</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label for="toctree-checkbox-10"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/custom_types/index.html">Custom result types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/delete/index.html">Delete methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/getentity/index.html">GetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/increment/index.html">Increment methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/insert/index.html">Insert methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/null_saving/index.html">Null saving strategy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/query/index.html">Query methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/queryprovider/index.html">Query provider methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/select/index.html">Select methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/setentity/index.html">SetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/statement_attributes/index.html">Statement attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/update/index.html">Update methods</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/entities/index.html">Entities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/mapper/index.html">Mapper interface</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../query_builder/index.html">Query builder</a><input class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" type="checkbox"/><label for="toctree-checkbox-11"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/condition/index.html">Conditions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/delete/index.html">DELETE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/idempotence/index.html">Idempotence in the query builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/insert/index.html">INSERT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/relation/index.html">Relations</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../query_builder/schema/index.html">Schema builder</a><input class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" type="checkbox"/><label for="toctree-checkbox-12"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/aggregate/index.html">Aggregate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/function/index.html">Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/index/index.html">Index</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/keyspace/index.html">Keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/materialized_view/index.html">Materialized View</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/table/index.html">Table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/type/index.html">Type</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/select/index.html">SELECT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/term/index.html">Terms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/truncate/index.html">TRUNCATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/update/index.html">UPDATE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html#id30">3.11.1</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html#id31">3.11.0</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Custom codecs&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.15.0.x/manual/core/custom_codecs/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/core/custom_codecs/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Custom codecs</a><ul>
+<li><a class="reference internal" href="#quick-overview">Quick overview</a></li>
+<li><a class="reference internal" href="#using-alternative-codecs-provided-by-the-driver">Using alternative codecs provided by the driver</a><ul>
+<li><a class="reference internal" href="#mapping-cql-blobs-to-java-arrays">Mapping CQL blobs to Java arrays</a></li>
+<li><a class="reference internal" href="#mapping-cql-lists-to-java-arrays">Mapping CQL lists to Java arrays</a></li>
+<li><a class="reference internal" href="#mapping-cql-timestamps-to-java-instant-types">Mapping CQL timestamps to Java “instant” types</a></li>
+<li><a class="reference internal" href="#mapping-cql-timestamps-to-zoneddatetime">Mapping CQL timestamps to <code class="docutils literal notranslate"><span class="pre">ZonedDateTime</span></code></a></li>
+<li><a class="reference internal" href="#mapping-cql-timestamps-to-localdatetime">Mapping CQL timestamps to <code class="docutils literal notranslate"><span class="pre">LocalDateTime</span></code></a></li>
+<li><a class="reference internal" href="#storing-the-time-zone-in-cassandra">Storing the time zone in Cassandra</a></li>
+<li><a class="reference internal" href="#mapping-to-optional-instead-of-null">Mapping to <code class="docutils literal notranslate"><span class="pre">Optional</span></code> instead of <code class="docutils literal notranslate"><span class="pre">null</span></code></a></li>
+<li><a class="reference internal" href="#mapping-java-enums">Mapping Java Enums</a></li>
+<li><a class="reference internal" href="#mapping-json">Mapping Json</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#writing-codecs">Writing codecs</a></li>
+<li><a class="reference internal" href="#using-codecs">Using codecs</a></li>
+<li><a class="reference internal" href="#creating-custom-java-to-cql-mappings-with-mappingcodec">Creating custom Java-to-CQL mappings with <code class="docutils literal notranslate"><span class="pre">MappingCodec</span></code></a></li>
+<li><a class="reference internal" href="#subtype-polymorphism">Subtype polymorphism</a></li>
+<li><a class="reference internal" href="#the-codec-registry">The codec registry</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

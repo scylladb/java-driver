@@ -1,0 +1,941 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Manual | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+    <span class="bread__item bread__item--last">Manual</span>
+</div>
+                    </div>
+                
+                <section id="manual">
+<h1>Manual<a class="headerlink" href="#manual" title="Link to this heading">¶</a></h1>
+<section id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<p>Here’s a short program that connects to Cassandra and executes a query:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span><span class="w">                                                    </span><span class="c1">// (1)</span>
+<span class="w">            </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">            </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+<span class="w">    </span><span class="n">Session</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">connect</span><span class="p">();</span><span class="w">                                           </span><span class="c1">// (2)</span>
+
+<span class="w">    </span><span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select release_version from system.local&quot;</span><span class="p">);</span><span class="w">    </span><span class="c1">// (3)</span>
+<span class="w">    </span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="na">one</span><span class="p">();</span>
+<span class="w">    </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="n">row</span><span class="p">.</span><span class="na">getString</span><span class="p">(</span><span class="s">&quot;release_version&quot;</span><span class="p">));</span><span class="w">                          </span><span class="c1">// (4)</span>
+<span class="p">}</span><span class="w"> </span><span class="k">finally</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cluster</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">close</span><span class="p">();</span><span class="w">                                          </span><span class="c1">// (5)</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ol class="simple">
+<li><p>the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Cluster.html">Cluster</a> object is the main entry point of the driver. It holds the known state of the actual Cassandra cluster
+(notably the <a class="reference external" href="metadata/">Metadata</a>). This class is thread-safe, you should create a single instance (per target
+Cassandra cluster), and share it throughout your application;</p></li>
+<li><p>the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Session.html">Session</a> is what you use to execute queries. Likewise, it is thread-safe and should be reused;</p></li>
+<li><p>we use <code class="docutils literal notranslate"><span class="pre">execute</span></code> to send a query to Cassandra. This returns a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/ResultSet.html">ResultSet</a>, which is essentially a collection of <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Row.html">Row</a>
+objects. On the next line, we extract the first row (which is the only one in this case);</p></li>
+<li><p>we extract the value of the first (and only) column from the row;</p></li>
+<li><p>finally, we close the cluster after we’re done with it. This will also close any session that was created from this
+cluster. This step is important because it frees underlying resources (TCP connections, thread pools…). In a real
+application, you would typically do this at shutdown (for example, when undeploying your webapp).</p></li>
+</ol>
+<p>Note: this example uses the synchronous API. Most methods have <a class="reference external" href="async/">asynchronous</a> equivalents.</p>
+</section>
+<section id="setting-up-the-driver">
+<h2>Setting up the driver<a class="headerlink" href="#setting-up-the-driver" title="Link to this heading">¶</a></h2>
+<section id="cluster">
+<h3><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Cluster.html">Cluster</a><a class="headerlink" href="#cluster" title="Link to this heading">¶</a></h3>
+<section id="creating-an-instance">
+<h4>Creating an instance<a class="headerlink" href="#creating-an-instance" title="Link to this heading">¶</a></h4>
+<p>The simplest approach is to do it programmatically with <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Cluster.Builder.html">Cluster.Builder</a>, which provides a fluent API:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withClusterName</span><span class="p">(</span><span class="s">&quot;myCluster&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Alternatively, you might want to retrieve the settings from an external source (like a properties file or a web
+service). You’ll need to provide an implementation of <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Cluster.Initializer.html">Initializer</a> that loads these settings:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Initializer</span><span class="w"> </span><span class="n">myInitializer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="c1">// your implementation</span>
+<span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">buildFrom</span><span class="p">(</span><span class="n">myInitializer</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="creation-options">
+<h4>Creation options<a class="headerlink" href="#creation-options" title="Link to this heading">¶</a></h4>
+<p>The only required option is the list of contact points, i.e. the hosts that the driver will initially contact to
+discover the cluster topology. You can provide a single contact point, but it is usually a good idea to provide more, so
+that the driver can fallback if the first one is down.</p>
+<p>The other aspects that you can configure on the <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> are:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="address_resolution/">address translation</a>;</p></li>
+<li><p><a class="reference external" href="auth/">authentication</a>;</p></li>
+<li><p><a class="reference external" href="compression/">compression</a>;</p></li>
+<li><p><a class="reference external" href="load_balancing/">load balancing</a>;</p></li>
+<li><p><a class="reference external" href="metrics/">metrics</a>;</p></li>
+<li><p>low-level <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/NettyOptions.html">Netty configuration</a>;</p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/QueryOptions.html">query options</a>;</p></li>
+<li><p><a class="reference external" href="reconnection/">reconnections</a>;</p></li>
+<li><p><a class="reference external" href="retries/">retries</a>;</p></li>
+<li><p><a class="reference external" href="socket_options/">socket options</a>;</p></li>
+<li><p><a class="reference external" href="ssl/">SSL</a>;</p></li>
+<li><p><a class="reference external" href="speculative_execution/">speculative executions</a>;</p></li>
+<li><p><a class="reference external" href="query_timestamps/">query timestamps</a>.</p></li>
+</ul>
+<p>In addition, you can register various types of listeners to be notified of cluster events; see <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Host.StateListener.html">Host.StateListener</a>,
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/LatencyTracker.html">LatencyTracker</a>, and <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/SchemaChangeListener.html">SchemaChangeListener</a>.</p>
+</section>
+<section id="cluster-initialization">
+<h4>Cluster initialization<a class="headerlink" href="#cluster-initialization" title="Link to this heading">¶</a></h4>
+<p>A freshly-built <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> instance does not initialize automatically; that will be triggered by one of the following
+actions:</p>
+<ul class="simple">
+<li><p>an explicit call to <code class="docutils literal notranslate"><span class="pre">cluster.init()</span></code>;</p></li>
+<li><p>a call to <code class="docutils literal notranslate"><span class="pre">cluster.getMetadata()</span></code>;</p></li>
+<li><p>creating a session with <code class="docutils literal notranslate"><span class="pre">cluster.connect()</span></code> or one of its variants;</p></li>
+<li><p>calling <code class="docutils literal notranslate"><span class="pre">session.init()</span></code> on a session that was created with <code class="docutils literal notranslate"><span class="pre">cluster.newSession()</span></code>.</p></li>
+</ul>
+<p>The initialization sequence is the following:</p>
+<ul class="simple">
+<li><p>initialize internal state (thread pools, utility components, etc.);</p></li>
+<li><p>try to connect to each of the contact points in sequence. The order is not deterministic (in fact, the driver shuffles
+the list to avoid hotspots if a large number of clients share the same contact points). If no contact point replies,
+a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/exceptions/NoHostAvailableException.html">NoHostAvailableException</a> is thrown and the process stops here;</p></li>
+<li><p>otherwise, the successful contact point is elected as the <a class="reference external" href="control_connection/">control host</a>. The driver negotiates
+the <a class="reference external" href="native_protocol/">native protocol version</a> with it, and queries its system tables to discover the addresses of
+the other hosts.</p></li>
+</ul>
+<p>Note that, at this stage, only the control connection has been established. Connections to other hosts will only be
+opened when a session gets created.</p>
+</section>
+</section>
+<section id="session">
+<h3><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Session.html">Session</a><a class="headerlink" href="#session" title="Link to this heading">¶</a></h3>
+<p>By default, a session isn’t tied to any specific keyspace. You’ll need to prefix table names in your queries:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Session</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">connect</span><span class="p">();</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select * from myKeyspace.myTable where id = 1&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>You can also specify a keyspace name at construction time, it will be used as the default when table names are not
+qualified:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Session</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">connect</span><span class="p">(</span><span class="s">&quot;myKeyspace&quot;</span><span class="p">);</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select * from myTable where id = 1&quot;</span><span class="p">);</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select * from otherKeyspace.otherTable where id = 1&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>You might be tempted to open a separate session for each keyspace used in your application; however, note that
+<a class="reference external" href="pooling/">connection pools</a> are created at the session level, so each new session will consume additional system
+resources:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Warning: creating two sessions doubles the number of TCP connections opened by the driver</span>
+<span class="n">Session</span><span class="w"> </span><span class="n">session1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">connect</span><span class="p">(</span><span class="s">&quot;ks1&quot;</span><span class="p">);</span>
+<span class="n">Session</span><span class="w"> </span><span class="n">session2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">connect</span><span class="p">(</span><span class="s">&quot;ks2&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Also, there is currently a <a class="reference external" href="async/#known-limitations">known limitation</a> with named sessions, that causes the driver to
+unexpectedly block the calling thread in certain circumstances; if you use a fully asynchronous model, you should use a
+session with no keyspace.</p>
+<p>Finally, if you issue a <code class="docutils literal notranslate"><span class="pre">USE</span></code> statement, it will change the default keyspace on that session:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Session</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">connect</span><span class="p">();</span>
+<span class="c1">// No default keyspace set, need to prefix:</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select * from myKeyspace.myTable where id = 1&quot;</span><span class="p">);</span>
+
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;USE myKeyspace&quot;</span><span class="p">);</span>
+<span class="c1">// Now the keyspace is set, unqualified query works:</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select * from myTable where id = 1&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Be very careful though: if the session is shared by multiple threads, switching the keyspace at runtime could easily
+cause unexpected query failures.</p>
+<p>Generally, the recommended approach is to use a single session with no keyspace, and prefix all your queries.</p>
+</section>
+</section>
+<section id="running-queries">
+<h2>Running queries<a class="headerlink" href="#running-queries" title="Link to this heading">¶</a></h2>
+<p>You run queries with the session’s <code class="docutils literal notranslate"><span class="pre">execute</span></code> method:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select release_version from system.local&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>As shown here, the simplest form is to pass a query string directly. You can also pass an instance of
+<a class="reference external" href="statements/">Statement</a>.</p>
+<section id="processing-rows">
+<h3>Processing rows<a class="headerlink" href="#processing-rows" title="Link to this heading">¶</a></h3>
+<p>Executing a query produces a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/ResultSet.html">ResultSet</a>, which is an iterable of <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Row.html">Row</a>. The basic way to process all rows is to use
+Java’s for-each loop:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">rs</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// process the row</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note that this will return <strong>all results</strong> without limit (even though the driver might use multiple queries in the
+background). To handle large result sets, you might want to use a <code class="docutils literal notranslate"><span class="pre">LIMIT</span></code> clause in your CQL query, or use one of the
+techniques described in the <a class="reference external" href="paging/">paging</a> documentation.</p>
+<p>When you know that there is only one row (or are only interested in the first one), the driver provides a convenience
+method:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="na">one</span><span class="p">();</span>
+</pre></div>
+</div>
+</section>
+<section id="reading-columns">
+<h3>Reading columns<a class="headerlink" href="#reading-columns" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Row.html">Row</a> provides getters to extract column values; they can be either positional or named:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;select first_name, last_name from users where id = 1&quot;</span><span class="p">).</span><span class="na">one</span><span class="p">();</span>
+
+<span class="c1">// The two are equivalent:</span>
+<span class="n">String</span><span class="w"> </span><span class="n">firstName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getString</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="n">String</span><span class="w"> </span><span class="n">firstName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getString</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<section id="cql-to-java-type-mapping">
+<h4>CQL to Java type mapping<a class="headerlink" href="#cql-to-java-type-mapping" title="Link to this heading">¶</a></h4>
+<table border="1" style="text-align:center; width:100%;margin-bottom:1em;">
+    <tr> <td><b>CQL3 data type</b></td> <td><b>Getter name</b></td> <td><b>Java type</b></td> </tr>
+    <tr> <td>ascii</td> <td>getString</td> <td>java.lang.String</td> </tr>
+    <tr> <td>bigint</td> <td>getLong</td> <td>long</td> </tr>
+    <tr> <td>blob</td> <td>getBytes</td> <td>java.nio.ByteBuffer</td> </tr>
+    <tr> <td>boolean</td> <td>getBool</td> <td>boolean</td> </tr>
+    <tr> <td>counter</td> <td>getLong</td> <td>long</td> </tr>
+    <tr> <td>date</td> <td>getDate</td> <td><a href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/LocalDate.html">LocalDate</a></td> </tr>
+    <tr> <td>decimal</td> <td>getDecimal</td> <td>java.math.BigDecimal</td> </tr>
+    <tr> <td>double</td> <td>getDouble</td> <td>double</td> </tr>
+    <tr> <td>float</td> <td>getFloat</td> <td>float</td> </tr>
+    <tr> <td>inet</td> <td>getInet</td> <td>java.net.InetAddress</td> </tr>
+    <tr> <td>int</td> <td>getInt</td> <td>int</td> </tr>
+    <tr> <td>list</td> <td>getList</td> <td>java.util.List<T></td> </tr>
+    <tr> <td>map</td> <td>getMap</td> <td>java.util.Map<K, V></td> </tr>
+    <tr> <td>set</td> <td>getSet</td> <td>java.util.Set<T></td> </tr>
+    <tr> <td>smallint</td> <td>getShort</td> <td>short</td> </tr>
+    <tr> <td>text</td> <td>getString</td> <td>java.lang.String</td> </tr>
+    <tr> <td>time</td> <td>getTime</td> <td>long</td> </tr>
+    <tr> <td>timestamp</td> <td>getTimestamp</td> <td>java.util.Date</td> </tr>
+    <tr> <td>timeuuid</td> <td>getUUID</td> <td>java.util.UUID</td> </tr>
+    <tr> <td>tinyint</td> <td>getByte</td> <td>byte</td> </tr>
+    <tr> <td>tuple</td> <td>getTupleValue</td> <td><a href="tuples/">TupleValue</a></td> </tr>
+    <tr> <td>user-defined types</td> <td>getUDTValue</td> <td><a href="udts/">UDTValue</a></td> </tr>
+    <tr> <td>uuid</td> <td>getUUID</td> <td>java.util.UUID</td> </tr>
+    <tr> <td>varchar</td> <td>getString</td> <td>java.lang.String</td> </tr>
+    <tr> <td>varint</td> <td>getVarint</td> <td>java.math.BigInteger</td> </tr>
+</table><p>In addition to these default mappings, you can register your own types with <a class="reference external" href="custom_codecs/">custom codecs</a>.</p>
+</section>
+<section id="primitive-types">
+<h4>Primitive types<a class="headerlink" href="#primitive-types" title="Link to this heading">¶</a></h4>
+<p>For performance reasons, the driver uses primitive Java types wherever possible (<code class="docutils literal notranslate"><span class="pre">boolean</span></code>, <code class="docutils literal notranslate"><span class="pre">int</span></code>…); the CQL value
+<code class="docutils literal notranslate"><span class="pre">NULL</span></code> is encoded as the type’s default value (<code class="docutils literal notranslate"><span class="pre">false</span></code>, <code class="docutils literal notranslate"><span class="pre">0</span></code>…), which can be ambiguous. To distinguish <code class="docutils literal notranslate"><span class="pre">NULL</span></code> from
+actual values, use <code class="docutils literal notranslate"><span class="pre">isNull</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Integer</span><span class="w"> </span><span class="n">age</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">isNull</span><span class="p">(</span><span class="s">&quot;age&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="kc">null</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getInt</span><span class="p">(</span><span class="s">&quot;age&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="collection-types">
+<h4>Collection types<a class="headerlink" href="#collection-types" title="Link to this heading">¶</a></h4>
+<p>To ensure type safety, collection getters are generic. You need to provide type parameters matching your CQL type when
+calling the methods:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming given_names is a list&lt;text&gt;:</span>
+<span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="n">givenNames</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getList</span><span class="p">(</span><span class="s">&quot;given_names&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="p">.</span><span class="na">class</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>For nested collections, element types are generic and cannot be expressed as Java <code class="docutils literal notranslate"><span class="pre">Class</span></code> instances. We use Guava’s
+<a class="reference external" href="https://github.com/google/guava/wiki/ReflectionExplained">TypeToken</a> instead:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Assuming teams is a set&lt;list&lt;text&gt;&gt;:</span>
+<span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">listOfStrings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">TypeToken</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;&gt;</span><span class="p">()</span><span class="w"> </span><span class="p">{};</span>
+<span class="n">Set</span><span class="o">&lt;</span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">teams</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getSet</span><span class="p">(</span><span class="s">&quot;teams&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">listOfStrings</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Since type tokens are anonymous inner classes, it’s recommended to store them as constants in a utility class instead of
+re-creating them each time.</p>
+</section>
+<section id="row-metadata">
+<h4>Row metadata<a class="headerlink" href="#row-metadata" title="Link to this heading">¶</a></h4>
+<p><code class="docutils literal notranslate"><span class="pre">Row</span></code> exposes an API to explore the column metadata at runtime:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">ColumnDefinitions</span><span class="p">.</span><span class="na">Definition</span><span class="w"> </span><span class="n">definition</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">row</span><span class="p">.</span><span class="na">getColumnDefinitions</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">printf</span><span class="p">(</span><span class="s">&quot;Column %s has type %s%n&quot;</span><span class="p">,</span>
+<span class="w">            </span><span class="n">definition</span><span class="p">.</span><span class="na">getName</span><span class="p">(),</span>
+<span class="w">            </span><span class="n">definition</span><span class="p">.</span><span class="na">getType</span><span class="p">());</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="object-mapping">
+<h2>Object mapping<a class="headerlink" href="#object-mapping" title="Link to this heading">¶</a></h2>
+<p>Besides explicit work with queries and rows, you can also use
+<a class="reference external" href="object_mapper/">Object Mapper</a> to simplify retrieval &amp; store of your data.</p>
+</section>
+<section id="more-information">
+<h2>More information<a class="headerlink" href="#more-information" title="Link to this heading">¶</a></h2>
+<p>If you’re reading this from the <a class="reference external" href="http://datastax.github.io/java-driver/">generated HTML documentation on
+github.io</a>, use the “Contents”
+menu on the left hand side to navigate sub-sections. If you’re <a class="reference external" href="https://github.com/datastax/java-driver/tree/3.x/manual">browsing the source files on
+github.com</a>,
+simply navigate to each sub-directory.</p>
+<div class="toctree-wrapper compound">
+</div>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Manual&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../api.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />API Documentation
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="address_resolution/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Address resolution
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.11.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children current-page"><a class="current reference internal" href="#">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="serverless/index.html">Connecting to ScyllaDB Cloud Serverless</a></li>
+<li class="toctree-l2"><a class="reference internal" href="control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Manual&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Manual</a><ul>
+<li><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li><a class="reference internal" href="#setting-up-the-driver">Setting up the driver</a><ul>
+<li><a class="reference internal" href="#cluster">Cluster</a><ul>
+<li><a class="reference internal" href="#creating-an-instance">Creating an instance</a></li>
+<li><a class="reference internal" href="#creation-options">Creation options</a></li>
+<li><a class="reference internal" href="#cluster-initialization">Cluster initialization</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#session">Session</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#running-queries">Running queries</a><ul>
+<li><a class="reference internal" href="#processing-rows">Processing rows</a></li>
+<li><a class="reference internal" href="#reading-columns">Reading columns</a><ul>
+<li><a class="reference internal" href="#cql-to-java-type-mapping">CQL to Java type mapping</a></li>
+<li><a class="reference internal" href="#primitive-types">Primitive types</a></li>
+<li><a class="reference internal" href="#collection-types">Collection types</a></li>
+<li><a class="reference internal" href="#row-metadata">Row metadata</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#object-mapping">Object mapping</a></li>
+<li><a class="reference internal" href="#more-information">More information</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

@@ -1,0 +1,968 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Non-blocking programming | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/core/non_blocking/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Core driver
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Non-blocking programming</span>
+</div>
+                    </div>
+                
+                <section id="non-blocking-programming">
+<h1>Non-blocking programming<a class="headerlink" href="#non-blocking-programming" title="Link to this heading">¶</a></h1>
+<section id="quick-overview">
+<h2>Quick overview<a class="headerlink" href="#quick-overview" title="Link to this heading">¶</a></h2>
+<p>With the advent of reactive programming, the demand for fully non-blocking libraries has become
+popular among application developers. The recent availability of frameworks enforcing lock-freedom,
+such as <a class="reference external" href="https://vertx.io">Vert.x</a> or <a class="reference external" href="https://projectreactor.io">Reactor</a>, along with tools for automatic detection of blocking calls like
+<a class="reference external" href="https://github.com/reactor/BlockHound">BlockHound</a>, has exacerbated this trend even more so.</p>
+<p><strong>In summary, when used properly, the DataStax Java driver offers non-blocking guarantees for most
+of its operations, and during most of the session lifecycle.</strong></p>
+<p>These guarantees and their exceptions are detailed below. A final chapter explains how to use the
+driver with BlockHound.</p>
+<p>The developer guide also has more information on driver internals and its
+<a class="reference external" href="../../developer/common/concurrency">concurrency model</a>.</p>
+</section>
+<section id="definition-of-non-blocking">
+<h2>Definition of “non-blocking”<a class="headerlink" href="#definition-of-non-blocking" title="Link to this heading">¶</a></h2>
+<p>Since the term “non-blocking” is subject to interpretation, in this page the term should be
+understood as “<a class="reference external" href="https://www.baeldung.com/lock-free-programming">lock-free</a>”: a program is non-blocking if at least one thread is guaranteed to make
+progress; such programs are implemented without locks, mutexes nor semaphores, using only low-level
+primitives such as atomic variables and CAS (compare-and-swap) instructions.</p>
+<p>A further distinction is generally established between “lock-free” and “wait-free” algorithms: the
+former ones allow progress of the overall system, while the latter ones allow each thread to make
+progress at any time. This distinction is however rather theoretical and is outside of the scope of
+this document.</p>
+</section>
+<section id="driver-lock-free-guarantees">
+<h2>Driver lock-free guarantees<a class="headerlink" href="#driver-lock-free-guarantees" title="Link to this heading">¶</a></h2>
+<section id="driver-lock-free-guarantees-per-execution-models">
+<h3>Driver lock-free guarantees per execution models<a class="headerlink" href="#driver-lock-free-guarantees-per-execution-models" title="Link to this heading">¶</a></h3>
+<p>The driver offers many execution models. For the built-in ones, the lock-free guarantees are as
+follows:</p>
+<ul class="simple">
+<li><p>The synchronous API is blocking and does not offer any lock-free guarantee.</p></li>
+<li><p>The <a class="reference external" href="../async">asynchronous</a> API is implemented in lock-free algorithms.</p></li>
+<li><p>The <a class="reference external" href="../reactive">reactive</a> API is implemented in lock-free algorithms (it’s actually wait-free).</p></li>
+</ul>
+<p>For example, calling any synchronous method declared in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/cql/SyncCqlSession.html%60"><code class="docutils literal notranslate"><span class="pre">SyncCqlSession</span></code></a>, such as <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/cql/SyncCqlSession.html#execute-com.datastax.oss.driver.api.core.cql.Statement-"><code class="docutils literal notranslate"><span class="pre">execute</span></code></a>,
+will block until the result is available. These methods should never be used in non-blocking
+applications.</p>
+<p>However, the asynchronous methods declared in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/cql/AsyncCqlSession.html"><code class="docutils literal notranslate"><span class="pre">AsyncCqlSession</span></code></a>, such as <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/cql/AsyncCqlSession.html#executeAsync-com.datastax.oss.driver.api.core.cql.Statement-"><code class="docutils literal notranslate"><span class="pre">executeAsync</span></code></a>, are all
+safe for use in non-blocking applications; the statement execution and asynchronous result delivery
+is guaranteed to never block.</p>
+<p>The same applies to the methods declared in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/dse/driver/api/core/cql/reactive/ReactiveSession.html"><code class="docutils literal notranslate"><span class="pre">ReactiveSession</span></code></a> such as <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/dse/driver/api/core/cql/reactive/ReactiveSession.html#executeReactive-com.datastax.oss.driver.api.core.cql.Statement-"><code class="docutils literal notranslate"><span class="pre">executeReactive</span></code></a>: the
+returned publisher will never block when subscribed to, until the final results are delivered to
+the subscriber.</p>
+<p>There is one exception though: continuous paging queries (a feature specific to DSE) have a special
+execution model which uses internal locks for coordination. Although such locks are only held for
+extremely brief periods of time, and never under high contention, this execution model doesn’t
+qualify as lock-free.</p>
+<p>As a consequence, all methods declared in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/dse/driver/api/core/cql/continuous/ContinuousSession.html"><code class="docutils literal notranslate"><span class="pre">ContinuousSession</span></code></a> and <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/dse/driver/api/core/cql/continuous/reactive/ContinuousReactiveSession.html"><code class="docutils literal notranslate"><span class="pre">ContinuousReactiveSession</span></code></a>
+cannot be considered as implemented 100% lock-free, even those built on top of the asynchronous or
+reactive APIs like <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/dse/driver/api/core/cql/continuous/ContinuousSession.html#executeContinuouslyAsync-com.datastax.oss.driver.api.core.cql.Statement-"><code class="docutils literal notranslate"><span class="pre">executeContinuouslyAsync</span></code></a> and <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/dse/driver/api/core/cql/continuous/reactive/ContinuousReactiveSession.html#executeContinuouslyReactive-com.datastax.oss.driver.api.core.cql.Statement-"><code class="docutils literal notranslate"><span class="pre">executeContinuouslyReactive</span></code></a>. In practice
+though, continuous paging is extremely efficient and can safely be used in most non-blocking
+contexts, unless they require strict lock-freedom.</p>
+</section>
+<section id="driver-lock-free-guarantees-per-session-lifecycle-phases">
+<h3>Driver lock-free guarantees per session lifecycle phases<a class="headerlink" href="#driver-lock-free-guarantees-per-session-lifecycle-phases" title="Link to this heading">¶</a></h3>
+<p>The guarantees vary according to three possible session states: initializing, running, and closing.</p>
+<p>Session initialization is a costly operation that performs many I/O operations, hitting both the
+local filesystem (configuration files) and the network (connection initialization). This procedure
+is triggered by a call to <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/session/SessionBuilder.html#buildAsync--"><code class="docutils literal notranslate"><span class="pre">SessionBuilder.buildAsync()</span></code></a> and happens partially on the calling
+thread, and partially asynchronously on an internal driver thread.</p>
+<ul class="simple">
+<li><p>The creation of the <a class="reference external" href="../../developer/common/context">driver context</a> happens synchronously on the calling thread. The context
+creation usually requires file I/O, mainly to read configuration files. A call to
+<code class="docutils literal notranslate"><span class="pre">SessionBuilder.buildAsync()</span></code>, in spite of its name, is thus a blocking call and must be
+dispatched to a thread that is allowed to block.</p></li>
+<li><p>The rest of the initialization process will happen asynchronously, on an internal driver admin
+thread. This process is mostly non-blocking, with a few exceptions listed below. Therefore,
+the driver admin thread performing the initialization tasks must be allowed to block, at least
+temporarily.</p></li>
+</ul>
+<p>For the reasons above, the initialization phase obviously doesn’t qualify as lock-free. For
+non-blocking applications, it is generally advised to trigger session initialization during
+application startup, before strong non-blocking guarantees are enforced on application threads.</p>
+<p>Similarly, a call to <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/session/SessionBuilder.html#build--"><code class="docutils literal notranslate"><span class="pre">SessionBuilder.build()</span></code></a> should be considered blocking as it will block the
+calling thread and wait until the method returns. For this reason, calls to <code class="docutils literal notranslate"><span class="pre">SessionBuilder.build()</span></code>
+should be avoided in non-blocking applications.</p>
+<p>Once the session is initialized, however, the driver is guaranteed to be non-blocking during the
+session’s lifecycle, and under normal operation, unless otherwise noted elsewhere in this document.</p>
+<p>Finally, closing the session is generally non-blocking, but the driver offers no strong guarantees
+during that phase. Therefore, calls to any method declared in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/AsyncAutoCloseable.html"><code class="docutils literal notranslate"><span class="pre">AsyncAutoCloseable</span></code></a>, including the
+asynchronous ones like <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/AsyncAutoCloseable.html#closeAsync--"><code class="docutils literal notranslate"><span class="pre">closeAsync()</span></code></a>, should also be preferably deferred until the application is
+shut down and lock-freedom enforcement is disabled.</p>
+</section>
+<section id="driver-lock-free-guarantees-for-specific-components">
+<h3>Driver lock-free guarantees for specific components<a class="headerlink" href="#driver-lock-free-guarantees-for-specific-components" title="Link to this heading">¶</a></h3>
+<p>Certain driver components are not implemented in lock-free algorithms.</p>
+<p>For example, <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/metadata/SafeInitNodeStateListener.html"><code class="docutils literal notranslate"><span class="pre">SafeInitNodeStateListener</span></code></a> is implemented with internal locks for coordination. It
+should not be used if strict lock-freedom is enforced.</p>
+<p>The same is valid for both built-in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/session/throttling/RequestThrottler.html">request throttlers</a>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ConcurrencyLimitingRequestThrottler</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RateLimitingRequestThrottler</span></code></p></li>
+</ul>
+<p>See the section about <a class="reference external" href="../throttling">throttling</a> for details about these components. Again, they
+use locks internally, and depending on how many requests are being executed in parallel, the thread
+contention on these locks can be high: in short, if your application enforces strict lock-freedom,
+then these components should not be used.</p>
+<p>Other components may be lock-free, <em>except</em> for their first invocation. This is the case of the
+following items:</p>
+<ul class="simple">
+<li><p>All built-in implementations of <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/time/TimestampGenerator.html"><code class="docutils literal notranslate"><span class="pre">TimestampGenerator</span></code></a>, upon instantiation;</p></li>
+<li><p>The utility method <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/uuid/Uuids.html#timeBased--"><code class="docutils literal notranslate"><span class="pre">Uuids.timeBased()</span></code></a>.</p></li>
+</ul>
+<p>Both components need to access native libraries when they get initialized and this may involve
+hitting the local filesystem, thus causing the initialization to become a blocking call.</p>
+<p>Timestamp generators are automatically created when the session is initialized, and are thus
+generally safe to use afterwards.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Uuids.timeBased()</span></code>, however, is a convenience method that the driver doesn’t use internally. For
+this reason, it is advised that this method be called once during application startup, so that it is
+safe to use it afterwards in a non-blocking context.</p>
+<p>Alternatively, it’s possible to disable the usage of client-side timestamp generation, and/or the
+usage of native libraries. See the manual sections on <a class="reference external" href="../query_timestamps">query timestamps</a> and
+<a class="reference external" href="../integration">integration</a> for more information.</p>
+<p>One component, the codec registry, can block when its <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/type/codec/registry/MutableCodecRegistry.html#register-com.datastax.oss.driver.api.core.type.codec.TypeCodec-"><code class="docutils literal notranslate"><span class="pre">register</span></code></a> method is called; it is
+therefore advised that codecs should be registered during application startup exclusively. See the
+<a class="reference external" href="../custom_codecs">custom codecs</a> section for more details about registering codecs.</p>
+<p>Finally, a few internal components also use locks, but only during session initialization; once the
+session is ready, they are either discarded, or don’t use locks anymore for the rest of the
+session’s lifecycle.</p>
+<p>These components are safe to use once the session is ready, although they could be reported by
+lock-freedom monitoring tools. They are listed below in case their exclusion is necessary:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.oss.driver.internal.core.context.DefaultNettyOptions</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.oss.driver.internal.core.util.concurrent.LazyReference</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.oss.driver.internal.core.util.concurrent.ReplayingEventFilter</span></code></p></li>
+</ul>
+</section>
+<section id="driver-lock-free-guarantees-on-topology-and-status-events">
+<h3>Driver lock-free guarantees on topology and status events<a class="headerlink" href="#driver-lock-free-guarantees-on-topology-and-status-events" title="Link to this heading">¶</a></h3>
+<p>Topology and status events can cause the driver to use locks temporarily.</p>
+<p>When a node gets added to the cluster, or when a node state changes (DOWN to UP or vice versa), the
+driver needs to notify a few components: the load balancing policies need to coordinate in order to
+assign a new distance to the node (LOCAL, REMOTE or IGNORED); and the node connection pool will have
+to be resized either to accommodate new connections, or to close existing ones.</p>
+<p>These operations use internal locks for coordination. Again, they are only held for extremely brief
+periods of time, and never under high contention. Note that this behavior cannot be disabled or
+changed; if you need to enforce strict lock-freedom, and topology or status changes are being
+reported as infringements, consider adding exceptions for the following method calls:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.oss.driver.internal.core.pool.ChannelSet#add(DriverChannel)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.oss.driver.internal.core.pool.ChannelSet#remote(DriverChannel)</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper$SinglePolicyDistanceReporter#setDistance(Node,NodeDistance)</span></code></p></li>
+</ul>
+</section>
+<section id="driver-lock-free-guarantees-on-random-uuid-generation">
+<h3>Driver lock-free guarantees on random uuid generation<a class="headerlink" href="#driver-lock-free-guarantees-on-random-uuid-generation" title="Link to this heading">¶</a></h3>
+<p>Until driver 4.9, the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/uuid/Uuids.html#random--"><code class="docutils literal notranslate"><span class="pre">Uuids.random()</span></code></a> method was a blocking call. Because of that, this method
+could not be used in non-blocking contexts, making UUID generation a difficult issue to solve.</p>
+<p>Moreover, this method is used in a few places internally. This situation was unfortunate because
+lock-freedom enforcement tools could report calls to that method, but it was impossible to suppress
+these calls. Thanks to <a class="reference external" href="https://datastax-oss.atlassian.net/browse/JAVA-2449">JAVA-2449</a>, released with driver 4.10.0, <code class="docutils literal notranslate"><span class="pre">Uuids.random()</span></code> became a
+non-blocking call and random UUIDs can now be safely generated in non-blocking applications.</p>
+</section>
+<section id="driver-lock-free-guarantees-when-reloading-the-configuration">
+<h3>Driver lock-free guarantees when reloading the configuration<a class="headerlink" href="#driver-lock-free-guarantees-when-reloading-the-configuration" title="Link to this heading">¶</a></h3>
+<p>The driver has a pluggable configuration mechanism built around the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html"><code class="docutils literal notranslate"><span class="pre">DriverConfigLoader</span></code></a>
+interface. Implementors may choose to support <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.11.1.x/api/com/datastax/oss/driver/api/core/config/DriverConfigLoader.html#supportsReloading--">hot-reloading</a> of configuration files, and the
+default built-in implementation has this feature enabled by default.</p>
+<p>Beware that a hot-reloading of the default configuration mechanism is performed on a driver internal
+admin thread. If hot-reloading is enabled, then this might be reported by lock-freedom infringement
+detectors. If that is the case, it is advised to disable hot-reloading by setting the
+<code class="docutils literal notranslate"><span class="pre">datastax-java-driver.basic.config-reload-interval</span></code> option to 0. See the manual page on
+<a class="reference external" href="../configuration">configuration</a> for more information.</p>
+</section>
+<section id="driver-lock-free-guarantees-when-connecting-to-dse">
+<h3>Driver lock-free guarantees when connecting to DSE<a class="headerlink" href="#driver-lock-free-guarantees-when-connecting-to-dse" title="Link to this heading">¶</a></h3>
+<p>When connecting to clusters running recent DSE versions, the driver automatically enables periodic
+status reporting. When preparing the status report, the driver has to hit the local filesystem, and
+because of that, the status reporting process does not qualify as lock-free.</p>
+<p>If lock-freedom is being enforced, then automatic status reporting must be disabled by setting the
+<code class="docutils literal notranslate"><span class="pre">datastax-java-driver.advanced.monitor-reporting.enabled</span></code> property to false in the driver
+configuration.</p>
+</section>
+</section>
+<section id="driver-mechanism-for-detection-of-blocking-calls">
+<h2>Driver mechanism for detection of blocking calls<a class="headerlink" href="#driver-mechanism-for-detection-of-blocking-calls" title="Link to this heading">¶</a></h2>
+<p>The driver has its own mechanism for detecting blocking calls happening on an internal driver
+thread. This mechanism is capable of detecting and reporting blatant cases of misuse of the
+asynchronous and reactive APIs, e.g. when the synchronous API is invoked inside a future or callback
+produced by the asynchronous execution of a statement. See the core manual page on the
+<a class="reference external" href="../async">asynchronous</a> API or the developer manual page on
+<a class="reference external" href="../../developer/common/concurrency">driver concurrency</a> for details.</p>
+<p>The driver is not capable, however, of detecting low-level lock-freedom infringements, such as the
+usage of locks. You must use an external tool to achieve that. See below how to use BlockHound for
+that.</p>
+</section>
+<section id="using-the-driver-with-reactor-blockhound">
+<h2>Using the driver with Reactor BlockHound<a class="headerlink" href="#using-the-driver-with-reactor-blockhound" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://projectreactor.io">Reactor</a>’s tool for automatic detection of blocking calls, <a class="reference external" href="https://github.com/reactor/BlockHound">BlockHound</a>, is capable of detecting
+and reporting any sort of blocking calls, including I/O, locks, <code class="docutils literal notranslate"><span class="pre">Thread.sleep</span></code>, etc.</p>
+<p>When used with the driver, BlockHound can report some calls that, for the reasons explained above,
+could be safely considered as false positives.</p>
+<p>For this reason, the driver, since version 4.10, ships with a custom <code class="docutils literal notranslate"><span class="pre">DriverBlockHoundIntegration</span></code>
+class which is automatically discovered by BlockHound through the Service Loader mechanism. It
+contains BlockHound customizations that target most of the cases detailed above, and prevent them
+from being reported as blocking calls.</p>
+<p>More specifically, the following items are currently declared to be allowed:</p>
+<ul class="simple">
+<li><p>Loading of native libraries during startup (<code class="docutils literal notranslate"><span class="pre">TimestampGenerator</span></code>);</p></li>
+<li><p>Locks held during startup only (<code class="docutils literal notranslate"><span class="pre">DefaultNettyOptions</span></code>, <code class="docutils literal notranslate"><span class="pre">LazyReference</span></code>, <code class="docutils literal notranslate"><span class="pre">ReplayingEventFilter</span></code>);</p></li>
+<li><p>Locks held during startup and topology and status events processing (<code class="docutils literal notranslate"><span class="pre">ChannelSet</span></code>,
+<code class="docutils literal notranslate"><span class="pre">DistanceReporter</span></code>);</p></li>
+<li><p>Locks held when executing continuous paging queries;</p></li>
+<li><p>Locks held during calls to <code class="docutils literal notranslate"><span class="pre">MutableCodecRegistry.register()</span></code> and <code class="docutils literal notranslate"><span class="pre">Uuids.timeBased()</span></code>.</p></li>
+</ul>
+<p>The following items are NOT declared to be allowed and are likely to be reported by BlockHound if
+used:</p>
+<ul class="simple">
+<li><p>Request throttlers;</p></li>
+<li><p>Automatic status reporting;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SafeInitNodeStateListener</span></code>.</p></li>
+</ul>
+<p>Note that other blocking startup steps, e.g. loading of configuration files, are also not declared
+to be allowed, because these are genuine blocking I/O calls. For this reason, if BlockHound is being
+used, the loading of the driver context, performed by the thread calling <code class="docutils literal notranslate"><span class="pre">SessionBuilder.build()</span></code>
+or <code class="docutils literal notranslate"><span class="pre">SessionBuilder.buildAsync()</span></code>, must be allowed to perform blocking calls.</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Non-blocking programming&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.11.1.x/manual/core/non_blocking/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../native_protocol/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Native protocol
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../paging/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Paging
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                4.11.1.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api_conventions/index.html">API conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../case_sensitivity/index.html">Case sensitivity</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Core driver</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../authentication/index.html">Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../bom/index.html">Bill of Materials (BOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../configuration/index.html">Configuration</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../configuration/reference/README.html">Reference configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../custom_codecs/index.html">Custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../detachable_types/index.html">Detachable types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../integration/index.html">Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../metadata/index.html">Metadata</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/node/index.html">Node metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/schema/index.html">Schema metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../metadata/token/index.html">Token metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Non-blocking programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../performance/index.html">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reactive/index.html">Reactive Style Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../request_tracker/index.html">Request tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/per_query_keyspace/index.html">Per-query keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../temporal_types/index.html">Temporal types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../throttling/index.html">Request throttling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tracing/index.html">Query tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../tuples/index.html">Tuples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../developer/index.html">Developer docs</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/><label for="toctree-checkbox-6"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/admin/index.html">Administrative tasks</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../developer/common/index.html">Common infrastructure</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/><label for="toctree-checkbox-7"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/context/index.html">Driver context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/event_bus/index.html">Event bus</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/native_protocol/index.html">Native protocol layer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/netty_pipeline/index.html">Netty pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/request_execution/index.html">Request execution</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../mapper/index.html">Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/><label for="toctree-checkbox-8"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/config/index.html">Integration</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label for="toctree-checkbox-9"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/kotlin/index.html">Kotlin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/lombok/index.html">Lombok</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/record/index.html">Java 14 Records</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/scala/index.html">Scala</a></li>
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/daos/index.html">DAOs</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label for="toctree-checkbox-10"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/custom_types/index.html">Custom result types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/delete/index.html">Delete methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/getentity/index.html">GetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/increment/index.html">Increment methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/insert/index.html">Insert methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/null_saving/index.html">Null saving strategy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/query/index.html">Query methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/queryprovider/index.html">Query provider methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/select/index.html">Select methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/setentity/index.html">SetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/statement_attributes/index.html">Statement attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/update/index.html">Update methods</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/entities/index.html">Entities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/mapper/index.html">Mapper interface</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../query_builder/index.html">Query builder</a><input class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" type="checkbox"/><label for="toctree-checkbox-11"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/condition/index.html">Conditions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/delete/index.html">DELETE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/idempotence/index.html">Idempotence in the query builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/insert/index.html">INSERT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/relation/index.html">Relations</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../query_builder/schema/index.html">Schema builder</a><input class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" type="checkbox"/><label for="toctree-checkbox-12"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/aggregate/index.html">Aggregate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/function/index.html">Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/index/index.html">Index</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/keyspace/index.html">Keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/materialized_view/index.html">Materialized View</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/table/index.html">Table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../query_builder/schema/type/index.html">Type</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/select/index.html">SELECT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/term/index.html">Terms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/truncate/index.html">TRUNCATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../query_builder/update/index.html">UPDATE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Non-blocking programming&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.11.1.x/manual/core/non_blocking/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/core/non_blocking/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Non-blocking programming</a><ul>
+<li><a class="reference internal" href="#quick-overview">Quick overview</a></li>
+<li><a class="reference internal" href="#definition-of-non-blocking">Definition of “non-blocking”</a></li>
+<li><a class="reference internal" href="#driver-lock-free-guarantees">Driver lock-free guarantees</a><ul>
+<li><a class="reference internal" href="#driver-lock-free-guarantees-per-execution-models">Driver lock-free guarantees per execution models</a></li>
+<li><a class="reference internal" href="#driver-lock-free-guarantees-per-session-lifecycle-phases">Driver lock-free guarantees per session lifecycle phases</a></li>
+<li><a class="reference internal" href="#driver-lock-free-guarantees-for-specific-components">Driver lock-free guarantees for specific components</a></li>
+<li><a class="reference internal" href="#driver-lock-free-guarantees-on-topology-and-status-events">Driver lock-free guarantees on topology and status events</a></li>
+<li><a class="reference internal" href="#driver-lock-free-guarantees-on-random-uuid-generation">Driver lock-free guarantees on random uuid generation</a></li>
+<li><a class="reference internal" href="#driver-lock-free-guarantees-when-reloading-the-configuration">Driver lock-free guarantees when reloading the configuration</a></li>
+<li><a class="reference internal" href="#driver-lock-free-guarantees-when-connecting-to-dse">Driver lock-free guarantees when connecting to DSE</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#driver-mechanism-for-detection-of-blocking-calls">Driver mechanism for detection of blocking calls</a></li>
+<li><a class="reference internal" href="#using-the-driver-with-reactor-blockhound">Using the driver with Reactor BlockHound</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

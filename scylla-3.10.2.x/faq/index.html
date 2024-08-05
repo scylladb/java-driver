@@ -1,0 +1,907 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Frequently Asked Questions | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/faq/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+    <span class="bread__item bread__item--last">Frequently Asked Questions</span>
+</div>
+                    </div>
+                
+                <section id="frequently-asked-questions">
+<h1>Frequently Asked Questions<a class="headerlink" href="#frequently-asked-questions" title="Link to this heading">¶</a></h1>
+<section id="how-do-i-implement-paging">
+<h2>How do I implement paging?<a class="headerlink" href="#how-do-i-implement-paging" title="Link to this heading">¶</a></h2>
+<p>When using <a class="reference external" href="../manual/native_protocol/">native protocol</a> version 2 or
+higher, the driver automatically pages large result sets under the hood.
+You can also save the paging state to resume iteration later. See <a class="reference external" href="../manual/paging/">this
+page</a> for more information.</p>
+<p>Native protocol v1 does not support paging, but you can emulate it in
+CQL with <code class="docutils literal notranslate"><span class="pre">LIMIT</span></code> and the <code class="docutils literal notranslate"><span class="pre">token()</span></code> function. See
+<a class="reference external" href="https://groups.google.com/a/lists.datastax.com/d/msg/java-driver-user/U2KzAHruWO4/6vDmUVDDkOwJ">this conversation</a> on the mailing list.</p>
+</section>
+<section id="can-i-check-if-a-conditional-statement-lightweight-transaction-was-successful">
+<h2>Can I check if a conditional statement (lightweight transaction) was successful?<a class="headerlink" href="#can-i-check-if-a-conditional-statement-lightweight-transaction-was-successful" title="Link to this heading">¶</a></h2>
+<p>When executing a conditional statement, the <code class="docutils literal notranslate"><span class="pre">ResultSet</span></code> will contain a single <code class="docutils literal notranslate"><span class="pre">Row</span></code> with a
+column named “applied” of type boolean. This tells whether the conditional statement was
+successful or not.</p>
+<p>The driver provides a convenience method <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.10.2.x/api/com/datastax/driver/core/ResultSet.html#wasApplied--">wasApplied</a> to check this on the result set directly:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ResultSet</span><span class="w"> </span><span class="n">rset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">conditionalStatement</span><span class="p">);</span>
+<span class="n">rset</span><span class="p">.</span><span class="na">wasApplied</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>You may also inspect the value yourself:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ResultSet</span><span class="w"> </span><span class="n">rset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">conditionalStatement</span><span class="p">);</span>
+<span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rset</span><span class="p">.</span><span class="na">one</span><span class="p">();</span>
+<span class="n">row</span><span class="p">.</span><span class="na">getBool</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">       </span><span class="c1">// this is equivalent row.getBool(&quot;applied&quot;)</span>
+</pre></div>
+</div>
+<p>Note that, unlike manual inspection, <code class="docutils literal notranslate"><span class="pre">wasApplied</span></code> does not consume the first row.</p>
+</section>
+<section id="what-is-a-parameterized-statement-and-how-can-i-use-it">
+<h2>What is a parameterized statement and how can I use it?<a class="headerlink" href="#what-is-a-parameterized-statement-and-how-can-i-use-it" title="Link to this heading">¶</a></h2>
+<p>Starting with Cassandra 2.0, normal statements (that is non-prepared statements) do
+not need to concatenate parameter values inside a query string. Instead you can use
+<code class="docutils literal notranslate"><span class="pre">?</span></code> markers and provide the values separately:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="w"> </span><span class="s">&quot;INSERT INTO contacts (email, firstname, lastname)</span>
+<span class="s">      VALUES (?, ?, ?)&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;clint.barton@hawkeye.com&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Barney&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Barton&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>See <a class="reference external" href="../manual/statements/simple/">Simple statements</a> for more information.</p>
+</section>
+<section id="does-a-parameterized-statement-escape-parameters">
+<h2>Does a parameterized statement escape parameters?<a class="headerlink" href="#does-a-parameterized-statement-escape-parameters" title="Link to this heading">¶</a></h2>
+<p>A parameterized statement sends the values of parameters separate from the query
+(similar to the way a prepared statement does) as bytes so there is no need to escape
+parameters.</p>
+</section>
+<section id="what-s-the-difference-between-a-parameterized-statement-and-a-prepared-statement">
+<h2>What’s the difference between a parameterized statement and a Prepared statement?<a class="headerlink" href="#what-s-the-difference-between-a-parameterized-statement-and-a-prepared-statement" title="Link to this heading">¶</a></h2>
+<p>The only similarity between a parameterized statement and a prepared statement is in
+the way that the parameters are sent. The difference is that a prepared statement:</p>
+<ul class="simple">
+<li><p>is already known on the cluster side (it has been compiled and there is an execution
+plan available for it) which leads to better performance</p></li>
+<li><p>sends only the statement id and its parameters (thus reducing the amount of data sent
+to the cluster)</p></li>
+</ul>
+<p>See <a class="reference external" href="../manual/statements/prepared/">Prepared statements</a> for more information.</p>
+</section>
+<section id="can-i-combine-preparedstatements-and-normal-statements-in-a-batch">
+<h2>Can I combine <code class="docutils literal notranslate"><span class="pre">PreparedStatements</span></code> and normal statements in a batch?<a class="headerlink" href="#can-i-combine-preparedstatements-and-normal-statements-in-a-batch" title="Link to this heading">¶</a></h2>
+<p>Yes. A batch can include both bound statements and simple statements:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PreparedStatement</span><span class="w"> </span><span class="n">ps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="w"> </span><span class="s">&quot;INSERT INTO contacts (email, firstname, lastname)</span>
+<span class="s">      VALUES (?, ?, ?)&quot;</span><span class="p">);</span>
+<span class="n">BatchStatement</span><span class="w"> </span><span class="n">batch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">BatchStatement</span><span class="p">();</span>
+<span class="n">batch</span><span class="p">.</span><span class="na">add</span><span class="p">(</span><span class="n">ps</span><span class="p">.</span><span class="na">bind</span><span class="p">(...));</span>
+<span class="n">batch</span><span class="p">.</span><span class="na">add</span><span class="p">(</span><span class="n">ps</span><span class="p">.</span><span class="na">bind</span><span class="p">(...));</span>
+<span class="c1">// here&#39;s a simple statement</span>
+<span class="n">batch</span><span class="p">.</span><span class="na">add</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">SimpleStatement</span><span class="p">(</span><span class="w"> </span><span class="s">&quot;INSERT INTO contacts (email, firstname, lastname) VALUES (?, ?, ?)&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">...));</span>
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">batch</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="why-do-my-select-preparedstatement-based-queries-stop-working-after-a-schema-change">
+<h2>Why do my ‘SELECT *’ <code class="docutils literal notranslate"><span class="pre">PreparedStatement</span></code>-based queries stop working after a schema change?<a class="headerlink" href="#why-do-my-select-preparedstatement-based-queries-stop-working-after-a-schema-change" title="Link to this heading">¶</a></h2>
+<p>Both the driver and Cassandra maintain a mapping of <code class="docutils literal notranslate"><span class="pre">PreparedStatement</span></code> queries to their
+metadata.  When a change is made to a table, such as a column being added or dropped, there
+is currently no mechanism for Cassandra to invalidate the existing metadata.  Because of this,
+the driver is not able to properly react to these changes and will improperly read rows after
+a schema change is made.</p>
+<p>See <a class="reference external" href="../manual/statements/prepared">Prepared statements</a> for more information.</p>
+</section>
+<section id="can-i-get-the-raw-bytes-of-a-text-column">
+<h2>Can I get the raw bytes of a text column?<a class="headerlink" href="#can-i-get-the-raw-bytes-of-a-text-column" title="Link to this heading">¶</a></h2>
+<p>If you need to access the raw bytes of a text column, call the
+<code class="docutils literal notranslate"><span class="pre">Row.getBytesUnsafe(&quot;columnName&quot;)</span></code> method.</p>
+<p>Trying to use <code class="docutils literal notranslate"><span class="pre">Row.getBytes(&quot;columnName&quot;)</span></code> for the same purpose results in an
+exception, as the <code class="docutils literal notranslate"><span class="pre">getBytes</span></code> method can only be used if the column has the CQL type <code class="docutils literal notranslate"><span class="pre">BLOB</span></code>.</p>
+</section>
+<section id="how-do-i-increment-counters-with-querybuilder">
+<h2>How do I increment counters with <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code>?<a class="headerlink" href="#how-do-i-increment-counters-with-querybuilder" title="Link to this heading">¶</a></h2>
+<p>Considering the following query:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">UPDATE</span><span class="w"> </span><span class="n">clickstream</span><span class="w"> </span><span class="n">SET</span><span class="w"> </span><span class="n">clicks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">clicks</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">WHERE</span><span class="w"> </span><span class="n">userid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">id</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>To do this using <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Statement</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">QueryBuilder</span><span class="p">.</span><span class="na">update</span><span class="p">(</span><span class="s">&quot;clickstream&quot;</span><span class="p">)</span>
+<span class="w">                              </span><span class="p">.</span><span class="na">with</span><span class="p">(</span><span class="n">incr</span><span class="p">(</span><span class="s">&quot;clicks&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">))</span><span class="w"> </span><span class="c1">// Use incr for counters</span>
+<span class="w">                              </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;userid&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="p">));</span>
+</pre></div>
+</div>
+</section>
+<section id="is-there-a-way-to-control-the-batch-size-of-the-results-returned-from-a-query">
+<h2>Is there a way to control the batch size of the results returned from a query?<a class="headerlink" href="#is-there-a-way-to-control-the-batch-size-of-the-results-returned-from-a-query" title="Link to this heading">¶</a></h2>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">setFetchSize()</span></code> method on your <code class="docutils literal notranslate"><span class="pre">Statement</span></code> object. The fetch size controls
+how many resulting rows are retrieved simultaneously (the goal being to avoid
+loading too many results in memory for queries yielding large result sets).</p>
+<p>Keep in mind that if your code iterates the <code class="docutils literal notranslate"><span class="pre">ResultSet</span></code> entirely, the driver may
+run additional background queries to fetch the rest of the data. The fetch size
+only affects what is retrieved at a time, not the overall number of rows.</p>
+<p>See <a class="reference external" href="../manual/paging/">Paging</a> for more information.</p>
+</section>
+<section id="what-s-the-difference-between-using-setfetchsize-and-limit">
+<h2>What’s the difference between using <code class="docutils literal notranslate"><span class="pre">setFetchSize()</span></code> and <code class="docutils literal notranslate"><span class="pre">LIMIT</span></code>?<a class="headerlink" href="#what-s-the-difference-between-using-setfetchsize-and-limit" title="Link to this heading">¶</a></h2>
+<p>Basically, <code class="docutils literal notranslate"><span class="pre">LIMIT</span></code> controls the maximum number of results returned by the query,
+while the <code class="docutils literal notranslate"><span class="pre">setFetchSize()</span></code> method controls the amount of data transferred at a time.</p>
+<p>For example, if you limit is 30 and your fetch size is 10, the <code class="docutils literal notranslate"><span class="pre">ResultSet</span></code> will contain
+30 rows, but under the hood the driver will perform 3 requests that will transfer 10
+rows each.</p>
+<p>See <a class="reference external" href="../manual/paging/">Paging</a> for more information.</p>
+</section>
+<section id="i-m-reading-a-blob-column-and-the-driver-returns-incorrect-data">
+<h2>I’m reading a BLOB column and the driver returns incorrect data.<a class="headerlink" href="#i-m-reading-a-blob-column-and-the-driver-returns-incorrect-data" title="Link to this heading">¶</a></h2>
+<p>Check your code to ensure that you read the returned <code class="docutils literal notranslate"><span class="pre">ByteBuffer</span></code> correctly. <code class="docutils literal notranslate"><span class="pre">ByteBuffer</span></code> is a very error-prone API,
+and we’ve had many reports where the problem turned out to be in user code.</p>
+<p>See <a class="reference external" href="https://github.com/datastax/java-driver/tree/3.x/driver-examples/src/main/java/com/datastax/driver/examples/datatypes/Blobs.java">Blobs.java</a> in the <code class="docutils literal notranslate"><span class="pre">driver-examples</span></code> module for some examples and explanations.</p>
+</section>
+<section id="how-do-i-use-the-driver-in-an-osgi-application">
+<h2>How do I use the driver in an OSGi application?<a class="headerlink" href="#how-do-i-use-the-driver-in-an-osgi-application" title="Link to this heading">¶</a></h2>
+<p>Read our <a class="reference external" href="osgi/">OSGi-specific FAQ section</a> to find out.</p>
+</section>
+<section id="why-am-i-seeing-messages-about-tombstone-warn-threshold-or-tombstone-fail-threshold-being-exceeded-in-my-cassandra-logs">
+<h2>Why am I seeing messages about <code class="docutils literal notranslate"><span class="pre">tombstone_warn_threshold</span></code> or <code class="docutils literal notranslate"><span class="pre">tombstone_fail_threshold</span></code> being exceeded in my Cassandra logs?<a class="headerlink" href="#why-am-i-seeing-messages-about-tombstone-warn-threshold-or-tombstone-fail-threshold-being-exceeded-in-my-cassandra-logs" title="Link to this heading">¶</a></h2>
+<p>Applications which use the object mapper or set <code class="docutils literal notranslate"><span class="pre">null</span></code> values in their
+statements may observe that many tombstones are being stored in their tables
+which subsequently may lead to poor query performance, failed queries, or
+columns being mysteriously deleted.</p>
+<p>This is caused by INSERT/UPDATE statements containing <code class="docutils literal notranslate"><span class="pre">null</span></code> values for columns
+that a user does not intend to change.  Common circumstances around this come
+from using the object mapper or writing your own persistence layer and
+attempting to reuse the same <code class="docutils literal notranslate"><span class="pre">PreparedStatement</span></code> for inserting data, even with
+partial updates.</p>
+<p>Prior to cassandra 2.2, there was no means of reusing the same
+<code class="docutils literal notranslate"><span class="pre">PreparedStatement</span></code> for making partial updates to different columns.</p>
+<p>For example, given the following code:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PreparedStatement</span><span class="w"> </span><span class="n">prepared</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="s">&quot;INSERT INTO contacts (email, firstname, lastname) VALUES (?, ?, ?)&quot;</span><span class="p">);</span>
+<span class="n">BoundStatement</span><span class="w"> </span><span class="n">bound</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prepared</span><span class="p">.</span><span class="na">bind</span><span class="p">();</span>
+<span class="n">bound</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;email&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;clint.barton@hawkeye.com&quot;</span><span class="p">);</span>
+<span class="n">bound</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;firstname&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Barney&quot;</span><span class="p">);</span>
+<span class="c1">// creates a tombstone!!</span>
+<span class="n">bound</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;lastname&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>If one wanted to use this query to update only <code class="docutils literal notranslate"><span class="pre">firstname</span></code> this would not
+be achievable without binding the <code class="docutils literal notranslate"><span class="pre">lastname</span></code> parameter to <code class="docutils literal notranslate"><span class="pre">null</span></code>.  This would
+have an undesired side effect of creating a tombstone for <code class="docutils literal notranslate"><span class="pre">lastname</span></code> and thus
+to the user giving the impression that <code class="docutils literal notranslate"><span class="pre">lastname</span></code> was deleted.</p>
+<p>In cassandra 2.2 and later with protocol v4, bind parameters (<code class="docutils literal notranslate"><span class="pre">?</span></code>) can
+optionally be left unset.
+(<a class="reference external" href="https://issues.apache.org/jira/browse/CASSANDRA-7304">CASSANDRA-7304</a>):</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PreparedStatement</span><span class="w"> </span><span class="n">prepared</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="s">&quot;INSERT INTO contacts (email, firstname, lastname) VALUES (?, ?, ?)&quot;</span><span class="p">);</span>
+<span class="n">BoundStatement</span><span class="w"> </span><span class="n">bound</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prepared</span><span class="p">.</span><span class="na">bind</span><span class="p">();</span>
+<span class="n">bound</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;email&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;clint.barton@hawkeye.com&quot;</span><span class="p">);</span>
+<span class="n">bound</span><span class="p">.</span><span class="na">set</span><span class="p">(</span><span class="s">&quot;firstname&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Barney&quot;</span><span class="p">);</span>
+<span class="c1">// lastname is left unset.</span>
+</pre></div>
+</div>
+<p>See <a class="reference external" href="../manual/statements/prepared/#parameters-and-binding">Parameters and Binding</a> for more details about unset parameters.</p>
+<p>Another possible root cause for this is using the object mapper and leaving
+fields set to <code class="docutils literal notranslate"><span class="pre">null</span></code>.  This also causes tombstones to be inserted unless
+setting <code class="docutils literal notranslate"><span class="pre">saveNullFields</span></code> option to false.
+See <a class="reference external" href="../manual/object_mapper/using/#mapper-options">Mapper options</a> for more details.</p>
+</section>
+<section id="i-am-encountering-busypoolexception-what-does-this-mean-and-how-do-i-avoid-it">
+<h2>I am encountering <code class="docutils literal notranslate"><span class="pre">BusyPoolException</span></code>, what does this mean and how do I avoid it?<a class="headerlink" href="#i-am-encountering-busypoolexception-what-does-this-mean-and-how-do-i-avoid-it" title="Link to this heading">¶</a></h2>
+<p>Often while writing a bulk loading program or an application that does many concurrent operations a user may encounter
+exceptions such as the following:</p>
+<blockquote>
+<div><p>com.datastax.driver.core.exceptions.BusyPoolException: [/X.X.X.X] Pool is busy (no available connection and the queue
+has reached its max size 256)</p>
+</div></blockquote>
+<p>This typically means that your application is submitting too many concurrent requests and not enforcing any limitation
+on the number of requests that are being processed at once.  A common mistake users might make is firing off a bunch
+of queries using <code class="docutils literal notranslate"><span class="pre">executeAsync</span></code> and not waiting for them to complete before submitting more.</p>
+<p>One simple approach to remedying this is to use something like a <a class="reference external" href="https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/Semaphore.html">Semaphore</a> to limit the number of concurrent
+<code class="docutils literal notranslate"><span class="pre">executeAsync</span></code> requests at a time.  Alternatively, one could submit requests X at a time and collect the returned
+<code class="docutils literal notranslate"><span class="pre">ResultSetFuture</span></code>s from <code class="docutils literal notranslate"><span class="pre">executeAsync</span></code> and use <a class="reference external" href="https://google.github.io/guava/releases/19.0/api/docs/com/google/common/util/concurrent/Futures.html#allAsList(java.lang.Iterable)">Futures.allAsList</a> and wait on completion of the resulting future
+before submitting the next batch.</p>
+<p>See the <a class="reference external" href="../manual/pooling/#acquisition-queue">Acquisition queue</a> section of the Pooling section in the manual for explanation of how the driver enqueues
+requests when connections are over-utilized.</p>
+</section>
+<section id="what-is-netty-s-native-epoll-transport-and-how-do-i-enable-or-disable-it">
+<h2>What is Netty’s native epoll transport and how do I enable or disable it?<a class="headerlink" href="#what-is-netty-s-native-epoll-transport-and-how-do-i-enable-or-disable-it" title="Link to this heading">¶</a></h2>
+<p>Netty provides <a class="reference external" href="http://netty.io/wiki/native-transports.html">native transport libraries</a> which generally generate less
+garbage and improve performance when compared to the default NIO-based transport.
+By default if the driver detects the  <code class="docutils literal notranslate"><span class="pre">netty-transport-native-epoll</span></code> library in its classpath it will attempt to use
+<a class="reference external" href="https://netty.io/4.0/api/io/netty/channel/epoll/EpollEventLoopGroup.html"><code class="docutils literal notranslate"><span class="pre">EpollEventLoopGroup</span></code></a> for its underlying
+event loop.</p>
+<p>In the usual case this works fine in linux environments.  On the other hand, many users have run into compatibility
+issues when the version of <code class="docutils literal notranslate"><span class="pre">netty-transport-native-epoll</span></code> is not compatible with a version of Netty in an application’s
+classpath.  One such case is where an application depends on a version of <code class="docutils literal notranslate"><span class="pre">netty-all</span></code> that is different than the
+version of <code class="docutils literal notranslate"><span class="pre">netty-handler</span></code> that the driver depends on.  In such a case, a user may encounter an exception such as the
+one described in <a class="reference external" href="https://datastax-oss.atlassian.net/browse/JAVA-1535">JAVA-1535</a>.</p>
+<p>While the epoll transport may in general improve performance, we expect the improvement to be marginal for a lot of use
+cases.  Therefore, if you don’t want <code class="docutils literal notranslate"><span class="pre">netty-transport-native-epoll</span></code> to be used by the driver even if the library is
+present in an application’s classpath, the most direct way to disable this is to provide the system property value
+<code class="docutils literal notranslate"><span class="pre">-Dcom.datastax.driver.FORCE_NIO=true</span></code> to your application to force the use of the default Netty NIO-based event loop.
+If properly used, the following log message will be logged at INFO on startup:</p>
+<blockquote>
+<div><p>Found Netty’s native epoll transport in the classpath, but NIO was forced through the FORCE_NIO system property.</p>
+</div></blockquote>
+</section>
+<section id="why-am-i-encountering-nosuchmethodfoundexception-noclassdeffounderror-or-verifyerrors-and-how-do-i-avoid-them">
+<h2>Why am I encountering <code class="docutils literal notranslate"><span class="pre">NoSuchMethodFoundException</span></code>, <code class="docutils literal notranslate"><span class="pre">NoClassDefFoundError</span></code>, or <code class="docutils literal notranslate"><span class="pre">VerifyError</span></code>s and how do I avoid them?<a class="headerlink" href="#why-am-i-encountering-nosuchmethodfoundexception-noclassdeffounderror-or-verifyerrors-and-how-do-i-avoid-them" title="Link to this heading">¶</a></h2>
+<p>Incompatibilities between the java driver and other libraries may cause these exceptions to surface in your
+application at runtime.</p>
+<p>It could be that an older or newer version of a library that the driver depends on, such as Netty
+or Guava, may be present in your application’s classpath.  If using Maven or another dependency
+management tool, the tool should offer a command, such as <code class="docutils literal notranslate"><span class="pre">mvn</span> <span class="pre">dependency:tree</span></code> to identify the dependencies
+in your project to help you understand the dependent versions across the various libraries you use in your
+project.  You may also want to evaluate your classpath to see if there are multiple JARs present for a library,
+but with different versions, which could cause compatibility issues.  In addition, consider evaluating
+using the Logback logging framework, which provides the capability to include <a class="reference external" href="https://logback.qos.ch/reasonsToSwitch.html#packagingData">packaging data</a> for classes
+in stack traces.</p>
+<p>For Netty in particular, the driver offers an alternative artifact that shades its Netty dependency,
+allowing you to use newer or older versions of Netty in your application without impacting the driver.
+See <a class="reference external" href="../manual/shaded_jar">Using the shaded JAR</a> for more details.</p>
+<p>Another possibility could be that another library depends on a different version of the driver.
+In this case, observe the stacktrace of the exception to see which library is attempting to use
+the driver.  To identify compatible versions, check that library’s dependency on the driver to understand
+what version is compatible.</p>
+<p>Finally, some monitoring and agent-based tools such as <a class="reference external" href="https://www.dynatrace.com/">DynaTrace</a> offer solutions that instrument the driver to
+observe and record useful metrics such as request rates, latencies and more.  It is possible that the tool
+is not compatible with the version of the java driver you are using.  In this case, check to
+see if a newer version of that tool is available that works with this version of the driver.  If no such
+version is available, you may want to reach out to the maintainer of that tool to request that they provide
+an update with compatibility to this driver version.</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Frequently Asked Questions&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.10.2.x/faq/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Queries and Results
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../changelog/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Changelog
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.10.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API Documentation</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../manual/index.html">Manual</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2"><a class="reference internal" href="../manual/address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../manual/object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../manual/object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../manual/object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../manual/object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../manual/statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../manual/statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../manual/statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../manual/statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../manual/statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../manual/udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Frequently Asked Questions&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.10.2.x/faq/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/faq/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Frequently Asked Questions</a><ul>
+<li><a class="reference internal" href="#how-do-i-implement-paging">How do I implement paging?</a></li>
+<li><a class="reference internal" href="#can-i-check-if-a-conditional-statement-lightweight-transaction-was-successful">Can I check if a conditional statement (lightweight transaction) was successful?</a></li>
+<li><a class="reference internal" href="#what-is-a-parameterized-statement-and-how-can-i-use-it">What is a parameterized statement and how can I use it?</a></li>
+<li><a class="reference internal" href="#does-a-parameterized-statement-escape-parameters">Does a parameterized statement escape parameters?</a></li>
+<li><a class="reference internal" href="#what-s-the-difference-between-a-parameterized-statement-and-a-prepared-statement">What’s the difference between a parameterized statement and a Prepared statement?</a></li>
+<li><a class="reference internal" href="#can-i-combine-preparedstatements-and-normal-statements-in-a-batch">Can I combine <code class="docutils literal notranslate"><span class="pre">PreparedStatements</span></code> and normal statements in a batch?</a></li>
+<li><a class="reference internal" href="#why-do-my-select-preparedstatement-based-queries-stop-working-after-a-schema-change">Why do my ‘SELECT *’ <code class="docutils literal notranslate"><span class="pre">PreparedStatement</span></code>-based queries stop working after a schema change?</a></li>
+<li><a class="reference internal" href="#can-i-get-the-raw-bytes-of-a-text-column">Can I get the raw bytes of a text column?</a></li>
+<li><a class="reference internal" href="#how-do-i-increment-counters-with-querybuilder">How do I increment counters with <code class="docutils literal notranslate"><span class="pre">QueryBuilder</span></code>?</a></li>
+<li><a class="reference internal" href="#is-there-a-way-to-control-the-batch-size-of-the-results-returned-from-a-query">Is there a way to control the batch size of the results returned from a query?</a></li>
+<li><a class="reference internal" href="#what-s-the-difference-between-using-setfetchsize-and-limit">What’s the difference between using <code class="docutils literal notranslate"><span class="pre">setFetchSize()</span></code> and <code class="docutils literal notranslate"><span class="pre">LIMIT</span></code>?</a></li>
+<li><a class="reference internal" href="#i-m-reading-a-blob-column-and-the-driver-returns-incorrect-data">I’m reading a BLOB column and the driver returns incorrect data.</a></li>
+<li><a class="reference internal" href="#how-do-i-use-the-driver-in-an-osgi-application">How do I use the driver in an OSGi application?</a></li>
+<li><a class="reference internal" href="#why-am-i-seeing-messages-about-tombstone-warn-threshold-or-tombstone-fail-threshold-being-exceeded-in-my-cassandra-logs">Why am I seeing messages about <code class="docutils literal notranslate"><span class="pre">tombstone_warn_threshold</span></code> or <code class="docutils literal notranslate"><span class="pre">tombstone_fail_threshold</span></code> being exceeded in my Cassandra logs?</a></li>
+<li><a class="reference internal" href="#i-am-encountering-busypoolexception-what-does-this-mean-and-how-do-i-avoid-it">I am encountering <code class="docutils literal notranslate"><span class="pre">BusyPoolException</span></code>, what does this mean and how do I avoid it?</a></li>
+<li><a class="reference internal" href="#what-is-netty-s-native-epoll-transport-and-how-do-i-enable-or-disable-it">What is Netty’s native epoll transport and how do I enable or disable it?</a></li>
+<li><a class="reference internal" href="#why-am-i-encountering-nosuchmethodfoundexception-noclassdeffounderror-or-verifyerrors-and-how-do-i-avoid-them">Why am I encountering <code class="docutils literal notranslate"><span class="pre">NoSuchMethodFoundException</span></code>, <code class="docutils literal notranslate"><span class="pre">NoClassDefFoundError</span></code>, or <code class="docutils literal notranslate"><span class="pre">VerifyError</span></code>s and how do I avoid them?</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

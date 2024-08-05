@@ -1,0 +1,1102 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             SELECT | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/query_builder/select/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Query builder
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">SELECT</span>
+</div>
+                    </div>
+                
+                <section id="select">
+<h1>SELECT<a class="headerlink" href="#select" title="Link to this heading">¶</a></h1>
+<p>Start your SELECT with the <code class="docutils literal notranslate"><span class="pre">selectFrom</span></code> method in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/querybuilder/QueryBuilder.html">QueryBuilder</a>. There are several variants
+depending on whether your table name is qualified, and whether you use
+<a class="reference external" href="../../case_sensitivity/">identifiers</a> or raw strings:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import static</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.querybuilder.QueryBuilder.*</span><span class="p">;</span>
+
+<span class="n">SelectFrom</span><span class="w"> </span><span class="n">selectUser</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note that, at this stage, the query can’t be built yet. You need at least one selector.</p>
+<section id="selectors">
+<h2>Selectors<a class="headerlink" href="#selectors" title="Link to this heading">¶</a></h2>
+<p>A selector is something that appears after the <code class="docutils literal notranslate"><span class="pre">SELECT</span></code> keyword, and will become a column in the
+result set. Its simplest form is a column identifier, but it can be a more complex expression.</p>
+<p>The easiest way to add a selector is with one of the fluent shortcuts:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT first_name,last_name FROM user</span>
+</pre></div>
+</div>
+<p>You can also create it manually with one of the factory methods in <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-4.15.0.x/api/com/datastax/oss/driver/api/querybuilder/select/Selector.html">Selector</a>, and then pass it to
+<code class="docutils literal notranslate"><span class="pre">selector()</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">selector</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT first_name FROM user</span>
+</pre></div>
+</div>
+<p>If you have multiple selectors, you can also use <code class="docutils literal notranslate"><span class="pre">selectors()</span></code> to add them all in a single call.
+This is a bit more efficient since it creates less temporary objects:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">selectors</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT first_name,last_name FROM user</span>
+</pre></div>
+</div>
+<p>Use an alias to give a selector a different name in the result set:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">).</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;first&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT first_name AS first FROM user</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">selector</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">).</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;first&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT first_name AS first FROM user</span>
+</pre></div>
+</div>
+<p>The query builder provides many kinds of selectors. Some of them only work with newer Cassandra
+versions, always check what your target platform supports.</p>
+<section id="star-selector-and-count">
+<h3>Star selector and count<a class="headerlink" href="#star-selector-and-count" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">all</span></code> is the classic “star” selector that returns all columns. It cannot be aliased, and must be the
+only selector:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">all</span><span class="p">();</span>
+<span class="c1">// SELECT * FROM user</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">all</span><span class="p">().</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;everything&quot;</span><span class="p">);</span>
+<span class="c1">// throws IllegalStateException: Can&#39;t alias the * selector</span>
+</pre></div>
+</div>
+<p>If you add it to a query that already had other selectors, they will get removed:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">).</span><span class="na">all</span><span class="p">();</span>
+<span class="c1">// SELECT * FROM user</span>
+</pre></div>
+</div>
+<p>If you add other selectors to a query that already had the star selector, the star selector gets
+removed:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">all</span><span class="p">().</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT first_name FROM user</span>
+</pre></div>
+</div>
+<p>If you add multiple selectors at once, and one of them is the star selector, an exception is thrown:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">selectors</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">all</span><span class="p">(),</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">));</span>
+<span class="c1">// throws IllegalArgumentException: Can&#39;t pass the * selector to selectors()</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">countAll</span></code> counts the number of rows:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">countAll</span><span class="p">();</span>
+<span class="c1">// SELECT count(*) FROM user</span>
+</pre></div>
+</div>
+</section>
+<section id="columns">
+<h3>Columns<a class="headerlink" href="#columns" title="Link to this heading">¶</a></h3>
+<p>We’ve already shown how <code class="docutils literal notranslate"><span class="pre">column</span></code> works:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT first_name,last_name FROM user</span>
+</pre></div>
+</div>
+<p>When all your selectors are simple columns, there is a convenience shortcut to add them in one call:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">columns</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;last_name&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT first_name,last_name FROM user</span>
+</pre></div>
+</div>
+</section>
+<section id="arithmetic-operations">
+<h3>Arithmetic operations<a class="headerlink" href="#arithmetic-operations" title="Link to this heading">¶</a></h3>
+<p>Selectors can be combined with arithmetic operations.</p>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>CQL Operator</th>
+<th>Selector name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>a+b</code></td>
+<td><code>add</code></td>
+</tr>
+<tr>
+<td><code>a-b</code></td>
+<td><code>subtract</code></td>
+</tr>
+<tr>
+<td><code>-a</code></td>
+<td><code>negate</code></td>
+</tr>
+<tr>
+<td><code>a*b</code></td>
+<td><code>multiply</code></td>
+</tr>
+<tr>
+<td><code>a/b</code></td>
+<td><code>divide</code></td>
+</tr>
+<tr>
+<td><code>a%b</code></td>
+<td><code>remainder</code></td>
+</tr>
+</tbody>
+</table><div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;rooms&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">multiply</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;length&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;width&quot;</span><span class="p">))</span>
+<span class="w">    </span><span class="p">.</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;surface&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT length*width AS surface FROM rooms</span>
+</pre></div>
+</div>
+<p>Operations can be nested, and will get parenthesized according to the usual precedence rules:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;foo&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">multiply</span><span class="p">(</span>
+<span class="w">        </span><span class="n">Selector</span><span class="p">.</span><span class="na">negate</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;a&quot;</span><span class="p">)),</span>
+<span class="w">        </span><span class="n">Selector</span><span class="p">.</span><span class="na">add</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;b&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;c&quot;</span><span class="p">)));</span>
+<span class="c1">// SELECT -a*(b+c) FROM foo</span>
+</pre></div>
+</div>
+<p>Note: as shown in the examples above, arithmetic operations can get verbose very quickly. If you
+have common expressions that get reused throughout your application code, consider writing your own
+shortcuts:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="n">Selector</span><span class="w"> </span><span class="nf">multiplyColumns</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">left</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">right</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">multiply</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="n">left</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="n">right</span><span class="p">));</span>
+<span class="p">}</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;rooms&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">selector</span><span class="p">(</span><span class="n">multiplyColumns</span><span class="p">(</span><span class="s">&quot;length&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;width&quot;</span><span class="p">))</span>
+<span class="w">    </span><span class="p">.</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;surface&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT length*width AS surface FROM rooms</span>
+</pre></div>
+</div>
+</section>
+<section id="casts">
+<h3>Casts<a class="headerlink" href="#casts" title="Link to this heading">¶</a></h3>
+<p>Casting is closely related to arithmetic operations; it allows you to coerce a selector to a
+different data type. For example, if <code class="docutils literal notranslate"><span class="pre">height</span></code> and <code class="docutils literal notranslate"><span class="pre">weight</span></code> are two <code class="docutils literal notranslate"><span class="pre">int</span></code> columns, the following
+expression uses integer division and returns an <code class="docutils literal notranslate"><span class="pre">int</span></code>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">divide</span><span class="p">(</span>
+<span class="w">        </span><span class="n">Selector</span><span class="p">.</span><span class="na">multiply</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;weight&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">literal</span><span class="p">(</span><span class="mi">10_000</span><span class="p">)),</span>
+<span class="w">        </span><span class="n">Selector</span><span class="p">.</span><span class="na">multiply</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;height&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;height&quot;</span><span class="p">)))</span>
+<span class="w">    </span><span class="p">.</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;bmi&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT weight*10000/(height*height) AS bmi FROM user</span>
+</pre></div>
+</div>
+<p>What if you want a floating-point result instead? You have to introduce a cast:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">divide</span><span class="p">(</span>
+<span class="w">        </span><span class="n">Selector</span><span class="p">.</span><span class="na">multiply</span><span class="p">(</span>
+<span class="w">            </span><span class="n">Selector</span><span class="p">.</span><span class="na">cast</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;weight&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">DataTypes</span><span class="p">.</span><span class="na">DOUBLE</span><span class="p">),</span>
+<span class="w">            </span><span class="n">literal</span><span class="p">(</span><span class="mi">10_000</span><span class="p">)),</span>
+<span class="w">        </span><span class="n">Selector</span><span class="p">.</span><span class="na">multiply</span><span class="p">(</span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;height&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;height&quot;</span><span class="p">)))</span>
+<span class="w">    </span><span class="p">.</span><span class="na">as</span><span class="p">(</span><span class="s">&quot;bmi&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT CAST(weight AS double)*10000/(height*height) AS bmi FROM user</span>
+</pre></div>
+</div>
+<p>Type hints are similar to casts, with a subtle difference: a cast applies to an expression with an
+already well-established type, whereas a hint is used with a literal, where the type can be
+ambiguous.</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;foo&quot;</span><span class="p">).</span><span class="na">divide</span><span class="p">(</span>
+<span class="w">    </span><span class="c1">// A literal 1 can be any numeric type (int, bigint, double, etc.)</span>
+<span class="w">    </span><span class="c1">// It defaults to int, which is wrong here if we want a floating-point result.</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">typeHint</span><span class="p">(</span><span class="n">literal</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="n">DataTypes</span><span class="p">.</span><span class="na">DOUBLE</span><span class="p">),</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;a&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT (double)1/a FROM foo</span>
+</pre></div>
+</div>
+</section>
+<section id="sub-elements">
+<h3>Sub-elements<a class="headerlink" href="#sub-elements" title="Link to this heading">¶</a></h3>
+<p>These selectors extract an element from a complex column, for example:</p>
+<ul>
+<li><p>a field from a user-defined type:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">field</span><span class="p">(</span><span class="s">&quot;address&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;street&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT address.street FROM user</span>
+</pre></div>
+</div>
+</li>
+<li><p>an element, or range of elements, in a set or a map:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;product&quot;</span><span class="p">).</span><span class="na">element</span><span class="p">(</span><span class="s">&quot;features&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">literal</span><span class="p">(</span><span class="s">&quot;color&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT features[&#39;color&#39;] FROM product</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;movie&quot;</span><span class="p">).</span><span class="na">range</span><span class="p">(</span><span class="s">&quot;ratings&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">literal</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span><span class="w"> </span><span class="n">literal</span><span class="p">(</span><span class="mi">4</span><span class="p">));</span>
+<span class="c1">// SELECT ratings[3..4] FROM movie</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;movie&quot;</span><span class="p">).</span><span class="na">range</span><span class="p">(</span><span class="s">&quot;ratings&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">literal</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span><span class="w"> </span><span class="kc">null</span><span class="p">);</span>
+<span class="c1">// SELECT ratings[3..] FROM movie</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;movie&quot;</span><span class="p">).</span><span class="na">range</span><span class="p">(</span><span class="s">&quot;ratings&quot;</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="n">literal</span><span class="p">(</span><span class="mi">3</span><span class="p">));</span>
+<span class="c1">// SELECT ratings[..3] FROM movie</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="collections-of-selectors">
+<h3>Collections of selectors<a class="headerlink" href="#collections-of-selectors" title="Link to this heading">¶</a></h3>
+<p>Groups of selectors can be extracted as a single collection, such as:</p>
+<ul>
+<li><p>a list or set. All inner selectors must return the same CQL type:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">listOf</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT [first_name,last_name] FROM user</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">setOf</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT {first_name,last_name} FROM user</span>
+</pre></div>
+</div>
+</li>
+<li><p>a map. All key and value selectors must have consistent types. In most cases, Cassandra will
+require a type hint for the outer map, so the query builder can generate that for you if you
+provide the key and value types:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Map</span><span class="o">&lt;</span><span class="n">Selector</span><span class="p">,</span><span class="w"> </span><span class="n">Selector</span><span class="o">&gt;</span><span class="w"> </span><span class="n">mapSelector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">HashMap</span><span class="o">&lt;&gt;</span><span class="p">();</span>
+<span class="n">mapSelector</span><span class="p">.</span><span class="na">put</span><span class="p">(</span><span class="n">literal</span><span class="p">(</span><span class="s">&quot;first&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">));</span>
+<span class="n">mapSelector</span><span class="p">.</span><span class="na">put</span><span class="p">(</span><span class="n">literal</span><span class="p">(</span><span class="s">&quot;last&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">));</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">mapOf</span><span class="p">(</span><span class="n">mapSelector</span><span class="p">,</span><span class="w"> </span><span class="n">DataTypes</span><span class="p">.</span><span class="na">TEXT</span><span class="p">,</span><span class="w"> </span><span class="n">DataTypes</span><span class="p">.</span><span class="na">TEXT</span><span class="p">);</span>
+<span class="c1">// SELECT (map&lt;text,text&gt;){&#39;first&#39;:first_name,&#39;last&#39;:last_name} FROM user</span>
+</pre></div>
+</div>
+</li>
+<li><p>a tuple. This time the types can be heterogeneous:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">tupleOf</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">),</span>
+<span class="w">    </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;birth_date&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT (first_name,birth_date) FROM user</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="functions">
+<h3>Functions<a class="headerlink" href="#functions" title="Link to this heading">¶</a></h3>
+<p>Function calls take a function name (optionally qualified with a keyspace), and a list of selectors
+that will be passed as arguments:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">function</span><span class="p">(</span><span class="s">&quot;utils&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;bmi&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;weight&quot;</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;height&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT utils.bmi(weight,height) FROM user</span>
+</pre></div>
+</div>
+<p>The built-in functions <code class="docutils literal notranslate"><span class="pre">ttl</span></code> and <code class="docutils literal notranslate"><span class="pre">writetime</span></code> have convenience shortcuts:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">writeTime</span><span class="p">(</span><span class="s">&quot;first_name&quot;</span><span class="p">).</span><span class="na">ttl</span><span class="p">(</span><span class="s">&quot;last_name&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT writetime(first_name),ttl(last_name) FROM user</span>
+</pre></div>
+</div>
+</section>
+<section id="literals">
+<h3>Literals<a class="headerlink" href="#literals" title="Link to this heading">¶</a></h3>
+<p>Occasionally, you’ll need to inline a CQL literal in your query; this is not very useful as a
+top-level selector, but could happen as part of an arithmetic operation:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;foo&quot;</span><span class="p">).</span><span class="na">quotient</span><span class="p">(</span><span class="n">literal</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;a&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT 1/a FROM foo</span>
+</pre></div>
+</div>
+<p>See the <a class="reference external" href="../term/#literals">terms</a> section for more details on literals.</p>
+</section>
+<section id="raw-snippets">
+<h3>Raw snippets<a class="headerlink" href="#raw-snippets" title="Link to this heading">¶</a></h3>
+<p>Lastly, a selector can be expressed as a raw CQL snippet, that will get appended to the query as-is,
+without any syntax checking or escaping:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">raw</span><span class="p">(</span><span class="s">&quot;first_name, last_name /*some random comment*/&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT first_name, last_name /*some random comment*/ FROM user</span>
+</pre></div>
+</div>
+<p>This should be used with caution, as it’s possible to generate invalid CQL that will fail at
+execution time; on the other hand, it can be used as a workaround to handle new CQL features that
+are not yet covered by the query builder.</p>
+</section>
+</section>
+<section id="relations">
+<h2>Relations<a class="headerlink" href="#relations" title="Link to this heading">¶</a></h2>
+<p>Relations get added with the <code class="docutils literal notranslate"><span class="pre">whereXxx()</span></code> methods:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">all</span><span class="p">().</span><span class="na">whereColumn</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">).</span><span class="na">isEqualTo</span><span class="p">(</span><span class="n">literal</span><span class="p">(</span><span class="mi">1</span><span class="p">));</span>
+<span class="c1">// SELECT * FROM user WHERE id=1</span>
+</pre></div>
+</div>
+<p>You can also create and add them manually:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">all</span><span class="p">().</span><span class="na">where</span><span class="p">(</span>
+<span class="w">    </span><span class="n">Relation</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">).</span><span class="na">isEqualTo</span><span class="p">(</span><span class="n">literal</span><span class="p">(</span><span class="mi">1</span><span class="p">)));</span>
+<span class="c1">// SELECT * FROM user WHERE id=1</span>
+</pre></div>
+</div>
+<p>Like selectors, they also have fluent shortcuts to build and add in a single call:</p>
+<p>Relations are a common feature used by many types of statements, so they have a
+<a class="reference external" href="../relation">dedicated page</a> in this manual.</p>
+</section>
+<section id="other-clauses">
+<h2>Other clauses<a class="headerlink" href="#other-clauses" title="Link to this heading">¶</a></h2>
+<p>The remaining SELECT clauses have a straightforward syntax. Refer to the javadocs for the fine
+print.</p>
+<p>Groupings:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;sensor_data&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">function</span><span class="p">(</span><span class="s">&quot;max&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Selector</span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;reading&quot;</span><span class="p">))</span>
+<span class="w">    </span><span class="p">.</span><span class="na">whereColumn</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">).</span><span class="na">isEqualTo</span><span class="p">(</span><span class="n">bindMarker</span><span class="p">())</span>
+<span class="w">    </span><span class="p">.</span><span class="na">groupBy</span><span class="p">(</span><span class="s">&quot;date&quot;</span><span class="p">);</span>
+<span class="c1">// SELECT max(reading) FROM sensor_data WHERE id=? GROUP BY date</span>
+</pre></div>
+</div>
+<p>Orderings:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">com.datastax.oss.driver.api.core.metadata.schema.ClusteringOrder</span><span class="p">;</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;sensor_data&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;reading&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">whereColumn</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">).</span><span class="na">isEqualTo</span><span class="p">(</span><span class="n">bindMarker</span><span class="p">())</span>
+<span class="w">    </span><span class="p">.</span><span class="na">orderBy</span><span class="p">(</span><span class="s">&quot;date&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ClusteringOrder</span><span class="p">.</span><span class="na">DESC</span><span class="p">);</span>
+<span class="c1">// SELECT reading FROM sensor_data WHERE id=? ORDER BY date DESC</span>
+</pre></div>
+</div>
+<p>Limits:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;sensor_data&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;reading&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">whereColumn</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">).</span><span class="na">isEqualTo</span><span class="p">(</span><span class="n">bindMarker</span><span class="p">())</span>
+<span class="w">    </span><span class="p">.</span><span class="na">limit</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="c1">// SELECT reading FROM sensor_data WHERE id=? LIMIT 10</span>
+
+<span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;sensor_data&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">column</span><span class="p">(</span><span class="s">&quot;reading&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">whereColumn</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">).</span><span class="na">isEqualTo</span><span class="p">(</span><span class="n">bindMarker</span><span class="p">())</span>
+<span class="w">    </span><span class="p">.</span><span class="na">perPartitionLimit</span><span class="p">(</span><span class="n">bindMarker</span><span class="p">(</span><span class="s">&quot;l&quot;</span><span class="p">));</span>
+<span class="c1">// SELECT reading FROM sensor_data WHERE id IN ? PER PARTITION LIMIT :l</span>
+</pre></div>
+</div>
+<p>Filtering:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">selectFrom</span><span class="p">(</span><span class="s">&quot;user&quot;</span><span class="p">).</span><span class="na">all</span><span class="p">().</span><span class="na">allowFiltering</span><span class="p">();</span>
+<span class="c1">// SELECT * FROM user ALLOW FILTERING</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page SELECT&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.15.0.x/manual/query_builder/select/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../schema/type/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Type
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../term/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Terms
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                4.15.0.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../api_conventions/index.html">API conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../case_sensitivity/index.html">Case sensitivity</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../core/index.html">Core driver</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../core/address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/authentication/index.html">Authentication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/bom/index.html">Bill of Materials (BOM)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/compression/index.html">Compression</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../core/configuration/index.html">Configuration</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../core/configuration/reference/README.html">Reference configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/control_connection/index.html">Control connection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/custom_codecs/index.html">Custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/detachable_types/index.html">Detachable types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/graalvm/index.html">GraalVM native images</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/integration/index.html">Integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/logging/index.html">Logging</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../core/metadata/index.html">Metadata</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../core/metadata/node/index.html">Node metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/metadata/schema/index.html">Schema metadata</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/metadata/token/index.html">Token metadata</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/metrics/index.html">Metrics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/non_blocking/index.html">Non-blocking programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/paging/index.html">Paging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/performance/index.html">Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/reactive/index.html">Reactive Style Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/request_tracker/index.html">Request tracker</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/retries/index.html">Retries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/ssl/index.html">SSL</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../core/statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/batch/index.html">Batch statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/per_query_keyspace/index.html">Per-query keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../core/statements/simple/index.html">Simple statements</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/temporal_types/index.html">Temporal types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/throttling/index.html">Request throttling</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/tracing/index.html">Query tracing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/tuples/index.html">Tuples</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../core/udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../developer/index.html">Developer docs</a><input class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" type="checkbox"/><label for="toctree-checkbox-6"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/admin/index.html">Administrative tasks</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../developer/common/index.html">Common infrastructure</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" type="checkbox"/><label for="toctree-checkbox-7"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/concurrency/index.html">Concurrency</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/context/index.html">Driver context</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../developer/common/event_bus/index.html">Event bus</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/native_protocol/index.html">Native protocol layer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/netty_pipeline/index.html">Netty pipeline</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../developer/request_execution/index.html">Request execution</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../mapper/index.html">Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" type="checkbox"/><label for="toctree-checkbox-8"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/config/index.html">Integration</a><input class="toctree-checkbox" id="toctree-checkbox-9" name="toctree-checkbox-9" type="checkbox"/><label for="toctree-checkbox-9"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/kotlin/index.html">Kotlin</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/lombok/index.html">Lombok</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/record/index.html">Java 14 Records</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/config/scala/index.html">Scala</a></li>
+</ul>
+</li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../mapper/daos/index.html">DAOs</a><input class="toctree-checkbox" id="toctree-checkbox-10" name="toctree-checkbox-10" type="checkbox"/><label for="toctree-checkbox-10"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/custom_types/index.html">Custom result types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/delete/index.html">Delete methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/getentity/index.html">GetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/increment/index.html">Increment methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/insert/index.html">Insert methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/null_saving/index.html">Null saving strategy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/query/index.html">Query methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/queryprovider/index.html">Query provider methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/select/index.html">Select methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/setentity/index.html">SetEntity methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/statement_attributes/index.html">Statement attributes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../mapper/daos/update/index.html">Update methods</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/entities/index.html">Entities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mapper/mapper/index.html">Mapper interface</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="../index.html">Query builder</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-11" name="toctree-checkbox-11" type="checkbox"/><label for="toctree-checkbox-11"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../condition/index.html">Conditions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../delete/index.html">DELETE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../idempotence/index.html">Idempotence in the query builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../insert/index.html">INSERT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../relation/index.html">Relations</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../schema/index.html">Schema builder</a><input class="toctree-checkbox" id="toctree-checkbox-12" name="toctree-checkbox-12" type="checkbox"/><label for="toctree-checkbox-12"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l4"><a class="reference internal" href="../schema/aggregate/index.html">Aggregate</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../schema/function/index.html">Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../schema/index/index.html">Index</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../schema/keyspace/index.html">Keyspace</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../schema/materialized_view/index.html">Materialized View</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../schema/table/index.html">Table</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../schema/type/index.html">Type</a></li>
+</ul>
+</li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">SELECT</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../term/index.html">Terms</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../truncate/index.html">TRUNCATE</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../update/index.html">UPDATE</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../upgrade_guide/index.html">Upgrade guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../faq/index.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html#id30">3.11.1</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog/index.html#id31">3.11.0</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page SELECT&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-4.15.0.x/manual/query_builder/select/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/query_builder/select/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">SELECT</a><ul>
+<li><a class="reference internal" href="#selectors">Selectors</a><ul>
+<li><a class="reference internal" href="#star-selector-and-count">Star selector and count</a></li>
+<li><a class="reference internal" href="#columns">Columns</a></li>
+<li><a class="reference internal" href="#arithmetic-operations">Arithmetic operations</a></li>
+<li><a class="reference internal" href="#casts">Casts</a></li>
+<li><a class="reference internal" href="#sub-elements">Sub-elements</a></li>
+<li><a class="reference internal" href="#collections-of-selectors">Collections of selectors</a></li>
+<li><a class="reference internal" href="#functions">Functions</a></li>
+<li><a class="reference internal" href="#literals">Literals</a></li>
+<li><a class="reference internal" href="#raw-snippets">Raw snippets</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#relations">Relations</a></li>
+<li><a class="reference internal" href="#other-clauses">Other clauses</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

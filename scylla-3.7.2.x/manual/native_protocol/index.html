@@ -1,0 +1,774 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Native protocol | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/native_protocol/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../_static/documentation_options.js?v=86e43a22"></script>
+            
+        
+            
+                <script src="../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Native protocol</span>
+</div>
+                    </div>
+                
+                <section id="native-protocol">
+<h1>Native protocol<a class="headerlink" href="#native-protocol" title="Link to this heading">¶</a></h1>
+<p>The native protocol defines the format of the binary messages exchanged
+between the driver and Cassandra over TCP. As a driver user, you don’t
+need to know the fine details (although the protocol spec is <a class="reference external" href="https://github.com/apache/cassandra/tree/trunk/doc">in the
+Cassandra codebase</a> if you’re curious); the most visible
+aspect is that some features are only available with specific protocol
+versions.</p>
+<section id="compatibility-matrix">
+<h2>Compatibility matrix<a class="headerlink" href="#compatibility-matrix" title="Link to this heading">¶</a></h2>
+<p>By default, the protocol version is negotiated between the driver and
+Cassandra when the first connection is established. Both sides are
+backward-compatible with older versions:</p>
+<table border="1" style="text-align:center; width:100%;margin-bottom:1em;">
+<tr><th>Driver Version</th><th>Cassandra: 1.2.x<br/>(DSE 3.2)</th><th>2.0.x<br/>(DSE 4.0 to 4.6)
+</th><th>2.1.x<br/>(DSE 4.7)</th><th>2.2.x</th><th>3.0.x &amp; 3.x<br/>(DSE 5.0+)</th></tr>
+<tr><th>1.0.x</th> <td>v1</td> <td>v1</td>  <td>v1</td> <td>v1</td>  <td>Unsupported <i>(1)</i></td> </tr>
+<tr><th>2.0.x to 2.1.1</th> <td>v1</td> <td>v2</td>  <td>v2</td> <td>v2</td> <td>Unsupported <i>(1)</i></td> </tr>
+<tr><th>2.1.2 to 2.1.x</th> <td>v1</td> <td>v2</td>  <td>v3</td> <td>v3</td> <td>Unsupported <i>(2)</i></td> </tr>
+<tr><th>3.x</th> <td>v1</td> <td>v2</td>  <td>v3</td> <td>v4</td> <td>v4</td> </tr>
+</table><p><em>(1) Cassandra 3.0 does not support protocol versions v1 and v2</em></p>
+<p><em>(2) There is a matching protocol version (v3), but the driver 2.1.x can’t read the new system table format of Cassandra 3.0</em></p>
+<p>For example, if you use version 2.1.5 of the driver to connect to
+Cassandra 2.0.9, the maximum version you can use (and the one you’ll get
+by default) is protocol v2 (third row, second column). If you use the
+same version to connect to Cassandra 2.1.4, you can use protocol v3.</p>
+</section>
+<section id="controlling-the-protocol-version">
+<h2>Controlling the protocol version<a class="headerlink" href="#controlling-the-protocol-version" title="Link to this heading">¶</a></h2>
+<p>To find out which version you’re currently using, use
+<a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/ProtocolOptions.html#getProtocolVersion--">ProtocolOptions#getProtocolVersion()</a>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ProtocolVersion</span><span class="w"> </span><span class="n">myCurrentVersion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">getProtocolOptions</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">getProtocolVersion</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>The protocol version can not be changed at runtime. However, you can
+force a given version at initialization:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">withProtocolVersion</span><span class="p">(</span><span class="n">ProtocolVersion</span><span class="p">.</span><span class="na">V2</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>If you specify a version that is not compatible with your current
+driver/Cassandra combination, you’ll get an error:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ne">Exception</span> <span class="ow">in</span> <span class="n">thread</span> <span class="s2">&quot;main&quot;</span> <span class="n">com</span><span class="o">.</span><span class="n">datastax</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">NoHostAvailableException</span><span class="p">:</span>
+<span class="n">All</span> <span class="n">host</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="n">tried</span> <span class="k">for</span> <span class="n">query</span> <span class="n">failed</span>
+<span class="p">(</span><span class="n">tried</span><span class="p">:</span> <span class="o">/</span><span class="mf">127.0.0.1</span><span class="p">:</span><span class="mi">9042</span> <span class="p">(</span><span class="n">com</span><span class="o">.</span><span class="n">datastax</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">UnsupportedProtocolVersionException</span><span class="p">:</span>
+  <span class="p">[</span><span class="o">/</span><span class="mf">127.0.0.1</span><span class="p">:</span><span class="mi">9042</span><span class="p">]</span> <span class="n">Host</span> <span class="o">/</span><span class="mf">127.0.0.1</span><span class="p">:</span><span class="mi">9042</span> <span class="n">does</span> <span class="ow">not</span> <span class="n">support</span> <span class="n">protocol</span> <span class="n">version</span> <span class="n">V3</span> <span class="n">but</span> <span class="n">V2</span><span class="p">))</span>
+</pre></div>
+</div>
+<section id="protocol-version-with-mixed-clusters">
+<h3>Protocol version with mixed clusters<a class="headerlink" href="#protocol-version-with-mixed-clusters" title="Link to this heading">¶</a></h3>
+<p>If you have a cluster with mixed versions (for example, while doing a
+rolling upgrade of Cassandra), note that <strong>the protocol version will be
+negotiated with the first host the driver connects to</strong>.</p>
+<p>This could lead to the following situation (assuming you use driver
+2.1.2+):</p>
+<ul class="simple">
+<li><p>the first contact point is a 2.1 host, so the driver negotiates
+protocol v3;</p></li>
+<li><p>while connecting to the rest of the cluster, the driver contacts a 2.0
+host using protocol v3, which fails; an error is logged and this host
+will be permanently ignored.</p></li>
+</ul>
+<p>To avoid this issue, you can use one the following workarounds:</p>
+<ul class="simple">
+<li><p>always force a protocol version at startup. You keep it at v2 while
+the rolling upgrade is happening, and only switch to v3 when the whole
+cluster has switched to Cassandra 2.1;</p></li>
+<li><p>ensure that the list of initial contact points only contains hosts
+with the oldest version (2.0 in this example).</p></li>
+</ul>
+</section>
+</section>
+<section id="new-features-by-protocol-version">
+<h2>New features by protocol version<a class="headerlink" href="#new-features-by-protocol-version" title="Link to this heading">¶</a></h2>
+<section id="v1-to-v2">
+<h3>v1 to v2<a class="headerlink" href="#v1-to-v2" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>bound variables in simple statements
+(<a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/Session.html#execute-java.lang.String-java.lang.Object...-">Session#execute(String, Object…)</a>)</p></li>
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/BatchStatement.html">batch statements</a></p></li>
+<li><p><a class="reference external" href="../paging/">query paging</a></p></li>
+</ul>
+</section>
+<section id="v2-to-v3">
+<h3>v2 to v3<a class="headerlink" href="#v2-to-v3" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>the number of stream ids per connection goes from 128 to 32768 (see
+<a class="reference external" href="../pooling/">Connection pooling</a>)</p></li>
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/BatchStatement.html#setSerialConsistencyLevel-com.datastax.driver.core.ConsistencyLevel-">serial consistency on batch statements</a></p></li>
+<li><p><a class="reference external" href="../query_timestamps/">client-side timestamps</a></p></li>
+</ul>
+</section>
+<section id="v3-to-v4">
+<h3>v3 to v4<a class="headerlink" href="#v3-to-v4" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><a class="reference external" href="http://java-driver.docs.scylladb.com/scylla-3.7.2.x/api/com/datastax/driver/core/ExecutionInfo.html#getWarnings--">query warnings</a></p></li>
+<li><p>allowed unset values in bound statements</p></li>
+<li><p><a class="reference external" href="../custom_payloads/">Custom payloads</a></p></li>
+</ul>
+</section>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Native protocol&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.7.2.x/manual/native_protocol/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../metrics/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Metrics
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../object_mapper/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Object Mapper
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.7.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Native protocol&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.7.2.x/manual/native_protocol/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/native_protocol/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Native protocol</a><ul>
+<li><a class="reference internal" href="#compatibility-matrix">Compatibility matrix</a></li>
+<li><a class="reference internal" href="#controlling-the-protocol-version">Controlling the protocol version</a><ul>
+<li><a class="reference internal" href="#protocol-version-with-mixed-clusters">Protocol version with mixed clusters</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#new-features-by-protocol-version">New features by protocol version</a><ul>
+<li><a class="reference internal" href="#v1-to-v2">v1 to v2</a></li>
+<li><a class="reference internal" href="#v2-to-v3">v2 to v3</a></li>
+<li><a class="reference internal" href="#v3-to-v4">v3 to v4</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

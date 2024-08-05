@@ -1,0 +1,933 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Connection pooling | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/pooling/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Connection pooling</span>
+</div>
+                    </div>
+                
+                <section id="connection-pooling">
+<h1>Connection pooling<a class="headerlink" href="#connection-pooling" title="Link to this heading">¶</a></h1>
+<section id="basics">
+<h2>Basics<a class="headerlink" href="#basics" title="Link to this heading">¶</a></h2>
+<p>The driver communicates with Cassandra over TCP, using the Cassandra
+binary protocol. This protocol is asynchronous, which allows each TCP
+connection to handle multiple simultaneous requests:</p>
+<ul class="simple">
+<li><p>when a query gets executed, a <em>stream id</em> gets assigned to it. It is a
+unique identifier on the current connection;</p></li>
+<li><p>the driver writes a request containing the stream id and the query on
+the connection, and then proceeds without waiting for the response (if
+you’re using the asynchronous API, this is when the driver will send you
+back a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/ResultSetFuture.html">ResultSetFuture</a>).
+Once the request has been written to the
+connection, we say that it is <em>in flight</em>;</p></li>
+<li><p>at some point, Cassandra will send back a response on the connection.
+This response also contains the stream id, which allows the driver to
+trigger a callback that will complete the corresponding query (this is
+the point where your <code class="docutils literal notranslate"><span class="pre">ResultSetFuture</span></code> will get completed).</p></li>
+</ul>
+<p>You don’t need to manage connections yourself. You simply interact with a <code class="docutils literal notranslate"><span class="pre">Session</span></code> object, which takes care of it.</p>
+<p><strong>For each <code class="docutils literal notranslate"><span class="pre">Session</span></code>, there is one connection pool per connected host</strong> (a host is connected when it is up and
+not ignored by the <a class="reference external" href="../load_balancing">load balancing policy</a>).</p>
+<p>The number of connections per pool is configurable (this will be
+described in the next section).  The number of stream ids depends on the
+<a class="reference external" href="../native_protocol/">native protocol version</a>:</p>
+<ul class="simple">
+<li><p>protocol v2 or below: 128 stream ids per connection.</p></li>
+<li><p>protocol v3 or above: up to 32768 stream ids per connection.</p></li>
+</ul>
+<div class="highlight-ditaa notranslate"><div class="highlight"><pre><span></span>+-------+1<span class="w">   </span>n+-------+1<span class="w">   </span>n+----+1<span class="w">   </span>n+----------+1<span class="w">   </span><span class="m">128</span>/32K+-------+
+<span class="p">|</span>Cluster+-----+Session+-----+Pool+-----+Connection+-----------+Request+
++-------+<span class="w">     </span>+-------+<span class="w">     </span>+----+<span class="w">     </span>+----------+<span class="w">           </span>+-------+
+</pre></div>
+</div>
+<p>If there are several connections in pool, driver evenly spreads new requests between connections.</p>
+</section>
+<section id="configuring-the-connection-pool">
+<h2>Configuring the connection pool<a class="headerlink" href="#configuring-the-connection-pool" title="Link to this heading">¶</a></h2>
+<p>Connections pools are configured with a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html">PoolingOptions</a> object, which
+is global to a <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> instance. You can pass that object when
+building the cluster:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PoolingOptions</span><span class="w"> </span><span class="n">poolingOptions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">PoolingOptions</span><span class="p">();</span>
+<span class="c1">// customize options...</span>
+
+<span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">withContactPoints</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">withPoolingOptions</span><span class="p">(</span><span class="n">poolingOptions</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Most options can also be changed at runtime. If you don’t have a
+reference to the <code class="docutils literal notranslate"><span class="pre">PoolingOptions</span></code> instance, here’s how you can get it:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PoolingOptions</span><span class="w"> </span><span class="n">poolingOptions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getPoolingOptions</span><span class="p">();</span>
+<span class="c1">// customize options...</span>
+</pre></div>
+</div>
+<section id="pool-size">
+<h3>Pool size<a class="headerlink" href="#pool-size" title="Link to this heading">¶</a></h3>
+<p>Connection pools have a variable size, which gets adjusted automatically
+depending on the current load. There will always be at least a <em>core</em>
+number of connections, and at most a <em>max</em> number. These values can be
+configured independently by host <em>distance</em> (the distance is determined
+by your <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LoadBalancingPolicy.html">LoadBalancingPolicy</a>, and will generally indicate whether a
+host is in the same datacenter or not).</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">poolingOptions</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setCoreConnectionsPerHost</span><span class="p">(</span><span class="n">HostDistance</span><span class="p">.</span><span class="na">LOCAL</span><span class="p">,</span><span class="w">  </span><span class="mi">4</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setMaxConnectionsPerHost</span><span class="p">(</span><span class="w"> </span><span class="n">HostDistance</span><span class="p">.</span><span class="na">LOCAL</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setCoreConnectionsPerHost</span><span class="p">(</span><span class="n">HostDistance</span><span class="p">.</span><span class="na">REMOTE</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setMaxConnectionsPerHost</span><span class="p">(</span><span class="w"> </span><span class="n">HostDistance</span><span class="p">.</span><span class="na">REMOTE</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>For convenience, core and max can be set simultaneously:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">poolingOptions</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setConnectionsPerHost</span><span class="p">(</span><span class="n">HostDistance</span><span class="p">.</span><span class="na">LOCAL</span><span class="p">,</span><span class="w">  </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setConnectionsPerHost</span><span class="p">(</span><span class="n">HostDistance</span><span class="p">.</span><span class="na">REMOTE</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The default settings are:</p>
+<ul class="simple">
+<li><p>protocol v2:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">LOCAL</span></code> hosts: core = 2, max = 8</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">REMOTE</span></code> hosts: core = 1, max = 2</p></li>
+</ul>
+</li>
+<li><p>protocol v3:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">LOCAL</span></code> hosts: core = max = 1</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">REMOTE</span></code> hosts: core = max = 1</p></li>
+</ul>
+</li>
+</ul>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setNewConnectionThreshold-com.datastax.driver.core.HostDistance-int-">PoolingOptions.setNewConnectionThreshold</a> determines the threshold
+that triggers the creation of a new connection when the pool is not at
+its maximum capacity. In general, you shouldn’t need to change its
+default value.</p>
+</section>
+<section id="dynamic-resizing">
+<h3>Dynamic resizing<a class="headerlink" href="#dynamic-resizing" title="Link to this heading">¶</a></h3>
+<p>If core != max, the pool will resize automatically to adjust to the
+current activity on the host.</p>
+<p>When activity goes up and there are <em>n</em> connections with n &lt; max, the driver
+will add a connection when the number of concurrent requests is more than
+(n - 1) * 128 + <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setNewConnectionThreshold-com.datastax.driver.core.HostDistance-int-">PoolingOptions.setNewConnectionThreshold</a>
+(in layman’s terms, when all but the last connection are full and the last
+connection is above the threshold).</p>
+<p>When activity goes down, the driver will “trash” connections if the maximum
+number of requests in a 10 second time period can be satisfied by less than
+the number of connections opened. Trashed connections are kept open but do
+not accept new requests. After a given timeout (defined by
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setIdleTimeoutSeconds-int-">PoolingOptions.setIdleTimeoutSeconds</a>), trashed connections are closed
+and removed. If during that idle period activity increases again, those
+connections will be resurrected back into the active pool and reused. The
+main intent of that is to not constantly recreate connections if activity
+changes quickly over an interval.</p>
+</section>
+<section id="simultaneous-requests-per-connection">
+<h3>Simultaneous requests per connection<a class="headerlink" href="#simultaneous-requests-per-connection" title="Link to this heading">¶</a></h3>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setMaxRequestsPerConnection-com.datastax.driver.core.HostDistance-int-">PoolingOptions.setMaxRequestsPerConnection</a> allows you to
+throttle the number of concurrent requests per connection.</p>
+<p>With protocol v2, there is no reason to throttle. It is set to 128 (the
+max) and you should not change it.</p>
+<p>With protocol v3, it is set to 1024 for <code class="docutils literal notranslate"><span class="pre">LOCAL</span></code>  hosts, and 256 for
+<code class="docutils literal notranslate"><span class="pre">REMOTE</span></code> hosts. These low defaults were chosen so that the default
+configuration for protocol v2 and v3 allow the same total number of
+simultaneous requests (to avoid bad surprises when clients migrate from
+v2 to v3). You can raise this threshold, or even set it to the max:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">poolingOptions</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setMaxRequestsPerConnection</span><span class="p">(</span><span class="n">HostDistance</span><span class="p">.</span><span class="na">LOCAL</span><span class="p">,</span><span class="w"> </span><span class="mi">32768</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">setMaxRequestsPerConnection</span><span class="p">(</span><span class="n">HostDistance</span><span class="p">.</span><span class="na">REMOTE</span><span class="p">,</span><span class="w"> </span><span class="mi">2000</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Just keep in mind that high values will give clients more bandwidth and
+therefore put more pressure on your cluster. This might require some
+tuning, especially if you have many clients.</p>
+</section>
+<section id="heartbeat">
+<h3>Heartbeat<a class="headerlink" href="#heartbeat" title="Link to this heading">¶</a></h3>
+<p>If connections stay idle for too long, they might be dropped by
+intermediate network devices (routers, firewalls…). Normally, TCP
+keepalive should take care of this; but tweaking low-level keepalive
+settings might be impractical in some environments.</p>
+<p>The driver provides application-side keepalive in the form of a
+connection heartbeat: when a connection has been idle for a given amount
+of time, the driver will simulate activity by writing a dummy request to
+it.</p>
+<p>This feature is enabled by default. The default heartbeat interval is 30
+seconds, it can be customized with the following method:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">poolingOptions</span><span class="p">.</span><span class="na">setHeartbeatIntervalSeconds</span><span class="p">(</span><span class="mi">60</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>If it gets changed at runtime, only connections created after that will
+use the new interval. Most users will want to do this at startup.</p>
+<p>The heartbeat interval should be set higher than
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/SocketOptions.html#getReadTimeoutMillis--">SocketOptions.readTimeoutMillis</a>:
+the read timeout is the maximum time that the driver waits for a regular
+query to complete, therefore the connection should not be considered
+idle before it has elapsed.</p>
+<p>To disable heartbeat, set the interval to 0.</p>
+<p>Implementation note: the dummy request sent by heartbeat is an
+<a class="reference external" href="https://github.com/apache/cassandra/blob/trunk/doc/native_protocol_v3.spec#L278">OPTIONS</a>
+message.</p>
+</section>
+<section id="acquisition-queue">
+<h3>Acquisition queue<a class="headerlink" href="#acquisition-queue" title="Link to this heading">¶</a></h3>
+<p>When the driver tries to send a request to a host, it will first try to
+acquire a connection from this host’s pool. If the pool is busy (i.e.
+all connections are already handling their maximum number of in flight
+requests), the acquisition attempt gets enqueued until a connection becomes
+available again.</p>
+<p>Two options control that queue: a maximum size (<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setMaxQueueSize-int-">PoolingOptions.setMaxQueueSize</a>) and a timeout
+(<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setPoolTimeoutMillis-int-">PoolingOptions.setPoolTimeoutMillis</a>).</p>
+<ul class="simple">
+<li><p>if either option is set to zero, the attempt is rejected immediately;</p></li>
+<li><p>else if more than <code class="docutils literal notranslate"><span class="pre">maxQueueSize</span></code> requests are already waiting for a connection, the attempt is also rejected;</p></li>
+<li><p>otherwise, the attempt is enqueued; if a connection becomes available before <code class="docutils literal notranslate"><span class="pre">poolTimeoutMillis</span></code> has elapsed,
+then the attempt succeeds, otherwise it is rejected.</p></li>
+</ul>
+<p>If the attempt is rejected, the driver will move to the next host in the <a class="reference external" href="../load_balancing/#query-plan">query plan</a>,
+and try to acquire a connection again.</p>
+<p>If all hosts are busy with a full queue, the request will fail with a
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/exceptions/NoHostAvailableException.html">NoHostAvailableException</a>. If you inspect the map returns by this
+exception’s <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/exceptions/NoHostAvailableException.html#getErrors--">getErrors</a> method, you will see a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/exceptions/BusyPoolException.html">BusyPoolException</a> for
+each host.</p>
+</section>
+</section>
+<section id="monitoring-and-tuning-the-pool">
+<h2>Monitoring and tuning the pool<a class="headerlink" href="#monitoring-and-tuning-the-pool" title="Link to this heading">¶</a></h2>
+<p>The easiest way to monitor pool usage is with <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Session.html#getState--">Session.getState</a>. Here’s
+a simple example that will print the number of open connections, active
+requests, and maximum capacity for each host, every 5 seconds:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">final</span><span class="w"> </span><span class="n">LoadBalancingPolicy</span><span class="w"> </span><span class="n">loadBalancingPolicy</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getPolicies</span><span class="p">().</span><span class="na">getLoadBalancingPolicy</span><span class="p">();</span>
+<span class="kd">final</span><span class="w"> </span><span class="n">PoolingOptions</span><span class="w"> </span><span class="n">poolingOptions</span><span class="w"> </span><span class="o">=</span>
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getPoolingOptions</span><span class="p">();</span>
+
+<span class="n">ScheduledExecutorService</span><span class="w"> </span><span class="n">scheduled</span><span class="w"> </span><span class="o">=</span>
+<span class="n">Executors</span><span class="p">.</span><span class="na">newScheduledThreadPool</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="n">scheduled</span><span class="p">.</span><span class="na">scheduleAtFixedRate</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">Runnable</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">run</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">Session</span><span class="p">.</span><span class="na">State</span><span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">getState</span><span class="p">();</span>
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Host</span><span class="w"> </span><span class="n">host</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">state</span><span class="p">.</span><span class="na">getConnectedHosts</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">HostDistance</span><span class="w"> </span><span class="n">distance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loadBalancingPolicy</span><span class="p">.</span><span class="na">distance</span><span class="p">(</span><span class="n">host</span><span class="p">);</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">connections</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">state</span><span class="p">.</span><span class="na">getOpenConnections</span><span class="p">(</span><span class="n">host</span><span class="p">);</span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">inFlightQueries</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">state</span><span class="p">.</span><span class="na">getInFlightQueries</span><span class="p">(</span><span class="n">host</span><span class="p">);</span>
+<span class="w">            </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">printf</span><span class="p">(</span><span class="s">&quot;%s connections=%d, current load=%d, max</span>
+<span class="s">load=%d%n&quot;</span><span class="p">,</span>
+<span class="w">                </span><span class="n">host</span><span class="p">,</span><span class="w"> </span><span class="n">connections</span><span class="p">,</span><span class="w"> </span><span class="n">inFlightQueries</span><span class="p">,</span>
+<span class="w">                </span><span class="n">connections</span><span class="w"> </span><span class="o">*</span>
+<span class="n">poolingOptions</span><span class="p">.</span><span class="na">getMaxRequestsPerConnection</span><span class="p">(</span><span class="n">distance</span><span class="p">));</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">},</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="n">TimeUnit</span><span class="p">.</span><span class="na">SECONDS</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>In real life, you’ll probably want something more sophisticated, like
+exposing a JMX MBean or sending the data to your favorite monitoring
+tool.</p>
+<p>If you find that the current load stays close or equal to the maximum
+load at all time, it’s a sign that your connection pools are saturated
+and you should raise the max connections per host, or max requests per
+connection (protocol v3).</p>
+<p>If you’re using protocol v2 and the load is often less than core * 128,
+your pools are underused and you could get away with less core
+connections.</p>
+<section id="tuning-protocol-v3-for-very-high-throughputs">
+<h3>Tuning protocol v3 for very high throughputs<a class="headerlink" href="#tuning-protocol-v3-for-very-high-throughputs" title="Link to this heading">¶</a></h3>
+<p>As mentioned above, the default pool size for protocol v3 is core = max
+= 1. This means all requests to a given node will share a single
+connection, and therefore a single Netty I/O thread.</p>
+<p>There is a corner case where this I/O thread can max out its CPU core
+and become a bottleneck in the driver; in our benchmarks, this happened
+with a single-node cluster and a high throughput (approximately 80K
+requests / second).</p>
+<p>It’s unlikely that you’ll run into this issue: in most real-world
+deployments, the driver connects to more than one node, so the load will
+spread across more I/O threads. However if you suspect that you
+experience the issue, here’s what to look out for:</p>
+<ul class="simple">
+<li><p>the driver throughput plateaus but the process does not appear to
+max out any system resource (in particular, overall CPU usage is well
+below 100%);</p></li>
+<li><p>one of the driver’s I/O threads maxes out its CPU core. You can see
+that with a profiler, or OS-level tools like <code class="docutils literal notranslate"><span class="pre">pidstat</span> <span class="pre">-tu</span></code> on Linux.
+I/O threads are called <code class="docutils literal notranslate"><span class="pre">&lt;cluster_name&gt;-nio-worker-&lt;n&gt;</span></code>, unless you’re
+injecting your own <code class="docutils literal notranslate"><span class="pre">EventLoopGroup</span></code> with <code class="docutils literal notranslate"><span class="pre">NettyOptions</span></code>.</p></li>
+</ul>
+<p>The solution is to add more connections per node. To ensure that
+additional connections get created before you run into the bottleneck,
+either:</p>
+<ul class="simple">
+<li><p>set core = max;</p></li>
+<li><p>keep core = 1, but adjust <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setMaxRequestsPerConnection-com.datastax.driver.core.HostDistance-int-">maxRequestsPerConnection</a> and
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#setNewConnectionThreshold-com.datastax.driver.core.HostDistance-int-">newConnectionThreshold</a> so that enough connections are added by
+the time you reach the bottleneck.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Connection pooling&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/pooling/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../paging/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Paging
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../query_timestamps/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Query timestamps
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.11.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../serverless/index.html">Connecting to ScyllaDB Cloud Serverless</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Connection pooling&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/pooling/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/pooling/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Connection pooling</a><ul>
+<li><a class="reference internal" href="#basics">Basics</a></li>
+<li><a class="reference internal" href="#configuring-the-connection-pool">Configuring the connection pool</a><ul>
+<li><a class="reference internal" href="#pool-size">Pool size</a></li>
+<li><a class="reference internal" href="#dynamic-resizing">Dynamic resizing</a></li>
+<li><a class="reference internal" href="#simultaneous-requests-per-connection">Simultaneous requests per connection</a></li>
+<li><a class="reference internal" href="#heartbeat">Heartbeat</a></li>
+<li><a class="reference internal" href="#acquisition-queue">Acquisition queue</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#monitoring-and-tuning-the-pool">Monitoring and tuning the pool</a><ul>
+<li><a class="reference internal" href="#tuning-protocol-v3-for-very-high-throughputs">Tuning protocol v3 for very high throughputs</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

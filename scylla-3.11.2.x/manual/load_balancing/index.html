@@ -1,0 +1,976 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Load balancing | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/load_balancing/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Load balancing</span>
+</div>
+                    </div>
+                
+                <section id="load-balancing">
+<h1>Load balancing<a class="headerlink" href="#load-balancing" title="Link to this heading">¶</a></h1>
+<p>A Cassandra cluster is typically composed of multiple hosts; the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LoadBalancingPolicy.html">LoadBalancingPolicy</a> (sometimes abbreviated LBP) is a
+central component that determines:</p>
+<ul class="simple">
+<li><p>which hosts the driver will communicate with;</p></li>
+<li><p>for each new query, which coordinator to pick, and which hosts to use as failover.</p></li>
+</ul>
+<p>The policy is configured when initializing the cluster:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withLoadBalancingPolicy</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">RoundRobinPolicy</span><span class="p">())</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>Once the cluster has been built, you can’t change the policy, but you may inspect it at runtime:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">LoadBalancingPolicy</span><span class="w"> </span><span class="n">lbp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getPolicies</span><span class="p">().</span><span class="na">getLoadBalancingPolicy</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>If you don’t explicitly configure the policy, you get the default, which is a
+<a class="reference external" href="#dc-aware-round-robin-policy">datacenter-aware</a>, <a class="reference external" href="#token-aware-policy">token-aware</a> policy:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="k">new</span><span class="w"> </span><span class="n">TokenAwarePolicy</span><span class="p">(</span><span class="n">DCAwareRoundRobinPolicy</span><span class="p">.</span><span class="na">builder</span><span class="p">().</span><span class="na">build</span><span class="p">());</span>
+</pre></div>
+</div>
+<section id="common-concepts">
+<h2>Common concepts<a class="headerlink" href="#common-concepts" title="Link to this heading">¶</a></h2>
+<p>Before we review the available implementations, we need to introduce two concepts:</p>
+<section id="host-distance">
+<h3>Host distance<a class="headerlink" href="#host-distance" title="Link to this heading">¶</a></h3>
+<p>For each host, the policy computes a <strong><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/HostDistance.html">distance</a></strong> that determines how the driver will establish connections
+to it:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">LOCAL</span></code> and <code class="docutils literal notranslate"><span class="pre">REMOTE</span></code> are “active” distances, meaning that the driver will keep open connections to the host. They
+differ in the number of connections opened, depending on your <a class="reference external" href="../pooling/">pooling options</a>. Also, the
+<a class="reference external" href="../control_connection/">control connection</a> will  favor local nodes if possible.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">IGNORED</span></code>, as the name suggests, means that the driver will not attempt to connect.</p></li>
+</ul>
+<p>Typically, the distance will reflect network topology (e.g. local vs. remote datacenter), although that is entirely up
+to your policy. The distance can be dynamic: the driver re-checks it whenever connection pools are created (e.g. at
+startup or if a node was down and just came back up); you can also trigger it with <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/PoolingOptions.html#refreshConnectedHosts--">refreshConnectedHosts</a>:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// Re-evaluate all host distances:</span>
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getPoolingOptions</span><span class="p">().</span><span class="na">refreshConnectedHosts</span><span class="p">();</span>
+
+<span class="c1">// Re-evaluate the distance for a given host:</span>
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getPoolingOptions</span><span class="p">().</span><span class="na">refreshConnectedHost</span><span class="p">(</span><span class="n">host</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="query-plan">
+<h3>Query plan<a class="headerlink" href="#query-plan" title="Link to this heading">¶</a></h3>
+<p>Each time the driver executes a query, it asks the policy to compute a <strong>query plan</strong>, which is a list of hosts. The
+driver will then try each host in sequence, according to the <a class="reference external" href="../retries/">retry policy</a> and
+<a class="reference external" href="../speculative_execution">speculative execution policy</a>.</p>
+<p>The contents and order of query plans are entirely up to your policy, but implementations typically return plans that:</p>
+<ul class="simple">
+<li><p>are different for each query, in order to balance the load across the cluster;</p></li>
+<li><p>only contain hosts that are known to be able to process queries, i.e. neither ignored nor down;</p></li>
+<li><p>favor local hosts over remote ones.</p></li>
+</ul>
+<p>The next sections describe the implementations that are provided with the driver.</p>
+</section>
+</section>
+<section id="roundrobinpolicy">
+<h2><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/RoundRobinPolicy.html">RoundRobinPolicy</a><a class="headerlink" href="#roundrobinpolicy" title="Link to this heading">¶</a></h2>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withLoadBalancingPolicy</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">RoundRobinPolicy</span><span class="p">())</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This is the most straightforward implementation. It returns query plans that include all hosts, and shift for each
+query in a round-robin fashion. For example:</p>
+<ul class="simple">
+<li><p>query 1: host1, host2, host3</p></li>
+<li><p>query 2: host2, host3, host1</p></li>
+<li><p>query 3: host3, host1, host2</p></li>
+<li><p>query 4: host1, host2, host3</p></li>
+<li><p>etc.</p></li>
+</ul>
+<p>All hosts are at distance <code class="docutils literal notranslate"><span class="pre">LOCAL</span></code>.</p>
+<p>This works well for simple deployments. If you have multiple datacenters, it will be inefficient and you probably want
+to switch to a DC-aware policy.</p>
+</section>
+<section id="dcawareroundrobinpolicy">
+<h2><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/DCAwareRoundRobinPolicy.html">DCAwareRoundRobinPolicy</a><a class="headerlink" href="#dcawareroundrobinpolicy" title="Link to this heading">¶</a></h2>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withLoadBalancingPolicy</span><span class="p">(</span>
+<span class="w">                </span><span class="n">DCAwareRoundRobinPolicy</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withLocalDc</span><span class="p">(</span><span class="s">&quot;myLocalDC&quot;</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">build</span><span class="p">()</span>
+<span class="w">        </span><span class="p">).</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This policy queries nodes of the local data-center in a round-robin fashion.</p>
+<p>Call <code class="docutils literal notranslate"><span class="pre">withLocalDc</span></code> to specify the name of your local datacenter. You can also leave it out, and the driver will use the
+datacenter of the first contact point that was reached <a class="reference external" href="../#cluster-initialization">at initialization</a>. However,
+remember that the driver shuffles the initial list of contact points, so this assumes that all contact points are in the
+local datacenter. In general, providing the datacenter name explicitly is a safer option.</p>
+<p>Hosts belonging to the local datacenter are at distance <code class="docutils literal notranslate"><span class="pre">LOCAL</span></code>, and appear first in query plans (in a round-robin
+fashion).</p>
+</section>
+<section id="rackawareroundrobinpolicy">
+<h2><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/RackAwareRoundRobinPolicy.html">RackAwareRoundRobinPolicy</a><a class="headerlink" href="#rackawareroundrobinpolicy" title="Link to this heading">¶</a></h2>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withLoadBalancingPolicy</span><span class="p">(</span>
+<span class="w">                </span><span class="n">RackAwareRoundRobinPolicy</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withLocalDc</span><span class="p">(</span><span class="s">&quot;myLocalDC&quot;</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withLocalRack</span><span class="p">(</span><span class="s">&quot;myLocalRack&quot;</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">build</span><span class="p">()</span>
+<span class="w">        </span><span class="p">).</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This policy queries nodes of the local rack in a round-robin fashion.</p>
+<p>Call <code class="docutils literal notranslate"><span class="pre">withLocalDc</span></code> to specify the name of your local datacenter and <code class="docutils literal notranslate"><span class="pre">withLocalRack</span></code> to specify the name of your local rack.
+You can also leave it out, and the driver will use the datacenter and rack of the first contact point that was reached <a class="reference external" href="../#cluster-initialization">at initialization</a>.
+However, remember that the driver shuffles the initial list of contact points, so this assumes that all contact points are in the
+local datacenter and rack. In general, providing the datacenter and rack name explicitly is a safer option.</p>
+<p>Hosts belonging to the local datacenter are at distance <code class="docutils literal notranslate"><span class="pre">LOCAL</span></code>, and appear first in query plans (in a round-robin
+fashion) with hosts in the local rack having precedence over nodes in remote racks in the local datacenter.</p>
+<p>For example, if there are any UP hosts in the local rack the policy will query those nodes in round-robin fashion:</p>
+<ul class="simple">
+<li><p>query 1: host1 <em>(local DC, local rack)</em>, host2 <em>(local DC, local rack)</em>, host3 <em>(local DC, local rack)</em></p></li>
+<li><p>query 2: host2 <em>(local DC, local rack)</em>, host3 <em>(local DC, local rack)</em>, host1 <em>(local DC, local rack)</em></p></li>
+<li><p>query 3: host3 <em>(local DC, local rack)</em>, host1 <em>(local DC, local rack)</em>, host2 <em>(local DC, local rack)</em></p></li>
+<li><p>query 4: host1 <em>(local DC, local rack)</em>, host2 <em>(local DC, local rack)</em>, host3 <em>(local DC, local rack)</em></p></li>
+</ul>
+<p>If all nodes in the local rack are DOWN, the policy will then move on to remote racks in local DC:</p>
+<ul class="simple">
+<li><p>query 1: host4 <em>(local DC, remote rack 1)</em>, host5 <em>(local DC, remote rack 1)</em>, host6 <em>(local DC, remote rack 2)</em></p></li>
+<li><p>query 2: host5 <em>(local DC, remote rack 1)</em>, host6 <em>(local DC, remote rack 2)</em>, host4 <em>(local DC, remote rack 1)</em></p></li>
+<li><p>query 3: host6 <em>(local DC, remote rack 2)</em>, host4 <em>(local DC, remote rack 1)</em>, host5 <em>(local DC, remote rack 1)</em></p></li>
+<li><p>query 4: host4 <em>(local DC, remote rack 1)</em>, host5 <em>(local DC, remote rack 1)</em>, host6 <em>(local DC, remote rack 2)</em></p></li>
+</ul>
+<p>If all nodes in the local datacenter are DOWN, the policy can query remote DCs (configurable by <code class="docutils literal notranslate"><span class="pre">withUsedHostsPerRemoteDc</span></code>):</p>
+<ul class="simple">
+<li><p>query 1: host7 <em>(remote DC, remote rack 1)</em>, host8 <em>(remote DC, remote rack 1)</em>, host9 <em>(remote DC, remote rack 2)</em></p></li>
+<li><p>query 2: host8 <em>(remote DC, remote rack 1)</em>, host9 <em>(remote DC, remote rack 2)</em>, host7 <em>(remote DC, remote rack 1)</em></p></li>
+<li><p>query 3: host9 <em>(remote DC, remote rack 2)</em>, host7 <em>(remote DC, remote rack 1)</em>, host8 <em>(remote DC, remote rack 1)</em></p></li>
+<li><p>query 4: host7 <em>(remote DC, remote rack 1)</em>, host8 <em>(remote DC, remote rack 1)</em>, host9 <em>(remote DC, remote rack 2)</em></p></li>
+</ul>
+</section>
+<section id="tokenawarepolicy">
+<h2><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/TokenAwarePolicy.html">TokenAwarePolicy</a><a class="headerlink" href="#tokenawarepolicy" title="Link to this heading">¶</a></h2>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withLoadBalancingPolicy</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">TokenAwarePolicy</span><span class="p">(</span><span class="n">anotherPolicy</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This policy adds <strong>token awareness</strong> on top of another policy: requests will be routed in priority to the local replicas
+that own the data that is being queried.</p>
+<section id="requirements">
+<h3>Requirements<a class="headerlink" href="#requirements" title="Link to this heading">¶</a></h3>
+<p>In order for token awareness to work, you should first ensure that metadata is enabled in the driver. That is the case
+by default, unless it’s been explicitly disabled by <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/QueryOptions.html#setMetadataEnabled-boolean-">QueryOptions#setMetadataEnabled</a>.</p>
+<p>Then you need to consider whether routing information (provided by <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Statement.html#getKeyspace--">Statement#getKeyspace</a> and
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/Statement.html#getRoutingKey--">Statement#getRoutingKey</a>) can be computed automatically for your statements; if not, you may provide it yourself (if a
+statement has no routing information, the query will still be executed, but token awareness will not work, so the driver
+might not pick the best coordinator).</p>
+<p>The examples assume the following CQL schema:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">CREATE</span> <span class="n">TABLE</span> <span class="n">testKs</span><span class="o">.</span><span class="n">sensor_data</span><span class="p">(</span><span class="nb">id</span> <span class="nb">int</span><span class="p">,</span> <span class="n">year</span> <span class="nb">int</span><span class="p">,</span> <span class="n">ts</span> <span class="n">timestamp</span><span class="p">,</span> <span class="n">data</span> <span class="n">double</span><span class="p">,</span>
+                                <span class="n">PRIMARY</span> <span class="n">KEY</span> <span class="p">((</span><span class="nb">id</span><span class="p">,</span> <span class="n">year</span><span class="p">),</span> <span class="n">ts</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>For <a class="reference external" href="../statements/simple/">simple statements</a>, routing information can never be computed automatically:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">SimpleStatement</span><span class="w"> </span><span class="n">statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">SimpleStatement</span><span class="p">(</span>
+<span class="w">        </span><span class="s">&quot;SELECT * FROM testKs.sensor_data WHERE id = 1 and year = 2016&quot;</span><span class="p">);</span>
+
+<span class="c1">// No routing info available:</span>
+<span class="k">assert</span><span class="w"> </span><span class="n">statement</span><span class="p">.</span><span class="na">getKeyspace</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="k">assert</span><span class="w"> </span><span class="n">statement</span><span class="p">.</span><span class="na">getRoutingKey</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+
+<span class="c1">// Set the keyspace manually:</span>
+<span class="n">statement</span><span class="p">.</span><span class="na">setKeyspace</span><span class="p">(</span><span class="s">&quot;testKs&quot;</span><span class="p">);</span>
+
+<span class="c1">// Set the routing key manually: serialize each partition key component to its target CQL type</span>
+<span class="n">ProtocolVersion</span><span class="w"> </span><span class="n">protocolVersion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getProtocolOptions</span><span class="p">().</span><span class="na">getProtocolVersionEnum</span><span class="p">();</span>
+<span class="n">statement</span><span class="p">.</span><span class="na">setRoutingKey</span><span class="p">(</span>
+<span class="w">        </span><span class="n">TypeCodec</span><span class="p">.</span><span class="na">cint</span><span class="p">().</span><span class="na">serialize</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">protocolVersion</span><span class="p">),</span>
+<span class="w">        </span><span class="n">TypeCodec</span><span class="p">.</span><span class="na">cint</span><span class="p">().</span><span class="na">serialize</span><span class="p">(</span><span class="mi">2016</span><span class="p">,</span><span class="w"> </span><span class="n">protocolVersion</span><span class="p">));</span>
+
+<span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">statement</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>For <a class="reference external" href="../statements/built/">built statements</a>, the keyspace is available if it was provided while building the query; the
+routing key is available only if the statement was built using the table metadata, and all components of the partition
+key appear in the query:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">TableMetadata</span><span class="w"> </span><span class="n">tableMetadata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cluster</span><span class="p">.</span><span class="na">getMetadata</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">getKeyspace</span><span class="p">(</span><span class="s">&quot;testKs&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">getTable</span><span class="p">(</span><span class="s">&quot;sensor_data&quot;</span><span class="p">);</span>
+
+<span class="c1">// Built from metadata: all info available</span>
+<span class="n">BuiltStatement</span><span class="w"> </span><span class="n">statement1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="n">tableMetadata</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">and</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;year&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">2016</span><span class="p">));</span>
+
+<span class="k">assert</span><span class="w"> </span><span class="n">statement1</span><span class="p">.</span><span class="na">getKeyspace</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="k">assert</span><span class="w"> </span><span class="n">statement1</span><span class="p">.</span><span class="na">getRoutingKey</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+
+<span class="c1">// Built from keyspace and table name: only keyspace available</span>
+<span class="n">BuiltStatement</span><span class="w"> </span><span class="n">statement2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">select</span><span class="p">().</span><span class="na">from</span><span class="p">(</span><span class="s">&quot;testKs&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;sensor&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">where</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;id&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">))</span>
+<span class="w">        </span><span class="p">.</span><span class="na">and</span><span class="p">(</span><span class="n">eq</span><span class="p">(</span><span class="s">&quot;year&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">2016</span><span class="p">));</span>
+
+<span class="k">assert</span><span class="w"> </span><span class="n">statement2</span><span class="p">.</span><span class="na">getKeyspace</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="k">assert</span><span class="w"> </span><span class="n">statement2</span><span class="p">.</span><span class="na">getRoutingKey</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>For <a class="reference external" href="../statements/prepared/">bound statements</a>, the keyspace is always available; the routing key is only available if
+all components of the partition key are bound as variables:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// All components bound: all info available</span>
+<span class="n">PreparedStatement</span><span class="w"> </span><span class="n">pst1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="s">&quot;SELECT * FROM testKs.sensor_data WHERE id = :id and year = :year&quot;</span><span class="p">);</span>
+<span class="n">BoundStatement</span><span class="w"> </span><span class="n">statement1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pst1</span><span class="p">.</span><span class="na">bind</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2016</span><span class="p">);</span>
+
+<span class="k">assert</span><span class="w"> </span><span class="n">statement1</span><span class="p">.</span><span class="na">getKeyspace</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="k">assert</span><span class="w"> </span><span class="n">statement1</span><span class="p">.</span><span class="na">getRoutingKey</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+
+<span class="c1">// &#39;id&#39; hard-coded, only &#39;year&#39; is bound: only keyspace available</span>
+<span class="n">PreparedStatement</span><span class="w"> </span><span class="n">pst2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">prepare</span><span class="p">(</span><span class="s">&quot;SELECT * FROM testKs.sensor_data WHERE id = 1 and year = :year&quot;</span><span class="p">);</span>
+<span class="n">BoundStatement</span><span class="w"> </span><span class="n">statement2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pst2</span><span class="p">.</span><span class="na">bind</span><span class="p">(</span><span class="mi">2016</span><span class="p">);</span>
+
+<span class="k">assert</span><span class="w"> </span><span class="n">statement2</span><span class="p">.</span><span class="na">getKeyspace</span><span class="p">()</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+<span class="k">assert</span><span class="w"> </span><span class="n">statement2</span><span class="p">.</span><span class="na">getRoutingKey</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>For <a class="reference external" href="../statements/batch/">batch statements</a>, the routing information of each child statement is inspected; the first
+non-null keyspace is used as the keyspace of the batch, and the first non-null routing key as its routing key (the idea
+is that all childs should have the same routing information, since batches are supposed to operate on a single
+partition). All children might have null information, in which case you need to provide the information manually as
+shown previously.</p>
+</section>
+<section id="behavior">
+<h3>Behavior<a class="headerlink" href="#behavior" title="Link to this heading">¶</a></h3>
+<p>For any host, the distance returned by <code class="docutils literal notranslate"><span class="pre">TokenAwarePolicy</span></code> is always the same as its child policy.</p>
+<p>When the policy computes a query plan, it will first inspect the statement’s routing information. If there is none, the
+policy simply acts as a pass-through, and returns the query plan computed by its child policy.</p>
+<p>If the statement has routing information, the policy uses it to determine the replicas that hold the corresponding data.
+Then it returns a query plan containing:</p>
+<ol class="simple">
+<li><p>the replicas for which the child policy returns distance <code class="docutils literal notranslate"><span class="pre">LOCAL</span></code>, shuffled in a random order;</p></li>
+<li><p>followed by the query plan of the child policy, skipping any host that were already returned by the previous step.</p></li>
+</ol>
+<p>Finally, the <code class="docutils literal notranslate"><span class="pre">shuffleReplicas</span></code> constructor parameter allows you to control whether the policy shuffles the replicas in
+step 1:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="k">new</span><span class="w"> </span><span class="n">TokenAwarePolicy</span><span class="p">(</span><span class="n">anotherPolicy</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">);</span><span class="w"> </span><span class="c1">// no shuffling</span>
+</pre></div>
+</div>
+<p>Shuffling will distribute writes better, and can alleviate hotspots caused by “fat” partitions. On the other hand,
+setting it to <code class="docutils literal notranslate"><span class="pre">false</span></code> might increase the effectiveness of caching, since data will always be retrieved from the
+“primary” replica. Shuffling is enabled by default.</p>
+</section>
+</section>
+<section id="latencyawarepolicy">
+<h2><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LatencyAwarePolicy.html">LatencyAwarePolicy</a><a class="headerlink" href="#latencyawarepolicy" title="Link to this heading">¶</a></h2>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">        </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="p">.</span><span class="na">withLoadBalancingPolicy</span><span class="p">(</span>
+<span class="w">                </span><span class="n">LatencyAwarePolicy</span><span class="p">.</span><span class="na">builder</span><span class="p">(</span><span class="n">anotherPolicy</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withExclusionThreshold</span><span class="p">(</span><span class="mf">2.0</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withScale</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="n">TimeUnit</span><span class="p">.</span><span class="na">MILLISECONDS</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withRetryPeriod</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="n">TimeUnit</span><span class="p">.</span><span class="na">SECONDS</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withUpdateRate</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span><span class="w"> </span><span class="n">TimeUnit</span><span class="p">.</span><span class="na">MILLISECONDS</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">withMininumMeasurements</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span>
+<span class="w">                        </span><span class="p">.</span><span class="na">build</span><span class="p">()</span>
+<span class="w">        </span><span class="p">).</span><span class="na">build</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This policy adds <strong>latency awareness</strong> on top of another policy: it collects the latencies of queries to each host, and
+will exclude the worst-performing hosts from query plans.</p>
+<p>The builder allow you to customize various aspects of the policy:</p>
+<ul class="simple">
+<li><p>the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withExclusionThreshold-double-">exclusion threshold</a> controls how much worse a host must perform (compared to the fastest
+host) in order to be excluded. For example, 2 means that hosts that are twice slower will be excluded;</p></li>
+<li><p>since a host’s performance can vary over time, its score is computed with a time-weighted average; the
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withScale-long-java.util.concurrent.TimeUnit-">scale</a> controls how fast the weight given to older latencies decreases over time;</p></li>
+<li><p>the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withRetryPeriod-long-java.util.concurrent.TimeUnit-">retry period</a> is the duration for which a slow host will be penalized;</p></li>
+<li><p>the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withUpdateRate-long-java.util.concurrent.TimeUnit-">update rate</a> defines how often the minimum average latency (i.e. the fastest host) is recomputed;</p></li>
+<li><p>the <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/LatencyAwarePolicy.Builder.html#withMininumMeasurements-int-">minimum measurements</a> threshold guarantees that we have enough measurements before we
+start excluding a host. This prevents skewing the measurements during a node restart, where JVM warm-up will influence
+latencies.</p></li>
+</ul>
+<p>For any host, the distance returned by the policy is always the same as its child policy.</p>
+<p>Query plans are based on the child policy’s, except that hosts that are currently excluded for being too slow are moved
+to the end of the plan.</p>
+</section>
+<section id="filtering-policies">
+<h2>Filtering policies<a class="headerlink" href="#filtering-policies" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/WhiteListPolicy.html">WhiteListPolicy</a> wraps another policy with a white list, to ensure that the driver will only ever connect to a
+pre-defined subset of the cluster. The distance will be that of the child policy for hosts that are in the white list,
+and <code class="docutils literal notranslate"><span class="pre">IGNORED</span></code> otherwise. Query plans are guaranteed to only contain white-listed hosts.</p>
+<p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.2.x/api/com/datastax/driver/core/policies/HostFilterPolicy.html">HostFilterPolicy</a> is a generalization of that concept, where you provide the predicate that will determine if a host is
+included or not.</p>
+</section>
+<section id="implementing-your-own">
+<h2>Implementing your own<a class="headerlink" href="#implementing-your-own" title="Link to this heading">¶</a></h2>
+<p>If none of the provided policies fit your use case, you can write your own. This is an advanced topic, so we recommend
+studying the existing implementations first: <code class="docutils literal notranslate"><span class="pre">RoundRobinPolicy</span></code> is a good place to start, then you can look at more
+complex ones like <code class="docutils literal notranslate"><span class="pre">DCAwareRoundRobinPolicy</span></code>.</p>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Load balancing&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/load_balancing/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../idempotence/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />Query idempotence
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../logging/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Logging
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.11.2.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.0.x/index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../serverless/index.html">Connecting to ScyllaDB Cloud Serverless</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../paging/index.html">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Load balancing&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.2.x/manual/load_balancing/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/load_balancing/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Load balancing</a><ul>
+<li><a class="reference internal" href="#common-concepts">Common concepts</a><ul>
+<li><a class="reference internal" href="#host-distance">Host distance</a></li>
+<li><a class="reference internal" href="#query-plan">Query plan</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#roundrobinpolicy">RoundRobinPolicy</a></li>
+<li><a class="reference internal" href="#dcawareroundrobinpolicy">DCAwareRoundRobinPolicy</a></li>
+<li><a class="reference internal" href="#rackawareroundrobinpolicy">RackAwareRoundRobinPolicy</a></li>
+<li><a class="reference internal" href="#tokenawarepolicy">TokenAwarePolicy</a><ul>
+<li><a class="reference internal" href="#requirements">Requirements</a></li>
+<li><a class="reference internal" href="#behavior">Behavior</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#latencyawarepolicy">LatencyAwarePolicy</a></li>
+<li><a class="reference internal" href="#filtering-policies">Filtering policies</a></li>
+<li><a class="reference internal" href="#implementing-your-own">Implementing your own</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>

@@ -1,0 +1,917 @@
+
+
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+    
+    
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width initial-scale=1" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <title>
+             Paging | ScyllaDB Docs 
+        </title>
+        <meta name="description" content="ScyllaDB is an Apache Cassandra-compatible NoSQL data store that can handle 1 million transactions per second on a single server." />
+        <link rel="icon" href="../../_static/img/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="../../_static/img/favicon-32x32.png" sizes="32x32" />
+        <link rel="icon" href="../../_static/img/favicon-228x228.png" sizes="192x192" />
+        <link rel="apple-touch-icon" href="../../_static/img/favicon-228x228.png" />
+        <meta name="msapplication-TileImage" href="../../_static/img/favicon-228x228.png" />
+
+        
+            
+        
+
+        
+            
+            <link rel="canonical" href="https://java-driver.docs.scylladb.com/stable/manual/paging/"/>
+        
+
+        <link rel="author" href="mailto:info@scylladb.com" />
+
+        
+            
+        <!-- increase expertrec loading priority-->
+        <link rel="dns-prefetch" href="https://cse.expertrec.com">
+
+        <!-- increase font loading priority -->
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link rel="preload" as="style"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- async CSS -->
+        <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
+              href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+
+        <!-- no-JS fallback -->
+        <noscript>
+            <link rel="stylesheet"
+                  href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,500;0,700;1,400&display=swap" />
+        </noscript>
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b76e3c8a" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/css/main.css?v=74345ccd" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/sphinx_collapse.css?v=226d88b4" />
+            
+        
+            
+                <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+            
+        
+    
+        
+        
+            
+        <script type="text/javascript" src="../../_static/js/runtime.bundle.js"></script>
+        <script type="text/javascript" src="../../_static/js/main.bundle.js"></script>
+        
+            
+                <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+            
+        
+            
+                <script src="../../_static/doctools.js?v=888ff710"></script>
+            
+        
+            
+                <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+            
+        
+            
+                <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+            
+        
+            
+                <script src="../../_static/copybutton.js?v=f281be69"></script>
+            
+        
+    
+            
+                <!-- Local meta tags -->
+            
+            
+                <!-- Google Tag Manager global -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-T8P2JP");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Google Tag Manager docs -->
+<script>
+    (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({
+            "gtm.start": new Date().getTime(),
+            event: "gtm.js"
+        });
+        var f = d.getElementsByTagName(s)[0],
+            j = d.createElement(s),
+            dl = l != "dataLayer" ? "&l=" + l : "";
+        j.async = true;
+        j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+        f.parentNode.insertBefore(j, f);
+    })(window, document, "script", "dataLayer", "GTM-54NWVS4");
+</script>
+<!-- End Google Tag Manager -->
+
+<!-- Expertrec -->
+<script>
+    var id = "e2077224-9ccf-11e9-a0c9-0242ac130002";
+    var ci_search = document.createElement("script");
+    ci_search.type = "text/javascript";
+    ci_search.async = true;
+    ci_search.src = "https://cse.expertrec.com/api/js/ci_common.js?id=" + id;
+    var s = document.getElementsByTagName("script")[0];
+    s.parentNode.insertBefore(ci_search, s);
+</script>
+<!-- End Expertrec -->
+            
+        
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/b1870adf6a.js" crossorigin="anonymous"></script>
+        <!-- End Font Awesome -->
+    </head>
+
+    <body>
+        <section class="promo-banner  promo-banner--hide" style="display: none;">
+    <div class="promo-banner-wrapper">
+        
+        <div class="promo-banner__title">ScyllaDB University Live | Free Virtual Training Event</div>
+        <a class="promo-banner__button button button--reverse" href="#"
+           target="_blank" rel="noopener noreferrer">Learn more</a>
+        <button class="promo-banner__close">
+            <i class="scylla-icon scylla-icon--close"></i>
+        </button>
+    </div>
+</section>
+        <header class="header">
+    <div class="header-logo">
+        <a class="header-logo__img" href="https://scylladb.com/">
+            <img src="../../_static/img/logo-docs.svg" alt="ScyllaDB Documentation Logo" />
+        </a>
+        <span class="header-logo__bar"></span>
+        <a class="header-logo__text" href="https://docs.scylladb.com/">
+            Documentation
+        </a>
+    </div>
+    <div class="header-navigation">
+        <ul class="dropdown menu scylla-dropdown scylla-dropdown--header" data-dropdown-menu>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Server
+                    <i class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://opensource.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--about-us"></i>
+                            ScyllaDB Open Source
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://enterprise.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--enterprise"></i>ScyllaDB Enterprise
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://scylla.docs.scylladb.com/stable/alternator/alternator.html">
+                            <i class="scylla-icon scylla-icon--alternator"></i>
+                            ScyllaDB Alternator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="https://docs.scylladb.com/scylla-cloud/" class="scylla-dropdown__title">Cloud</a>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Tools <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://manager.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--manager"></i>ScyllaDB Manager</a>
+                    </li>
+                    <li>
+                        <a href="https://monitoring.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--monitoring"></i>ScyllaDB
+                            Monitoring Stack</a>
+                    </li>
+                    <li>
+                        <a href="https://operator.docs.scylladb.com/">
+                            <i class="scylla-icon scylla-icon--operator"></i>ScyllaDB Operator
+                        </a>
+                    </li>
+                </ul>
+            </li>
+            <li class="scylla-dropdown__item">
+                <a href="#" class="scylla-dropdown__title">Drivers <i
+                    class="chevron scylla-icon scylla-icon--triangle-down"></i></a>
+                <ul class="menu scylla-dropdown__content">
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/cql-drivers/">
+                            <i class="scylla-icon scylla-icon--nsql-guides"></i>CQL Drivers
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://docs.scylladb.com/using-scylla/drivers/dynamo-drivers/">
+                            <i class="scylla-icon scylla-icon--alternator"></i>DynamoDB Drivers
+                        </a>
+                    </li>
+                </ul>
+            </li>
+        </ul>
+        <div class="header-button">
+            <a href="https://www.scylladb.com/download/" class="button">Download</a>
+        </div>
+    </div>
+    <div class="header-search-box">
+        <div class="search-box">
+            <ci-search></ci-search>
+        </div>
+    </div>
+    <div class="side-nav-toggle" data-toggle="side-nav">
+    <div class="side-nav-toggle__button">
+        <img src="../../_static/img/menu.svg" alt="Menu" />
+    </div>
+</div>
+</header>
+        <section
+            class="layout  layout--sidebar layout--has-secondary-sidebar ">
+            <div class="content large-order-2">
+                
+                    
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            
+                You're viewing documentation for a previous version of Scylla Java Driver.
+            
+            <a href="../../../stable/index.html">Switch to the latest stable version.</a>
+        </p>
+    </div>
+
+                
+                
+                    <div class="pre-content">
+                        <div class="breadcrumbs">
+    <span class="bread__item">
+        <a href="https://docs.scylladb.com"
+           class="bread__highlight">
+            <i class="fas fa-home"></i> ScyllaDB Docs
+        </a>
+    </span>
+    <span class="bread__item">
+        <a href="https://java-driver.docs.scylladb.com"
+           class="bread__highlight">
+            Scylla Java Driver
+        </a>
+    </span>
+    
+        <span class="bread__item">
+            <a href="../index.html" class="bread__highlight">
+                Manual
+            </a>
+        </span>
+    
+    <span class="bread__item bread__item--last">Paging</span>
+</div>
+                    </div>
+                
+                <section id="paging">
+<h1>Paging<a class="headerlink" href="#paging" title="Link to this heading">¶</a></h1>
+<p>When a query returns many rows, it would be inefficient to return them
+as a single response message. Instead, the driver breaks the results
+into <em>pages</em> which get returned as they are needed.</p>
+<section id="setting-the-fetch-size">
+<h2>Setting the fetch size<a class="headerlink" href="#setting-the-fetch-size" title="Link to this heading">¶</a></h2>
+<p>The <em>fetch size</em> specifies how many rows will be returned at once by
+Cassandra (in other words, it’s the size of each page).</p>
+<p>You can set a default fetch size globally for a <code class="docutils literal notranslate"><span class="pre">Cluster</span></code> instance:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="c1">// At initialization:</span>
+<span class="n">Cluster</span><span class="w"> </span><span class="n">cluster</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Cluster</span><span class="p">.</span><span class="na">builder</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="na">addContactPoint</span><span class="p">(</span><span class="s">&quot;127.0.0.1&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="p">.</span><span class="na">withQueryOptions</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">QueryOptions</span><span class="p">().</span><span class="na">setFetchSize</span><span class="p">(</span><span class="mi">2000</span><span class="p">))</span>
+<span class="w">    </span><span class="p">.</span><span class="na">build</span><span class="p">();</span>
+
+<span class="c1">// Or at runtime:</span>
+<span class="n">cluster</span><span class="p">.</span><span class="na">getConfiguration</span><span class="p">().</span><span class="na">getQueryOptions</span><span class="p">().</span><span class="na">setFetchSize</span><span class="p">(</span><span class="mi">2000</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The fetch size can also be set on a statement:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">Statement</span><span class="w"> </span><span class="n">statement</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">SimpleStatement</span><span class="p">(</span><span class="s">&quot;your query&quot;</span><span class="p">);</span>
+<span class="n">statement</span><span class="p">.</span><span class="na">setFetchSize</span><span class="p">(</span><span class="mi">2000</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>If the fetch size is set on a statement, it will take precedence;
+otherwise, the cluster-wide value (which defaults to 5000) will be used.</p>
+<p>Note that setting a fetch size doesn’t mean that Cassandra will always
+return the exact number of rows, it is possible that it returns slightly
+more or less results.</p>
+</section>
+<section id="result-set-iteration">
+<h2>Result set iteration<a class="headerlink" href="#result-set-iteration" title="Link to this heading">¶</a></h2>
+<p>The fetch size limits the number of results that are returned in one
+page; if you iterate past that, the driver will run background queries
+to fetch subsequent pages. Here’s an example with a fetch size of 20:</p>
+<div class="highlight-ditaa notranslate"><div class="highlight"><pre><span></span><span class="w">    </span>client<span class="w">         </span>Session<span class="w">                          </span>Cassandra
+<span class="w">    </span>--+--------------+---------------------------------+-----
+<span class="w">      </span><span class="p">|</span>execute<span class="o">(</span>query<span class="o">)</span><span class="p">|</span><span class="w">                                 </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span>-------------&gt;<span class="p">|</span><span class="w">                                 </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">              </span><span class="p">|</span><span class="w"> </span>query<span class="w"> </span>rows<span class="w"> </span><span class="m">1</span><span class="w"> </span>to<span class="w"> </span><span class="m">20</span><span class="w">              </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">              </span><span class="p">|</span>--------------------------------&gt;<span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">              </span><span class="p">|</span><span class="w">                                 </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">              </span><span class="p">|</span>create<span class="w">                           </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">              </span><span class="p">|</span>------&gt;ResultSet<span class="w">                 </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">                          </span><span class="p">|</span><span class="w">                     </span><span class="p">|</span>
++-----+--------+-----------------+-+<span class="w">                   </span><span class="p">|</span>
+<span class="p">|</span>For<span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="m">1</span>..20<span class="p">|</span><span class="w">                 </span><span class="p">|</span><span class="w"> </span><span class="p">|</span><span class="w">                   </span><span class="p">|</span>
++--------------+<span class="w">                 </span><span class="p">|</span><span class="w"> </span><span class="p">|</span><span class="w">                   </span><span class="p">|</span>
+<span class="p">|</span><span class="w">     </span><span class="p">|</span><span class="w">        </span>get<span class="w"> </span>next<span class="w"> </span>row<span class="w">      </span><span class="p">|</span><span class="w"> </span><span class="p">|</span><span class="w">                   </span><span class="p">|</span>
+<span class="p">|</span><span class="w">     </span><span class="p">|</span>-------------------------&gt;<span class="p">|</span><span class="w"> </span><span class="p">|</span><span class="w">                   </span><span class="p">|</span>
+<span class="p">|</span><span class="w">     </span><span class="p">|</span><span class="w">          </span>row<span class="w"> </span>i<span class="w">           </span><span class="p">|</span><span class="w"> </span><span class="p">|</span><span class="w">                   </span><span class="p">|</span>
+<span class="p">|</span><span class="w">     </span><span class="p">|</span>&lt;-------------------------<span class="p">|</span><span class="w"> </span><span class="p">|</span><span class="w">                   </span><span class="p">|</span>
+<span class="p">|</span><span class="w">     </span><span class="p">|</span><span class="w">                          </span><span class="p">|</span><span class="w"> </span><span class="p">|</span><span class="w">                   </span><span class="p">|</span>
++-----+--------------------------+-+<span class="w">                   </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">                          </span><span class="p">|</span><span class="w">                     </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">                          </span><span class="p">|</span><span class="w">                     </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">        </span>get<span class="w"> </span>next<span class="w"> </span>row<span class="w">      </span><span class="p">|</span><span class="w">                     </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span>-------------------------&gt;<span class="p">|</span><span class="w">                     </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">                          </span><span class="p">|</span><span class="w"> </span>query<span class="w"> </span>rows<span class="w"> </span><span class="m">21</span><span class="w"> </span>to<span class="w"> </span><span class="m">40</span><span class="w"> </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">                          </span><span class="p">|</span>--------------------&gt;<span class="p">|</span>
+<span class="w">      </span><span class="p">|</span><span class="w">          </span>row<span class="w"> </span><span class="m">21</span><span class="w">          </span><span class="p">|</span><span class="w">                     </span><span class="p">|</span>
+<span class="w">      </span><span class="p">|</span>&lt;------------------------<span class="w"> </span><span class="p">|</span><span class="w">                     </span><span class="p">|</span>
+</pre></div>
+</div>
+<p>By default, the background fetch happens at the last moment, when there
+are no more “local” rows available. If you need finer control, the
+<a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/ResultSet.html">ResultSet</a> interface provides the following methods:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">getAvailableWithoutFetching()</span></code> and <code class="docutils literal notranslate"><span class="pre">isFullyFetched()</span></code> to check the
+current state;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fetchMoreResults()</span></code> to force a page fetch.</p></li>
+</ul>
+<p>Here’s how you could use these methods to pre-fetch the next page in
+advance, in order to avoid the performance hit at the end of each page:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;your query&quot;</span><span class="p">);</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">rs</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rs</span><span class="p">.</span><span class="na">getAvailableWithoutFetching</span><span class="p">()</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="n">rs</span><span class="p">.</span><span class="na">isFullyFetched</span><span class="p">())</span>
+<span class="w">        </span><span class="n">rs</span><span class="p">.</span><span class="na">fetchMoreResults</span><span class="p">();</span><span class="w"> </span><span class="c1">// this is asynchronous</span>
+<span class="w">    </span><span class="c1">// Process the row ...</span>
+<span class="w">    </span><span class="n">System</span><span class="p">.</span><span class="na">out</span><span class="p">.</span><span class="na">println</span><span class="p">(</span><span class="n">row</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>If you use paging with the async API, you’ll also want to use those
+methods to avoid triggering synchronous fetches unintentionally; see
+<a class="reference external" href="../async/#async-paging">async paging</a>.</p>
+</section>
+<section id="saving-and-reusing-the-paging-state">
+<h2>Saving and reusing the paging state<a class="headerlink" href="#saving-and-reusing-the-paging-state" title="Link to this heading">¶</a></h2>
+<p>Sometimes it is convenient to save the paging state in order to restore
+it later. For example, consider a stateless web service that displays a
+list of results with a link to the next page. When the user clicks that
+link, we want to run the exact same query, except that the iteration
+should start where we stopped on the previous page.</p>
+<p>To do so, the driver exposes a <a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/PagingState.html">PagingState</a> object that represents
+where we were in the result set when the last page was fetched:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">ResultSet</span><span class="w"> </span><span class="n">resultSet</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="s">&quot;your query&quot;</span><span class="p">);</span>
+<span class="c1">// iterate the result set...</span>
+<span class="n">PagingState</span><span class="w"> </span><span class="n">pagingState</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">resultSet</span><span class="p">.</span><span class="na">getExecutionInfo</span><span class="p">().</span><span class="na">getPagingState</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This object can be serialized to a <code class="docutils literal notranslate"><span class="pre">String</span></code> or a byte array:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">String</span><span class="w"> </span><span class="n">string</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pagingState</span><span class="p">.</span><span class="na">toString</span><span class="p">();</span>
+<span class="kt">byte</span><span class="o">[]</span><span class="w"> </span><span class="n">bytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pagingState</span><span class="p">.</span><span class="na">toBytes</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>This serialized form can be saved in some form of persistent storage to
+be reused later. In our web service example, we would probably save the
+string version as a query parameter in the URL to the next page
+(<code class="docutils literal notranslate"><span class="pre">http://myservice.com/results?page=&lt;...&gt;</span></code>). When that value is
+retrieved later, we can deserialize it and reinject it in a statement:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="n">PagingState</span><span class="w"> </span><span class="n">pagingState</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PagingState</span><span class="p">.</span><span class="na">fromString</span><span class="p">(</span><span class="n">string</span><span class="p">);</span>
+<span class="n">Statement</span><span class="w"> </span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">SimpleStatement</span><span class="p">(</span><span class="s">&quot;your query&quot;</span><span class="p">);</span>
+<span class="n">st</span><span class="p">.</span><span class="na">setPagingState</span><span class="p">(</span><span class="n">pagingState</span><span class="p">);</span>
+<span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">st</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Note that the paging state can only be reused with the exact same
+statement (same query string, same parameters). Also, it is an opaque
+value that is only meant to be collected, stored an re-used. If you try
+to modify its contents or reuse it with a different statement, the
+driver will raise an error.</p>
+<p>Putting it all together, here’s a more comprehensive example
+implementation for our web service:</p>
+<div class="highlight-java notranslate"><div class="highlight"><pre><span></span><span class="kd">final</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">RESULTS_PER_PAGE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">100</span><span class="p">;</span>
+
+<span class="n">Statement</span><span class="w"> </span><span class="n">st</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">SimpleStatement</span><span class="p">(</span><span class="s">&quot;your query&quot;</span><span class="p">);</span>
+<span class="n">st</span><span class="p">.</span><span class="na">setFetchSize</span><span class="p">(</span><span class="n">RESULTS_PER_PAGE</span><span class="p">);</span>
+
+<span class="n">String</span><span class="w"> </span><span class="n">requestedPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">extractPagingStateStringFromURL</span><span class="p">();</span>
+<span class="c1">// This will be absent for the first page</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">requestedPage</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">st</span><span class="p">.</span><span class="na">setPagingState</span><span class="p">(</span>
+<span class="w">        </span><span class="n">PagingState</span><span class="p">.</span><span class="na">fromString</span><span class="p">(</span><span class="n">requestedPage</span><span class="p">));</span>
+<span class="p">}</span>
+
+<span class="n">ResultSet</span><span class="w"> </span><span class="n">rs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">st</span><span class="p">);</span>
+<span class="n">PagingState</span><span class="w"> </span><span class="n">nextPage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="na">getExecutionInfo</span><span class="p">().</span><span class="na">getPagingState</span><span class="p">();</span>
+
+<span class="c1">// Note that we don&#39;t rely on RESULTS_PER_PAGE, since Cassandra might</span>
+<span class="c1">// have not respected it, or we might be at the end of the result set</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">remaining</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rs</span><span class="p">.</span><span class="na">getAvailableWithoutFetching</span><span class="p">();</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">Row</span><span class="w"> </span><span class="n">row</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="n">rs</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">renderInResponse</span><span class="p">(</span><span class="n">row</span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">--</span><span class="n">remaining</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// This will be null if there are no more pages</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">nextPage</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">renderNextPageLink</span><span class="p">(</span><span class="n">nextPage</span><span class="p">.</span><span class="na">toString</span><span class="p">());</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Due to internal implementation details, <code class="docutils literal notranslate"><span class="pre">PagingState</span></code> instances are not
+portable across <a class="reference external" href="../native_protocol/">native protocol</a> versions. This
+could become a problem in the following scenario:</p>
+<ul class="simple">
+<li><p>you’re using the driver 2.0.x and Cassandra 2.0.x, and therefore
+native protocol v2;</p></li>
+<li><p>a user bookmarks a link to your web service that contains a serialized
+paging state;</p></li>
+<li><p>you upgrade your server stack to use the driver 2.1.x and Cassandra
+2.1.x, so you’re now using protocol v3;</p></li>
+<li><p>the user tries to reload their bookmark, but the paging state was
+serialized with protocol v2, so trying to reuse it will fail.</p></li>
+</ul>
+<p>If this is not acceptable for you, you might want to consider the unsafe
+API described in the next section.</p>
+<p>Note: because of <a class="reference external" href="https://issues.apache.org/jira/browse/CASSANDRA-10880">CASSANDRA-10880</a>, paging states are also incompatible
+between Cassandra 2.2 and 3.0, even if they’re both using native protocol v4.
+This will manifest as the following error:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">com</span><span class="o">.</span><span class="n">datastax</span><span class="o">.</span><span class="n">driver</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">ProtocolError</span><span class="p">:</span> <span class="n">An</span> <span class="n">unexpected</span> <span class="n">protocol</span> <span class="n">error</span> <span class="n">occurred</span> <span class="n">on</span> <span class="n">host</span> <span class="n">xxx</span><span class="o">.</span>
+<span class="n">This</span> <span class="ow">is</span> <span class="n">a</span> <span class="n">bug</span> <span class="ow">in</span> <span class="n">this</span> <span class="n">library</span><span class="p">,</span> <span class="n">please</span> <span class="n">report</span><span class="p">:</span> <span class="n">Invalid</span> <span class="n">value</span> <span class="k">for</span> <span class="n">the</span> <span class="n">paging</span> <span class="n">state</span>
+</pre></div>
+</div>
+<p>The <a class="reference external" href="https://github.com/apache/cassandra/blob/cassandra-3.0/NEWS.txt#L334-L336">Cassandra documentation</a>
+recommends staying on protocol v3 during an upgrade between these two versions:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Clients</span> <span class="n">must</span> <span class="n">use</span> <span class="n">the</span> <span class="n">native</span> <span class="n">protocol</span> <span class="n">version</span> <span class="mi">3</span> <span class="n">when</span> <span class="n">upgrading</span> <span class="kn">from</span> <span class="mf">2.2</span><span class="o">.</span><span class="n">X</span> <span class="k">as</span>
+<span class="n">the</span> <span class="n">native</span> <span class="n">protocol</span> <span class="n">version</span> <span class="mi">4</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">compatible</span> <span class="n">between</span> <span class="mf">2.2</span><span class="o">.</span><span class="n">X</span> <span class="ow">and</span> <span class="mf">3.</span><span class="n">Y</span><span class="o">.</span> <span class="n">See</span>
+<span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">www</span><span class="o">.</span><span class="n">mail</span><span class="o">-</span><span class="n">archive</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">user</span><span class="nd">@cassandra</span><span class="o">.</span><span class="n">apache</span><span class="o">.</span><span class="n">org</span><span class="o">/</span><span class="n">msg45381</span><span class="o">.</span><span class="n">html</span> <span class="k">for</span> <span class="n">details</span><span class="o">.</span>
+</pre></div>
+</div>
+<section id="unsafe-api">
+<h3>Unsafe API<a class="headerlink" href="#unsafe-api" title="Link to this heading">¶</a></h3>
+<p>As an alternative to the standard API, there are two methods that
+manipulate a raw <code class="docutils literal notranslate"><span class="pre">byte[]</span></code> instead of a <code class="docutils literal notranslate"><span class="pre">PagingState</span></code> object:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/ExecutionInfo.html#getPagingStateUnsafe--">ExecutionInfo#getPagingStateUnsafe()</a></p></li>
+<li><p><a class="reference external" href="https://java-driver.docs.scylladb.com/scylla-3.11.0.x/api/com/datastax/driver/core/Statement.html#setPagingStateUnsafe-byte:A-">Statement#setPagingStateUnsafe(byte[])</a></p></li>
+</ul>
+<p>These low-level methods perform no validation on their arguments;
+therefore nothing protects you from reusing a paging state that was
+generated from a different statement, or altered in any way. This could
+result in sending a corrupt paging state to Cassandra, with
+unpredictable consequences (ranging from wrong results to a query
+failure).</p>
+<p>There are two situations where you might want to use the unsafe API:</p>
+<ul class="simple">
+<li><p>you never expose the paging state to end users and you are confident
+that it won’t get altered;</p></li>
+<li><p>you want portability across protocol versions and/or you prefer
+implementing your own validation logic (for example, signing the raw
+state with a private key).</p></li>
+</ul>
+</section>
+</section>
+<section id="offset-queries">
+<h2>Offset queries<a class="headerlink" href="#offset-queries" title="Link to this heading">¶</a></h2>
+<p>Saving the paging state works well when you only let the user move from
+one page to the next. But it doesn’t allow random jumps (like “go
+directly to page 10”), because you can’t fetch a page unless you have
+the paging state of the previous one. Such a feature would require
+<em>offset queries</em>, but they are not natively supported by Cassandra (see
+<a class="reference external" href="https://issues.apache.org/jira/browse/CASSANDRA-6511">CASSANDRA-6511</a>).
+The rationale is that offset queries are inherently inefficient (the
+performance will always be linear in the number of rows skipped), so the
+Cassandra team doesn’t want to encourage their use.</p>
+<p>If you really want offset queries, you can emulate them client-side.
+You’ll still get linear performance, but maybe that’s acceptable for
+your use case. For example, if each page holds 10 rows and you show at
+most 20 pages, this means you’ll fetch at most 190 extra rows, which
+doesn’t sound like a big deal.</p>
+<p>For example, if the page size is 10, the fetch size is 50, and the user
+asks for page 12 (rows 110 to 119):</p>
+<ul class="simple">
+<li><p>execute the statement a first time (the result set contains rows 0 to
+49, but you’re not going to use them, only the paging state);</p></li>
+<li><p>execute the statement a second time with the paging state from the
+first query;</p></li>
+<li><p>execute the statement a third time with the paging state from the
+second query. The result set now contains rows 100 to 149;</p></li>
+<li><p>skip the first 10 rows of the iterator. Read the next 10 rows and
+discard the remaining ones.</p></li>
+</ul>
+<p>You’ll want to experiment with the fetch size to find the best balance:
+too small means many background queries; too big means bigger messages
+and too many unneeded rows returned (we picked 50 above for the sake of
+example, but it’s probably too small – the default is 5000).</p>
+<p>Again, offset queries are inefficient by nature. Emulating them
+client-side is a compromise when you think you can get away with the
+performance hit. We recommend that you:</p>
+<ul class="simple">
+<li><p>test your code at scale with the expected query patterns, to make sure
+that your assumptions are correct;</p></li>
+<li><p>set a hard limit on the highest possible page number, to prevent
+malicious users from triggering queries that would skip a huge amount
+of rows.</p></li>
+</ul>
+</section>
+</section>
+
+                
+                    <div class="post-content">
+                        
+    <div class="feedback-container">
+        <p class="feedback-container__title">Was this page helpful?</p>
+        <span data-tooltip tabindex="1" title="Yes" data-position="top">
+            <button class="feedback-container__button" id="feedback-positive">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-up"></i>
+            </button>
+        </span>
+        <span data-tooltip tabindex="1" title="No" data-position="top">
+            <button class="feedback-container__button" id="feedback-negative">
+                <i class="feedback-container__icon scylla-icon scylla-icon--thumbs-down"></i>
+            </button>
+        </span>
+        <div class="feedback-container__message" id="feedback-message"></div>
+    </div>
+
+    <script>
+        function resetFeedbackButtonActive() {
+            const feedbackButtons = document.getElementsByClassName('feedback-container__button');
+            for (let i = 0; i < feedbackButtons.length; i++) {
+                feedbackButtons[i].classList.remove('active');
+            }
+        }
+
+        function showMessage(liked) {
+            const feedbackMessage = document.getElementById('feedback-message');
+            const themeGithubRepository = true;
+            let message = 'Great! Thanks for your feedback.';
+            if (themeGithubRepository && !liked) {
+                message = "Thanks for your feedback! Please don't hesitate to <a href='https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Paging&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.0.x/manual/paging/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation'>create an issue</a> if you have any suggestions on how we can improve.";
+            }
+            feedbackMessage.innerHTML = message;
+        }
+
+        function sendGaEvent(liked) {
+            const event_label = liked ? "positive" : "negative";
+            const event = "feedback_" + event_label;
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+                'event': event,
+            });
+        }
+
+        const positiveFeebackButton = document.getElementById('feedback-positive');
+        const negativeFeedbackButton = document.getElementById('feedback-negative');
+
+        positiveFeebackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(true);
+            showMessage(true);
+            positiveFeebackButton.classList.add('active');
+        });
+
+        negativeFeedbackButton.addEventListener('click', function() {
+            resetFeedbackButtonActive();
+            sendGaEvent(false);
+            showMessage(false);
+            negativeFeedbackButton.classList.add('active');
+        });
+    </script>
+
+                        <div class="content-navigation">
+    <div class="navigation navigation--prev">
+        
+            <a class="navigation__link" href="../osgi/index.html">
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-left"></i>
+                </button>
+                <div class="navigation__title">
+                    <span class="colored">PREVIOUS</span> <br />OSGi
+                </div>
+            </a>
+        
+    </div>
+    <div class="navigation navigation--next">
+        
+            <a class="navigation__link" href="../pooling/index.html">
+                <div class="navigation__title">
+                    <span class="colored">NEXT</span> <br />Connection pooling
+                </div>
+                <button class="navigation__button">
+                    <i class="scylla-icon scylla-icon--chevron-right"></i>
+                </button>
+            </a>
+        
+    </div>
+</div>
+                        <div class="notice">
+    <p>ScyllaDB Java Driver is available under the <a href="https://www.apache.org/licenses/LICENSE-2.0.html">Apache v2 License</a>.
+    ScyllaDB Java Driver is a fork of <a href="https://github.com/datastax/java-driver">DataStax Java Driver</a>.
+    See Copyright <a href="https://java-driver.docs.scylladb.com/stable/#license">here</a>.</p>
+</div>
+                    </div>
+                
+            </div>
+            <div class="sidebar-left  large-order-1">
+                
+                    
+                        <div id="side-nav" class="side-nav custom-scroll-bar" data-closable data-toggler=".show">
+    <button class="collapsible-button">
+        <i class="scylla-icon scylla-icon--chevron-left"></i>
+    </button>
+    <div class="side-nav-content" style="visibility: hidden;">
+        <div class="side-nav__search">
+            <div class="search-box">
+                <ci-search></ci-search>
+            </div>
+        </div>
+        <div class="side-nav__title">
+            <a href="https://java-driver.docs.scylladb.com">Scylla Java Driver</a>
+        </div>
+        <div class="side-nav__versions"><ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            
+                3.11.0.x
+            
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            
+                
+                    <li>
+                        <a href="../../../stable/index.html">4.15.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.14.1.x/index.html">4.14.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.13.0.x/index.html">4.13.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.12.0.x/index.html">4.12.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.11.1.x/index.html">4.11.1.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.10.0.x/index.html">4.10.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-4.7.2.x/index.html">4.7.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.11.2.x/index.html">3.11.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="index.html">3.11.0.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.10.2.x/index.html">3.10.2.x</a>
+                    </li>
+                
+            
+                
+                    <li>
+                        <a href="../../../scylla-3.7.2.x/index.html">3.7.2.x</a>
+                    </li>
+                
+            
+            
+        </ul>
+    </li>
+</ul></div>
+        <div class="side-nav__content">
+            <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../index.html">Scylla Java Driver for Scylla and Apache Cassandra®</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Documentation</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Manual</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" type="checkbox"/><label for="toctree-checkbox-1"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../address_resolution/index.html">Address resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../async/index.html">Asynchronous programming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../auth/index.html">Authentication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../compression/index.html">Compression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../control_connection/index.html">Control connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_codecs/index.html">Custom Codecs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_payloads/index.html">Custom Payloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../idempotence/index.html">Query idempotence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../load_balancing/index.html">Load balancing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../logging/index.html">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metadata/index.html">Metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../metrics/index.html">Metrics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../native_protocol/index.html">Native protocol</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../object_mapper/index.html">Object Mapper</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" type="checkbox"/><label for="toctree-checkbox-2"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/creating/index.html">Definition of mapped classes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/custom_codecs/index.html">Using custom codecs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../object_mapper/using/index.html">Using the mapper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../osgi/index.html">OSGi</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">Paging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../pooling/index.html">Connection pooling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../query_timestamps/index.html">Query timestamps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reconnection/index.html">Reconnection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../retries/index.html">Retries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../shaded_jar/index.html">Using the shaded JAR</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../socket_options/index.html">Socket options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../speculative_execution/index.html">Speculative query execution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ssl/index.html">SSL</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../statements/index.html">Statements</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" type="checkbox"/><label for="toctree-checkbox-3"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../statements/simple/index.html">Simple statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/prepared/index.html">Prepared statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/built/index.html">Built statements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../statements/batch/index.html">Batch statements</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../tuples/index.html">Using Tuples with the Java driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../udts/index.html">User-defined types</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../upgrade_guide/index.html">Upgrade guide</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" type="checkbox"/><label for="toctree-checkbox-4"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/index.html">Migrating from Astyanax</a><input class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" type="checkbox"/><label for="toctree-checkbox-5"><i class="scylla-icon scylla-icon--expand"></i></label><div class="break"></div><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/configuration/index.html">Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/language_level_changes/index.html">Language change : from Thrift to CQL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../upgrade_guide/migrating_from_astyanax/queries_and_results/index.html">Queries and Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../faq/index.html">Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog/index.html">Changelog</a></li>
+</ul>
+
+        </div>
+    </div>
+</div>
+                    
+                
+            </div>
+            
+                <div class="sidebar-right large-order-3">
+                    <div class="secondary-side-nav custom-scroll-bar">
+    
+    <ul class="contribute">
+        <li class="contribute__item">
+            <a href="https://github.com/scylladb/java-driver/issues/new?title=docs:%20Issue on page Paging&&body=I%20would%20like%20to%20report%20an%20issue%20on%20page%20https://java-driver.docs.scylladb.com/scylla-3.11.0.x/manual/paging/index%0A%0A%23%23%23%20Problem%0A%0A%23%23%23%20%20Suggest%20a%20fix&labels=documentation"
+               target="_blank">
+                <i class="icon fab fa-github" aria-hidden="true"></i>Create an issue
+            </a>
+        </li>
+        
+            <li class="contribute__item">
+                <a href="https://github.com/scylladb/java-driver/edit/master/docs/source/manual/paging/index.md"
+                   target="_blank">
+                    <i class="icon fa fa-edit" aria-hidden="true"></i>Edit this page
+                </a>
+            </li>
+        
+    </ul>
+
+    
+        <div class="secondary-side-nav__content">
+            <p class="topic-title">On this page</p>
+            <ul>
+<li><a class="reference internal" href="#">Paging</a><ul>
+<li><a class="reference internal" href="#setting-the-fetch-size">Setting the fetch size</a></li>
+<li><a class="reference internal" href="#result-set-iteration">Result set iteration</a></li>
+<li><a class="reference internal" href="#saving-and-reusing-the-paging-state">Saving and reusing the paging state</a><ul>
+<li><a class="reference internal" href="#unsafe-api">Unsafe API</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#offset-queries">Offset queries</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+    
+</div>
+                </div>
+            
+        </section>
+
+        <footer class="footer">
+    <div class="footer-group">
+        <div class="footer-top">
+            <a class="footer-logo" href="https://www.scylladb.com">
+                <img src="../../_static/img/logo-scylla-horizontal-RGB.svg" alt="Logo" />
+            </a>
+            <div class="footer-links">
+                <a class="footer-links__link" href="https://docs.scylladb.com/" target="_blank">Docs</a>
+                <a class="footer-links__link" href="https://university.scylladb.com/" target="_blank">University</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/contact-us/" target="_blank">Contact Us</a>
+                <a class="footer-links__link" href="https://www.scylladb.com/company/" target="_blank">About Us</a>
+            </div>
+            <div class="footer-actions">
+                <a class="footer-actions__link" href="https://groups.google.com/g/scylladb-users" target="_blank">
+                    <span data-tooltip tabindex="1" title="User mailing list" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-mail-list.svg" alt="Mail List Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="http://slack.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="User Slack channel" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-slack.svg" alt="Slack Icon" />
+                    </span>
+                </a>
+                <a class="footer-actions__link" href="https://forum.scylladb.com/" target="_blank">
+                    <span data-tooltip tabindex="1" title="Community forum" data-position="bottom">
+                        <img src="../../_static/img/icons/icon-forum.svg" alt="Forum Icon" />
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            
+                <div class="footer-bottom__copyright">
+                    
+                        
+                            &#169; 2024, ScyllaDB. All rights reserved.
+                        
+                    
+                </div>
+            
+            
+                <div class="footer-bottom__last-updated">
+                    
+                        Last updated on 05 August 2024.
+                    
+                </div>
+            
+            <div class="footer-bottom__version">
+                Powered by
+                <a href="http://sphinx-doc.org/">Sphinx 7.2.6</a> &amp;
+                <a href="https://sphinx-theme.scylladb.com/">ScyllaDB Theme 1.7.4</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <noscript>
+            <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T8P2JP" height="0" width="0"
+                    style="display: none; visibility: hidden"></iframe>
+        </noscript>
+    </body>
+
+</html>
