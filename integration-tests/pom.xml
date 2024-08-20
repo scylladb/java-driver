@@ -247,6 +247,8 @@
               <threadCountClasses>8</threadCountClasses>
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-parallelized.xml</summaryFile>
               <skipITs>${skipParallelizableITs}</skipITs>
+              <parallel>methods</parallel>
+              <threadCount>4</threadCount>
             </configuration>
           </execution>
           <execution>
