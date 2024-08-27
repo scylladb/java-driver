@@ -27,7 +27,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.scylladb</groupId>
   <artifactId>java-driver-parent</artifactId>
-  <version>4.18.0.2-SNAPSHOT</version>
+  <version>4.18.1.0</version>
   <packaging>pom</packaging>
   <name>Java Driver for Scylla and Apache Cassandra</name>
   <description>A driver for Scylla and Apache Cassandra(R) 2.1+ that works exclusively with the Cassandra Query Language version 3 (CQL3) and Cassandra's native protocol versions 3 and above.</description>
@@ -686,6 +686,7 @@
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
+          <jvm>${testing.jvm}/bin/java</jvm>
           <systemPropertyVariables>
             <logback.configurationFile>${project.basedir}/src/test/resources/logback-test.xml</logback.configurationFile>
           </systemPropertyVariables>
@@ -712,9 +713,9 @@
         <extensions>true</extensions>
         <configuration>
           <serverId>ossrh</serverId>
-          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-          <autoReleaseAfterClose>true</autoReleaseAfterClose>
-          <!-- skipLocalStaging>true</skipLocalStaging -->
+          <nexusUrl>https://repository.apache.org/</nexusUrl>
+          <autoReleaseAfterClose>false</autoReleaseAfterClose>
+          <skipLocalStaging>true</skipLocalStaging>
         </configuration>
       </plugin>
       <plugin>
@@ -1020,16 +1021,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </properties>
     </profile>
   </profiles>
-  <distributionManagement>
-    <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-    </snapshotRepository>
-    <repository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-    </repository>
-  </distributionManagement>
   <licenses>
     <license>
       <name>Apache 2</name>
@@ -1042,7 +1033,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <connection>scm:git:https://github.com/scylladb/java-driver</connection>
     <developerConnection>scm:git:https://github.com/scylladb/java-driver</developerConnection>
     <url>https://github.com/scylladb/java-driver</url>
-    <tag>HEAD</tag>
+    <tag>4.18.1.0</tag>
   </scm>
   <developers>
     <developer>

@@ -63,13 +63,14 @@ See the [upgrade guide](upgrade_guide/) for details.
 
 * [Manual](manual/)
 * [API docs]
-* Bug tracking: [JIRA]
+* Bug tracking: [GITHUB]
 * [Mailing list]
 * Training: [Scylla University]
 * [Changelog]
 * [FAQ]
 
 [API docs]: https://java-driver.docs.scylladb.com/scylla-4.17.0.x/api/overview-summary.html
+[GITHUB]: https://github.com/scylladb/java-driver/issues
 [Scylla University]: https://university.scylladb.com
 [Changelog]: changelog/
 [FAQ]: faq/

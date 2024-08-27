@@ -58,11 +58,11 @@ import net.jcip.annotations.ThreadSafe;
 @ThreadSafe
 public class DriverChannel {
 
-  static final AttributeKey<String> CLUSTER_NAME_KEY = AttributeKey.newInstance("cluster_name");
+  static final AttributeKey<String> CLUSTER_NAME_KEY = AttributeKey.valueOf("cluster_name");
   static final AttributeKey<Map<String, List<String>>> OPTIONS_KEY =
-      AttributeKey.newInstance("options");
+      AttributeKey.valueOf("options");
   static final AttributeKey<ConnectionShardingInfo> SHARDING_INFO_KEY =
-      AttributeKey.newInstance("sharding_info");
+      AttributeKey.valueOf("sharding_info");
   static final AttributeKey<LwtInfo> LWT_INFO_KEY = AttributeKey.newInstance("lwt_info");
 
   @SuppressWarnings("RedundantStringConstructorCall")
