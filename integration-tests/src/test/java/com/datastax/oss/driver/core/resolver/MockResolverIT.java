@@ -34,7 +34,6 @@ import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
-import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultProgrammaticDriverConfigLoaderBuilder;
 import com.datastax.oss.driver.internal.core.resolver.ResolverProvider;
@@ -48,7 +47,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
@@ -59,47 +57,48 @@ public class MockResolverIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(MockResolverIT.class);
 
-  @ClassRule
-  public static final CustomCcmRule CCM_RULE = CustomCcmRule.builder().withNodes(1).build();
-
   @Test
   public void should_connect_with_mocked_hostname() {
-    CcmBridge ccmBridge = CCM_RULE.getCcmBridge();
+    CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder().withNodes(1).withIpPrefix("127.0.1.");
+    try (CcmBridge ccmBridge = ccmBridgeBuilder.build()) {
+      ccmBridge.create();
+      ccmBridge.start();
 
-    MockResolverFactory resolverFactory = new MockResolverFactory();
-    resolverFactory.updateResponse(
-        "node-1.cluster.fake",
-        new ValidResponse(new InetAddress[] {getNodeInetAddress(ccmBridge, 1)}));
-    ResolverProvider.setDefaultResolverFactory(resolverFactory);
+      MockResolverFactory resolverFactory = new MockResolverFactory();
+      resolverFactory.updateResponse(
+          "node-1.cluster.fake",
+          new ValidResponse(new InetAddress[] {getNodeInetAddress(ccmBridge, 1)}));
+      ResolverProvider.setDefaultResolverFactory(resolverFactory);
 
-    DriverConfigLoader loader =
-        new DefaultProgrammaticDriverConfigLoaderBuilder()
-            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
-            .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
-            .withStringList(
-                TypedDriverOption.CONTACT_POINTS.getRawOption(),
-                Collections.singletonList("node-1.cluster.fake:9042"))
-            .build();
+      DriverConfigLoader loader =
+          new DefaultProgrammaticDriverConfigLoaderBuilder()
+              .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
+              .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
+              .withStringList(
+                  TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                  Collections.singletonList("node-1.cluster.fake:9042"))
+              .build();
 
-    CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
-    try (CqlSession session = builder.build()) {
-      ResultSet rs = session.execute("SELECT * FROM system.local");
-      List<Row> rows = rs.all();
-      assertThat(rows).hasSize(1);
-      LOG.trace("system.local contents: {}", rows.get(0).getFormattedContents());
-      Collection<Node> nodes = session.getMetadata().getNodes().values();
-      for (Node node : nodes) {
-        LOG.trace("Found metadata node: {}", node);
+      CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
+      try (CqlSession session = builder.build()) {
+        ResultSet rs = session.execute("SELECT * FROM system.local");
+        List<Row> rows = rs.all();
+        assertThat(rows).hasSize(1);
+        LOG.trace("system.local contents: {}", rows.get(0).getFormattedContents());
+        Collection<Node> nodes = session.getMetadata().getNodes().values();
+        for (Node node : nodes) {
+          LOG.trace("Found metadata node: {}", node);
+        }
+        Set<Node> filteredNodes;
+        filteredNodes =
+            nodes.stream()
+                .filter(x -> x.toString().contains("node-1.cluster.fake"))
+                .collect(Collectors.toSet());
+        assertThat(filteredNodes).hasSize(1);
+        InetSocketAddress address =
+            (InetSocketAddress) filteredNodes.iterator().next().getEndPoint().resolve();
+        assertTrue(address.isUnresolved());
       }
-      Set<Node> filteredNodes;
-      filteredNodes =
-          nodes.stream()
-              .filter(x -> x.toString().contains("node-1.cluster.fake"))
-              .collect(Collectors.toSet());
-      assertThat(filteredNodes).hasSize(1);
-      InetSocketAddress address =
-          (InetSocketAddress) filteredNodes.iterator().next().getEndPoint().resolve();
-      assertTrue(address.isUnresolved());
     }
   }
 
