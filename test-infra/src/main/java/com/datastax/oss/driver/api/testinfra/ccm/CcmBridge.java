@@ -373,7 +373,7 @@ public class CcmBridge implements AutoCloseable {
   public void start() {
     if (started.compareAndSet(false, true)) {
       try {
-        execute("start", jvmArgs, "--wait-for-binary-proto");
+        execute("start", jvmArgs, "--wait-for-binary-proto", "--wait-other-notice");
       } catch (RuntimeException re) {
         // if something went wrong starting CCM, see if we can also dump the error
         executeCheckLogError();
@@ -407,9 +407,11 @@ public class CcmBridge implements AutoCloseable {
           "node" + n,
           "start",
           "--jvm_arg=-Dcassandra.allow_new_old_config_keys=true",
-          "--jvm_arg=-Dcassandra.allow_duplicate_config_keys=false");
+          "--jvm_arg=-Dcassandra.allow_duplicate_config_keys=false",
+          "--wait-other-notice",
+          "--wait-for-binary-proto");
     } else {
-      execute("node" + n, "start");
+      execute("node" + n, "start", "--wait-other-notice", "--wait-for-binary-proto");
     }
   }
 
