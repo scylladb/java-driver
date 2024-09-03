@@ -531,7 +531,7 @@ public class CcmBridge implements AutoCloseable {
     private final Map<String, Object> dseConfiguration = new LinkedHashMap<>();
     private final List<String> dseRawYaml = new ArrayList<>();
     private final List<String> jvmArgs = new ArrayList<>();
-    private String ipPrefix = "127.0.0.";
+    private String ipPrefix = "127.0.1.";
     private final List<String> createOptions = new ArrayList<>();
     private final List<String> dseWorkloads = new ArrayList<>();
 
