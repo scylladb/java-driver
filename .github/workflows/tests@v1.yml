@@ -179,7 +179,7 @@ jobs:
 
       - name: Setup environment
         run: |
-          pip3 install https://github.com/scylladb/scylla-ccm/archive/a93125bc6ad7dd5c9694331e89dc1fb212431ffe.zip
+          pip3 install https://github.com/scylladb/scylla-ccm/archive/81076bce792a0fb3f2050e4c209a93e4a62ab55f.zip
 
       - name: Get cassandra version
         id: cassandra-version
@@ -265,7 +265,7 @@ jobs:
 
       - name: Setup environment
         run: |
-          pip3 install https://github.com/scylladb/scylla-ccm/archive/a93125bc6ad7dd5c9694331e89dc1fb212431ffe.zip
+          pip3 install https://github.com/scylladb/scylla-ccm/archive/81076bce792a0fb3f2050e4c209a93e4a62ab55f.zip
           sudo sh -c "echo 2097152 > /proc/sys/fs/aio-max-nr"
 
       - name: Get scylla version
