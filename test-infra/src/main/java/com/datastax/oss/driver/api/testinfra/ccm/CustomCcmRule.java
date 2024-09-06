@@ -39,7 +39,15 @@ public class CustomCcmRule extends BaseCcmRule {
   @Override
   protected void before() {
     if (CURRENT.get() == null && CURRENT.compareAndSet(null, this)) {
-      super.before();
+      try {
+        super.before();
+      } catch (Exception e) {
+        // If exception is thrown in this rule, `after` is not going to be executed and test suit is
+        // going to become broken
+        // So we need to drop CURRENT to let other tests run
+        CURRENT.set(null);
+        throw e;
+      }
     } else if (CURRENT.get() != this) {
       throw new IllegalStateException(
           "Attempting to use a Ccm rule while another is in use.  This is disallowed");
@@ -48,8 +56,11 @@ public class CustomCcmRule extends BaseCcmRule {
 
   @Override
   protected void after() {
-    super.after();
-    CURRENT.compareAndSet(this, null);
+    try {
+      super.after();
+    } finally {
+      CURRENT.compareAndSet(this, null);
+    }
   }
 
   public CcmBridge getCcmBridge() {
