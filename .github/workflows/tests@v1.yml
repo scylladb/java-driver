@@ -247,7 +247,7 @@ jobs:
 
     strategy:
       matrix:
-        scylla-version: [ENTERPRISE-RELEASE, ENTERPRISE-PRIOR-RELEASE, OSS-RELEASE, OSS-PRIOR-RELEASE, ENTERPRISE-RC, OSS-RC]
+        scylla-version: [ENTERPRISE-RELEASE, ENTERPRISE-PRIOR-RELEASE, OSS-RELEASE, OSS-PRIOR-RELEASE]
         java-version: [8]
       fail-fast: false
 
