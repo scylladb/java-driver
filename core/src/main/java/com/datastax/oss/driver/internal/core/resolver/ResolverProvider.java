@@ -8,6 +8,8 @@ import com.datastax.oss.driver.internal.core.resolver.defaultResolver.DefaultRes
  */
 public class ResolverProvider {
 
+  private static boolean alreadyInUse = false;
+  private static boolean alreadySet = false;
   private static AbstractResolverFactory defaultResolverFactoryImpl = new DefaultResolverFactory();
 
   /**
@@ -16,7 +18,8 @@ public class ResolverProvider {
    * @param clazz Class that is requesting the {@link Resolver}.
    * @return new {@link Resolver}.
    */
-  public static Resolver getResolver(Class<?> clazz) {
+  public static synchronized Resolver getResolver(Class<?> clazz) {
+    alreadyInUse = true;
     return defaultResolverFactoryImpl.getResolver(clazz);
   }
 
@@ -26,7 +29,20 @@ public class ResolverProvider {
    *
    * @param resolverFactoryImpl new {@link Resolver} factory.
    */
-  public static void setDefaultResolverFactory(AbstractResolverFactory resolverFactoryImpl) {
+  public static synchronized void setDefaultResolverFactory(
+      AbstractResolverFactory resolverFactoryImpl) {
+    if (alreadyInUse) {
+      throw new IllegalStateException(
+          "Cannot change default resolver factory: ResolverProvider has already returned "
+              + "an instance of a Resolver to use. Default resolver factory needs to be set up before first use by any "
+              + "class.");
+    }
+    if (alreadySet) {
+      throw new IllegalStateException(
+          "Cannot change default resolver factory: this method has already been called. "
+              + "You can set default resolver factory only once.");
+    }
+    alreadySet = true;
     defaultResolverFactoryImpl = resolverFactoryImpl;
   }
 }
