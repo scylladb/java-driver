@@ -1,6 +1,7 @@
 package com.datastax.oss.driver.internal.core.resolver;
 
 import com.datastax.oss.driver.internal.core.resolver.defaultResolver.DefaultResolverFactory;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 
 /**
  * Entry point for driver components to getting the {@link Resolver} instances. By default returns
@@ -44,5 +45,11 @@ public class ResolverProvider {
     }
     alreadySet = true;
     defaultResolverFactoryImpl = resolverFactoryImpl;
+  }
+
+  @VisibleForTesting
+  static synchronized void resetBooleansForTesting() {
+    alreadyInUse = false;
+    alreadySet = false;
   }
 }
