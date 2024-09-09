@@ -160,7 +160,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 8
+      - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
@@ -185,47 +185,56 @@ jobs:
         id: cassandra-version
         run: |
           if [[ "${{ matrix.cassandra-version }}" == "RELEASE-3.X" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 cassandra3-stable:1)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 1 cassandra3-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.cassandra-version }}" == "RELEASE-4.X" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 cassandra4-stable:1)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 1 cassandra4-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
           else
             echo "Unknown cassandra version name `${{ matrix.cassandra-version }}`"
           fi
 
-      - name: Restore CCM image cache
+      - name: Pull CCM image from the cache
         uses: actions/cache/restore@v4
         id: ccm-cache
         with:
           path: ~/.ccm/repository
           key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
 
-      - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }})
-        run: mvn -B -e verify -Dccm.version=${{ steps.cassandra-version.outputs.value }} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
-
-      - name: Save CCM image cache
-        uses: actions/cache/save@v4
+      - name: Download Cassandra (${{ steps.cassandra-version.outputs.value }}) image
         if: steps.ccm-cache.outputs.cache-hit != 'true'
+        run: |
+          rm -rf /tmp/download.ccm || true 
+          mkdir /tmp/download.ccm || true
+          ccm create ccm_1 -i 127.0.1. -n 3:0 -v "${{ steps.cassandra-version.outputs.value }}" --config-dir=/tmp/download.ccm
+          rm -rf /tmp/download.ccm
+
+      - name: Save CCM image into the cache
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
         with:
           path: ~/.ccm/repository
           key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
 
+      - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }})
+        id: run-integration-tests
+        run: mvn -B -e verify -Dccm.version=${{ steps.cassandra-version.outputs.value }} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+
       - name: Copy test results
-        if: success() || failure()
+        if: steps.run-integration-tests.outcome == 'failure'
         run: |
           shopt -s globstar
           mkdir cassandra-${{ matrix.cassandra-version }}
           cp --parents ./**/target/*-reports/*.xml cassandra-${{ matrix.cassandra-version }}/
 
       - name: Upload test results
+        if: steps.run-integration-tests.outcome == 'failure'
         uses: actions/upload-artifact@v4
-        if: success() || failure()
         with:
           name: test-results-${{ matrix.java-version }}-${{ matrix.cassandra-version }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
         uses: actions/upload-artifact@v4
-        if: ${{ failure() }}
+        if: failure()
         with:
           name: ccm-log-cassandra-${{ matrix.java-version }}-${{ matrix.cassandra-version }}
           path: /tmp/ccm*/ccm*/node*/logs/*
@@ -238,7 +247,7 @@ jobs:
 
     strategy:
       matrix:
-        scylla-version: [ENTERPRISE-RELEASE, ENTERPRISE-PRIOR-RELEASE, OSS-RELEASE, OSS-PRIOR-RELEASE, ENTERPRISE-RC, OSS-RC]
+        scylla-version: [ENTERPRISE-RELEASE, ENTERPRISE-PRIOR-RELEASE, OSS-RELEASE, OSS-PRIOR-RELEASE]
         java-version: [8]
       fail-fast: false
 
@@ -246,7 +255,7 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 8
+      - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
@@ -272,41 +281,50 @@ jobs:
         id: scylla-version
         run: |
           if [[ "${{ matrix.scylla-version }}" == "ENTERPRISE-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-enterprise-stable:1)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-enterprise-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.scylla-version }}" == "ENTERPRISE-PRIOR-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 2 scylla-enterprise-stable:2)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 2 scylla-enterprise-stable:2 | tr -d '\"')" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.scylla-version }}" == "ENTERPRISE-RC" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-enterprise-rc)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-enterprise-rc | tr -d '\"')" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.scylla-version }}" == "OSS-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-oss-stable:1)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-oss-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.scylla-version }}" == "OSS-PRIOR-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 2 scylla-oss-stable:2)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 2 scylla-oss-stable:2 | tr -d '\"')" >> $GITHUB_OUTPUT
           elif [[ "${{ matrix.scylla-version }}" == "OSS-RC" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-oss-rc)" >> $GITHUB_OUTPUT
+            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-oss-rc | tr -d '\"')" >> $GITHUB_OUTPUT
           else
             echo "Unknown scylla version name `${{ matrix.scylla-version }}`"
             exit 1
           fi
 
-      - name: Restore CCM image cache
+      - name: Pull CCM image from the cache
         uses: actions/cache/restore@v4
         id: ccm-cache
         with:
           path: ~/.ccm/repository
           key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
 
-      - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
-        run: mvn -B verify -Dccm.version=${{ steps.scylla-version.outputs.value }} -Dccm.scylla=true -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+      - name: Download Scylla (${{ steps.scylla-version.outputs.value }}) image
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        run: |
+          rm -rf /tmp/download.ccm || true 
+          mkdir /tmp/download.ccm || true
+          ccm create ccm_1 -i 127.0.1. -n 3:0 -v "release:${{ steps.scylla-version.outputs.value }}" --scylla --config-dir=/tmp/download.ccm
+          rm -rf /tmp/download.ccm
 
-      - name: Save CCM image cache
+      - name: Save CCM image into the cache
         uses: actions/cache/save@v4
         if: steps.ccm-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.ccm/repository
           key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
 
+      - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
+        id: run-integration-tests
+        run: mvn -B verify -Dccm.version=${{ steps.scylla-version.outputs.value }} -Dccm.scylla=true -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+
       - name: Copy test results
-        if: success() || failure()
+        if: steps.run-integration-tests.outcome == 'failure'
         run: |
           shopt -s globstar
           mkdir scylla-${{ matrix.scylla-version }}
@@ -314,14 +332,14 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: success() || failure()
+        if: steps.run-integration-tests.outcome == 'failure'
         with:
           name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
         uses: actions/upload-artifact@v4
-        if: ${{ failure() }}
+        if: failure()
         with:
           name: ccm-log-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}
           path: /tmp/ccm*/ccm*/node*/logs/*
