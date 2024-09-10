@@ -24,6 +24,7 @@
 package com.datastax.oss.driver.core.resolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -33,11 +34,14 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.TypedDriverOption;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.SimpleStatementBuilder;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultProgrammaticDriverConfigLoaderBuilder;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -236,5 +240,196 @@ public class MockResolverIT {
           "Running ({}/20}) {}", i, MockResolverIT.class.toString() + "#replace_cluster_test()");
       replace_cluster_test();
     }
+  }
+
+  // This is too long to run during CI, but is useful for manual investigations.
+  @SuppressWarnings("unused")
+  public void cannot_reconnect_with_resolved_socket() {
+    DriverConfigLoader loader =
+        new DefaultProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
+            .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
+            .withStringList(
+                TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                Collections.singletonList("test.cluster.fake:9042"))
+            .build();
+
+    CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
+    CqlSession session;
+    Collection<Node> nodes;
+    Set<Node> filteredNodes;
+    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).withIpPrefix("127.0.1.").build()) {
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(3));
+      ccmBridge.create();
+      ccmBridge.start();
+      session = builder.build();
+      long endTime = System.currentTimeMillis() + CLUSTER_WAIT_SECONDS * 1000;
+      while (System.currentTimeMillis() < endTime) {
+        try {
+          nodes = session.getMetadata().getNodes().values();
+          int upNodes = 0;
+          for (Node node : nodes) {
+            if (node.getUpSinceMillis() > 0) {
+              upNodes++;
+            }
+          }
+          if (upNodes == 3) {
+            break;
+          }
+          // session.refreshSchema();
+          SimpleStatement statement =
+              new SimpleStatementBuilder("SELECT * FROM system.local")
+                  .setTimeout(Duration.ofSeconds(3))
+                  .build();
+          session.executeAsync(statement);
+          Thread.sleep(3000);
+        } catch (InterruptedException e) {
+          break;
+        }
+      }
+      ResultSet rs = session.execute("SELECT * FROM system.local");
+      assertThat(rs).isNotNull();
+      Row row = rs.one();
+      assertThat(row).isNotNull();
+      nodes = session.getMetadata().getNodes().values();
+      assertThat(nodes).hasSize(3);
+      Iterator<Node> iterator = nodes.iterator();
+      while (iterator.hasNext()) {
+        LOG.trace("Metadata node: " + iterator.next().toString());
+      }
+      filteredNodes =
+          nodes.stream()
+              .filter(x -> x.toString().contains("test.cluster.fake"))
+              .collect(Collectors.toSet());
+      assertThat(filteredNodes).hasSize(1);
+    }
+    int counter = 0;
+    while (filteredNodes.size() == 1) {
+      counter++;
+      if (counter == 255) {
+        LOG.error("Completed 254 runs. Breaking.");
+        break;
+      }
+      LOG.warn(
+          "Launching another cluster until we lose resolved socket from metadata (run {}).",
+          counter);
+      try (CcmBridge ccmBridge =
+          CcmBridge.builder().withNodes(3).withIpPrefix("127.0." + counter + ".").build()) {
+        MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+        MultimapHostResolverProvider.addResolverEntry(
+            "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+        MultimapHostResolverProvider.addResolverEntry(
+            "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+        MultimapHostResolverProvider.addResolverEntry(
+            "test.cluster.fake", ccmBridge.getNodeIpAddress(3));
+        ccmBridge.create();
+        ccmBridge.start();
+        long endTime = System.currentTimeMillis() + CLUSTER_WAIT_SECONDS * 1000;
+        while (System.currentTimeMillis() < endTime) {
+          try {
+            nodes = session.getMetadata().getNodes().values();
+            int upNodes = 0;
+            for (Node node : nodes) {
+              if (node.getUpSinceMillis() > 0) {
+                upNodes++;
+              }
+            }
+            if (upNodes == 3) {
+              break;
+            }
+            SimpleStatement statement =
+                new SimpleStatementBuilder("SELECT * FROM system.local")
+                    .setTimeout(Duration.ofSeconds(3))
+                    .build();
+            session.executeAsync(statement);
+            Thread.sleep(3000);
+          } catch (InterruptedException e) {
+            break;
+          }
+        }
+        /*
+        ResultSet rs = session.execute("SELECT * FROM system.local");
+        assertThat(rs).isNotNull();
+        Row row = rs.one();
+        assertThat(row).isNotNull();
+        */
+        nodes = session.getMetadata().getNodes().values();
+        assertThat(nodes).hasSize(3);
+        Iterator<Node> iterator = nodes.iterator();
+        while (iterator.hasNext()) {
+          LOG.trace("Metadata node: " + iterator.next().toString());
+        }
+        filteredNodes =
+            nodes.stream()
+                .filter(x -> x.toString().contains("test.cluster.fake"))
+                .collect(Collectors.toSet());
+        if (filteredNodes.size() > 1) {
+          fail(
+              "Somehow there is more than 1 node in metadata with unresolved hostname. This should not ever happen.");
+        }
+      }
+    }
+    Iterator<Node> iterator = nodes.iterator();
+    while (iterator.hasNext()) {
+      InetSocketAddress address = (InetSocketAddress) iterator.next().getEndPoint().resolve();
+      assertFalse(address.isUnresolved());
+    }
+    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).withIpPrefix("127.1.1.").build()) {
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(3));
+      // Now the driver should fail to reconnect since unresolved hostname is gone.
+      ccmBridge.create();
+      ccmBridge.start();
+      long endTime = System.currentTimeMillis() + CLUSTER_WAIT_SECONDS * 1000;
+      while (System.currentTimeMillis() < endTime) {
+        try {
+          nodes = session.getMetadata().getNodes().values();
+          int upNodes = 0;
+          for (Node node : nodes) {
+            if (node.getUpSinceMillis() > 0) {
+              upNodes++;
+            }
+          }
+          if (upNodes == 3) {
+            break;
+          }
+          // session.refreshSchema();
+          SimpleStatement statement =
+              new SimpleStatementBuilder("SELECT * FROM system.local")
+                  .setTimeout(Duration.ofSeconds(3))
+                  .build();
+          session.executeAsync(statement);
+          Thread.sleep(3000);
+        } catch (InterruptedException e) {
+          break;
+        }
+      }
+      /*
+      for (int i = 0; i < 15; i++) {
+        try {
+          nodes = session.getMetadata().getNodes().values();
+          if (nodes.size() == 3) {
+            break;
+          }
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          break;
+        }
+      }
+       */
+      session.execute("SELECT * FROM system.local");
+    }
+    session.close();
   }
 }
