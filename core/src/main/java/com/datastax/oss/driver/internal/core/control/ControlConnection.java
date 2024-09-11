@@ -433,7 +433,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                         // We were reconnecting: make sure previous channel gets closed (it may
                         // still be open if reconnection was forced)
                         LOG.debug(
-                            "[{}] Forcefully closing previous channel {}", logPrefix, channel);
+                            "[{}] Forcefully closing previous channel {}",
+                            logPrefix,
+                            previousChannel);
                         previousChannel.forceClose();
                       }
                       context.getEventBus().fire(ChannelEvent.channelOpened(node));
