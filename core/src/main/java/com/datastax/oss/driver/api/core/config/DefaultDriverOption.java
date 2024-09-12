@@ -669,6 +669,15 @@ public enum DefaultDriverOption implements DriverOption {
   CONTROL_CONNECTION_AGREEMENT_WARN("advanced.control-connection.schema-agreement.warn-on-failure"),
 
   /**
+   * Whether to forcibly add original contact points held by MetadataManager to the reconnection
+   * plan, in case there is no live nodes available according to LBP. Experimental.
+   *
+   * <p>Value-type: boolean
+   */
+  CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS(
+      "advanced.control-connection.reconnection.fallback-to-original-contact-points"),
+
+  /**
    * Whether `Session.prepare` calls should be sent to all nodes in the cluster.
    *
    * <p>Value-type: boolean

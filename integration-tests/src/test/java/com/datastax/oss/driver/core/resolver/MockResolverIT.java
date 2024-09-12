@@ -353,12 +353,6 @@ public class MockResolverIT {
             break;
           }
         }
-        /*
-        ResultSet rs = session.execute("SELECT * FROM system.local");
-        assertThat(rs).isNotNull();
-        Row row = rs.one();
-        assertThat(row).isNotNull();
-        */
         nodes = session.getMetadata().getNodes().values();
         assertThat(nodes).hasSize(3);
         Iterator<Node> iterator = nodes.iterator();
@@ -415,19 +409,6 @@ public class MockResolverIT {
           break;
         }
       }
-      /*
-      for (int i = 0; i < 15; i++) {
-        try {
-          nodes = session.getMetadata().getNodes().values();
-          if (nodes.size() == 3) {
-            break;
-          }
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
-       */
       session.execute("SELECT * FROM system.local");
     }
     session.close();

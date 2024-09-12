@@ -119,9 +119,21 @@ public class LoadBalancingPolicyWrapperTest {
   }
 
   @Test
+  public void should_build_control_connection_query_plan_from_contact_points_before_init() {
+    // When
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then
+    for (LoadBalancingPolicy policy : ImmutableList.of(policy1, policy2, policy3)) {
+      verify(policy, never()).newQueryPlan(null, null);
+    }
+    assertThat(queryPlan).hasSameElementsAs(contactPoints);
+  }
+
+  @Test
   public void should_build_query_plan_from_contact_points_before_init() {
     // When
-    Queue<Node> queryPlan = wrapper.newQueryPlan();
+    Queue<Node> queryPlan = wrapper.newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
 
     // Then
     for (LoadBalancingPolicy policy : ImmutableList.of(policy1, policy2, policy3)) {
@@ -139,7 +151,24 @@ public class LoadBalancingPolicyWrapperTest {
     }
 
     // When
-    Queue<Node> queryPlan = wrapper.newQueryPlan();
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then
+    // no-arg newQueryPlan() uses the default profile
+    verify(policy1).newQueryPlan(null, null);
+    assertThat(queryPlan).isEqualTo(defaultPolicyQueryPlan);
+  }
+
+  @Test
+  public void should_fetch_control_connection_query_plan_from_policy_after_init() {
+    // Given
+    wrapper.init();
+    for (LoadBalancingPolicy policy : ImmutableList.of(policy1, policy2, policy3)) {
+      verify(policy).init(anyMap(), any(DistanceReporter.class));
+    }
+
+    // When
+    Queue<Node> queryPlan = wrapper.newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
 
     // Then
     // no-arg newQueryPlan() uses the default profile

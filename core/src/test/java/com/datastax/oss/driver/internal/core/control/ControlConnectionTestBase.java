@@ -132,11 +132,25 @@ abstract class ControlConnectionTestBase {
     when(defaultProfile.getBoolean(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR))
         .thenReturn(false);
 
+    when(context.getConfig()).thenReturn(config);
+    when(config.getDefaultProfile()).thenReturn(defaultProfile);
+    when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
+        .thenReturn(false);
+
     controlConnection = new ControlConnection(context);
   }
 
   protected void mockQueryPlan(Node... nodes) {
-    when(loadBalancingPolicyWrapper.newQueryPlan())
+    when(loadBalancingPolicyWrapper.newControlReconnectionQueryPlan())
+        .thenAnswer(
+            i -> {
+              ConcurrentLinkedQueue<Node> queryPlan = new ConcurrentLinkedQueue<>();
+              for (Node node : nodes) {
+                queryPlan.offer(node);
+              }
+              return queryPlan;
+            });
+    when(loadBalancingPolicyWrapper.newControlReconnectionQueryPlan())
         .thenAnswer(
             i -> {
               ConcurrentLinkedQueue<Node> queryPlan = new ConcurrentLinkedQueue<>();
