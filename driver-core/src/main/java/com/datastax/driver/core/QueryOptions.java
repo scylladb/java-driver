@@ -72,6 +72,8 @@ public class QueryOptions {
 
   private volatile boolean schemaQueriesPaged = true;
 
+  private volatile boolean addOriginalContactsToReconnectionPlan = false;
+
   /**
    * Creates a new {@link QueryOptions} instance using the {@link #DEFAULT_CONSISTENCY_LEVEL},
    * {@link #DEFAULT_SERIAL_CONSISTENCY_LEVEL} and {@link #DEFAULT_FETCH_SIZE}.
@@ -497,6 +499,26 @@ public class QueryOptions {
    */
   public int getMaxPendingRefreshNodeRequests() {
     return maxPendingRefreshNodeRequests;
+  }
+
+  /**
+   * Whether the driver should use original contact points when reconnecting to a control node. In
+   * practice this forces driver to manually add original contact points to the end of the query
+   * plan. It is possible that it may introduce duplicates (but under differnet Host class
+   * instances) in the query plan. If this is set to false it does not mean that original contact
+   * points will be excluded.
+   *
+   * <p>One use case of this feature is that if the original contact point is defined by hostname
+   * and its IP address changes then setting this to {@code true} allows trying reconnecting to the
+   * new IP if all connection was lost.
+   */
+  public QueryOptions setAddOriginalContactsToReconnectionPlan(boolean enabled) {
+    this.addOriginalContactsToReconnectionPlan = enabled;
+    return this;
+  }
+
+  public boolean shouldAddOriginalContactsToReconnectionPlan() {
+    return this.addOriginalContactsToReconnectionPlan;
   }
 
   @Override
