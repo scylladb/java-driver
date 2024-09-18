@@ -949,6 +949,7 @@ public class CCMBridge implements CCMAccess {
     private static final Pattern RANDOM_PORT_PATTERN = Pattern.compile(RANDOM_PORT);
 
     private String ipPrefix = TestUtils.IP_PREFIX;
+    private String providedClusterName = null;
     int[] nodes = {1};
     private int[] jmxPorts = {};
     private boolean start = true;
@@ -988,6 +989,15 @@ public class CCMBridge implements CCMAccess {
 
     public Builder withSniProxy() {
       this.startSniProxy = true;
+      return this;
+    }
+
+    /**
+     * Builder takes care of naming and numbering clusters on its own. Use if you really need a
+     * specific name
+     */
+    public Builder withClusterName(String clusterName) {
+      this.providedClusterName = clusterName;
       return this;
     }
 
@@ -1114,6 +1124,8 @@ public class CCMBridge implements CCMAccess {
     public CCMBridge build() {
       // be careful NOT to alter internal state (hashCode/equals) during build!
       String clusterName = TestUtils.generateIdentifier("ccm_");
+
+      if (providedClusterName != null) clusterName = providedClusterName;
 
       VersionNumber dseVersion;
       VersionNumber cassandraVersion;
