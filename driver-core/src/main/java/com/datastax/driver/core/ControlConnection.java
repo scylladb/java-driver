@@ -34,6 +34,7 @@ import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.datastax.driver.core.utils.MoreObjects;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -160,6 +161,15 @@ class ControlConnection implements Connection.Owner {
         if (isShutdown) throw new ConnectionException(null, "Control connection was shut down");
 
         try {
+          if (cluster
+              .configuration
+              .getQueryOptions()
+              .shouldAddOriginalContactsToReconnectionPlan()) {
+            List<Host> initialContacts = cluster.metadata.getContactPoints();
+            Collections.shuffle(initialContacts);
+            return reconnectInternal(
+                Iterators.concat(queryPlan(), initialContacts.iterator()), false);
+          }
           return reconnectInternal(queryPlan(), false);
         } catch (NoHostAvailableException e) {
           throw new ConnectionException(null, e.getMessage());

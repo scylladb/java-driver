@@ -176,6 +176,7 @@ jobs:
 
     strategy:
       matrix:
+        java-version: [8, 11]
         scylla-version: ${{ fromJson(needs.setup-integration-tests.outputs.scylla-integration-tests-versions) }}
       fail-fast: false
 
@@ -183,10 +184,10 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 8
+      - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v4
         with:
-          java-version: '8'
+          java-version: ${{ matrix.java-version }}
           distribution: 'adopt'
 
       - name: Setup Python 3
@@ -209,19 +210,19 @@ jobs:
         if: failure()
         run: |
           shopt -s globstar
-          mkdir scylla-${{ matrix.scylla-version }}
-          cp --parents ./**/target/*-reports/*.xml scylla-${{ matrix.scylla-version }}/
+          mkdir scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}
+          cp --parents ./**/target/*-reports/*.xml scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: test-results-${{ matrix.scylla-version }}
+          name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ccm-logs-scylla-${{ matrix.scylla-version }}
+          name: ccm-logs-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}
           path: /tmp/*-0/ccm*/node*/logs/*
