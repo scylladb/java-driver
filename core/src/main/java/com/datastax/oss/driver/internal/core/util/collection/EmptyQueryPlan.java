@@ -42,4 +42,9 @@ class EmptyQueryPlan extends AbstractQueue<Node> implements QueryPlan {
   public int size() {
     return 0;
   }
+
+  @Override
+  public String toString() {
+    return "EmptyQueryPlan";
+  }
 }

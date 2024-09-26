@@ -18,9 +18,11 @@
 package com.datastax.oss.driver.internal.core.loadbalancing.nodeset;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNodeInfo;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import net.jcip.annotations.ThreadSafe;
@@ -49,5 +51,37 @@ public class DcAgnosticNodeSet implements NodeSet {
   @Override
   public Set<String> dcs() {
     return Collections.emptySet();
+  }
+
+  @Override
+  public NodeSetInfo toInfo() {
+    return new DcAgnosticNodeSetInfo(nodes);
+  }
+
+  private static class DcAgnosticNodeSetInfo implements NodeSetInfo {
+    private final HashSet<DefaultNodeInfo> nodes;
+
+    private DcAgnosticNodeSetInfo(Set<Node> nodes) {
+      this.nodes = new HashSet<>();
+      for (Node node : nodes) {
+        this.nodes.add(new DefaultNodeInfo.Builder(node).build());
+      }
+    }
+
+    @Override
+    @NonNull
+    public Set<DefaultNodeInfo> dc(@Nullable String dc) {
+      return nodes;
+    }
+
+    @Override
+    public String toString() {
+      return "DcAgnosticNodeSet(nodes: " + nodes.toString() + ")";
+    }
+
+    @Override
+    public Set<String> dcs() {
+      return Collections.emptySet();
+    }
   }
 }

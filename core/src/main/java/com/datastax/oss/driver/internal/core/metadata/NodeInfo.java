@@ -158,4 +158,28 @@ public interface NodeInfo {
    */
   @Nullable
   UUID getSchemaVersion();
+
+  /**
+   * The current node distance.
+   *
+   * <p>This is not required; the driver reports it in {@link Node#getDistance()}, but for
+   * informational purposes only. It is not used anywhere internally.
+   */
+  NodeDistance getDistance();
+
+  /**
+   * The current reconnecting status.
+   *
+   * <p>This is not required; the driver reports it in {@link Node#isReconnecting()}, but for
+   * informational purposes only. It is not used anywhere internally.
+   */
+  boolean isReconnecting();
+
+  /**
+   * The current number of opened connections to the host.
+   *
+   * <p>This is not required; the driver reports it in {@link Node#getOpenConnections()}, but for
+   * informational purposes only. It is not used anywhere internally.
+   */
+  int getOpenConnections();
 }

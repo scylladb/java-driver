@@ -68,4 +68,7 @@ public interface NodeSet {
    * disabled, this method returns an empty set.
    */
   Set<String> dcs();
+
+  /** Returns deep copy of the NodeSet. */
+  NodeSetInfo toInfo();
 }

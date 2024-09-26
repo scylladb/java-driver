@@ -142,6 +142,12 @@ public enum DefaultDriverOption implements DriverOption {
    */
   CONNECTION_WARN_INIT_ERROR("advanced.connection.warn-on-init-error"),
   /**
+   * Provide more details when query execution has failed.
+   *
+   * <p>Value-Type: boolean
+   */
+  CONNECTION_QUERY_PLAN_EXCEPTIONS("advanced.connection.detailed-query-plan-exceptions"),
+  /**
    * The number of connections in the LOCAL pool.
    *
    * <p>Value-type: int

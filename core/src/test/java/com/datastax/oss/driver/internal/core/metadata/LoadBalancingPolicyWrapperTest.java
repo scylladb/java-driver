@@ -27,6 +27,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy.DistanceReporter;
@@ -77,6 +78,9 @@ public class LoadBalancingPolicyWrapperTest {
   @Mock protected MetricsFactory metricsFactory;
   @Captor private ArgumentCaptor<Map<UUID, Node>> initNodesCaptor;
 
+  private static final DriverConfigLoader configLoader =
+      DriverConfigLoader.programmaticBuilder().build();
+
   private LoadBalancingPolicyWrapper wrapper;
 
   @Before
@@ -103,6 +107,7 @@ public class LoadBalancingPolicyWrapperTest {
 
     eventBus = spy(new EventBus("test"));
     when(context.getEventBus()).thenReturn(eventBus);
+    when(context.getConfig()).thenReturn(configLoader.getInitialConfig());
 
     wrapper =
         new LoadBalancingPolicyWrapper(

@@ -47,6 +47,7 @@ import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.Message;
@@ -197,7 +198,11 @@ public class CqlPrepareHandler implements Throttled {
       }
     }
     if (channel == null) {
-      setFinalError(AllNodesFailedException.fromErrors(this.errors));
+      if (queryPlan instanceof DebugQueryPlan) {
+        setFinalError(AllNodesFailedException.fromErrors(this.errors, queryPlan));
+      } else {
+        setFinalError(AllNodesFailedException.fromErrors(this.errors));
+      }
     } else {
       InitialPrepareCallback initialPrepareCallback =
           new InitialPrepareCallback(request, node, channel, retryCount);

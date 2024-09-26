@@ -48,18 +48,23 @@ import com.datastax.oss.driver.internal.core.loadbalancing.helper.OptionalLocalR
 import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.DcAgnosticNodeSet;
 import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.MultiDcNodeSet;
 import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.NodeSet;
+import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.NodeSetInfo;
 import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.SingleDcNodeSet;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenLong64;
 import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.LazyQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.base.Predicates;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -88,7 +93,7 @@ import org.slf4j.LoggerFactory;
  * }
  * </pre>
  *
- * See {@code reference.conf} (in the manual or core driver JAR) for more details.
+ * <p>See {@code reference.conf} (in the manual or core driver JAR) for more details.
  *
  * <p><b>Local datacenter</b>: This implementation will only define a local datacenter if it is
  * explicitly set either through configuration or programmatically; if the local datacenter is
@@ -121,6 +126,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
 
   private final int maxNodesPerRemoteDc;
   private final boolean allowDcFailoverForLocalCl;
+  protected final boolean detailedQueryPlanExceptions;
   private final ConsistencyLevel defaultConsistencyLevel;
 
   // private because they should be set in init() and never be modified after
@@ -139,6 +145,8 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     allowDcFailoverForLocalCl =
         profile.getBoolean(
             DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_ALLOW_FOR_LOCAL_CONSISTENCY_LEVELS);
+    detailedQueryPlanExceptions =
+        profile.getBoolean(DefaultDriverOption.CONNECTION_QUERY_PLAN_EXCEPTIONS);
     defaultConsistencyLevel =
         this.context
             .getConsistencyLevelRegistry()
@@ -249,11 +257,18 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   @NonNull
   @Override
   public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    BasicLoadBalancingPolicyDebugInfo debugInfo =
+        detailedQueryPlanExceptions ? new BasicLoadBalancingPolicyDebugInfo(this) : null;
+
     // Take a snapshot since the set is concurrent:
     Object[] currentNodes = liveNodes.dc(localDc).toArray();
 
     Set<Node> allReplicas = getReplicas(request, session);
     int replicaCount = 0; // in currentNodes
+
+    if (debugInfo != null) {
+      debugInfo.withReplicas(allReplicas);
+    }
 
     if (!allReplicas.isEmpty()) {
       // Move replicas to the beginning
@@ -280,7 +295,13 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
         roundRobinAmount.getAndUpdate(INCREMENT));
 
     QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
-    return maybeAddDcFailover(request, plan);
+    Queue<Node> finalPlan = maybeAddDcFailover(request, plan);
+    if (debugInfo != null) {
+      DebugQueryPlan debugPlan = new DebugQueryPlan(finalPlan);
+      debugPlan.setLoadBalancingPolicyInfo(debugInfo);
+      return debugPlan;
+    }
+    return finalPlan;
   }
 
   @NonNull
@@ -478,5 +499,45 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   @Override
   public void close() {
     // nothing to do
+  }
+
+  protected static class BasicLoadBalancingPolicyDebugInfo implements Serializable {
+    protected int maxNodesPerRemoteDc;
+    protected boolean allowDcFailoverForLocalCl;
+    protected ConsistencyLevel defaultConsistencyLevel;
+    protected String localDc;
+    protected String localRack;
+    protected NodeSetInfo liveNodes;
+    protected Set<DefaultNodeInfo> replicas = null;
+
+    protected BasicLoadBalancingPolicyDebugInfo(BasicLoadBalancingPolicy policy) {
+      this.maxNodesPerRemoteDc = policy.maxNodesPerRemoteDc;
+      this.allowDcFailoverForLocalCl = policy.allowDcFailoverForLocalCl;
+      this.defaultConsistencyLevel = policy.defaultConsistencyLevel;
+      this.localDc = policy.localDc;
+      this.localRack = policy.localRack;
+      this.liveNodes = policy.liveNodes.toInfo();
+    }
+
+    @Override
+    public String toString() {
+      return String.format(
+          "BasicLoadBalancingPolicyDebugInfo{localDc: %s, localRack: %s, liveNodes: %s, replicas: %s"
+              + "defaultConsistencyLevel: %s, allowDcFailoverForLocalCl: %s, maxNodesPerRemoteDc: %s}",
+          localDc,
+          localRack,
+          liveNodes,
+          replicas,
+          defaultConsistencyLevel,
+          allowDcFailoverForLocalCl,
+          maxNodesPerRemoteDc);
+    }
+
+    public void withReplicas(Set<Node> nodes) {
+      replicas = new HashSet<>();
+      for (Node node : nodes) {
+        replicas.add(new DefaultNodeInfo.Builder(node).build());
+      }
+    }
   }
 }

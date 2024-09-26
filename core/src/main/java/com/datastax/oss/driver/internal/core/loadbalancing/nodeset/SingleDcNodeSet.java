@@ -18,10 +18,12 @@
 package com.datastax.oss.driver.internal.core.loadbalancing.nodeset;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNodeInfo;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -68,5 +70,45 @@ public class SingleDcNodeSet implements NodeSet {
   @Override
   public Set<String> dcs() {
     return dcs;
+  }
+
+  @Override
+  public NodeSetInfo toInfo() {
+    return new SingleDcNodeSetInfo(dc, dcs, nodes);
+  }
+
+  private static class SingleDcNodeSetInfo implements NodeSetInfo {
+    private final Set<DefaultNodeInfo> nodes = new HashSet<>();
+
+    private final String dc;
+    private final Set<String> dcs;
+
+    private SingleDcNodeSetInfo(String dc, Set<String> dcs, Set<Node> nodes) {
+      this.dc = dc;
+      this.dcs = dcs;
+
+      for (Node node : nodes) {
+        this.nodes.add(new DefaultNodeInfo.Builder(node).build());
+      }
+    }
+
+    @Override
+    @NonNull
+    public Set<DefaultNodeInfo> dc(@Nullable String dc) {
+      if (Objects.equals(this.dc, dc)) {
+        return nodes;
+      }
+      return Collections.emptySet();
+    }
+
+    @Override
+    public Set<String> dcs() {
+      return dcs;
+    }
+
+    @Override
+    public String toString() {
+      return "SingleDcNodeSetInfo(dc:" + dc + ", dcs: " + dcs + ", nodes: " + nodes + ")";
+    }
   }
 }

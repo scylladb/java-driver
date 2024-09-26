@@ -889,6 +889,11 @@ public class TypedDriverOption<ValueT> {
               DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_ALLOW_FOR_LOCAL_CONSISTENCY_LEVELS,
               GenericType.BOOLEAN);
 
+  /** TBD. */
+  public static final TypedDriverOption<Boolean> CONNECTION_QUERY_PLAN_EXCEPTIONS =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_QUERY_PLAN_EXCEPTIONS, GenericType.BOOLEAN);
+
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {
       ImmutableList.Builder<TypedDriverOption<?>> result = ImmutableList.builder();
