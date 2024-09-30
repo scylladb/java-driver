@@ -29,7 +29,7 @@ Which nodes the driver talks to, and in which order they are tried.
 
 -----
 
-A Cassandra cluster is typically composed of multiple nodes; the *load balancing policy* (sometimes
+A Scylla cluster is typically composed of multiple nodes; the *load balancing policy* (sometimes
 abbreviated LBP) is a central component that determines:
 
 * which nodes the driver will communicate with;
@@ -86,6 +86,9 @@ policies, that we consider the best choices for most cases:
 - `DefaultLoadBalancingPolicy` should almost always be used; it requires a local datacenter to be 
   specified either programmatically when creating the session, or via the configuration (see below). 
   It can also use a highly efficient slow replica avoidance mechanism, which is by default enabled.
+  This implementation prioritizes replica nodes over non-replica ones. If more than one replica is available, the
+  replicas will be shuffled. If more than 2 replicas are available, they will be ordered from most healthy to least
+  healthy ("Power of 2 choices" or busy node avoidance algorithm). Non-replica nodes will be included in a round-robin fashion.
 - `DcInferringLoadBalancingPolicy` is similar to `DefaultLoadBalancingPolicy`, but does not require 
   a local datacenter to be defined, in which case it will attempt to infer the local datacenter from 
   the provided contact points. If that's not possible, it will throw an error during session 
@@ -105,7 +108,7 @@ requirements.
 
 By default, both `DefaultLoadBalancingPolicy` and `DcInferringLoadBalancingPolicy` **only connect to 
 a single datacenter**. The rationale is that a typical multi-region deployment will collocate one or 
-more application instances with each Cassandra datacenter:
+more application instances with each ScyllaDB datacenter:
 
 ```ditaa
                   /----+----\
@@ -128,7 +131,7 @@ more application instances with each Cassandra datacenter:
 |         v         |     |         v         |
 |   +-----------+   |     |   +-----------+   |
 |   | {s}       |   |     |   | {s}       |   |
-|   | Cassandra +------=------+ Cassandra |   |
+|   | ScyllaDB  +------=------+ ScyllaDB  |   |
 |   |    DC1    |   |     |   |    DC2    |   |
 |   +-----------+   |     |   +-----------+   |
 |                   |     |                   |
@@ -272,7 +275,7 @@ alternatives:
 
 1. **Application-level failover**: instead of letting the driver do the failover, implement the
 failover logic in your application. Granted, this solution wouldn't be much better if the
-application servers are co-located with the Cassandra datacenter itself. It's also a bit more work,
+application servers are co-located with the ScyllaDB datacenter itself. It's also a bit more work,
 but at least, you would have full control over the failover procedure: you could for example decide,
 based on the exact error that prevented the local datacenter from fulfilling a given request,
 whether a failover would make sense, and which remote datacenter to use for that specific request.
@@ -287,7 +290,7 @@ possibly scaling up its bandwidth to cope with the network traffic spike. This i
 solution for the cross-datacenter failover issue in general, but we acknowledge that it also
 requires a purpose-built infrastructure. To help you explore this option, read our [white paper].
 
-[application-level failover example]: https://github.com/datastax/java-driver/blob/4.x/examples/src/main/java/com/datastax/oss/driver/examples/failover/CrossDatacenterFailover.java
+[application-level failover example]: https://github.com/scylladb/java-driver/blob/scylla-4.x/examples/src/main/java/com/datastax/oss/driver/examples/failover/CrossDatacenterFailover.java
 [white paper]: https://www.datastax.com/sites/default/files/content/whitepaper/files/2019-09/Designing-Fault-Tolerant-Applications-DataStax.pdf
 
 #### Token-aware
@@ -462,12 +465,12 @@ Then it uses the "closest" distance for any given node. For example:
 * policy1 changes its suggestion to IGNORED. node1 is set to REMOTE;
 * policy1 changes its suggestion to REMOTE. node1 stays at REMOTE.
 
-[DriverContext]:        https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/context/DriverContext.html
-[LoadBalancingPolicy]:  https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/loadbalancing/LoadBalancingPolicy.html
-[BasicLoadBalancingPolicy]: https://github.com/datastax/java-driver/blob/4.x/core/src/main/java/com/datastax/oss/driver/internal/core/loadbalancing/BasicLoadBalancingPolicy.java
-[getRoutingKeyspace()]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/Request.html#getRoutingKeyspace--
-[getRoutingToken()]:    https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/Request.html#getRoutingToken--
-[getRoutingKey()]:      https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/Request.html#getRoutingKey--
-[NodeDistanceEvaluator]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/loadbalancing/NodeDistanceEvaluator.html
-[`nodetool status`]: https://docs.datastax.com/en/dse/6.7/dse-dev/datastax_enterprise/tools/nodetool/toolsStatus.html 
-[cqlsh]: https://docs.datastax.com/en/dse/6.7/cql/cql/cql_using/startCqlshStandalone.html
+[DriverContext]:        https://java-driver.docs.scylladb.com/scylla-4.13.0.x/api/com/datastax/oss/driver/api/core/context/DriverContext.html
+[LoadBalancingPolicy]:  https://java-driver.docs.scylladb.com/scylla-4.13.0.x/api/com/datastax/oss/driver/api/core/loadbalancing/LoadBalancingPolicy.html
+[BasicLoadBalancingPolicy]: https://github.com/scylladb/java-driver/blob/scylla-4.x/core/src/main/java/com/datastax/oss/driver/internal/core/loadbalancing/BasicLoadBalancingPolicy.java
+[getRoutingKeyspace()]: https://java-driver.docs.scylladb.com/scylla-4.13.0.x/api/com/datastax/oss/driver/api/core/session/Request.html#getRoutingKeyspace--
+[getRoutingToken()]:    https://java-driver.docs.scylladb.com/scylla-4.13.0.x/api/com/datastax/oss/driver/api/core/session/Request.html#getRoutingToken--
+[getRoutingKey()]:      https://java-driver.docs.scylladb.com/scylla-4.13.0.x/api/com/datastax/oss/driver/api/core/session/Request.html#getRoutingKey--
+[NodeDistanceEvaluator]: https://java-driver.docs.scylladb.com/scylla-4.13.0.x/api/com/datastax/oss/driver/api/core/loadbalancing/NodeDistanceEvaluator.html
+[`nodetool status`]: https://docs.scylladb.com/stable/operating-scylla/nodetool-commands/status.html 
+[cqlsh]: https://docs.scylladb.com/stable/cql/cqlsh.html
