@@ -138,6 +138,7 @@ html_theme_options = {
     'conf_py_path': 'docs/source/',
     'branch_substring_removed': 'scylla-',
     'github_repository': 'scylladb/java-driver',
+    'default_branch': 'scylla-3.x',
     'github_issues_repository': 'scylladb/java-driver',
     'hide_edit_this_page_button': 'false',
     'hide_feedback_buttons': 'false',
