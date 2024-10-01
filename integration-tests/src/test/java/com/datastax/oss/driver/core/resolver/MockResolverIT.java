@@ -37,19 +37,13 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultProgrammaticDriverConfigLoaderBuilder;
-import com.datastax.oss.driver.internal.core.resolver.ResolverProvider;
-import com.datastax.oss.driver.internal.core.resolver.mockResolver.MockResolverFactory;
-import com.datastax.oss.driver.internal.core.resolver.mockResolver.ValidResponse;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
@@ -59,23 +53,17 @@ import org.slf4j.LoggerFactory;
 public class MockResolverIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(MockResolverIT.class);
-  private static final MockResolverFactory RESOLVER_FACTORY = new MockResolverFactory();
 
   private static final int CLUSTER_WAIT_SECONDS =
       60; // Maximal wait time for cluster nodes to get up
-
-  @BeforeClass
-  public static void setUpResolver() {
-    ResolverProvider.setDefaultResolverFactory(RESOLVER_FACTORY);
-  }
 
   @Test
   public void should_connect_with_mocked_hostname() {
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder().withNodes(1).withIpPrefix("127.0.1.");
     try (CcmBridge ccmBridge = ccmBridgeBuilder.build()) {
-      RESOLVER_FACTORY.updateResponse(
-          "test.cluster.fake",
-          new ValidResponse(new InetAddress[] {getNodeInetAddress(ccmBridge, 1)}));
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
       ccmBridge.create();
       ccmBridge.start();
 
@@ -128,14 +116,13 @@ public class MockResolverIT {
 
     try (CcmBridge ccmBridge =
         CcmBridge.builder().withNodes(numberOfNodes).withIpPrefix("127.0.1.").build()) {
-      RESOLVER_FACTORY.updateResponse(
-          "test.cluster.fake",
-          new ValidResponse(
-              new InetAddress[] {
-                getNodeInetAddress(ccmBridge, 1),
-                getNodeInetAddress(ccmBridge, 2),
-                getNodeInetAddress(ccmBridge, 3)
-              }));
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(3));
       ccmBridge.create();
       ccmBridge.start();
       session = builder.build();
@@ -248,14 +235,6 @@ public class MockResolverIT {
       LOG.info(
           "Running ({}/20}) {}", i, MockResolverIT.class.toString() + "#replace_cluster_test()");
       replace_cluster_test();
-    }
-  }
-
-  private static InetAddress getNodeInetAddress(CcmBridge ccmBridge, int nodeid) {
-    try {
-      return InetAddress.getByName(ccmBridge.getNodeIpAddress(nodeid));
-    } catch (UnknownHostException e) {
-      return null;
     }
   }
 }
