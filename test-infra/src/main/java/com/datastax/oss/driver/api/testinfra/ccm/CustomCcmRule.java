@@ -63,10 +63,6 @@ public class CustomCcmRule extends BaseCcmRule {
     }
   }
 
-  public CcmBridge getCcmBridge() {
-    return ccmBridge;
-  }
-
   public static Builder builder() {
     return new Builder();
   }
