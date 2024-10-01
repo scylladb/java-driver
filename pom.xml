@@ -458,6 +458,11 @@
         <artifactId>blockhound-junit-platform</artifactId>
         <version>1.0.8.RELEASE</version>
       </dependency>
+      <dependency>
+        <groupId>org.burningwave</groupId>
+        <artifactId>tools</artifactId>
+        <version>0.26.2</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>

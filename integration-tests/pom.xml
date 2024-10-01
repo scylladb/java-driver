@@ -228,6 +228,11 @@
       <artifactId>esri-geometry-api</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.burningwave</groupId>
+      <artifactId>tools</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
