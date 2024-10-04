@@ -72,20 +72,26 @@ class InitialNodeListRefresh extends NodesRefresh {
                 + "keeping only the first one",
             logPrefix,
             hostId);
+        continue;
+      }
+      EndPoint endPoint = nodeInfo.getEndPoint();
+      DefaultNode node = findIn(contactPoints, endPoint);
+      if (node == null) {
+        node = new DefaultNode(endPoint, context);
+        LOG.debug("[{}] Adding new node {}", logPrefix, node);
       } else {
-        EndPoint endPoint = nodeInfo.getEndPoint();
-        DefaultNode node = findIn(contactPoints, endPoint);
-        if (node == null) {
-          node = new DefaultNode(endPoint, context);
-          LOG.debug("[{}] Adding new node {}", logPrefix, node);
-        } else {
-          LOG.debug("[{}] Copying contact point {}", logPrefix, node);
-        }
-        if (tokenMapEnabled && tokenFactory == null && nodeInfo.getPartitioner() != null) {
+        LOG.debug("[{}] Copying contact point {}", logPrefix, node);
+      }
+      copyInfos(nodeInfo, node, context);
+      newNodes.put(hostId, node);
+    }
+
+    if (tokenMapEnabled) {
+      for (NodeInfo nodeInfo : nodeInfos) {
+        if (nodeInfo.getPartitioner() != null) {
           tokenFactory = tokenFactoryRegistry.tokenFactoryFor(nodeInfo.getPartitioner());
+          break;
         }
-        copyInfos(nodeInfo, node, context);
-        newNodes.put(hostId, node);
       }
     }
 

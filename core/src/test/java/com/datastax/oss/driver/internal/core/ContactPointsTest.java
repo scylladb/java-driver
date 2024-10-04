@@ -29,6 +29,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.UnresolvedEndPoint;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.net.InetAddress;
@@ -94,9 +95,7 @@ public class ContactPointsTest {
     Set<EndPoint> endPoints =
         ContactPoints.merge(Collections.emptySet(), ImmutableList.of("localhost:9042"), false);
 
-    assertThat(endPoints)
-        .containsExactly(
-            new DefaultEndPoint(InetSocketAddress.createUnresolved("localhost", 9042)));
+    assertThat(endPoints).containsExactly(new UnresolvedEndPoint("localhost", 9042));
   }
 
   @Test

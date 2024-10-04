@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.UnresolvedEndPoint;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
 import java.net.InetAddress;
@@ -41,18 +42,17 @@ public class ContactPoints {
 
     Set<EndPoint> result = Sets.newHashSet(programmaticContactPoints);
     for (String spec : configContactPoints) {
-      for (InetSocketAddress address : extract(spec, resolve)) {
-        DefaultEndPoint endPoint = new DefaultEndPoint(address);
+      for (EndPoint endPoint : extract(spec, resolve)) {
         boolean wasNew = result.add(endPoint);
         if (!wasNew) {
-          LOG.warn("Duplicate contact point {}", address);
+          LOG.warn("Duplicate contact point {}", endPoint);
         }
       }
     }
     return ImmutableSet.copyOf(result);
   }
 
-  private static Set<InetSocketAddress> extract(String spec, boolean resolve) {
+  private static Set<EndPoint> extract(String spec, boolean resolve) {
     int separator = spec.lastIndexOf(':');
     if (separator < 0) {
       LOG.warn("Ignoring invalid contact point {} (expecting host:port)", spec);
@@ -69,7 +69,7 @@ public class ContactPoints {
       return Collections.emptySet();
     }
     if (!resolve) {
-      return ImmutableSet.of(InetSocketAddress.createUnresolved(host, port));
+      return ImmutableSet.of(new UnresolvedEndPoint(host, port));
     } else {
       try {
         InetAddress[] inetAddresses = InetAddress.getAllByName(host);
@@ -79,9 +79,9 @@ public class ContactPoints {
               spec,
               Arrays.deepToString(inetAddresses));
         }
-        Set<InetSocketAddress> result = new HashSet<>();
+        Set<EndPoint> result = new HashSet<>();
         for (InetAddress inetAddress : inetAddresses) {
-          result.add(new InetSocketAddress(inetAddress, port));
+          result.add(new DefaultEndPoint(new InetSocketAddress(inetAddress, port)));
         }
         return result;
       } catch (UnknownHostException e) {

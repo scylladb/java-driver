@@ -21,6 +21,7 @@ import com.datastax.dse.driver.api.core.auth.BaseDseAuthenticator;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.InetSocketAddress;
@@ -29,6 +30,7 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
@@ -169,6 +171,12 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
           @Override
           public SocketAddress resolve() {
             return new InetSocketAddress("127.0.0.1", 9042);
+          }
+
+          @NonNull
+          @Override
+          public List<EndPoint> resolveAll() {
+            return ImmutableList.of(this);
           }
 
           @NonNull
