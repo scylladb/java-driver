@@ -25,10 +25,14 @@ import com.datastax.oss.driver.internal.core.metadata.token.TokenFactoryRegistry
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
+
+import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,8 +46,10 @@ class InitialNodeListRefresh extends NodesRefresh {
 
   private static final Logger LOG = LoggerFactory.getLogger(InitialNodeListRefresh.class);
 
-  @VisibleForTesting final Iterable<NodeInfo> nodeInfos;
-  @VisibleForTesting final Set<DefaultNode> contactPoints;
+  @VisibleForTesting
+  final Iterable<NodeInfo> nodeInfos;
+  @VisibleForTesting
+  final Set<DefaultNode> contactPoints;
 
   InitialNodeListRefresh(Iterable<NodeInfo> nodeInfos, Set<DefaultNode> contactPoints) {
     this.nodeInfos = nodeInfos;
@@ -72,21 +78,21 @@ class InitialNodeListRefresh extends NodesRefresh {
                 + "keeping only the first one",
             logPrefix,
             hostId);
-      } else {
-        EndPoint endPoint = nodeInfo.getEndPoint();
-        DefaultNode node = findIn(contactPoints, endPoint);
-        if (node == null) {
-          node = new DefaultNode(endPoint, context);
-          LOG.debug("[{}] Adding new node {}", logPrefix, node);
-        } else {
-          LOG.debug("[{}] Copying contact point {}", logPrefix, node);
-        }
-        if (tokenMapEnabled && tokenFactory == null && nodeInfo.getPartitioner() != null) {
-          tokenFactory = tokenFactoryRegistry.tokenFactoryFor(nodeInfo.getPartitioner());
-        }
-        copyInfos(nodeInfo, node, context);
-        newNodes.put(hostId, node);
+        continue;
       }
+      EndPoint endPoint = nodeInfo.getEndPoint();
+      DefaultNode node = findIn(contactPoints, endPoint);
+      if (node == null) {
+        node = new DefaultNode(endPoint, context);
+        LOG.debug("[{}] Adding new node {}", logPrefix, node);
+      } else {
+        LOG.debug("[{}] Copying contact point {}", logPrefix, node);
+      }
+      if (tokenMapEnabled && tokenFactory == null && nodeInfo.getPartitioner() != null) {
+        tokenFactory = tokenFactoryRegistry.tokenFactoryFor(nodeInfo.getPartitioner());
+      }
+      copyInfos(nodeInfo, node, context);
+      newNodes.put(hostId, node);
     }
 
     ImmutableList.Builder<Object> eventsBuilder = ImmutableList.builder();

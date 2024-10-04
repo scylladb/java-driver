@@ -20,6 +20,8 @@ package com.datastax.oss.driver.api.core.metadata;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.net.UnknownHostException;
+import java.util.List;
 
 /**
  * Encapsulates the information needed to open connections to a node.
@@ -40,6 +42,14 @@ public interface EndPoint {
   @NonNull
   SocketAddress resolve();
 
+  /**
+   * Resolves this instance to a socket address.
+   *
+   * <p>This will be called each time the driver opens a new connection to the node. The returned
+   * address cannot be null.
+   */
+  @NonNull
+  List<EndPoint> resolveAll() throws UnknownHostException;
   /**
    * Returns an alternate string representation for use in node-level metric names.
    *

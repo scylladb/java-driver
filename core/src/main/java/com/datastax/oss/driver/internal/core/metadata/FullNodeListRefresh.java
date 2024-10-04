@@ -29,8 +29,11 @@ import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+
+import com.datastax.oss.driver.shaded.guava.common.collect.Streams;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,9 +44,11 @@ class FullNodeListRefresh extends NodesRefresh {
   private static final Logger LOG = LoggerFactory.getLogger(FullNodeListRefresh.class);
 
   @VisibleForTesting final Iterable<NodeInfo> nodeInfos;
+  @VisibleForTesting final Set<DefaultNode> contactPoints;
 
-  FullNodeListRefresh(Iterable<NodeInfo> nodeInfos) {
+  FullNodeListRefresh(Iterable<NodeInfo> nodeInfos, Set<DefaultNode> contactPoints) {
     this.nodeInfos = nodeInfos;
+    this.contactPoints = contactPoints;
   }
 
   @Override
@@ -82,6 +87,14 @@ class FullNodeListRefresh extends NodesRefresh {
           tokenFactory = tokenFactoryRegistry.tokenFactoryFor(nodeInfo.getPartitioner());
         }
         tokensChanged |= copyInfos(nodeInfo, node, context);
+      }
+    }
+
+    Set<Node> newContactPoints = new HashSet<>();
+
+    for (DefaultNode endpoint: contactPoints) {
+      if (Streams.concat(added.values().stream(), oldNodes.values().stream()).noneMatch(n -> n.getEndPoint().equals(endpoint))) {
+        newContactPoints.add(endpoint);
       }
     }
 

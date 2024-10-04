@@ -19,20 +19,27 @@ package com.datastax.oss.driver.internal.core;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.UnresolvedEndPoint;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Utility class to handle the initial contact points passed to the driver. */
+/**
+ * Utility class to handle the initial contact points passed to the driver.
+ */
 public class ContactPoints {
   private static final Logger LOG = LoggerFactory.getLogger(ContactPoints.class);
 
@@ -41,22 +48,21 @@ public class ContactPoints {
 
     Set<EndPoint> result = Sets.newHashSet(programmaticContactPoints);
     for (String spec : configContactPoints) {
-      for (InetSocketAddress address : extract(spec, resolve)) {
-        DefaultEndPoint endPoint = new DefaultEndPoint(address);
+      for (EndPoint endPoint : fromString(spec, resolve)) {
         boolean wasNew = result.add(endPoint);
         if (!wasNew) {
-          LOG.warn("Duplicate contact point {}", address);
+          LOG.warn("Duplicate contact point {}", spec);
         }
       }
     }
     return ImmutableSet.copyOf(result);
   }
 
-  private static Set<InetSocketAddress> extract(String spec, boolean resolve) {
+  public static List<EndPoint> fromString(String spec, Boolean resolve) {
     int separator = spec.lastIndexOf(':');
     if (separator < 0) {
       LOG.warn("Ignoring invalid contact point {} (expecting host:port)", spec);
-      return Collections.emptySet();
+      return Collections.emptyList();
     }
 
     String host = spec.substring(0, separator);
@@ -66,28 +72,27 @@ public class ContactPoints {
       port = Integer.parseInt(portSpec);
     } catch (NumberFormatException e) {
       LOG.warn("Ignoring invalid contact point {} (expecting a number, got {})", spec, portSpec);
-      return Collections.emptySet();
+      return Collections.emptyList();
     }
     if (!resolve) {
-      return ImmutableSet.of(InetSocketAddress.createUnresolved(host, port));
-    } else {
-      try {
-        InetAddress[] inetAddresses = InetAddress.getAllByName(host);
-        if (inetAddresses.length > 1) {
-          LOG.info(
-              "Contact point {} resolves to multiple addresses, will use them all ({})",
-              spec,
-              Arrays.deepToString(inetAddresses));
-        }
-        Set<InetSocketAddress> result = new HashSet<>();
-        for (InetAddress inetAddress : inetAddresses) {
-          result.add(new InetSocketAddress(inetAddress, port));
-        }
-        return result;
-      } catch (UnknownHostException e) {
-        LOG.warn("Ignoring invalid contact point {} (unknown host {})", spec, host);
-        return Collections.emptySet();
+      return ImmutableList.of(new UnresolvedEndPoint(host, port));
+    }
+    try {
+      InetAddress[] inetAddresses = InetAddress.getAllByName(host);
+      if (inetAddresses.length > 1) {
+        LOG.info(
+            "Contact point {} resolves to multiple addresses, will use them all ({})",
+            spec,
+            Arrays.deepToString(inetAddresses));
       }
+      Set<EndPoint> result = new HashSet<>();
+      for (InetAddress inetAddress : inetAddresses) {
+        result.add(new DefaultEndPoint(new InetSocketAddress(inetAddress, port)));
+      }
+      return new ArrayList<>(result);
+    } catch (UnknownHostException e) {
+      LOG.warn("Ignoring invalid contact point {} (unknown host {})", spec, host);
+      return Collections.emptyList();
     }
   }
 }

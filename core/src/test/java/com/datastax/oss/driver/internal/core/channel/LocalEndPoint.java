@@ -18,9 +18,12 @@
 package com.datastax.oss.driver.internal.core.channel;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.channel.local.LocalAddress;
 import java.net.SocketAddress;
+import java.util.Collections;
+import java.util.List;
 
 /** Endpoint implementation for unit tests that use the local Netty transport. */
 public class LocalEndPoint implements EndPoint {
@@ -35,6 +38,12 @@ public class LocalEndPoint implements EndPoint {
   @Override
   public SocketAddress resolve() {
     return localAddress;
+  }
+
+  @NonNull
+  @Override
+  public List<EndPoint> resolveAll() {
+    return ImmutableList.of(this);
   }
 
   @NonNull

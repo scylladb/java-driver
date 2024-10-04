@@ -18,66 +18,74 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.internal.core.ContactPoints;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Serializable;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
-public class DefaultEndPoint implements EndPoint, Serializable {
-
-  private static final long serialVersionUID = 1;
-
-  private final InetSocketAddress address;
+public class UnresolvedEndPoint implements EndPoint, Serializable {
   private final String metricPrefix;
+  String host;
+  int port;
 
-  public DefaultEndPoint(InetSocketAddress address) {
-    this.address = Objects.requireNonNull(address, "address can't be null");
-    this.metricPrefix = buildMetricPrefix(address);
+  public UnresolvedEndPoint(String host, int port) {
+    this.host = host;
+    this.port = port;
+    this.metricPrefix = buildMetricPrefix(host, port);
   }
 
   @NonNull
   @Override
-  public InetSocketAddress resolve() {
-    return address;
+  public SocketAddress resolve() {
+    throw new RuntimeException(String.format("This endpoint %s should never been resolved, but it happened, it somehow leaked to downstream code.", this));
   }
 
   @NonNull
   @Override
-  public List<EndPoint> resolveAll() {
-    return ImmutableList.of(this);
+  public List<EndPoint> resolveAll() throws UnknownHostException {
+    InetAddress[] inetAddresses = InetAddress.getAllByName(host);
+    Set<EndPoint> result = new HashSet<>();
+    for (InetAddress inetAddress : inetAddresses) {
+      result.add(new DefaultEndPoint(new InetSocketAddress(inetAddress, port)));
+    }
+    return new ArrayList<>(result);
   }
+
 
   @Override
   public boolean equals(Object other) {
     if (other == this) {
       return true;
-    } else if (other instanceof DefaultEndPoint) {
-      InetSocketAddress thisAddress = this.address;
-      InetSocketAddress thatAddress = ((DefaultEndPoint) other).address;
-      // If only one of the addresses is unresolved, resolve the other. Otherwise (both resolved or
-      // both unresolved), compare as-is.
-      if (thisAddress.isUnresolved() && !thatAddress.isUnresolved()) {
-        thisAddress = new InetSocketAddress(thisAddress.getHostName(), thisAddress.getPort());
-      } else if (thatAddress.isUnresolved() && !thisAddress.isUnresolved()) {
-        thatAddress = new InetSocketAddress(thatAddress.getHostName(), thatAddress.getPort());
-      }
-      return thisAddress.equals(thatAddress);
-    } else {
-      return false;
     }
+    if (other instanceof UnresolvedEndPoint) {
+      UnresolvedEndPoint that = (UnresolvedEndPoint) other;
+      return this.host.equals(that.host) && this.port == that.port;
+    }
+    return false;
   }
 
   @Override
   public int hashCode() {
-    return address.hashCode();
+    return host.toLowerCase().hashCode() + port;
   }
 
   @Override
   public String toString() {
-    return address.toString();
+    return host + ":" + port;
   }
 
   @NonNull
@@ -86,13 +94,8 @@ public class DefaultEndPoint implements EndPoint, Serializable {
     return metricPrefix;
   }
 
-  private static String buildMetricPrefix(InetSocketAddress address) {
-    String hostString = address.getHostString();
-    if (hostString == null) {
-      throw new IllegalArgumentException(
-          "Could not extract a host string from provided address " + address);
-    }
+  private static String buildMetricPrefix(String host, int port) {
     // Append the port since Cassandra 4 supports nodes with different ports
-    return hostString.replace('.', '_') + ':' + address.getPort();
+    return host.replace('.', '_') + ':' + port;
   }
 }

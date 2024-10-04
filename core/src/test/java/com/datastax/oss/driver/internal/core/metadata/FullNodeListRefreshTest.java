@@ -75,7 +75,7 @@ public class FullNodeListRefreshTest {
                 .withHostId(node2.getHostId())
                 .build(),
             DefaultNodeInfo.builder().withEndPoint(endPoint3).withHostId(hostId3).build());
-    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos);
+    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos, Collections.emptySet());
 
     // When
     MetadataRefresh.Result result = refresh.compute(oldMetadata, false, context);
@@ -115,7 +115,7 @@ public class FullNodeListRefreshTest {
                 .withHostId(node2.getHostId())
                 .withSchemaVersion(schemaVersion2)
                 .build());
-    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos);
+    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos, Collections.emptySet());
 
     // When
     MetadataRefresh.Result result = refresh.compute(oldMetadata, false, context);
@@ -163,7 +163,7 @@ public class FullNodeListRefreshTest {
                 .withRack("rack3")
                 .withHostId(node2.getHostId())
                 .build());
-    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos);
+    FullNodeListRefresh refresh = new FullNodeListRefresh(newInfos, Collections.emptySet());
 
     // When
     MetadataRefresh.Result result = refresh.compute(oldMetadata, false, context);
