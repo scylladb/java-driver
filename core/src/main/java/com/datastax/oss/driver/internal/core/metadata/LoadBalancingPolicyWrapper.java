@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.internal.core.metadata;
 
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
@@ -161,8 +162,25 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
   }
 
   @NonNull
-  public Queue<Node> newQueryPlan() {
-    return newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
+  public Queue<Node> newControlReconnectionQueryPlan() {
+    // First try the original way
+    Queue<Node> regularQueryPlan = newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
+    if (!regularQueryPlan.isEmpty()) return regularQueryPlan;
+
+    if (context
+        .getConfig()
+        .getDefaultProfile()
+        .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)) {
+      Set<DefaultNode> originalNodes = context.getMetadataManager().getContactPoints();
+      List<Node> nodes = new ArrayList<>();
+      for (DefaultNode node : originalNodes) {
+        nodes.add(new DefaultNode(node.getEndPoint(), context));
+      }
+      Collections.shuffle(nodes);
+      return new ConcurrentLinkedQueue<>(nodes);
+    } else {
+      return regularQueryPlan;
+    }
   }
 
   // when it comes in from the outside

@@ -360,6 +360,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_INTERVAL, Duration.ofMillis(200));
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_TIMEOUT, Duration.ofSeconds(10));
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, true);
+    map.put(TypedDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, false);
     map.put(TypedDriverOption.PREPARE_ON_ALL_NODES, true);
     map.put(TypedDriverOption.REPREPARE_ENABLED, true);
     map.put(TypedDriverOption.REPREPARE_CHECK_SYSTEM_TABLE, false);

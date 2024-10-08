@@ -566,6 +566,10 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_AGREEMENT_WARN =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, GenericType.BOOLEAN);
+  /** Whether to forcibly try original contacts if no live nodes are available */
+  public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, GenericType.BOOLEAN);
   /** Whether `Session.prepare` calls should be sent to all nodes in the cluster. */
   public static final TypedDriverOption<Boolean> PREPARE_ON_ALL_NODES =
       new TypedDriverOption<>(DefaultDriverOption.PREPARE_ON_ALL_NODES, GenericType.BOOLEAN);

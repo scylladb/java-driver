@@ -300,7 +300,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                 .withOwnerLogPrefix(logPrefix + "|control")
                 .build();
 
-        Queue<Node> nodes = context.getLoadBalancingPolicyWrapper().newQueryPlan();
+        Queue<Node> nodes =
+            context.getLoadBalancingPolicyWrapper().newControlReconnectionQueryPlan();
 
         connect(
             nodes,
@@ -336,7 +337,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
 
     private CompletionStage<Boolean> reconnect() {
       assert adminExecutor.inEventLoop();
-      Queue<Node> nodes = context.getLoadBalancingPolicyWrapper().newQueryPlan();
+      Queue<Node> nodes = context.getLoadBalancingPolicyWrapper().newControlReconnectionQueryPlan();
       CompletableFuture<Boolean> result = new CompletableFuture<>();
       connect(
           nodes,
