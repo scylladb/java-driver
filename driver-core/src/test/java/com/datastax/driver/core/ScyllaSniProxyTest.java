@@ -69,6 +69,10 @@ public class ScyllaSniProxyTest extends CCMTestsSupport {
 
     // Sometimes (probably due to reconnection) both events can be read twice
     // assertingListener ensures we deal with the same keyspace and table
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException ignored) {
+    }
     verify(listener, atLeast(1)).onTableAdded(any(TableMetadata.class));
     verify(listener, atMost(2)).onTableAdded(any(TableMetadata.class));
     verify(listener, atLeast(1)).onKeyspaceAdded(any(KeyspaceMetadata.class));
