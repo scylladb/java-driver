@@ -86,6 +86,7 @@
         <scassandra.version>1.1.2</scassandra.version>
         <logback.version>1.2.13</logback.version>
         <byteman.version>3.0.8</byteman.version>
+        <burningwave.tools.version>0.26.2</burningwave.tools.version>
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
@@ -396,6 +397,12 @@
                 <groupId>org.codehaus.groovy</groupId>
                 <artifactId>groovy-all</artifactId>
                 <version>${groovy.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.burningwave</groupId>
+                <artifactId>tools</artifactId>
+                <version>${burningwave.tools.version}</version>
             </dependency>
 
         </dependencies>

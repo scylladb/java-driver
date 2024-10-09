@@ -195,6 +195,13 @@
             <version>1.78.1</version>
         </dependency>
 
+        <!-- added for easier DNS hostname resolution mocking -->
+        <dependency>
+            <groupId>org.burningwave</groupId>
+            <artifactId>tools</artifactId>
+            <scope>test</scope>
+        </dependency>
+
 
     </dependencies>
 
