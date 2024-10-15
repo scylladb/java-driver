@@ -60,6 +60,7 @@ import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
 import com.datastax.oss.driver.internal.core.tracker.RequestLogger;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.Message;
@@ -265,11 +266,13 @@ public class GraphRequestHandler implements Throttled {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
         // We're the last execution so fail the result
-        setFinalError(
-            statement,
-            AllNodesFailedException.fromErrors(this.errors),
-            null,
-            NO_SUCCESSFUL_EXECUTION);
+        AllNodesFailedException exception;
+        if (queryPlan instanceof DebugQueryPlan) {
+          exception = AllNodesFailedException.fromErrors(this.errors, queryPlan);
+        } else {
+          exception = AllNodesFailedException.fromErrors(this.errors);
+        }
+        setFinalError(statement, exception, null, NO_SUCCESSFUL_EXECUTION);
       }
     } else {
       NodeResponseCallback nodeResponseCallback =

@@ -63,6 +63,7 @@ public class CustomCcmRule extends BaseCcmRule {
     }
   }
 
+  @Override
   public CcmBridge getCcmBridge() {
     return ccmBridge;
   }

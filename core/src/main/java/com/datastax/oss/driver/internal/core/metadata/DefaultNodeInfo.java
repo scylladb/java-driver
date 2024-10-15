@@ -17,7 +17,10 @@
  */
 package com.datastax.oss.driver.internal.core.metadata;
 
+import com.datastax.oss.driver.api.core.Version;
+import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.InetSocketAddress;
@@ -48,6 +51,9 @@ public class DefaultNodeInfo implements NodeInfo {
   private final Map<String, Object> extras;
   private final UUID hostId;
   private final UUID schemaVersion;
+  private final boolean isReconnecting;
+  private final NodeDistance distance;
+  private final int openConnections;
 
   private DefaultNodeInfo(Builder builder) {
     this.endPoint = builder.endPoint;
@@ -62,6 +68,9 @@ public class DefaultNodeInfo implements NodeInfo {
     this.hostId = builder.hostId;
     this.schemaVersion = builder.schemaVersion;
     this.extras = (builder.extras == null) ? Collections.emptyMap() : builder.extras;
+    this.isReconnecting = builder.isReconnecting;
+    this.distance = builder.distance;
+    this.openConnections = builder.openConnections;
   }
 
   @NonNull
@@ -129,6 +138,40 @@ public class DefaultNodeInfo implements NodeInfo {
     return schemaVersion;
   }
 
+  @Override
+  public NodeDistance getDistance() {
+    return distance;
+  }
+
+  @Override
+  public boolean isReconnecting() {
+    return isReconnecting;
+  }
+
+  @Override
+  public int getOpenConnections() {
+    return openConnections;
+  }
+
+  @Override
+  public String toString() {
+    return String.format(
+        "DefaultNodeInfo(hostId: %s, endPoint: %s, datacenter: %s, rack: %s, distance: %s, schemaVersion: %s, "
+            + "broadcastRpcAddress: %s, broadcastAddress: %s, listenAddress: %s, partitioner: %s, isReconnecting: %b, openConnections: %d)",
+        hostId,
+        endPoint,
+        datacenter,
+        rack,
+        distance,
+        schemaVersion,
+        broadcastRpcAddress,
+        broadcastAddress,
+        listenAddress,
+        partitioner,
+        isReconnecting,
+        openConnections);
+  }
+
   @NotThreadSafe
   public static class Builder {
     private EndPoint endPoint;
@@ -143,6 +186,9 @@ public class DefaultNodeInfo implements NodeInfo {
     private Map<String, Object> extras;
     private UUID hostId;
     private UUID schemaVersion;
+    private boolean isReconnecting;
+    private NodeDistance distance;
+    private int openConnections;
 
     public Builder withEndPoint(@NonNull EndPoint endPoint) {
       this.endPoint = endPoint;
@@ -197,6 +243,50 @@ public class DefaultNodeInfo implements NodeInfo {
     public Builder withSchemaVersion(@Nullable UUID schemaVersion) {
       this.schemaVersion = schemaVersion;
       return this;
+    }
+
+    public Builder withReconnecting(boolean isReconnecting) {
+      this.isReconnecting = isReconnecting;
+      return this;
+    }
+
+    public Builder withOpenConnections(int openConnections) {
+      this.openConnections = openConnections;
+      return this;
+    }
+
+    public Builder withDistance(NodeDistance distance) {
+      this.distance = distance;
+      return this;
+    }
+
+    public Builder() {}
+
+    public Builder(Node node) {
+      this.withEndPoint(node.getEndPoint());
+      this.withBroadcastAddress(node.getBroadcastAddress().orElse(null));
+      this.withBroadcastRpcAddress(node.getBroadcastRpcAddress().orElse(null));
+      this.withListenAddress(node.getListenAddress().orElse(null));
+      this.withDatacenter(node.getDatacenter());
+      this.withReconnecting(node.isReconnecting());
+      this.withDistance(node.getDistance());
+      this.withRack(node.getRack());
+      this.withOpenConnections(node.getOpenConnections());
+
+      Version cassandraVersion = node.getCassandraVersion();
+      if (cassandraVersion != null) {
+        this.withCassandraVersion(cassandraVersion.toString());
+      }
+
+      UUID hostID = node.getHostId();
+      if (hostID != null) {
+        this.withHostId(hostID);
+      }
+
+      UUID schemaVersion = node.getSchemaVersion();
+      if (schemaVersion != null) {
+        this.withSchemaVersion(schemaVersion);
+      }
     }
 
     public Builder withExtra(@NonNull String key, @Nullable Object value) {

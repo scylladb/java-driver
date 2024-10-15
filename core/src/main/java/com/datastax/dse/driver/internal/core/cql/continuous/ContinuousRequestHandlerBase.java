@@ -65,6 +65,7 @@ import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.protocol.internal.Frame;
@@ -360,7 +361,11 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
       // We've reached the end of the query plan without finding any node to write to; abort the
       // continuous paging session.
       if (activeExecutionsCount.decrementAndGet() == 0) {
-        abortGlobalRequestOrChosenCallback(AllNodesFailedException.fromErrors(errors));
+        if (queryPlan instanceof DebugQueryPlan) {
+          abortGlobalRequestOrChosenCallback(AllNodesFailedException.fromErrors(errors, queryPlan));
+        } else {
+          abortGlobalRequestOrChosenCallback(AllNodesFailedException.fromErrors(errors));
+        }
       }
     } else if (!chosenCallback.isDone()) {
       NodeResponseCallback nodeResponseCallback =

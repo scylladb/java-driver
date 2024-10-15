@@ -186,6 +186,10 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     return ccmBridge.getCassandraVersion();
   }
 
+  public CcmBridge getCcmBridge() {
+    return ccmBridge;
+  }
+
   public Optional<Version> getDseVersion() {
     return ccmBridge.getDseVersion();
   }

@@ -27,14 +27,18 @@ import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.ReplayingEventFilter;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -76,6 +80,7 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
   private final Set<LoadBalancingPolicy> policies;
   private final Map<String, LoadBalancingPolicy> policiesPerProfile;
   private final Map<LoadBalancingPolicy, SinglePolicyDistanceReporter> reporters;
+  private final boolean detailedQueryPlanExceptions;
 
   private final Lock distancesLock = new ReentrantLock();
 
@@ -95,6 +100,13 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
     this.context = context;
 
     this.policiesPerProfile = policiesPerProfile;
+
+    detailedQueryPlanExceptions =
+        context
+            .getConfig()
+            .getDefaultProfile()
+            .getBoolean(DefaultDriverOption.CONNECTION_QUERY_PLAN_EXCEPTIONS);
+
     ImmutableMap.Builder<LoadBalancingPolicy, SinglePolicyDistanceReporter> reportersBuilder =
         ImmutableMap.builder();
     // ImmutableMap.values does not remove duplicates, do it now so that we won't invoke a policy
@@ -143,13 +155,22 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
   @NonNull
   public Queue<Node> newQueryPlan(
       @Nullable Request request, @NonNull String executionProfileName, @Nullable Session session) {
-    switch (stateRef.get()) {
+    State state = stateRef.get();
+    switch (state) {
       case BEFORE_INIT:
       case DURING_INIT:
-        // The contact points are not stored in the metadata yet:
         List<Node> nodes = new ArrayList<>(context.getMetadataManager().getContactPoints());
         Collections.shuffle(nodes);
-        return new ConcurrentLinkedQueue<>(nodes);
+        Queue<Node> plan = new ConcurrentLinkedQueue<>(nodes);
+        if (!detailedQueryPlanExceptions) {
+          // The contact points are not stored in the metadata yet:
+          return plan;
+        }
+        DebugQueryPlan debugPlan = new DebugQueryPlan(plan);
+        LoadBalancingPolicyWrapperInfo wrapperInfo =
+            new LoadBalancingPolicyWrapperInfo(this, state);
+        debugPlan.setLoadBalancingPolicyWrapperInfo(wrapperInfo);
+        return debugPlan;
       case RUNNING:
         LoadBalancingPolicy policy = policiesPerProfile.get(executionProfileName);
         if (policy == null) {
@@ -157,7 +178,14 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
         }
         return policy.newQueryPlan(request, session);
       default:
-        return new ConcurrentLinkedQueue<>();
+        if (!detailedQueryPlanExceptions) {
+          return QueryPlan.EMPTY;
+        }
+        plan = QueryPlan.EMPTY;
+        debugPlan = new DebugQueryPlan(plan);
+        wrapperInfo = new LoadBalancingPolicyWrapperInfo(this, state);
+        debugPlan.setLoadBalancingPolicyWrapperInfo(wrapperInfo);
+        return debugPlan;
     }
   }
 
@@ -286,6 +314,27 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
         }
       }
       return minimum;
+    }
+  }
+
+  private static class LoadBalancingPolicyWrapperInfo implements Serializable {
+    private final InternalDriverContext context;
+    private final Set<LoadBalancingPolicy> policies;
+    private final Map<String, LoadBalancingPolicy> policiesPerProfile;
+    private final State state;
+
+    private LoadBalancingPolicyWrapperInfo(LoadBalancingPolicyWrapper wrapper, State state) {
+      this.context = wrapper.context;
+      this.policies = new HashSet<>();
+      this.policiesPerProfile = new HashMap<>();
+      this.state = state;
+    }
+
+    @Override
+    public String toString() {
+      return String.format(
+          "LoadBalancingPolicyWrapperInfo(state: %s, context: %s, policies: %s, policiesPerProfile: %s)",
+          state, context, policies, policiesPerProfile);
     }
   }
 }

@@ -37,6 +37,7 @@ import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
@@ -358,7 +359,11 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       assert adminExecutor.inEventLoop();
       Node node = nodes.poll();
       if (node == null) {
-        onFailure.accept(AllNodesFailedException.fromErrors(errors));
+        if (nodes instanceof DebugQueryPlan) {
+          onFailure.accept(AllNodesFailedException.fromErrors(errors, nodes));
+        } else {
+          onFailure.accept(AllNodesFailedException.fromErrors(errors));
+        }
       } else {
         LOG.debug("[{}] Trying to establish a connection to {}", logPrefix, node);
         context

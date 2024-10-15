@@ -28,14 +28,17 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.internal.core.loadbalancing.helper.MandatoryLocalDcHelper;
+import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.LazyCopyQueryPlan;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.ArrayUtils;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.BitSet;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -64,7 +67,7 @@ import org.slf4j.LoggerFactory;
  * }
  * </pre>
  *
- * See {@code reference.conf} (in the manual or core driver JAR) for more details.
+ * <p>See {@code reference.conf} (in the manual or core driver JAR) for more details.
  *
  * <p><b>Local datacenter</b>: This implementation requires a local datacenter to be defined,
  * otherwise it will throw an {@link IllegalStateException}. A local datacenter can be supplied
@@ -126,8 +129,16 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   @NonNull
   @Override
   public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    DefaultLoadBalancingPolicyDebugInfo debugInfo =
+        detailedQueryPlanExceptions ? new DefaultLoadBalancingPolicyDebugInfo(this) : null;
     if (!avoidSlowReplicas) {
-      return super.newQueryPlan(request, session);
+      Queue<Node> basicPlan = super.newQueryPlan(request, session);
+      if (debugInfo == null) {
+        return basicPlan;
+      }
+      DebugQueryPlan debugPlan = new DebugQueryPlan(basicPlan);
+      debugPlan.setLoadBalancingPolicyInfo(debugInfo);
+      return debugPlan;
     }
 
     // Take a snapshot since the set is concurrent:
@@ -246,8 +257,20 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
         currentNodes.length - replicaCount,
         roundRobinAmount.getAndUpdate(INCREMENT));
 
+    if (debugInfo == null) {
+      QueryPlan plan =
+          currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
+      return maybeAddDcFailover(request, plan);
+    }
+
     QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
-    return maybeAddDcFailover(request, plan);
+    plan = new LazyCopyQueryPlan(plan);
+    Queue<Node> finalPlan = maybeAddDcFailover(request, plan);
+
+    DebugQueryPlan debugPlan = new DebugQueryPlan(finalPlan);
+    debugPlan.setLocalPlan(plan);
+    debugPlan.setLoadBalancingPolicyInfo(debugInfo);
+    return debugPlan;
   }
 
   @Override
@@ -333,5 +356,36 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     // for requests that were cancelled or timed out (since the node is likely to still be
     // processing them).
     return (pool == null) ? 0 : pool.getInFlight();
+  }
+
+  private static class DefaultLoadBalancingPolicyDebugInfo
+      extends BasicLoadBalancingPolicyDebugInfo {
+    protected final Map<Node, AtomicLongArray> responseTimes = new HashMap<>();
+    protected final Map<Node, Long> upTimes = new HashMap<>();
+    private final boolean avoidSlowReplicas;
+
+    public DefaultLoadBalancingPolicyDebugInfo(DefaultLoadBalancingPolicy policy) {
+      super(policy);
+      responseTimes.putAll(policy.responseTimes);
+      upTimes.putAll(policy.upTimes);
+      avoidSlowReplicas = policy.avoidSlowReplicas;
+    }
+
+    @Override
+    public String toString() {
+      return String.format(
+          "DefaultLoadBalancingPolicyDebugInfo{localDc: %s, localRack: %s, liveNodes: %s, replicas: %s"
+              + ", defaultConsistencyLevel: %s, allowDcFailoverForLocalCl: %s, maxNodesPerRemoteDc: %s, responseTimes: %s, upTimes: %s, avoidSlowReplicas: %s}",
+          localDc,
+          localRack,
+          liveNodes,
+          replicas,
+          defaultConsistencyLevel,
+          allowDcFailoverForLocalCl,
+          maxNodesPerRemoteDc,
+          responseTimes,
+          upTimes,
+          avoidSlowReplicas);
+    }
   }
 }

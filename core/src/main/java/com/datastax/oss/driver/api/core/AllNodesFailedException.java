@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 
 /**
  * Thrown when a query failed on all the coordinators it was tried on. This exception may wrap
@@ -37,7 +38,6 @@ import java.util.Map.Entry;
  * exceptions}, or via {@link #getAllErrors()} where they are grouped by node.
  */
 public class AllNodesFailedException extends DriverException {
-
   /** @deprecated Use {@link #fromErrors(List)} instead. */
   @NonNull
   @Deprecated
@@ -45,7 +45,17 @@ public class AllNodesFailedException extends DriverException {
     if (errors == null || errors.isEmpty()) {
       return new NoNodeAvailableException();
     } else {
-      return new AllNodesFailedException(groupByNode(errors));
+      return new AllNodesFailedException(groupByNode(errors), null);
+    }
+  }
+
+  @NonNull
+  public static AllNodesFailedException fromErrors(
+      @Nullable List<Entry<Node, Throwable>> errors, Queue<Node> queryPlan) {
+    if (errors == null || errors.isEmpty()) {
+      return new NoNodeAvailableException(queryPlan);
+    } else {
+      return new AllNodesFailedException(groupByNode(errors), queryPlan);
     }
   }
 
@@ -59,6 +69,7 @@ public class AllNodesFailedException extends DriverException {
   }
 
   private final Map<Node, List<Throwable>> errors;
+  private final Queue<Node> queryPlan;
 
   /** @deprecated Use {@link #AllNodesFailedException(String, ExecutionInfo, Iterable)} instead. */
   @Deprecated
@@ -68,6 +79,7 @@ public class AllNodesFailedException extends DriverException {
       @NonNull Map<Node, Throwable> errors) {
     super(message, executionInfo, null, true);
     this.errors = toDeepImmutableMap(groupByNode(errors));
+    this.queryPlan = null;
     addSuppressedErrors();
   }
 
@@ -77,6 +89,18 @@ public class AllNodesFailedException extends DriverException {
       @NonNull Iterable<Entry<Node, List<Throwable>>> errors) {
     super(message, executionInfo, null, true);
     this.errors = toDeepImmutableMap(errors);
+    this.queryPlan = null;
+    addSuppressedErrors();
+  }
+
+  protected AllNodesFailedException(
+      @NonNull String message,
+      @Nullable ExecutionInfo executionInfo,
+      @NonNull Iterable<Entry<Node, List<Throwable>>> errors,
+      @Nullable Queue<Node> queryPlan) {
+    super(message, executionInfo, null, true);
+    this.errors = toDeepImmutableMap(errors);
+    this.queryPlan = queryPlan;
     addSuppressedErrors();
   }
 
@@ -91,12 +115,26 @@ public class AllNodesFailedException extends DriverException {
   private AllNodesFailedException(Map<Node, List<Throwable>> errors) {
     this(
         buildMessage(
-            String.format("All %d node(s) tried for the query failed", errors.size()), errors),
+            String.format("All %d node(s) tried for the query failed", errors.size()),
+            errors,
+            null),
         null,
         errors.entrySet());
   }
 
-  private static String buildMessage(String baseMessage, Map<Node, List<Throwable>> errors) {
+  private AllNodesFailedException(Map<Node, List<Throwable>> errors, Queue<Node> queryPlan) {
+    this(
+        buildMessage(
+            String.format("All %d node(s) tried for the query failed", errors.size()),
+            errors,
+            queryPlan),
+        null,
+        errors.entrySet(),
+        queryPlan);
+  }
+
+  private static String buildMessage(
+      String baseMessage, Map<Node, List<Throwable>> errors, Queue<Node> queryPlan) {
     int limit = Math.min(errors.size(), 3);
     Iterator<Entry<Node, List<Throwable>>> iterator =
         Iterables.limit(errors.entrySet(), limit).iterator();
@@ -108,9 +146,14 @@ public class AllNodesFailedException extends DriverException {
         details.append(", ");
       }
     }
+    if (queryPlan == null) {
+      return String.format(
+          "%s (showing first %d nodes, use getAllErrors() for more): %s",
+          baseMessage, limit, details);
+    }
     return String.format(
-        "%s (showing first %d nodes, use getAllErrors() for more): %s",
-        baseMessage, limit, details);
+        "%s\nQuery Plan: %s\n(showing first %d nodes, use getAllErrors() for more): %s",
+        baseMessage, queryPlan, limit, details);
   }
 
   /**
@@ -131,6 +174,10 @@ public class AllNodesFailedException extends DriverException {
     return builder.build();
   }
 
+  protected Queue<Node> getQueryPlan() {
+    return this.queryPlan;
+  }
+
   /** An immutable map containing all errors on each tried node. */
   @NonNull
   public Map<Node, List<Throwable>> getAllErrors() {
@@ -146,7 +193,7 @@ public class AllNodesFailedException extends DriverException {
   @NonNull
   public AllNodesFailedException reword(String newMessage) {
     return new AllNodesFailedException(
-        buildMessage(newMessage, errors), getExecutionInfo(), errors.entrySet());
+        buildMessage(newMessage, errors, queryPlan), getExecutionInfo(), errors.entrySet());
   }
 
   private static Map<Node, List<Throwable>> groupByNode(Map<Node, Throwable> errors) {

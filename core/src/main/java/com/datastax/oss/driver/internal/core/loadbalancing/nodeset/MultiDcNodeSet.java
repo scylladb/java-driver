@@ -18,9 +18,12 @@
 package com.datastax.oss.driver.internal.core.loadbalancing.nodeset;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNodeInfo;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,6 +85,11 @@ public class MultiDcNodeSet implements NodeSet {
     return nodes.keySet();
   }
 
+  @Override
+  public NodeSetInfo toInfo() {
+    return new MultiDcNodeSetInfo(nodes);
+  }
+
   @NonNull
   private String getMapKey(@NonNull Node node) {
     return getMapKey(node.getDatacenter());
@@ -90,5 +98,39 @@ public class MultiDcNodeSet implements NodeSet {
   @NonNull
   private String getMapKey(@Nullable String dc) {
     return dc == null ? UNKNOWN_DC : dc;
+  }
+
+  private static class MultiDcNodeSetInfo implements NodeSetInfo {
+    private final Map<String, Set<DefaultNodeInfo>> nodes;
+
+    private MultiDcNodeSetInfo(Map<String, Set<Node>> nodes) {
+      this.nodes = new HashMap<>();
+      for (Map.Entry<String, Set<Node>> entry : nodes.entrySet()) {
+        Set<DefaultNodeInfo> dcNodes = this.nodes.getOrDefault(entry.getKey(), null);
+        if (dcNodes == null) {
+          dcNodes = new HashSet<>();
+          this.nodes.put(entry.getKey(), dcNodes);
+        }
+        for (Node node : entry.getValue()) {
+          dcNodes.add(new DefaultNodeInfo.Builder(node).build());
+        }
+      }
+    }
+
+    @Override
+    public String toString() {
+      return "MultiDcNodeSetInfo(nodes: " + nodes.toString() + ")";
+    }
+
+    @NonNull
+    @Override
+    public Set<DefaultNodeInfo> dc(@Nullable String dc) {
+      return Collections.emptySet();
+    }
+
+    @Override
+    public Set<String> dcs() {
+      return Collections.emptySet();
+    }
   }
 }

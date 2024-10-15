@@ -18,8 +18,10 @@
 package com.datastax.oss.driver.api.core;
 
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collections;
+import java.util.Queue;
 
 /**
  * Specialization of {@code AllNodesFailedException} when no coordinators were tried.
@@ -32,13 +34,25 @@ public class NoNodeAvailableException extends AllNodesFailedException {
     this(null);
   }
 
-  private NoNodeAvailableException(ExecutionInfo executionInfo) {
-    super("No node was available to execute the query", executionInfo, Collections.emptySet());
+  private NoNodeAvailableException(
+      String message, ExecutionInfo executionInfo, Queue<Node> queryPlan) {
+    super(message, executionInfo, Collections.emptySet(), queryPlan);
+  }
+
+  public NoNodeAvailableException(Queue<Node> queryPlan) {
+    this(buildMessage(queryPlan), null, queryPlan);
+  }
+
+  private static String buildMessage(Queue<Node> queryPlan) {
+    if (queryPlan == null) {
+      return "No node was available to execute the query";
+    }
+    return "No node was available to execute the query. Query Plan: " + queryPlan;
   }
 
   @NonNull
   @Override
   public DriverException copy() {
-    return new NoNodeAvailableException(getExecutionInfo());
+    return new NoNodeAvailableException(getMessage(), getExecutionInfo(), getQueryPlan());
   }
 }

@@ -72,6 +72,7 @@ import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
 import com.datastax.oss.driver.internal.core.tracker.RequestLogger;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.collection.DebugQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.Message;
@@ -385,7 +386,12 @@ public class CqlRequestHandler implements Throttled {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
         // We're the last execution so fail the result
-        setFinalError(statement, AllNodesFailedException.fromErrors(this.errors), null, -1);
+        if (queryPlan instanceof DebugQueryPlan) {
+          setFinalError(
+              statement, AllNodesFailedException.fromErrors(this.errors, queryPlan), null, -1);
+        } else {
+          setFinalError(statement, AllNodesFailedException.fromErrors(this.errors), null, -1);
+        }
       }
     } else {
       NodeResponseCallback nodeResponseCallback =
