@@ -179,7 +179,7 @@ jobs:
 
       - name: Setup environment
         run: |
-          pip3 install https://github.com/scylladb/scylla-ccm/archive/81076bce792a0fb3f2050e4c209a93e4a62ab55f.zip
+          pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
 
       - name: Get cassandra version
         id: cassandra-version
