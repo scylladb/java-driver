@@ -25,7 +25,6 @@ package com.datastax.oss.driver.core.resolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -96,9 +95,6 @@ public class MockResolverIT {
                 .filter(x -> x.toString().contains("test.cluster.fake"))
                 .collect(Collectors.toSet());
         assertThat(filteredNodes).hasSize(1);
-        InetSocketAddress address =
-            (InetSocketAddress) filteredNodes.iterator().next().getEndPoint().resolve();
-        assertTrue(address.isUnresolved());
       }
     }
   }
@@ -172,7 +168,7 @@ public class MockResolverIT {
           nodes.stream()
               .filter(x -> x.toString().contains("test.cluster.fake"))
               .collect(Collectors.toSet());
-      assertThat(filteredNodes).hasSize(1);
+      assertThat(filteredNodes).hasSize(3);
     }
     try (CcmBridge ccmBridge =
         CcmBridge.builder().withNodes(numberOfNodes).withIpPrefix("127.0.1.").build()) {
@@ -412,5 +408,41 @@ public class MockResolverIT {
       session.execute("SELECT * FROM system.local");
     }
     session.close();
+  }
+
+  @Test
+  public void should_connect_when_first_node_is_unavailable() {
+    // Reproduce case when dns first record points to the node that is unresponsive
+    // With RESOLVE_CONTACT_POINTS set to false
+    DriverConfigLoader loader =
+        new DefaultProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
+            .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
+            .withStringList(
+                TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                Collections.singletonList("test.cluster.fake:9042"))
+            .build();
+
+    CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
+    CqlSession session;
+    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).withIpPrefix("127.0.1.").build()) {
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(11));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(3));
+      ccmBridge.create();
+      ccmBridge.start();
+      session = builder.build();
+      SimpleStatement statement =
+          new SimpleStatementBuilder("SELECT * FROM system.local")
+              .setTimeout(Duration.ofSeconds(3))
+              .build();
+      session.execute(statement);
+      ccmBridge.stop(2);
+      session.execute(statement);
+    }
   }
 }

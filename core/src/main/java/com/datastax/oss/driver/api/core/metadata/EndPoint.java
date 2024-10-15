@@ -20,6 +20,7 @@ package com.datastax.oss.driver.api.core.metadata;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.List;
 
 /**
  * Encapsulates the information needed to open connections to a node.
@@ -40,6 +41,13 @@ public interface EndPoint {
   @NonNull
   SocketAddress resolve();
 
+  /**
+   * Resolves this instance to a list of {@link EndPoint}.
+   *
+   * <p>This is called occasionally to resolve unresolved endpoints to their resolved counterparts.
+   */
+  @NonNull
+  List<EndPoint> resolveAll();
   /**
    * Returns an alternate string representation for use in node-level metric names.
    *

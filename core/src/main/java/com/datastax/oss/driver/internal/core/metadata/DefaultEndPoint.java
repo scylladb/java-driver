@@ -18,9 +18,11 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.Serializable;
 import java.net.InetSocketAddress;
+import java.util.List;
 import java.util.Objects;
 
 public class DefaultEndPoint implements EndPoint, Serializable {
@@ -39,6 +41,12 @@ public class DefaultEndPoint implements EndPoint, Serializable {
   @Override
   public InetSocketAddress resolve() {
     return address;
+  }
+
+  @NonNull
+  @Override
+  public List<EndPoint> resolveAll() {
+    return ImmutableList.of(this);
   }
 
   @Override
