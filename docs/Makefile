@@ -24,10 +24,13 @@ setupenv:
 .PHONY: setup
 setup:
 	$(POETRY) install
-	$(POETRY) update
 	@if [ ! -d "$(SOURCEDIR)" ]; then mkdir -p "$(SOURCEDIR)"; fi
 	cp -RL source/* $(SOURCEDIR)
 	cd $(SOURCEDIR) && find . -name README.md -execdir mv '{}' index.md ';'
+
+.PHONY: update
+update:
+	$(POETRY) update
 
 # Clean commands
 .PHONY: pristine
