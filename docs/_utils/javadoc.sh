@@ -14,4 +14,4 @@ fi
 mvn javadoc:javadoc -T 1C
 [ -d $OUTPUT_DIR ] && rm -r $OUTPUT_DIR
 mkdir -p "$OUTPUT_DIR"
-mv -f core/target/site/apidocs/* $OUTPUT_DIR
+mv -f driver-core/target/site/apidocs/* $OUTPUT_DIR
