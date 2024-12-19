@@ -1034,9 +1034,6 @@
             <activation>
                 <jdk>[1.8,)</jdk>
             </activation>
-            <properties>
-                <javadoc.opts>-Xdoclint:none</javadoc.opts>
-            </properties>
             <build>
                 <plugins>
                     <!-- only activate for jdk8+ since requires java 8 -->
@@ -1053,6 +1050,13 @@
                             </execution>
                         </executions>
                     </plugin>
+		    <plugin>
+		      <groupId>org.apache.maven.plugins</groupId>
+		      <artifactId>maven-javadoc-plugin</artifactId>
+		      <configuration combine.self="override">
+			<doclint>none</doclint>
+		      </configuration>
+		    </plugin>
                 </plugins>
             </build>
         </profile>
