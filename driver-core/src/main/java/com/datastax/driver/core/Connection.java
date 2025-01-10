@@ -505,6 +505,9 @@ class Connection {
       public ListenableFuture<Void> apply(Void input) throws Exception {
         ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
         Map<String, String> extraOptions = new HashMap<String, String>();
+
+        DriverConfigurationInfo.build(factory.configuration).addOption(extraOptions);
+
         LwtInfo lwtInfo = getHost().getLwtInfo();
         if (lwtInfo != null) {
           lwtInfo.addOption(extraOptions);
