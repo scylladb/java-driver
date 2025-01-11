@@ -18,9 +18,9 @@ package com.datastax.driver.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaVersion;
 import org.testng.annotations.Test;
 
-@CassandraVersion("4.0.0")
 public class StartupOptionTest extends CCMTestsSupport {
 
   /**
@@ -28,6 +28,7 @@ public class StartupOptionTest extends CCMTestsSupport {
    * DRIVER_VERSION configuration in its option map. This should be reflected in the
    * system_views.clients table.
    */
+  @CassandraVersion("4.0.0")
   @Test(groups = "short")
   public void should_send_driver_name_and_version() {
     ResultSet result =
@@ -38,7 +39,21 @@ public class StartupOptionTest extends CCMTestsSupport {
 
     for (Row row : result) {
       assertThat(row.getString("driver_version")).isEqualTo(Cluster.getDriverVersion());
-      assertThat(row.getString("driver_name")).isEqualTo("DataStax Java Driver");
+      assertThat(row.getString("driver_name")).isEqualTo("ScyllaDB Java Driver");
+    }
+  }
+
+  @ScyllaVersion(minOSS = "5.2.0", minEnterprise = "2019.1")
+  @Test(groups = "short")
+  public void should_send_driver_name_and_version_scylla() {
+    ResultSet result = session().execute("select driver_name, driver_version from system.clients");
+
+    // Should be at least 2 connections (1 control connection, 1 pooled connection)
+    assertThat(result.getAvailableWithoutFetching()).isGreaterThanOrEqualTo(2);
+
+    for (Row row : result) {
+      assertThat(row.getString("driver_version")).isEqualTo(Cluster.getDriverVersion());
+      assertThat(row.getString("driver_name")).isEqualTo("ScyllaDB Java Driver");
     }
   }
 }
