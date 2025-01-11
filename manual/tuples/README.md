@@ -14,7 +14,7 @@ CREATE TABLE ks.collect_things (
 
 ### Fetching Tuples from Rows results
 
-The DataStax Java driver exposes a special [`TupleValue`][TupleValue] class to handle such columns. 
+The driver exposes a special [`TupleValue`][TupleValue] class to handle such columns. 
 [`TupleValue`][TupleValue] exposes getters allowing to extract from the tuple all the data types 
 supported by Cassandra:
 

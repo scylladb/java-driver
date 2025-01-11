@@ -15,7 +15,7 @@ Configuring a `Cluster` works with the *Builder* pattern. The `Builder` takes al
 the configurations into account before building the `Cluster`.
 
 Following are some examples of the most important configurations that were 
-possible with *Astyanax* and how to translate them into *DataStax Java driver*
+possible with *Astyanax* and how to translate them into *ScyllaDB Java driver*
 configurations. Please note that the Java driver has been optimized to handle most use
 cases at best and even though the following sections show how to tune some various 
 options, the driver should provide the best performances with the default configurations 

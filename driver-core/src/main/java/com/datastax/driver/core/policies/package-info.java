@@ -13,7 +13,5 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * Policies that allow to control some of the behavior of the DataStax Java driver for Cassandra.
- */
+/** Policies that allow to control some of the behavior of the ScyllaDB Java driver. */
 package com.datastax.driver.core.policies;
