@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Compile source and tests
         run: mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
@@ -49,7 +49,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Full verify
         run: mvn -B verify -DskipTests
@@ -67,7 +67,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '8'
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Run unit tests
         run: mvn -B test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
@@ -130,7 +130,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '8'
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Setup Python 3
         uses: actions/setup-python@v5
@@ -187,7 +187,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '8'
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Setup Python 3
         uses: actions/setup-python@v5
