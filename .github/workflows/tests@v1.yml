@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Get POM hash
         id: get-pom-hash
@@ -75,7 +75,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
@@ -105,7 +105,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
@@ -164,7 +164,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
@@ -259,7 +259,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java-version }}
-          distribution: 'adopt'
+          distribution: 'temurin'
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
