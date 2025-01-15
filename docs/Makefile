@@ -23,7 +23,7 @@ setupenv:
 
 .PHONY: setup
 setup:
-	$(POETRY) install
+	$(POETRY) install --no-root
 	$(POETRY) update
 	@if [ ! -d "$(SOURCEDIR)" ]; then mkdir -p "$(SOURCEDIR)"; fi
 	cp -RL source/* $(SOURCEDIR)
