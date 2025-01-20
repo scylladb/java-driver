@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -61,16 +62,17 @@ public class CcmBridge implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CcmBridge.class);
 
-  public static final Version VERSION =
-      Objects.requireNonNull(Version.parse(System.getProperty("ccm.version", "4.0.0")));
+  public static final Boolean SCYLLA_ENABLEMENT = Boolean.getBoolean("ccm.scylla");
+
+  public static final String CCM_VERSION_PROPERTY = System.getProperty("ccm.version", "4.0.0");
+
+  public static final Version VERSION = Objects.requireNonNull(parseCcmVersion());
 
   public static final String INSTALL_DIRECTORY = System.getProperty("ccm.directory");
 
   public static final String BRANCH = System.getProperty("ccm.branch");
 
   public static final Boolean DSE_ENABLEMENT = Boolean.getBoolean("ccm.dse");
-
-  public static final Boolean SCYLLA_ENABLEMENT = Boolean.getBoolean("ccm.scylla");
 
   public static final Boolean SCYLLA_ENTERPRISE =
       String.valueOf(VERSION.getMajor()).matches("\\d{4}");
@@ -232,6 +234,45 @@ public class CcmBridge implements AutoCloseable {
     return System.getProperty("os.name", "").toLowerCase(Locale.US).contains("win");
   }
 
+  private static Version parseCcmVersion() {
+    String versionString = CCM_VERSION_PROPERTY;
+    Version result = null;
+    try {
+      result = Version.parse(versionString);
+      return result;
+    } catch (IllegalArgumentException ex) {
+      LOG.warn(
+          "Failed to parse ccm.version property \'{}\' as Version instance. Attempting to fetch it through \'ccm node versionfrombuild\'",
+          versionString);
+    }
+    Path configDir = null;
+    try {
+      configDir = Files.createTempDirectory("ccmParseVer");
+      configDir.toFile().deleteOnExit();
+      execute(
+          CommandLine.parse(
+              String.format(
+                  "ccm create get_version -n 1 %s --version %s --config-dir=%s",
+                  (SCYLLA_ENABLEMENT ? "--scylla" : " "), versionString, configDir)));
+      String output =
+          execute(
+              CommandLine.parse(
+                  String.format("ccm node1 versionfrombuild --config-dir=%s", configDir)));
+      result = Version.parse(output.trim());
+      LOG.info("Cluster reports that {} corresponds to version {}", versionString, result);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      try {
+        if (configDir != null) {
+          execute(CommandLine.parse("ccm remove get_version --config-dir=" + configDir));
+        }
+      } catch (Exception ignored) {
+      }
+    }
+    return result;
+  }
+
   public Optional<Version> getScyllaVersion() {
     return SCYLLA_ENABLEMENT ? Optional.of(VERSION) : Optional.empty();
   }
@@ -264,7 +305,15 @@ public class CcmBridge implements AutoCloseable {
     }
   }
 
-  private String getCcmVersionString(Version version) {
+  private String getCcmVersionString(String propertyString) {
+    Version version = null;
+    try {
+      version = Version.parse(propertyString);
+    } catch (IllegalArgumentException ex) {
+      // In case it's not a recognized version pattern, use raw string.
+      // If parseCcmVersion has not failed execution it should be usable.
+      return propertyString;
+    }
     if (SCYLLA_ENABLEMENT) {
       // Scylla OSS versions before 5.1 had RC versioning scheme of 5.0.rc3.
       // Scylla OSS versions after (and including 5.1) have RC versioning of 5.1.0-rc3.
@@ -307,7 +356,7 @@ public class CcmBridge implements AutoCloseable {
         createOptions.add("-v git:" + BRANCH.trim().replaceAll("\"", ""));
 
       } else {
-        createOptions.add("-v " + getCcmVersionString(VERSION));
+        createOptions.add("-v " + getCcmVersionString(CCM_VERSION_PROPERTY));
       }
       if (DSE_ENABLEMENT) {
         createOptions.add("--dse");
@@ -497,21 +546,25 @@ public class CcmBridge implements AutoCloseable {
     execute(CommandLine.parse(command));
   }
 
-  private void execute(CommandLine cli) {
-    LOG.info("Executing: " + cli);
+  private static String execute(CommandLine cli) {
+    Logger logger = CcmBridge.LOG;
+    logger.info("Executing: " + cli);
     ExecuteWatchdog watchDog = new ExecuteWatchdog(TimeUnit.MINUTES.toMillis(10));
+    StringWriter sw = new StringWriter();
     try (LogOutputStream outStream =
             new LogOutputStream() {
               @Override
               protected void processLine(String line, int logLevel) {
-                LOG.info("ccmout> {}", line);
+                logger.info("ccmout> {}", line);
+                sw.append(line).append(System.lineSeparator());
               }
             };
         LogOutputStream errStream =
             new LogOutputStream() {
               @Override
               protected void processLine(String line, int logLevel) {
-                LOG.error("ccmerr> {}", line);
+                logger.error("ccmerr> {}", line);
+                sw.append(line).append(System.lineSeparator());
               }
             }) {
       Executor executor = new DefaultExecutor();
@@ -521,7 +574,8 @@ public class CcmBridge implements AutoCloseable {
 
       int retValue = executor.execute(cli, ENVIRONMENT_MAP);
       if (retValue != 0) {
-        LOG.error("Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
+        logger.error(
+            "Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
       }
     } catch (IOException ex) {
       if (watchDog.killedProcess()) {
@@ -530,6 +584,7 @@ public class CcmBridge implements AutoCloseable {
         throw new RuntimeException("The command '" + cli + "' failed to execute", ex);
       }
     }
+    return sw.toString();
   }
 
   @Override
