@@ -52,7 +52,15 @@ public class StateListenerTest extends CCMTestsSupport {
     ccm().start(1);
     listener.waitForEvent();
 
-    listener.setExpectedEvent(REMOVE);
+    // Different expectation for Scylla versions since 6.0.0 and 2024.2, both included
+    VersionNumber scyllaVer = ccm().getScyllaVersion();
+    if (scyllaVer != null
+        && ((scyllaVer.getMajor() >= 6 && scyllaVer.getMajor() <= 9)
+            || (scyllaVer.getMajor() >= 2024 && scyllaVer.getMinor() >= 2))) {
+      listener.setExpectedEvent(DOWN);
+    } else {
+      listener.setExpectedEvent(REMOVE);
+    }
     ccm().decommission(2);
     listener.waitForEvent();
   }

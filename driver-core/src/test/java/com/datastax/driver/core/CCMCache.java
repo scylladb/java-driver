@@ -65,6 +65,11 @@ public class CCMCache {
     }
 
     @Override
+    public VersionNumber getScyllaVersion() {
+      return ccm.getScyllaVersion();
+    }
+
+    @Override
     public File getCcmDir() {
       return ccm.getCcmDir();
     }

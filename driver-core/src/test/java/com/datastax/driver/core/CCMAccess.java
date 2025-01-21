@@ -54,6 +54,13 @@ public interface CCMAccess extends Closeable {
    */
   VersionNumber getDSEVersion();
 
+  /**
+   * Returns the Scylla version of this CCM cluster if this is a Scylla cluster, otherwise null.
+   *
+   * @return The version of this CCM cluster.
+   */
+  VersionNumber getScyllaVersion();
+
   /** @return The config directory for this CCM cluster. */
   File getCcmDir();
 

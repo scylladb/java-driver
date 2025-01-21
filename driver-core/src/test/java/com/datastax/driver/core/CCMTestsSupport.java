@@ -111,6 +111,11 @@ public class CCMTestsSupport {
     }
 
     @Override
+    public VersionNumber getScyllaVersion() {
+      return delegate.getScyllaVersion();
+    }
+
+    @Override
     public InetSocketAddress addressOfNode(int n) {
       return delegate.addressOfNode(n);
     }

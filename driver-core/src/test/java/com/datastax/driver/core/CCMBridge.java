@@ -368,6 +368,8 @@ public class CCMBridge implements CCMAccess {
 
   private final VersionNumber dseVersion;
 
+  private final VersionNumber scyllaVersion;
+
   private final int storagePort;
 
   private final int thriftPort;
@@ -402,6 +404,7 @@ public class CCMBridge implements CCMAccess {
       String clusterName,
       VersionNumber cassandraVersion,
       VersionNumber dseVersion,
+      VersionNumber scyllaVersion,
       String ipPrefix,
       int storagePort,
       int thriftPort,
@@ -415,6 +418,7 @@ public class CCMBridge implements CCMAccess {
     this.clusterName = clusterName;
     this.cassandraVersion = cassandraVersion;
     this.dseVersion = dseVersion;
+    this.scyllaVersion = scyllaVersion;
     this.ipPrefix = ipPrefix;
     this.storagePort = storagePort;
     this.thriftPort = thriftPort;
@@ -487,6 +491,11 @@ public class CCMBridge implements CCMAccess {
   @Override
   public VersionNumber getDSEVersion() {
     return dseVersion;
+  }
+
+  @Override
+  public VersionNumber getScyllaVersion() {
+    return scyllaVersion;
   }
 
   @Override
@@ -1000,6 +1009,7 @@ public class CCMBridge implements CCMAccess {
     private int[] jmxPorts = {};
     private boolean start = true;
     private boolean dse = isDse();
+    private boolean scylla = GLOBAL_SCYLLA_VERSION_NUMBER != null;
     private boolean startSniProxy = false;
     private VersionNumber version = null;
     private final Set<String> createOptions = new LinkedHashSet<String>();
@@ -1091,8 +1101,8 @@ public class CCMBridge implements CCMAccess {
     }
 
     /**
-     * The Cassandra or DSE version to use. If not specified the globally configured version is used
-     * instead.
+     * The Cassandra or DSE or Scylla version to use. If not specified the globally configured
+     * version is used instead.
      */
     public Builder withVersion(VersionNumber version) {
       this.version = version;
@@ -1102,6 +1112,12 @@ public class CCMBridge implements CCMAccess {
     /** Indicates whether or not this cluster is meant to be a DSE cluster. */
     public Builder withDSE(boolean dse) {
       this.dse = dse;
+      return this;
+    }
+
+    /** Indicates whether or not this cluster is meant to be a Scylla cluster. */
+    public Builder withScylla(boolean scylla) {
+      this.scylla = scylla;
       return this;
     }
 
@@ -1175,17 +1191,26 @@ public class CCMBridge implements CCMAccess {
 
       VersionNumber dseVersion;
       VersionNumber cassandraVersion;
+      VersionNumber scyllaVersion;
       boolean versionConfigured = this.version != null;
       // No version was explicitly provided, fallback on global config.
       if (!versionConfigured) {
+        scyllaVersion = GLOBAL_SCYLLA_VERSION_NUMBER;
         dseVersion = GLOBAL_DSE_VERSION_NUMBER;
         cassandraVersion = GLOBAL_CASSANDRA_VERSION_NUMBER;
       } else if (dse) {
         // given version is the DSE version, base cassandra version on DSE version.
+        scyllaVersion = null;
         dseVersion = this.version;
         cassandraVersion = getCassandraVersion(dseVersion);
+      } else if (scylla) {
+        scyllaVersion = this.version;
+        dseVersion = null;
+        // Versions from 5.1 to 6.2.0 seem to report release_version 3.0.8 in system_local
+        cassandraVersion = VersionNumber.parse("3.0.8");
       } else {
         // given version is cassandra version.
+        scyllaVersion = null;
         dseVersion = null;
         cassandraVersion = this.version;
       }
@@ -1240,6 +1265,7 @@ public class CCMBridge implements CCMAccess {
               clusterName,
               cassandraVersion,
               dseVersion,
+              scyllaVersion,
               ipPrefix,
               storagePort,
               thriftPort,
@@ -1449,6 +1475,7 @@ public class CCMBridge implements CCMAccess {
 
       if (ipPrefix != builder.ipPrefix) return false;
       if (dse != builder.dse) return false;
+      if (scylla != builder.scylla) return false;
       if (!Arrays.equals(nodes, builder.nodes)) return false;
       if (version != null ? !version.equals(builder.version) : builder.version != null)
         return false;
