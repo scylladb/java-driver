@@ -18,3 +18,7 @@ notes
 /driver-core/dependency-reduced-pom.xml
 .java-version
 
+## Leftovers from scylla-4.x
+
+bom/
+core-shaded/
