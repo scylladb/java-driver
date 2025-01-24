@@ -53,10 +53,12 @@ public class StateListenerTest extends CCMTestsSupport {
     listener.waitForEvent();
 
     // Different expectation for Scylla versions since 6.0.0 and 2024.2, both included
+    VersionNumber minOss = VersionNumber.parse("6.0.0");
+    VersionNumber minEnterprise = VersionNumber.parse("2024.2");
     VersionNumber scyllaVer = ccm().getScyllaVersion();
-    if (scyllaVer != null
-        && ((scyllaVer.getMajor() >= 6 && scyllaVer.getMajor() <= 9)
-            || (scyllaVer.getMajor() >= 2024 && scyllaVer.getMinor() >= 2))) {
+    boolean isEnterprise = scyllaVer.getMajor() >= 2017;
+    if ((isEnterprise && scyllaVer.compareTo(minEnterprise) >= 0)
+        || (!isEnterprise && scyllaVer.compareTo(minOss) >= 0)) {
       listener.setExpectedEvent(DOWN);
     } else {
       listener.setExpectedEvent(REMOVE);
