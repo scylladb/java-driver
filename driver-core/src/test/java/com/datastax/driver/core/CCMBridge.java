@@ -258,6 +258,14 @@ public class CCMBridge implements CCMAccess {
           GLOBAL_DSE_VERSION_NUMBER,
           GLOBAL_CASSANDRA_VERSION_NUMBER,
           CASSANDRA_INSTALL_ARGS);
+    } else if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
+      GLOBAL_CASSANDRA_VERSION_NUMBER = VersionNumber.parse(inputCassandraVersion);
+      GLOBAL_DSE_VERSION_NUMBER = null;
+      logger.info(
+          "Tests requiring CCM will by default use Scylla version {} and report Cassandra version {} when asked specifically for it (install arguments: {})",
+          GLOBAL_SCYLLA_VERSION_NUMBER,
+          GLOBAL_CASSANDRA_VERSION_NUMBER,
+          CASSANDRA_INSTALL_ARGS);
     } else {
       GLOBAL_CASSANDRA_VERSION_NUMBER = VersionNumber.parse(inputCassandraVersion);
       GLOBAL_DSE_VERSION_NUMBER = null;
@@ -358,6 +366,10 @@ public class CCMBridge implements CCMAccess {
           "Failed to parse scylla.version: " + versionString + ". Trying to get it through CCM.",
           e);
       parsedScyllaVersionNumber = getScyllaVersionThroughCcm(versionString);
+      logger.info(
+          String.format(
+              "Version string %s corresponds here to version number %s",
+              versionString, parsedScyllaVersionNumber));
     }
     return parsedScyllaVersionNumber;
   }
