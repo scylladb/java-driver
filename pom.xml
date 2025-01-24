@@ -88,6 +88,7 @@
         <logback.version>1.2.13</logback.version>
         <byteman.version>3.0.8</byteman.version>
         <burningwave.tools.version>0.26.2</burningwave.tools.version>
+        <surefire.version>3.0.0-M6</surefire.version>
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
@@ -732,7 +733,7 @@
 
                 <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.0.0-M6</version>
+                    <version>${surefire.version}</version>
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
@@ -759,6 +760,13 @@
                             </property>
                         </properties>
                     </configuration>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.maven.surefire</groupId>
+                            <artifactId>surefire-testng</artifactId>
+                            <version>${surefire.version}</version>
+                        </dependency>
+                    </dependencies>
                 </plugin>
 
                 <plugin>
