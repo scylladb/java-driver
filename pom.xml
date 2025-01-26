@@ -25,7 +25,7 @@
 
     <groupId>com.scylladb</groupId>
     <artifactId>scylla-driver-parent</artifactId>
-    <version>3.11.5.4</version>
+    <version>3.11.5.5-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Java Driver for Scylla and Apache Cassandra</name>
     <description>
@@ -50,7 +50,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <cassandra.version>3.11.2</cassandra.version>
-        <scylla.version />
+        <scylla.version/>
         <java.version>1.8</java.version>
         <log4j.version>1.2.17</log4j.version>
         <slf4j.version>1.7.25</slf4j.version>
@@ -1142,7 +1142,7 @@
         <connection>scm:git:https://github.com/scylladb/java-driver</connection>
         <developerConnection>scm:git:https://github.com/scylladb/java-driver</developerConnection>
         <url>https://github.com/scylladb/java-driver</url>
-        <tag>3.11.5.4</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <developers>
