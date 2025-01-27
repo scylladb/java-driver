@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * A wrapper load balancing policy that adds token awareness to a child policy.
@@ -250,7 +251,7 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
 
       if (replicaOrdering == ReplicaOrdering.RANDOM) {
         List<Host> replicasList = Lists.newArrayList(replicas);
-        Collections.shuffle(replicasList);
+        Collections.shuffle(replicasList, ThreadLocalRandom.current());
         replicasIterator = replicasList.iterator();
       } else {
         replicasIterator = replicas.iterator();
