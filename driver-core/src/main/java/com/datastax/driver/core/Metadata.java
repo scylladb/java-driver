@@ -156,12 +156,12 @@ public class Metadata {
               new TabletMapListener(tabletMap) {
                 @Override
                 public void onRegister(Cluster cluster) {
-                  logger.info("Registered event listener for tablet map.");
+                  logger.debug("Registered event listener for tablet map.");
                 }
 
                 @Override
                 public void onUnregister(Cluster cluster) {
-                  logger.info("Unregistered tablet map's event listener.");
+                  logger.debug("Unregistered tablet map's event listener.");
                 }
               });
     }
