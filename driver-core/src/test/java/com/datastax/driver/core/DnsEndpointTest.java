@@ -7,11 +7,17 @@ import java.net.InetSocketAddress;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-public class DnsEndpointTests {
+public class DnsEndpointTest {
 
-  private static final Logger logger = LoggerFactory.getLogger(DnsEndpointTests.class);
+  private static final Logger logger = LoggerFactory.getLogger(DnsEndpointTest.class);
+
+  @AfterClass(alwaysRun = true)
+  public void clearMocks() {
+    MappedHostResolverProvider.unsetResolver();
+  }
 
   @Test(groups = "long")
   public void replace_cluster_test() {

@@ -18,6 +18,15 @@ public class MappedHostResolverProvider {
     return true;
   }
 
+  public static synchronized boolean unsetResolver() {
+    if (resolver == null) {
+      return false;
+    }
+    resolver = null;
+    HostResolutionRequestInterceptor.INSTANCE.uninstall();
+    return true;
+  }
+
   public static synchronized void addResolverEntry(String hostname, String address) {
     if (resolver == null) {
       setResolver(new MappedHostResolver());
