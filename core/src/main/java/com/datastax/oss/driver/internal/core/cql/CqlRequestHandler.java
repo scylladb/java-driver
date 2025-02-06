@@ -355,7 +355,7 @@ public class CqlRequestHandler implements Throttled {
         || (channel =
                 session.getChannel(
                     node,
-                    logPrefix,
+                    handlerLogPrefix,
                     getRoutingToken(statement),
                     getShardFromTabletMap(statement, node, getRoutingToken(statement))))
             == null) {
@@ -363,7 +363,7 @@ public class CqlRequestHandler implements Throttled {
         channel =
             session.getChannel(
                 node,
-                logPrefix,
+                handlerLogPrefix,
                 getRoutingToken(statement),
                 getShardFromTabletMap(statement, node, getRoutingToken(statement)));
         if (channel != null) {

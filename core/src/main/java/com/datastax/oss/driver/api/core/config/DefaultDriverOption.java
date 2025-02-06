@@ -1065,7 +1065,6 @@ public enum DefaultDriverOption implements DriverOption {
   LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS(
       "advanced.load-balancing-policy.dc-failover.preferred-remote-dcs"),
 
-
   /**
    * The default routing method to use for LWT (Lightweight Transaction) requests. REGULAR uses the
    * standard load balancing algorithm with slow replica avoidance and shuffling.
