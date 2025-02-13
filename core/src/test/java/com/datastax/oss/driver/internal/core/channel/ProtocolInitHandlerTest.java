@@ -434,7 +434,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Query.class);
     Query query = (Query) requestFrame.message;
-    assertThat(query.query).isEqualTo("SELECT cluster_name FROM system.local");
+    assertThat(query.query).isEqualTo("SELECT cluster_name FROM system.local WHERE key='local'");
     assertThat(connectFuture).isNotDone();
 
     writeInboundFrame(requestFrame, TestResponses.clusterNameResponse("expectedClusterName"));

@@ -170,7 +170,8 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
 
     savePort(channel);
 
-    CompletionStage<AdminResult> localQuery = query(channel, "SELECT * FROM system.local");
+    CompletionStage<AdminResult> localQuery =
+        query(channel, "SELECT * FROM system.local WHERE key='local'");
     CompletionStage<AdminResult> peersV2Query = query(channel, "SELECT * FROM system.peers_v2");
     CompletableFuture<AdminResult> peersQuery = new CompletableFuture<>();
 

@@ -83,7 +83,7 @@ import org.slf4j.LoggerFactory;
 class ProtocolInitHandler extends ConnectInitHandler {
   private static final Logger LOG = LoggerFactory.getLogger(ProtocolInitHandler.class);
   private static final Query CLUSTER_NAME_QUERY =
-      new Query("SELECT cluster_name FROM system.local");
+      new Query("SELECT cluster_name FROM system.local WHERE key='local'");
 
   private final InternalDriverContext context;
   private final long timeoutMillis;
