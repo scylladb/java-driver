@@ -337,7 +337,7 @@ public class DefaultTopologyMonitorTest {
     AdminRow peer3 = mockPeersRow(3, UUID.randomUUID());
     AdminRow peer2 = mockPeersRow(2, node2.getHostId());
     topologyMonitor.stubQueries(
-        new StubbedQuery("SELECT * FROM system.local", mockResult(local)),
+        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult(local)),
         new StubbedQuery("SELECT * FROM system.peers_v2", Collections.emptyMap(), null, true),
         new StubbedQuery("SELECT * FROM system.peers", mockResult(peer3, peer2)));
 
@@ -447,7 +447,7 @@ public class DefaultTopologyMonitorTest {
     AdminRow peer2 = mockPeersRow(2, node2.getHostId());
     AdminRow peer1 = mockPeersRow(1, node2.getHostId()); // invalid
     topologyMonitor.stubQueries(
-        new StubbedQuery("SELECT * FROM system.local", mockResult(local)),
+        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult(local)),
         new StubbedQuery("SELECT * FROM system.peers_v2", Collections.emptyMap(), null, true),
         new StubbedQuery("SELECT * FROM system.peers", mockResult(peer3, peer2, peer1)));
 
@@ -478,7 +478,7 @@ public class DefaultTopologyMonitorTest {
     AdminRow peer2 = mockPeersRow(2, node2.getHostId());
     AdminRow peer1 = mockPeersRow(1, node2.getHostId()); // invalid
     topologyMonitor.stubQueries(
-        new StubbedQuery("SELECT * FROM system.local", mockResult(local)),
+        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult(local)),
         new StubbedQuery("SELECT * FROM system.peers_v2", mockResult(peer3, peer2, peer1)));
 
     // When

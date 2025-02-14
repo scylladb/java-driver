@@ -76,8 +76,8 @@ public class ProtocolVersionMixedClusterIT {
       assertThat(protocolQueries(contactPoint, 4))
           .containsExactly(
               // Initial connection with protocol v4
-              "SELECT cluster_name FROM system.local",
-              "SELECT * FROM system.local",
+              "SELECT cluster_name FROM system.local WHERE key='local'",
+              "SELECT * FROM system.local WHERE key='local'",
               "SELECT * FROM system.peers_v2",
               "SELECT * FROM system.peers");
     }
@@ -104,8 +104,8 @@ public class ProtocolVersionMixedClusterIT {
       assertThat(protocolQueries(contactPoint, 4))
           .containsExactly(
               // Initial connection with protocol v4
-              "SELECT cluster_name FROM system.local",
-              "SELECT * FROM system.local",
+              "SELECT cluster_name FROM system.local WHERE key='local'",
+              "SELECT * FROM system.local WHERE key='local'",
               "SELECT * FROM system.peers_v2",
               "SELECT * FROM system.peers");
     }
@@ -155,8 +155,8 @@ public class ProtocolVersionMixedClusterIT {
       assertThat(protocolQueries(contactPoint, 4))
           .containsExactly(
               // Initial connection with protocol v4
-              "SELECT cluster_name FROM system.local",
-              "SELECT * FROM system.local",
+              "SELECT cluster_name FROM system.local WHERE key='local'",
+              "SELECT * FROM system.local WHERE key='local'",
               "SELECT * FROM system.peers_v2",
               "SELECT * FROM system.peers");
 

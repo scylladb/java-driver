@@ -92,7 +92,7 @@ public class ZeroTokenNodesIT {
 
       Set<String> landedOn = new HashSet<>();
       for (int i = 0; i < 30; i++) {
-        ResultSet rs = session.execute("SELECT * FROM system.local");
+        ResultSet rs = session.execute("SELECT * FROM system.local WHERE key='local'");
         InetAddress broadcastRpcInetAddress =
             Objects.requireNonNull(rs.one()).getInetAddress("rpc_address");
         landedOn.add(Objects.requireNonNull(broadcastRpcInetAddress).toString());
@@ -130,7 +130,7 @@ public class ZeroTokenNodesIT {
 
       Set<String> landedOn = new HashSet<>();
       for (int i = 0; i < 30; i++) {
-        ResultSet rs = session.execute("SELECT * FROM system.local");
+        ResultSet rs = session.execute("SELECT * FROM system.local WHERE key='local'");
         InetAddress broadcastRpcInetAddress =
             Objects.requireNonNull(rs.one()).getInetAddress("rpc_address");
         landedOn.add(Objects.requireNonNull(broadcastRpcInetAddress).toString());
@@ -201,7 +201,7 @@ public class ZeroTokenNodesIT {
 
       Set<String> landedOn = new HashSet<>();
       for (int i = 0; i < 30; i++) {
-        ResultSet rs = session.execute("SELECT * FROM system.local");
+        ResultSet rs = session.execute("SELECT * FROM system.local WHERE key='local'");
         InetAddress broadcastRpcInetAddress =
             Objects.requireNonNull(rs.one()).getInetAddress("rpc_address");
         landedOn.add(Objects.requireNonNull(broadcastRpcInetAddress).toString());
