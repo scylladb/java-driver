@@ -312,7 +312,7 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
               .equals(cluster().manager.controlConnection.connectionRef.get().endPoint);
       Row row;
       if (isControlHost) {
-        row = session().execute("select tokens from system.local").one();
+        row = session().execute("select tokens from system.local where key='local'").one();
       } else {
         // non-control hosts are populated from system.peers and their broadcast address should be
         // known

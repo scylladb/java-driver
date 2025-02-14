@@ -91,7 +91,7 @@ public class ReusedStreamIdTest extends CCMTestsSupport {
           }
           semaphore.acquire();
           final String column = columnsToGrab.get(i % columnsToGrab.size()).getName();
-          String query = String.format("select %s from system.local", column);
+          String query = String.format("select %s from system.local where key='local'", column);
           ResultSetFuture future = session().executeAsync(query);
 
           GuavaCompatibility.INSTANCE.addCallback(

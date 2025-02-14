@@ -25,7 +25,8 @@ public class DelegatingClusterIntegrationTest extends CCMTestsSupport {
   public void should_allow_subclass_to_delegate_to_other_instance() {
     SimpleDelegatingCluster delegatingCluster = new SimpleDelegatingCluster(cluster());
 
-    ResultSet rs = delegatingCluster.connect().execute("select * from system.local");
+    ResultSet rs =
+        delegatingCluster.connect().execute("select * from system.local where key='local'");
 
     assertThat(rs.all()).hasSize(1);
   }

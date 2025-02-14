@@ -84,7 +84,7 @@ public class MapperAccessorTest extends CCMTestsSupport {
   @SuppressWarnings("unused")
   @Accessor
   public interface SystemAccessor {
-    @Query("select release_version from system.local")
+    @Query("select release_version from system.local where key='local'")
     ResultSet getCassandraVersion();
   }
 
