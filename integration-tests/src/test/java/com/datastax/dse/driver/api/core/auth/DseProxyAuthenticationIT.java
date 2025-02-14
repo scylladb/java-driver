@@ -114,7 +114,7 @@ public class DseProxyAuthenticationIT {
             .addContactEndPoints(ads.ccm.getContactPoints())
             .withAuthCredentials("ben", "fakePasswordForBen", "alice")
             .build()) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 

@@ -53,7 +53,7 @@ public class ProgrammaticSslIT {
                 .addContactEndPoints(CCM_RULE.getContactPoints())
                 .withSslEngineFactory(factory)
                 .build()) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -66,7 +66,7 @@ public class ProgrammaticSslIT {
                 .addContactEndPoints(CCM_RULE.getContactPoints())
                 .withSslContext(sslContext)
                 .build()) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 

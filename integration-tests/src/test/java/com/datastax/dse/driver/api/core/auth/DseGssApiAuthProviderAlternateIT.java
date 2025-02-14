@@ -74,7 +74,7 @@ public class DseGssApiAuthProviderAlternateIT {
                         "keyTab",
                         ads.getUserKeytab().getAbsolutePath()))
                 .build())) {
-      Row row = session.execute("select * from system.local").one();
+      Row row = session.execute("select * from system.local where key='local'").one();
       assertThat(row).isNotNull();
     } finally {
       System.clearProperty(saslSystemProperty);
@@ -104,7 +104,7 @@ public class DseGssApiAuthProviderAlternateIT {
                         "keyTab",
                         ads.getUserKeytab().getAbsolutePath()))
                 .build())) {
-      Row row = session.execute("select * from system.local").one();
+      Row row = session.execute("select * from system.local where key='local'").one();
       assertThat(row).isNotNull();
     }
   }

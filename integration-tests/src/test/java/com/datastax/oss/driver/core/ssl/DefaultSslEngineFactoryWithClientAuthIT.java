@@ -59,7 +59,7 @@ public class DefaultSslEngineFactoryWithClientAuthIT {
                 CcmBridge.DEFAULT_CLIENT_TRUSTSTORE_PASSWORD)
             .build();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -77,7 +77,7 @@ public class DefaultSslEngineFactoryWithClientAuthIT {
                 CcmBridge.DEFAULT_CLIENT_TRUSTSTORE_PASSWORD)
             .build();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 }

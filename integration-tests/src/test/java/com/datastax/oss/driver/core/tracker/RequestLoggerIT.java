@@ -84,7 +84,7 @@ public class RequestLoggerIT {
   private static final Predicate<String> WITH_EXECUTION_PREFIX =
       log -> LOG_PREFIX_WITH_EXECUTION_NUMBER.matcher(log).lookingAt();
 
-  private static final String QUERY = "SELECT release_version FROM system.local";
+  private static final String QUERY = "SELECT release_version FROM system.local WHERE key='local'";
 
   private final SimulacronRule simulacronRule =
       new SimulacronRule(ClusterSpec.builder().withNodes(3));

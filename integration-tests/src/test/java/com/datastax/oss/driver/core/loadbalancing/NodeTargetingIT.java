@@ -78,7 +78,8 @@ public class NodeTargetingIT {
       Node node = getNode(nodeIndex);
 
       // given a statement with node explicitly set.
-      Statement statement = SimpleStatement.newInstance("select * system.local").setNode(node);
+      Statement statement =
+          SimpleStatement.newInstance("select * system.local WHERE key='local'").setNode(node);
 
       // when statement is executed
       ResultSet result = SESSION_RULE.session().execute(statement);
@@ -114,7 +115,8 @@ public class NodeTargetingIT {
     // given a statement with node explicitly set that for which we have no active pool.
     Node node4 = getNode(4);
 
-    Statement statement = SimpleStatement.newInstance("select * system.local").setNode(node4);
+    Statement statement =
+        SimpleStatement.newInstance("select * system.local WHERE key='local'").setNode(node4);
     try {
       // when statement is executed
       SESSION_RULE.session().execute(statement);

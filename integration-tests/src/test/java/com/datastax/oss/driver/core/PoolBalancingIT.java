@@ -99,7 +99,7 @@ public class PoolBalancingIT {
       }
       SESSION_RULE
           .session()
-          .executeAsync("SELECT release_version FROM system.local")
+          .executeAsync("SELECT release_version FROM system.local WHERE key='local'")
           .whenComplete(this::reschedule);
     }
   }

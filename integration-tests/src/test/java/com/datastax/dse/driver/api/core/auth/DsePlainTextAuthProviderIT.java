@@ -73,7 +73,7 @@ public class DsePlainTextAuthProviderIT {
                 .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, "cassandra")
                 .withClass(DefaultDriverOption.AUTH_PROVIDER_CLASS, PlainTextAuthProvider.class)
                 .build())) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -84,7 +84,7 @@ public class DsePlainTextAuthProviderIT {
             .addContactEndPoints(ccm.getContactPoints())
             .withAuthCredentials("cassandra", "cassandra")
             .build()) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 

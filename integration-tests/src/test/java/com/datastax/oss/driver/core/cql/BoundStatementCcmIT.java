@@ -312,7 +312,7 @@ public class BoundStatementCcmIT {
     int mockPageSize = 2000;
 
     SimpleStatementBuilder simpleStatementBuilder =
-        SimpleStatement.builder("SELECT release_version FROM system.local")
+        SimpleStatement.builder("SELECT release_version FROM system.local WHERE key='local'")
             .setExecutionProfile(mockProfile)
             .setPagingState(mockPagingState)
             .setKeyspace(mockKeyspace)

@@ -61,7 +61,7 @@ public class DriverExecutionProfileSimulacronIT {
   public void should_fail_if_config_profile_specified_doesnt_exist() {
     try (CqlSession session = SessionUtils.newSession(SIMULACRON_RULE)) {
       SimpleStatement statement =
-          SimpleStatement.builder("select * from system.local")
+          SimpleStatement.builder("select * from system.local where key='local'")
               .setExecutionProfileName("IDONTEXIST")
               .build();
 
