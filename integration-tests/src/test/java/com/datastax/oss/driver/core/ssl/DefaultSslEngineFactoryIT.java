@@ -53,7 +53,7 @@ public class DefaultSslEngineFactoryIT {
             .build();
 
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -72,7 +72,7 @@ public class DefaultSslEngineFactoryIT {
                 CcmBridge.DEFAULT_CLIENT_TRUSTSTORE_PASSWORD)
             .build();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -84,14 +84,14 @@ public class DefaultSslEngineFactoryIT {
             .withBoolean(DefaultDriverOption.SSL_HOSTNAME_VALIDATION, false)
             .build();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
   @Test(expected = AllNodesFailedException.class)
   public void should_not_connect_if_not_using_ssl() {
     try (CqlSession session = SessionUtils.newSession(CCM_RULE)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 }

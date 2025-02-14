@@ -60,7 +60,7 @@ public class QueryTraceIT {
     ExecutionInfo executionInfo =
         SESSION_RULE
             .session()
-            .execute("SELECT release_version FROM system.local")
+            .execute("SELECT release_version FROM system.local WHERE key='local'")
             .getExecutionInfo();
 
     assertThat(executionInfo.getTracingId()).isNull();
@@ -78,7 +78,8 @@ public class QueryTraceIT {
         SESSION_RULE
             .session()
             .execute(
-                SimpleStatement.builder("SELECT release_version FROM system.local")
+                SimpleStatement.builder(
+                        "SELECT release_version FROM system.local WHERE key='local'")
                     .setTracing()
                     .build())
             .getExecutionInfo();
@@ -115,7 +116,7 @@ public class QueryTraceIT {
     assertThat(queryTrace.getParameters())
         .containsEntry("consistency_level", "LOCAL_ONE")
         .containsEntry("page_size", "5000")
-        .containsEntry("query", "SELECT release_version FROM system.local")
+        .containsEntry("query", "SELECT release_version FROM system.local WHERE key='local'")
         .containsEntry("serial_consistency_level", "SERIAL");
     assertThat(queryTrace.getStartedAt()).isPositive();
     // Don't want to get too deep into event testing because that could change across versions

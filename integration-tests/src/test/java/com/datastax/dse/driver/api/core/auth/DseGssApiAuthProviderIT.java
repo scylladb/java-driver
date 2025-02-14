@@ -50,7 +50,7 @@ public class DseGssApiAuthProviderIT {
   @Test
   public void should_authenticate_using_kerberos_with_keytab() {
     try (CqlSession session = ads.newKeyTabSession()) {
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       assertThat(set).isNotNull();
     }
   }
@@ -67,7 +67,7 @@ public class DseGssApiAuthProviderIT {
     Assume.assumeTrue(isUnix);
     acquireTicket(ads.getUserPrincipal(), ads.getUserKeytab(), ads.getAdsServer());
     try (CqlSession session = ads.newTicketSession()) {
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       assertThat(set).isNotNull();
     } finally {
       destroyTicket(ads);
@@ -133,7 +133,7 @@ public class DseGssApiAuthProviderIT {
             .withAuthProvider(new ProgrammaticDseGssApiAuthProvider(builder.build()))
             .build()) {
 
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       assertThat(set).isNotNull();
     }
   }

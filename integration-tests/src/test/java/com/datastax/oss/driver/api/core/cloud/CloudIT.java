@@ -80,7 +80,7 @@ public class CloudIT {
             .withAuthCredentials("cassandra", "cassandra")
             .withCloudSecureConnectBundle(bundle)
             .build()) {
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -96,7 +96,7 @@ public class CloudIT {
             .withAuthCredentials("cassandra", "cassandra")
             .withCloudSecureConnectBundle(bundle)
             .build()) {
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
       verify(logger.appender, timeout(500).atLeast(1))
           .doAppend(logger.loggingEventCaptor.capture());
       assertThat(
@@ -135,7 +135,7 @@ public class CloudIT {
             .withCloudSecureConnectBundle(bundle)
             .withAuthCredentials("cassandra", "cassandra")
             .build()) {
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -149,7 +149,7 @@ public class CloudIT {
             .withAuthCredentials("cassandra", "cassandra")
             .withCloudSecureConnectBundle(bundle)
             .build()) {
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -163,7 +163,7 @@ public class CloudIT {
             .withAuthCredentials("cassandra", "cassandra")
             .withCloudSecureConnectBundle(bundle)
             .build()) {
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -191,7 +191,7 @@ public class CloudIT {
             .build()) {
 
       // then
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -213,7 +213,7 @@ public class CloudIT {
             .build()) {
 
       // then
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -236,7 +236,7 @@ public class CloudIT {
             .build()) {
 
       // then
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -259,7 +259,7 @@ public class CloudIT {
             .build()) {
 
       // then
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -290,7 +290,7 @@ public class CloudIT {
             .build()) {
 
       // then
-      set = session.execute("select * from system.local");
+      set = session.execute("select * from system.local where key='local'");
     }
     assertThat(set).isNotNull();
   }
@@ -311,7 +311,7 @@ public class CloudIT {
             .build(); ) {
 
       // when
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       // then
       assertThat(set).isNotNull();
       verify(logger.appender, timeout(500).atLeast(1))
@@ -348,7 +348,7 @@ public class CloudIT {
             .build(); ) {
 
       // when
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       // then
       assertThat(set).isNotNull();
       verify(logger.appender, timeout(500).atLeast(1))
@@ -379,7 +379,7 @@ public class CloudIT {
             .withSslContext(SSLContext.getInstance("SSL"))
             .build()) {
       // when
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       // then
       assertThat(set).isNotNull();
       verify(logger.appender, timeout(500).atLeast(1))
@@ -415,7 +415,7 @@ public class CloudIT {
             .withAuthCredentials("cassandra", "cassandra")
             .build()) {
       // when
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       // then
       assertThat(set).isNotNull();
       verify(logger.appender, timeout(500).atLeast(1))
@@ -451,7 +451,7 @@ public class CloudIT {
             .build(); ) {
 
       // when
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       // then
       assertThat(set).isNotNull();
       verify(logger.appender, timeout(500).atLeast(1))
@@ -482,7 +482,7 @@ public class CloudIT {
             .build(); ) {
 
       // when
-      ResultSet set = session.execute("select * from system.local");
+      ResultSet set = session.execute("select * from system.local where key='local'");
       // then
       assertThat(set).isNotNull();
       verify(logger.appender, timeout(500).atLeast(1))

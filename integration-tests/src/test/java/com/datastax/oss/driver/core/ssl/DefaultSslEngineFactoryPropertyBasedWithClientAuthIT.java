@@ -57,7 +57,7 @@ public class DefaultSslEngineFactoryPropertyBasedWithClientAuthIT {
             .withBoolean(DefaultDriverOption.SSL_HOSTNAME_VALIDATION, false)
             .build();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 }

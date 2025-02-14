@@ -82,7 +82,7 @@ public class MockResolverIT {
 
       CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
       try (CqlSession session = builder.build()) {
-        ResultSet rs = session.execute("SELECT * FROM system.local");
+        ResultSet rs = session.execute("select * from system.local where key='local'");
         List<Row> rows = rs.all();
         assertThat(rows).hasSize(1);
         LOG.trace("system.local contents: {}", rows.get(0).getFormattedContents());
@@ -157,7 +157,7 @@ public class MockResolverIT {
             numberOfNodes,
             CLUSTER_WAIT_SECONDS);
       }
-      ResultSet rs = session.execute("SELECT * FROM system.local");
+      ResultSet rs = session.execute("select * from system.local where key='local'");
       assertThat(rs).isNotNull();
       Row row = rs.one();
       assertThat(row).isNotNull();
@@ -205,7 +205,7 @@ public class MockResolverIT {
             numberOfNodes,
             CLUSTER_WAIT_SECONDS);
       }
-      ResultSet rs = session.execute("SELECT * FROM system.local");
+      ResultSet rs = session.execute("select * from system.local where key='local'");
       assertThat(rs).isNotNull();
       Row row = rs.one();
       assertThat(row).isNotNull();
@@ -284,7 +284,7 @@ public class MockResolverIT {
           }
           // session.refreshSchema();
           SimpleStatement statement =
-              new SimpleStatementBuilder("SELECT * FROM system.local")
+              new SimpleStatementBuilder("select * from system.local where key='local'")
                   .setTimeout(Duration.ofSeconds(3))
                   .build();
           session.executeAsync(statement);
@@ -293,7 +293,7 @@ public class MockResolverIT {
           break;
         }
       }
-      ResultSet rs = session.execute("SELECT * FROM system.local");
+      ResultSet rs = session.execute("select * from system.local where key='local'");
       assertThat(rs).isNotNull();
       Row row = rs.one();
       assertThat(row).isNotNull();
@@ -344,7 +344,7 @@ public class MockResolverIT {
               break;
             }
             SimpleStatement statement =
-                new SimpleStatementBuilder("SELECT * FROM system.local")
+                new SimpleStatementBuilder("select * from system.local where key='local'")
                     .setTimeout(Duration.ofSeconds(3))
                     .build();
             session.executeAsync(statement);
@@ -400,7 +400,7 @@ public class MockResolverIT {
           }
           // session.refreshSchema();
           SimpleStatement statement =
-              new SimpleStatementBuilder("SELECT * FROM system.local")
+              new SimpleStatementBuilder("select * from system.local where key='local'")
                   .setTimeout(Duration.ofSeconds(3))
                   .build();
           session.executeAsync(statement);
@@ -409,7 +409,7 @@ public class MockResolverIT {
           break;
         }
       }
-      session.execute("SELECT * FROM system.local");
+      session.execute("select * from system.local where key='local'");
     }
     session.close();
   }

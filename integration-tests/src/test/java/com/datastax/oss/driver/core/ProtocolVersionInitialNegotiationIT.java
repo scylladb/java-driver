@@ -63,7 +63,7 @@ public class ProtocolVersionInitialNegotiationIT {
   public void should_downgrade_to_v3() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion().getCode()).isEqualTo(3);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -81,7 +81,7 @@ public class ProtocolVersionInitialNegotiationIT {
   public void should_downgrade_to_v4() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion().getCode()).isEqualTo(4);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -96,7 +96,7 @@ public class ProtocolVersionInitialNegotiationIT {
   public void should_downgrade_to_v5_oss() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion().getCode()).isEqualTo(5);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -109,7 +109,7 @@ public class ProtocolVersionInitialNegotiationIT {
   public void should_downgrade_to_dse_v1() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion()).isEqualTo(DseProtocolVersion.DSE_V1);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -222,7 +222,7 @@ public class ProtocolVersionInitialNegotiationIT {
   public void should_not_downgrade_if_server_supports_latest_version() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion()).isEqualTo(ProtocolVersion.V5);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -235,7 +235,7 @@ public class ProtocolVersionInitialNegotiationIT {
   public void should_not_downgrade_if_server_supports_latest_version_dse() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion()).isEqualTo(ProtocolVersion.DSE_V2);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -255,7 +255,7 @@ public class ProtocolVersionInitialNegotiationIT {
             .build();
     try (CqlSession session = SessionUtils.newSession(ccm, loader)) {
       assertThat(session.getContext().getProtocolVersion().getCode()).isEqualTo(3);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -275,7 +275,7 @@ public class ProtocolVersionInitialNegotiationIT {
             .build();
     try (CqlSession session = SessionUtils.newSession(ccm, loader)) {
       assertThat(session.getContext().getProtocolVersion().getCode()).isEqualTo(4);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -298,7 +298,7 @@ public class ProtocolVersionInitialNegotiationIT {
             .build();
     try (CqlSession session = SessionUtils.newSession(ccm, loader)) {
       assertThat(session.getContext().getProtocolVersion().getCode()).isEqualTo(5);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -314,7 +314,7 @@ public class ProtocolVersionInitialNegotiationIT {
             .build();
     try (CqlSession session = SessionUtils.newSession(ccm, loader)) {
       assertThat(session.getContext().getProtocolVersion()).isEqualTo(DseProtocolVersion.DSE_V1);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 
@@ -330,7 +330,7 @@ public class ProtocolVersionInitialNegotiationIT {
             .build();
     try (CqlSession session = SessionUtils.newSession(ccm, loader)) {
       assertThat(session.getContext().getProtocolVersion()).isEqualTo(DseProtocolVersion.DSE_V2);
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 }

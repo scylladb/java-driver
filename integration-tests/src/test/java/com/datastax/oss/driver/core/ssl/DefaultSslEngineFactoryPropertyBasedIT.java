@@ -54,7 +54,7 @@ public class DefaultSslEngineFactoryPropertyBasedIT {
             .withClass(DefaultDriverOption.SSL_ENGINE_FACTORY_CLASS, DefaultSslEngineFactory.class)
             .build();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
-      session.execute("select * from system.local");
+      session.execute("select * from system.local where key='local'");
     }
   }
 }
