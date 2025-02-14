@@ -41,7 +41,7 @@ public class DnsEndpointTests {
               .build();
       session = cluster.connect();
 
-      ResultSet rs = session.execute("select * from system.local");
+      ResultSet rs = session.execute("select * from system.local where key='local'");
       Row row = rs.one();
       String address = row.getInet("broadcast_address").toString();
       logger.info("Queried node has broadcast_address: {}}", address);
@@ -64,7 +64,7 @@ public class DnsEndpointTests {
               .build();
       bridgeB.start();
       Thread.sleep(1000 * 92);
-      ResultSet rs = session.execute("select * from system.local");
+      ResultSet rs = session.execute("select * from system.local where key='local'");
       Row row = rs.one();
       String address = row.getInet("broadcast_address").toString();
       logger.info("Queried node has broadcast_address: {}}", address);
@@ -89,7 +89,7 @@ public class DnsEndpointTests {
                 .build()) {
       ccmBridge.start();
       Session session = cluster.connect();
-      ResultSet rs = session.execute("SELECT * FROM system.local");
+      ResultSet rs = session.execute("SELECT * FROM system.local WHERE key='local'");
       List<Row> rows = rs.all();
       assertThat(rows).hasSize(1);
       Row row = rows.get(0);

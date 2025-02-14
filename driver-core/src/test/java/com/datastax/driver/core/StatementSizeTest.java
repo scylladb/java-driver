@@ -154,7 +154,7 @@ public class StatementSizeTest {
 
   @Test(groups = "unit")
   public void should_measure_size_of_batch_statement() {
-    String queryString = "SELECT release_version FROM system.local";
+    String queryString = "SELECT release_version FROM system.local WHERE key='local'";
     SimpleStatement statement1 = new SimpleStatement(queryString);
 
     BoundStatement statement2 =

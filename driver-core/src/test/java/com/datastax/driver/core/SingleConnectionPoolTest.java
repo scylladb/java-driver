@@ -54,7 +54,7 @@ public class SingleConnectionPoolTest extends CCMTestsSupport {
 
     // Generate the load
     for (int i = 0; i < 10000; i++)
-      session().executeAsync("SELECT release_version FROM system.local");
+      session().executeAsync("SELECT release_version FROM system.local WHERE key='local'");
 
     openConnectionsWatcherExecutor.shutdownNow();
     if (excessInflightQueriesSpotted.get()) {

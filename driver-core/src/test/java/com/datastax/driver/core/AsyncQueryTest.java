@@ -73,7 +73,8 @@ public class AsyncQueryTest extends CCMTestsSupport {
   /** Checks that a cancelled query releases the connection (JAVA-407). */
   @Test(groups = "short")
   public void cancelled_query_should_release_the_connection() throws InterruptedException {
-    ResultSetFuture future = session().executeAsync("select release_version from system.local");
+    ResultSetFuture future =
+        session().executeAsync("select release_version from system.local where key='local'");
     future.cancel(true);
     assertTrue(future.isCancelled());
 
@@ -98,7 +99,8 @@ public class AsyncQueryTest extends CCMTestsSupport {
       // Neither cluster2 nor session2 are initialized at this point
       assertThat(cluster2.manager.metadata).isNull();
 
-      ResultSetFuture future = session2.executeAsync("select release_version from system.local");
+      ResultSetFuture future =
+          session2.executeAsync("select release_version from system.local where key='local'");
       Row row = Uninterruptibles.getUninterruptibly(future).one();
 
       assertThat(row.getString(0)).isNotEmpty();
@@ -152,14 +154,15 @@ public class AsyncQueryTest extends CCMTestsSupport {
   @Test(groups = "short")
   public void should_fail_when_synchronous_call_on_io_thread() throws Exception {
     for (int i = 0; i < 1000; i++) {
-      ResultSetFuture f = session().executeAsync("select release_version from system.local");
+      ResultSetFuture f =
+          session().executeAsync("select release_version from system.local where key='local'");
       ListenableFuture<Thread> f2 =
           GuavaCompatibility.INSTANCE.transform(
               f,
               new Function<ResultSet, Thread>() {
                 @Override
                 public Thread apply(ResultSet input) {
-                  session().execute("select release_version from system.local");
+                  session().execute("select release_version from system.local where key='local'");
                   return Thread.currentThread();
                 }
               });
@@ -176,14 +179,15 @@ public class AsyncQueryTest extends CCMTestsSupport {
       throws Exception {
     final Session session = new SessionWrapper(session());
     for (int i = 0; i < 1000; i++) {
-      ResultSetFuture f = session.executeAsync("select release_version from system.local");
+      ResultSetFuture f =
+          session.executeAsync("select release_version from system.local where key='local'");
       ListenableFuture<Thread> f2 =
           GuavaCompatibility.INSTANCE.transform(
               f,
               new Function<ResultSet, Thread>() {
                 @Override
                 public Thread apply(ResultSet input) {
-                  session.execute("select release_version from system.local");
+                  session.execute("select release_version from system.local where key='local'");
                   return Thread.currentThread();
                 }
               });

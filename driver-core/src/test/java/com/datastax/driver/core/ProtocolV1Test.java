@@ -45,7 +45,7 @@ public class ProtocolV1Test extends CCMTestsSupport {
    */
   @Test(groups = "short")
   public void should_execute_query_with_no_variables() throws Exception {
-    session().execute("select * from system.local");
+    session().execute("select * from system.local where key='local'");
   }
 
   /**

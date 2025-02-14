@@ -43,7 +43,7 @@ public class SchemaAgreementTest extends CCMTestsSupport {
   public void should_set_flag_on_non_schema_altering_statement() {
     ProtocolOptions protocolOptions = cluster().getConfiguration().getProtocolOptions();
     protocolOptions.maxSchemaAgreementWaitSeconds = 10;
-    ResultSet rs = session().execute("select release_version from system.local");
+    ResultSet rs = session().execute("select release_version from system.local where key='local'");
     assertThat(rs.getExecutionInfo().isSchemaInAgreement()).isTrue();
   }
 
@@ -68,7 +68,8 @@ public class SchemaAgreementTest extends CCMTestsSupport {
     Cluster controlCluster = register(TestUtils.buildControlCluster(cluster(), ccm()));
     Session controlSession = controlCluster.connect();
 
-    Row localRow = controlSession.execute("SELECT schema_version FROM system.local").one();
+    Row localRow =
+        controlSession.execute("SELECT schema_version FROM system.local WHERE key='local'").one();
     UUID localVersion = localRow.getUUID("schema_version");
     Row peerRow = controlSession.execute("SELECT peer, schema_version FROM system.peers").one();
     InetAddress peerAddress = peerRow.getInet("peer");

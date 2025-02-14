@@ -91,7 +91,8 @@ public class HostTargetingTest {
       Host host = TestUtils.findHost(cluster, hostIndex);
 
       // given a statement with host explicitly set.
-      Statement statement = new SimpleStatement("select * system.local").setHost(host);
+      Statement statement =
+          new SimpleStatement("select * system.local where key='local'").setHost(host);
 
       // when statement is executed
       ResultSet result = session.execute(statement);
@@ -136,7 +137,8 @@ public class HostTargetingTest {
   public void should_fail_if_host_is_not_connected() {
     // given a statement with host explicitly set that for which we have no active pool.
     Host host4 = TestUtils.findHost(cluster, 4);
-    Statement statement = new SimpleStatement("select * system.local").setHost(host4);
+    Statement statement =
+        new SimpleStatement("select * system.local where key='local'").setHost(host4);
 
     try {
       // when statement is executed

@@ -34,7 +34,8 @@ public class TrafficMetersTest extends CCMTestsSupport {
     long bytesReceivedBefore = bytesReceived.getCount();
     long bytesSentBefore = bytesSent.getCount();
 
-    SimpleStatement statement = new SimpleStatement("SELECT host_id FROM system.local");
+    SimpleStatement statement =
+        new SimpleStatement("SELECT host_id FROM system.local WHERE key='local'");
     // Set serial CL to something non-default so request size estimate is accurate.
     statement.setSerialConsistencyLevel(ConsistencyLevel.LOCAL_SERIAL);
     int requestSize =
