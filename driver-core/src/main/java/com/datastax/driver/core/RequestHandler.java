@@ -121,11 +121,11 @@ class RequestHandler {
       tableName = defs.getTable(0);
     }
 
-    final Set<Host> replicas =
+    final List<Host> replicas =
         manager
             .cluster
             .getMetadata()
-            .getReplicas(Metadata.quote(keyspace), tableName, partitioner, partitionKey);
+            .getReplicasList(Metadata.quote(keyspace), tableName, partitioner, partitionKey);
 
     // replicas are stored in the right order starting with the primary replica
     return replicas.iterator();

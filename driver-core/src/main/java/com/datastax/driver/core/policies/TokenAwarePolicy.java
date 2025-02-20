@@ -32,14 +32,12 @@ import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.Statement;
 import com.google.common.collect.AbstractIterator;
-import com.google.common.collect.Lists;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -200,8 +198,8 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       tableName = defs.getTable(0);
     }
 
-    final Set<Host> replicas =
-        clusterMetadata.getReplicas(
+    final List<Host> replicas =
+        clusterMetadata.getReplicasList(
             Metadata.quote(keyspace), tableName, statement.getPartitioner(), partitionKey);
     if (replicas.isEmpty()) return childPolicy.newQueryPlan(loggedKeyspace, statement);
 
@@ -250,9 +248,9 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       final Iterator<Host> replicasIterator;
 
       if (replicaOrdering == ReplicaOrdering.RANDOM) {
-        List<Host> replicasList = Lists.newArrayList(replicas);
-        Collections.shuffle(replicasList, ThreadLocalRandom.current());
-        replicasIterator = replicasList.iterator();
+        ArrayList<Host> replicasCopy = new ArrayList<>(replicas);
+        Collections.shuffle(replicasCopy, ThreadLocalRandom.current());
+        replicasIterator = replicasCopy.iterator();
       } else {
         replicasIterator = replicas.iterator();
       }

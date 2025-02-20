@@ -15,7 +15,7 @@
  */
 package com.datastax.driver.core;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.HashMap;
@@ -67,7 +67,7 @@ abstract class ReplicationStrategy {
     }
   }
 
-  abstract Map<Token, Set<Host>> computeTokenToReplicaMap(
+  abstract Map<Token, ImmutableList<Host>> computeTokenToReplicaMap(
       String keyspaceName, Map<Token, Host> tokenToPrimary, List<Token> ring);
 
   private static Token getTokenWrapping(int i, List<Token> ring) {
@@ -83,18 +83,18 @@ abstract class ReplicationStrategy {
     }
 
     @Override
-    Map<Token, Set<Host>> computeTokenToReplicaMap(
+    Map<Token, ImmutableList<Host>> computeTokenToReplicaMap(
         String keyspaceName, Map<Token, Host> tokenToPrimary, List<Token> ring) {
 
       int rf = Math.min(replicationFactor.fullReplicas(), ring.size());
 
-      Map<Token, Set<Host>> replicaMap = new HashMap<Token, Set<Host>>(tokenToPrimary.size());
+      Map<Token, ImmutableList<Host>> replicaMap = new HashMap<>(tokenToPrimary.size());
       for (int i = 0; i < ring.size(); i++) {
         // Consecutive sections of the ring can assigned to the same host
-        Set<Host> replicas = new LinkedHashSet<Host>();
+        Set<Host> replicas = new LinkedHashSet<>();
         for (int j = 0; j < ring.size() && replicas.size() < rf; j++)
           replicas.add(tokenToPrimary.get(getTokenWrapping(i + j, ring)));
-        replicaMap.put(ring.get(i), ImmutableSet.copyOf(replicas));
+        replicaMap.put(ring.get(i), ImmutableList.copyOf(replicas));
       }
       return replicaMap;
     }
@@ -125,7 +125,7 @@ abstract class ReplicationStrategy {
     }
 
     @Override
-    Map<Token, Set<Host>> computeTokenToReplicaMap(
+    Map<Token, ImmutableList<Host>> computeTokenToReplicaMap(
         String keyspaceName, Map<Token, Host> tokenToPrimary, List<Token> ring) {
 
       logger.debug("Computing token to replica map for keyspace: {}.", keyspaceName);
@@ -135,7 +135,7 @@ abstract class ReplicationStrategy {
 
       // This is essentially a copy of org.apache.cassandra.locator.NetworkTopologyStrategy
       Map<String, Set<String>> racks = getRacksInDcs(tokenToPrimary.values());
-      Map<Token, Set<Host>> replicaMap = new HashMap<Token, Set<Host>>(tokenToPrimary.size());
+      Map<Token, ImmutableList<Host>> replicaMap = new HashMap<>(tokenToPrimary.size());
       Map<String, Integer> dcHostCount = Maps.newHashMapWithExpectedSize(replicationFactors.size());
       Set<String> warnedDcs = Sets.newHashSetWithExpectedSize(replicationFactors.size());
       // find maximum number of nodes in each DC
@@ -157,7 +157,7 @@ abstract class ReplicationStrategy {
         }
 
         // Preserve order - primary replica will be first
-        Set<Host> replicas = new LinkedHashSet<Host>();
+        Set<Host> replicas = new LinkedHashSet<>();
         for (int j = 0; j < ring.size() && !allDone(allDcReplicas, dcHostCount); j++) {
           Host h = tokenToPrimary.get(getTokenWrapping(i + j, ring));
           String dc = h.getDatacenter();
@@ -214,7 +214,7 @@ abstract class ReplicationStrategy {
           }
         }
 
-        replicaMap.put(ring.get(i), ImmutableSet.copyOf(replicas));
+        replicaMap.put(ring.get(i), ImmutableList.copyOf(replicas));
       }
 
       long duration = System.currentTimeMillis() - startTime;

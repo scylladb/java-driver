@@ -22,6 +22,7 @@
 package com.datastax.driver.core;
 
 import com.google.common.annotations.Beta;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -34,6 +35,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,6 +53,7 @@ import org.slf4j.LoggerFactory;
 public class Metadata {
 
   private static final Logger logger = LoggerFactory.getLogger(Metadata.class);
+  private static final ImmutableList<Host> EMPTY_LIST = ImmutableList.of();
 
   final Cluster.Manager cluster;
   volatile String clusterName;
@@ -553,9 +556,39 @@ public class Metadata {
    * @return the (immutable) set of replicas for {@code partitionKey} as known by the driver. Note
    *     that the result might be stale or empty if metadata was explicitly disabled with {@link
    *     QueryOptions#setMetadataEnabled(boolean)}.
+   * @deprecated use {@link Metadata#getReplicasList(String, String, Token.Factory, ByteBuffer)}
    */
+  @Deprecated
   @Beta
   public Set<Host> getReplicas(
+      String keyspace, String table, Token.Factory partitioner, ByteBuffer partitionKey) {
+    return new LinkedHashSet<>(this.getReplicasList(keyspace, table, partitioner, partitionKey));
+  }
+
+  /**
+   * Extension of legacy method {@link Metadata#getReplicas(String, Token.Factory, ByteBuffer)}.
+   * Tablets model requires knowledge of the table name to determine the replicas. This method will
+   * first try to lookup replicas through known tablets metadata. It will default to TokenMap lookup
+   * if either {@code null} was passed as table name or the tablet lookup is unsuccessful for any
+   * other reason.
+   *
+   * <p>Returns the list of hosts that are replica for a given partition key. Partitioner can be
+   * {@code null} and then a cluster-wide partitioner will be invoked.
+   *
+   * <p>Note that this information is refreshed asynchronously by the control connection, when
+   * schema or ring topology changes. It might occasionally be stale (or even empty).
+   *
+   * @param keyspace the name of the keyspace to get replicas for.
+   * @param table the name of the table to get replicas for. Necessary for distinction for tablets.
+   *     Unnecessary for regular TokenMap
+   * @param partitioner the partitioner to use or @{code null} for cluster-wide partitioner.
+   * @param partitionKey the partition key for which to find the list of replica.
+   * @return the (immutable) list of replicas for {@code partitionKey} as known by the driver. Note
+   *     that the result might be stale or empty if metadata was explicitly disabled with {@link
+   *     QueryOptions#setMetadataEnabled(boolean)}.
+   */
+  @Beta
+  public List<Host> getReplicasList(
       String keyspace, String table, Token.Factory partitioner, ByteBuffer partitionKey) {
     keyspace = handleId(keyspace);
     table = handleId(table);
@@ -564,7 +597,7 @@ public class Metadata {
       partitioner = current.factory;
     }
     if (partitioner == null) {
-      return Collections.emptySet();
+      return EMPTY_LIST;
     }
     Token token = partitioner.hash(partitionKey);
 
@@ -575,14 +608,13 @@ public class Metadata {
         assert (token instanceof Token.TokenLong64);
         return tabletMap.getReplicas(keyspace, table, (long) token.getValue());
       } else {
-        return Collections.emptySet();
+        return EMPTY_LIST;
       }
     }
 
     // TokenMap:
-    if (current == null) return Collections.<Host>emptySet();
-    Set<Host> hosts = current.getReplicas(keyspace, token);
-    return hosts == null ? Collections.<Host>emptySet() : hosts;
+    if (current == null) return EMPTY_LIST;
+    return current.getReplicas(keyspace, token);
   }
 
   /**
@@ -598,10 +630,31 @@ public class Metadata {
    * @return the (immutable) set of replicas for {@code partitionKey} as known by the driver. Note
    *     that the result might be stale or empty if metadata was explicitly disabled with {@link
    *     QueryOptions#setMetadataEnabled(boolean)}.
+   * @deprecated use {@link Metadata#getReplicasList(String, Token.Factory, ByteBuffer)}
    */
+  @Deprecated
   public Set<Host> getReplicas(
       String keyspace, Token.Factory partitioner, ByteBuffer partitionKey) {
     return getReplicas(keyspace, null, partitioner, partitionKey);
+  }
+
+  /**
+   * Returns the immutable list of hosts that are replica for a given partition key. Partitioner can
+   * be {@code null} and then a cluster-wide partitioner will be invoked.
+   *
+   * <p>Note that this information is refreshed asynchronously by the control connection, when
+   * schema or ring topology changes. It might occasionally be stale (or even empty).
+   *
+   * @param keyspace the name of the keyspace to get replicas for.
+   * @param partitioner the partitioner to use or @{code null} for cluster-wide partitioner.
+   * @param partitionKey the partition key for which to find the set of replica.
+   * @return the (immutable) list of replicas for {@code partitionKey} as known by the driver. Note
+   *     that the result might be stale or empty if metadata was explicitly disabled with {@link
+   *     QueryOptions#setMetadataEnabled(boolean)}.
+   */
+  public List<Host> getReplicasList(
+      String keyspace, Token.Factory partitioner, ByteBuffer partitionKey) {
+    return getReplicasList(keyspace, null, partitioner, partitionKey);
   }
 
   /**
@@ -620,6 +673,7 @@ public class Metadata {
    * @return the (immutable) set of replicas for {@code range} as known by the driver. Note that the
    *     result might be stale or empty if metadata was explicitly disabled with {@link
    *     QueryOptions#setMetadataEnabled(boolean)}.
+   * @deprecated use {@link Metadata#getReplicasList(String, TokenRange)}
    */
   public Set<Host> getReplicas(String keyspace, TokenRange range) {
     keyspace = handleId(keyspace);
@@ -627,8 +681,34 @@ public class Metadata {
     if (current == null) {
       return Collections.emptySet();
     } else {
-      Set<Host> hosts = current.getReplicas(keyspace, range.getEnd());
-      return hosts == null ? Collections.<Host>emptySet() : hosts;
+      return new HashSet<>(current.getReplicas(keyspace, range.getEnd()));
+    }
+  }
+
+  /**
+   * Returns the list of hosts that are replica for a given token range.
+   *
+   * <p>Note that it is assumed that the input range does not overlap across multiple host ranges.
+   * If the range extends over multiple hosts, it only returns the replicas for those hosts that are
+   * replicas for the last token of the range. This behavior may change in a future release, see <a
+   * href="https://datastax-oss.atlassian.net/browse/JAVA-1355">JAVA-1355</a>.
+   *
+   * <p>Also note that this information is refreshed asynchronously by the control connection, when
+   * schema or ring topology changes. It might occasionally be stale (or even empty).
+   *
+   * @param keyspace the name of the keyspace to get replicas for.
+   * @param range the token range.
+   * @return the list of replicas for {@code range} as known by the driver. Note that the result
+   *     might be stale or empty if metadata was explicitly disabled with {@link
+   *     QueryOptions#setMetadataEnabled(boolean)}.
+   */
+  public List<Host> getReplicasList(String keyspace, TokenRange range) {
+    keyspace = handleId(keyspace);
+    TokenMap current = tokenMap;
+    if (current == null) {
+      return EMPTY_LIST;
+    } else {
+      return current.getReplicas(keyspace, range.getEnd());
     }
   }
 
@@ -985,7 +1065,7 @@ public class Metadata {
 
     private final Token.Factory factory;
     private final Map<Host, Set<Token>> primaryToTokens;
-    private final Map<String, Map<Token, Set<Host>>> tokenToHostsByKeyspace;
+    private final Map<String, Map<Token, ImmutableList<Host>>> tokenToHostsByKeyspace;
     private final Map<String, Map<Host, Set<TokenRange>>> hostsToRangesByKeyspace;
     private final List<Token> ring;
     private final Set<TokenRange> tokenRanges;
@@ -997,7 +1077,7 @@ public class Metadata {
         Set<TokenRange> tokenRanges,
         Map<Token, Host> tokenToPrimary,
         Map<Host, Set<Token>> primaryToTokens,
-        Map<String, Map<Token, Set<Host>>> tokenToHostsByKeyspace,
+        Map<String, Map<Token, ImmutableList<Host>>> tokenToHostsByKeyspace,
         Map<String, Map<Host, Set<TokenRange>>> hostsToRangesByKeyspace) {
       this.factory = factory;
       this.ring = ring;
@@ -1042,15 +1122,13 @@ public class Metadata {
         Set<TokenRange> tokenRanges,
         Map<Token, Host> tokenToPrimary) {
       Set<Host> hosts = allTokens.keySet();
-      Map<String, Map<Token, Set<Host>>> tokenToHosts =
-          new HashMap<String, Map<Token, Set<Host>>>();
-      Map<ReplicationStrategy, Map<Token, Set<Host>>> replStrategyToHosts =
-          new HashMap<ReplicationStrategy, Map<Token, Set<Host>>>();
-      Map<String, Map<Host, Set<TokenRange>>> hostsToRanges =
-          new HashMap<String, Map<Host, Set<TokenRange>>>();
+      Map<String, Map<Token, ImmutableList<Host>>> tokenToHosts = new HashMap<>();
+      Map<ReplicationStrategy, Map<Token, ImmutableList<Host>>> replStrategyToHosts =
+          new HashMap<>();
+      Map<String, Map<Host, Set<TokenRange>>> hostsToRanges = new HashMap<>();
       for (KeyspaceMetadata keyspace : keyspaces) {
         ReplicationStrategy strategy = keyspace.replicationStrategy();
-        Map<Token, Set<Host>> ksTokens = replStrategyToHosts.get(strategy);
+        Map<Token, ImmutableList<Host>> ksTokens = replStrategyToHosts.get(strategy);
         if (ksTokens == null) {
           ksTokens =
               (strategy == null)
@@ -1077,14 +1155,14 @@ public class Metadata {
           factory, ring, tokenRanges, tokenToPrimary, allTokens, tokenToHosts, hostsToRanges);
     }
 
-    private Set<Host> getReplicas(String keyspace, Token token) {
+    private ImmutableList<Host> getReplicas(String keyspace, Token token) {
 
-      Map<Token, Set<Host>> tokenToHosts = tokenToHostsByKeyspace.get(keyspace);
-      if (tokenToHosts == null) return Collections.emptySet();
+      Map<Token, ImmutableList<Host>> tokenToHosts = tokenToHostsByKeyspace.get(keyspace);
+      if (tokenToHosts == null) return EMPTY_LIST;
 
       // If the token happens to be one of the "primary" tokens, get result directly
-      Set<Host> hosts = tokenToHosts.get(token);
-      if (hosts != null) return hosts;
+      ImmutableList<Host> hosts = tokenToHosts.get(token);
+      if (hosts != null) return ImmutableList.copyOf(hosts);
 
       // Otherwise, find closest "primary" token on the ring
       int i = Collections.binarySearch(ring, token);
@@ -1096,10 +1174,10 @@ public class Metadata {
       return tokenToHosts.get(ring.get(i));
     }
 
-    private static Map<Token, Set<Host>> makeNonReplicatedMap(Map<Token, Host> input) {
-      Map<Token, Set<Host>> output = new HashMap<Token, Set<Host>>(input.size());
+    private static Map<Token, ImmutableList<Host>> makeNonReplicatedMap(Map<Token, Host> input) {
+      Map<Token, ImmutableList<Host>> output = new HashMap<>(input.size());
       for (Map.Entry<Token, Host> entry : input.entrySet())
-        output.put(entry.getKey(), ImmutableSet.of(entry.getValue()));
+        output.put(entry.getKey(), ImmutableList.of(entry.getValue()));
       return output;
     }
 
@@ -1119,11 +1197,11 @@ public class Metadata {
     }
 
     private static Map<Host, Set<TokenRange>> computeHostsToRangesMap(
-        Set<TokenRange> tokenRanges, Map<Token, Set<Host>> ksTokens, int hostCount) {
+        Set<TokenRange> tokenRanges, Map<Token, ImmutableList<Host>> ksTokens, int hostCount) {
       Map<Host, ImmutableSet.Builder<TokenRange>> builders =
           Maps.newHashMapWithExpectedSize(hostCount);
       for (TokenRange range : tokenRanges) {
-        Set<Host> replicas = ksTokens.get(range.getEnd());
+        List<Host> replicas = ksTokens.get(range.getEnd());
         for (Host host : replicas) {
           ImmutableSet.Builder<TokenRange> hostRanges = builders.get(host);
           if (hostRanges == null) {
