@@ -19,7 +19,7 @@
 
 -->
 <!--
-    Copyright (C) 2020 ScyllaDB
+    Copyright (C) 2025 ScyllaDB
 
     Modified by ScyllaDB
 -->
@@ -30,49 +30,11 @@
     <artifactId>java-driver-parent</artifactId>
     <version>4.18.1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>java-driver-distribution</artifactId>
-  <!-- Should be pom but Javadoc generation requires a "classpath-capable" package -->
-  <packaging>jar</packaging>
-  <name>Java driver for Scylla and Apache Cassandra(R) - binary distribution</name>
-  <!--
-    These dependencies are only here to ensure proper build order and proper inclusion of binaries
-    in the final tarball
-  -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>java-driver-bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-  <dependencies>
-    <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>java-driver-core</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>java-driver-query-builder</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>java-driver-mapper-runtime</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>java-driver-mapper-processor</artifactId>
-      <version>${project.version}</version>
-    </dependency>
-  </dependencies>
+  <artifactId>java-driver-distribution-source</artifactId>
+  <packaging>pom</packaging>
+  <name>Scylla Java Driver - source distribution</name>
   <build>
-    <finalName>scylla-java-driver-${project.version}</finalName>
+    <finalName>scylla-java-driver-${project.version}-source</finalName>
     <plugins>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
@@ -116,14 +78,6 @@
           <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.5</version>
-        <configuration>
-          <skip>true</skip>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
   <profiles>
@@ -132,49 +86,10 @@
       <build>
         <plugins>
           <plugin>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <includeDependencySources>true</includeDependencySources>
-                  <doctitle>Java driver for Scylla and Apache Cassandra® ${project.version} API</doctitle>
-                  <windowtitle>Java driver for Scylla and Apache Cassandra(R) ${project.version} API</windowtitle>
-                  <additionalDependencies>
-                    <additionalDependency>
-                      <groupId>org.lz4</groupId>
-                      <artifactId>lz4-java</artifactId>
-                      <version>${lz4.version}</version>
-                    </additionalDependency>
-                    <additionalDependency>
-                      <groupId>org.xerial.snappy</groupId>
-                      <artifactId>snappy-java</artifactId>
-                      <version>${snappy.version}</version>
-                    </additionalDependency>
-                    <additionalDependency>
-                      <groupId>org.apache.tinkerpop</groupId>
-                      <artifactId>gremlin-core</artifactId>
-                      <version>${tinkerpop.version}</version>
-                    </additionalDependency>
-                    <additionalDependency>
-                      <groupId>org.apache.tinkerpop</groupId>
-                      <artifactId>tinkergraph-gremlin</artifactId>
-                      <version>${tinkerpop.version}</version>
-                    </additionalDependency>
-                  </additionalDependencies>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
             <artifactId>maven-assembly-plugin</artifactId>
             <executions>
               <execution>
-                <id>assemble-binary-tarball</id>
+                <id>assemble-source-tarball</id>
                 <phase>package</phase>
                 <goals>
                   <goal>single</goal>
@@ -184,7 +99,7 @@
             <configuration>
               <appendAssemblyId>false</appendAssemblyId>
               <descriptors>
-                <descriptor>src/assembly/binary-tarball.xml</descriptor>
+                <descriptor>src/assembly/source-tarball.xml</descriptor>
               </descriptors>
               <tarLongFileMode>posix</tarLongFileMode>
             </configuration>
