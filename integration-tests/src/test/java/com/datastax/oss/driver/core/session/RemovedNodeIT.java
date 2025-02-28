@@ -24,7 +24,7 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
@@ -33,10 +33,10 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 
-@ScyllaSkip(description = "@IntegrationTestDisabledFlaky")
 public class RemovedNodeIT {
 
   @ClassRule
@@ -44,8 +44,21 @@ public class RemovedNodeIT {
       CustomCcmRule.builder()
           // We need 4 nodes to run this test against DSE, because it requires at least 3 nodes to
           // maintain RF=3 for keyspace system_distributed
-          .withNodes(4)
+          //
+          // To avoid issue with flakiness of this test (scylladb/java-driver/issues/393) we start
+          // with 1 node and manually start 3 more nodes with initial_token explicitly set.
+          .withNodes(1)
           .build();
+
+  @Before
+  public void setup() {
+    CcmBridge ccmBridge = CCM_RULE.getCcmBridge();
+    for (int nodeId = 2; nodeId <= 4; nodeId++) {
+      ccmBridge.addWithoutStart(nodeId, "dc1", "-j", String.valueOf(7000 + nodeId * 100));
+      ccmBridge.updateNodeConfig(nodeId, "initial_token", String.valueOf(nodeId * 100));
+      ccmBridge.start(nodeId);
+    }
+  }
 
   @Test
   public void should_signal_and_destroy_pool_when_node_gets_removed() {

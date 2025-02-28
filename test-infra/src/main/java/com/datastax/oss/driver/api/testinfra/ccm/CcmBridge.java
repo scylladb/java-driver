@@ -487,6 +487,18 @@ public class CcmBridge implements AutoCloseable {
     execute("node" + n, "stop");
   }
 
+  public void addWithoutStart(int n, String dc, String... extraArgs) {
+    String[] initialArgs = new String[] {"add", "-i", ipPrefix + n, "-d", dc, "node" + n};
+    ArrayList<String> args = new ArrayList<>(Arrays.asList(initialArgs));
+    args.addAll(Arrays.asList(extraArgs));
+    if (getDseVersion().isPresent()) {
+      args.add("--dse");
+    } else if (getScyllaVersion().isPresent()) {
+      args.add("--scylla");
+    }
+    execute(args.toArray(new String[] {}));
+  }
+
   public void addWithoutStart(int n, String dc) {
     String[] initialArgs = new String[] {"add", "-i", ipPrefix + n, "-d", dc, "node" + n};
     ArrayList<String> args = new ArrayList<>(Arrays.asList(initialArgs));
