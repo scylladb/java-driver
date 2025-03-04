@@ -377,22 +377,26 @@ public class CcmBridge implements AutoCloseable {
       // Works around the behavior introduced in https://github.com/scylladb/scylla-ccm/pull/410
       StringBuilder updateConfArguments = new StringBuilder();
 
-      for (Map.Entry<String, Object> conf : cassandraConfiguration.entrySet()) {
-        updateConfArguments.append(conf.getKey()).append(':').append(conf.getValue()).append(' ');
-      }
+      Version cassandraVersion = getCassandraVersion();
+
       if (getCassandraVersion().compareTo(Version.V2_2_0) >= 0 && !SCYLLA_ENABLEMENT) {
         // @IntegrationTestDisabledScyllaJVMArgs @IntegrationTestDisabledScyllaUDF
-        if (getCassandraVersion().compareTo(Version.V4_1_0) >= 0) {
-          updateConfArguments.append("user_defined_functions_enabled:true").append(' ');
+        cassandraConfiguration.put("enable_user_defined_functions", "true");
+      }
 
-        } else {
-          updateConfArguments.append("enable_user_defined_functions:true").append(' ');
-        }
+      for (Map.Entry<String, Object> conf : cassandraConfiguration.entrySet()) {
+        String originalKey = conf.getKey();
+        Object originalValue = conf.getValue();
+        String configKey = getConfigKey(originalKey, originalValue, cassandraVersion);
+        String configValue = getConfigValue(originalKey, originalValue, cassandraVersion);
+        updateConfArguments.append(configKey).append(':').append(configValue).append(' ');
       }
 
       if (updateConfArguments.length() > 0) {
         execute("updateconf", updateConfArguments.toString());
       }
+
+      // Note that we aren't performing any substitution on DSE key/value props (at least for now)
       if (DSE_ENABLEMENT) {
         for (Map.Entry<String, Object> conf : dseConfiguration.entrySet()) {
           execute("updatedseconf", String.format("%s:%s", conf.getKey(), conf.getValue()));
@@ -614,6 +618,40 @@ public class CcmBridge implements AutoCloseable {
 
   public String getNodeIpAddress(int nodeId) {
     return ipPrefix + nodeId;
+  }
+
+  private static String IN_MS_STR = "_in_ms";
+  private static int IN_MS_STR_LENGTH = IN_MS_STR.length();
+  private static String ENABLE_STR = "enable_";
+  private static int ENABLE_STR_LENGTH = ENABLE_STR.length();
+  private static String IN_KB_STR = "_in_kb";
+  private static int IN_KB_STR_LENGTH = IN_KB_STR.length();
+
+  @SuppressWarnings("unused")
+  private String getConfigKey(String originalKey, Object originalValue, Version cassandraVersion) {
+
+    // At least for now we won't support substitutions on nested keys.  This requires an extra
+    // traversal of the string
+    // but we'll live with that for now
+    if (originalKey.contains(".")) return originalKey;
+    if (cassandraVersion.compareTo(Version.V4_1_0) < 0) return originalKey;
+    if (originalKey.endsWith(IN_MS_STR))
+      return originalKey.substring(0, originalKey.length() - IN_MS_STR_LENGTH);
+    if (originalKey.startsWith(ENABLE_STR))
+      return originalKey.substring(ENABLE_STR_LENGTH) + "_enabled";
+    if (originalKey.endsWith(IN_KB_STR))
+      return originalKey.substring(0, originalKey.length() - IN_KB_STR_LENGTH);
+    return originalKey;
+  }
+
+  private String getConfigValue(
+      String originalKey, Object originalValue, Version cassandraVersion) {
+
+    String originalValueStr = originalValue.toString();
+    if (cassandraVersion.compareTo(Version.V4_1_0) < 0) return originalValueStr;
+    if (originalKey.endsWith(IN_MS_STR)) return originalValueStr + "ms";
+    if (originalKey.endsWith(IN_KB_STR)) return originalValueStr + "KiB";
+    return originalValueStr;
   }
 
   public static Builder builder() {
