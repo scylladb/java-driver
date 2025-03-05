@@ -63,8 +63,6 @@ See the [upgrade guide](upgrade_guide/) for details.
 
 * [Manual](manual/)
 * [API docs]
-* Bug tracking: [JIRA]
-* [Mailing list]
 * Training: [Scylla University]
 * [Changelog]
 * [FAQ]
