@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.api.core.config;
 
+import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -258,6 +259,9 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.REQUEST_TIMEOUT, requestTimeout);
     map.put(TypedDriverOption.REQUEST_CONSISTENCY, "LOCAL_ONE");
     map.put(TypedDriverOption.REQUEST_PAGE_SIZE, requestPageSize);
+    map.put(
+        TypedDriverOption.PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD,
+        CQL4SkipMetadataResolveMethod.SMART.toString());
     map.put(TypedDriverOption.REQUEST_SERIAL_CONSISTENCY, "SERIAL");
     map.put(TypedDriverOption.REQUEST_DEFAULT_IDEMPOTENCE, false);
     map.put(TypedDriverOption.GRAPH_TRAVERSAL_SOURCE, "g");

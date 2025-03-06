@@ -194,8 +194,15 @@ public class Conversions {
           protocolVersion, DefaultProtocolFeature.UNSET_BOUND_VALUES)) {
         ensureAllSet(boundStatement);
       }
-      boolean skipMetadata =
-          boundStatement.getPreparedStatement().getResultSetDefinitions().size() > 0;
+
+      boolean skipMetadata;
+      if (boundStatement.getPreparedStatement() instanceof DefaultPreparedStatement) {
+        skipMetadata =
+            ((DefaultPreparedStatement) boundStatement.getPreparedStatement()).isSkipMetadata();
+      } else {
+        skipMetadata = boundStatement.getPreparedStatement().getResultSetDefinitions().size() > 0;
+      }
+
       QueryOptions queryOptions =
           new QueryOptions(
               consistencyCode,
@@ -382,6 +389,17 @@ public class Conversions {
 
     Partitioner partitioner = PartitionerFactory.partitioner(variableDefinitions, context);
 
+    DriverExecutionProfile executionProfile = request.getExecutionProfileForBoundStatements();
+    if (executionProfile == null) {
+      if (request.getExecutionProfileNameForBoundStatements() != null
+          && !request.getExecutionProfileNameForBoundStatements().isEmpty()) {
+        executionProfile =
+            context.getConfig().getProfile(request.getExecutionProfileNameForBoundStatements());
+      } else {
+        executionProfile = context.getConfig().getDefaultProfile();
+      }
+    }
+
     return new DefaultPreparedStatement(
         ByteBuffer.wrap(response.preparedQueryId).asReadOnlyBuffer(),
         request.getQuery(),
@@ -395,7 +413,7 @@ public class Conversions {
         partitioner,
         NullAllowingImmutableMap.copyOf(request.getCustomPayload()),
         request.getExecutionProfileNameForBoundStatements(),
-        request.getExecutionProfileForBoundStatements(),
+        executionProfile,
         request.getRoutingKeyspaceForBoundStatements(),
         request.getRoutingKeyForBoundStatements(),
         request.getRoutingTokenForBoundStatements(),

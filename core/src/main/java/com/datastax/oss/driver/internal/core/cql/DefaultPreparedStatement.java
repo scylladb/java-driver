@@ -23,29 +23,43 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
+import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatementBuilder;
+import com.datastax.oss.driver.api.core.cql.ColumnDefinition;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
+import com.datastax.oss.driver.api.core.type.ContainerType;
+import com.datastax.oss.driver.api.core.type.DataType;
+import com.datastax.oss.driver.api.core.type.MapType;
+import com.datastax.oss.driver.api.core.type.TupleType;
+import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
 import com.datastax.oss.driver.internal.core.data.ValuesHelper;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
+import com.datastax.oss.driver.shaded.guava.common.base.Splitter;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import net.jcip.annotations.ThreadSafe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @ThreadSafe
 public class DefaultPreparedStatement implements PreparedStatement {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultPreparedStatement.class);
+  private static final Splitter SPACE_SPLITTER = Splitter.onPattern("\\s+");
+  private static final Splitter COMMA_SPLITTER = Splitter.onPattern(",");
 
   private final ByteBuffer id;
   private final RepreparePayload repreparePayload;
@@ -69,6 +83,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   private final Duration timeoutForBoundStatements;
   private final Partitioner partitioner;
   private final boolean isLWT;
+  private volatile boolean skipMetadata;
 
   public DefaultPreparedStatement(
       ByteBuffer id,
@@ -122,6 +137,9 @@ public class DefaultPreparedStatement implements PreparedStatement {
     this.codecRegistry = codecRegistry;
     this.protocolVersion = protocolVersion;
     this.isLWT = isLWT;
+    this.skipMetadata =
+        resolveSkipMetadata(
+            query, resultMetadataId, resultSetDefinitions, this.executionProfileForBoundStatements);
   }
 
   @NonNull
@@ -145,6 +163,10 @@ public class DefaultPreparedStatement implements PreparedStatement {
   @Override
   public Partitioner getPartitioner() {
     return partitioner;
+  }
+
+  public boolean isSkipMetadata() {
+    return skipMetadata;
   }
 
   @NonNull
@@ -172,6 +194,13 @@ public class DefaultPreparedStatement implements PreparedStatement {
   @Override
   public void setResultMetadata(
       @NonNull ByteBuffer newResultMetadataId, @NonNull ColumnDefinitions newResultSetDefinitions) {
+    this.skipMetadata =
+        resolveSkipMetadata(
+            this.getQuery(),
+            newResultMetadataId,
+            newResultSetDefinitions,
+            executionProfileForBoundStatements);
+
     this.resultMetadata = new ResultMetadata(newResultMetadataId, newResultSetDefinitions);
   }
 
@@ -241,5 +270,122 @@ public class DefaultPreparedStatement implements PreparedStatement {
       this.resultMetadataId = resultMetadataId;
       this.resultSetDefinitions = resultSetDefinitions;
     }
+  }
+
+  private static boolean resolveSkipMetadata(
+      String query,
+      ByteBuffer resultMetadataId,
+      ColumnDefinitions resultSet,
+      DriverExecutionProfile executionProfileForBoundStatements) {
+    if (resultSet == null || resultSet.size() == 0) {
+      // there is no reason to send this flag, there will be no rows in the response and,
+      // consequently, no metadata.
+      return false;
+    }
+    if (resultMetadataId != null && resultMetadataId.capacity() > 0) {
+      // Result metadata ID feature is supported, it makes prepared statement invalidation work
+      // properly.
+      // Skip Metadata should be enabled.
+      // Prepared statement invalidation works perfectly no need to disable skip metadata
+      return true;
+    }
+
+    CQL4SkipMetadataResolveMethod resolveMethod = CQL4SkipMetadataResolveMethod.SMART;
+
+    if (executionProfileForBoundStatements != null) {
+      String resolveMethodName =
+          executionProfileForBoundStatements.getString(
+              DefaultDriverOption.PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD);
+      try {
+        resolveMethod = CQL4SkipMetadataResolveMethod.fromValue(resolveMethodName);
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn(
+            "Property advanced.prepared-statements.skip-cql4-metadata-resolve-method is incorrectly set to `{}`, "
+                + "available options: smart, enabled, disabled. Defaulting to `SMART`",
+            resolveMethodName);
+        resolveMethod = CQL4SkipMetadataResolveMethod.SMART;
+      }
+    }
+
+    switch (resolveMethod) {
+      case ENABLED:
+        return true;
+      case DISABLED:
+        return false;
+      case SMART:
+        break;
+    }
+
+    if (isWildcardSelect(query)) {
+      LOGGER.warn(
+          "Prepared statement {} is a wildcard select, which can cause prepared statement invalidation issues when executed on CQL4. "
+              + "These issues may lead to broken deserialization or data corruption. "
+              + "To mitigate this, the driver ensures that the server returns metadata with each query for such statements, "
+              + "though this negatively impacts performance. "
+              + "To avoid this, consider using a targeted select instead. "
+              + "Find more mitigation options in description of `advanced.prepared-statements.skip-cql4-metadata-resolve-method` flag",
+          query);
+      return false;
+    }
+    // Disable skipping metadata if results contains udt and
+    for (ColumnDefinition columnDefinition : resultSet) {
+      if (containsUDT(columnDefinition.getType())) {
+        LOGGER.warn(
+            "Prepared statement {} contains UDT in result, which can cause prepared statement invalidation issues when executed on CQL4. "
+                + "These issues may lead to broken deserialization or data corruption. "
+                + "To mitigate this, the driver ensures that the server returns metadata with each query for such statements, "
+                + "though this negatively impacts performance. "
+                + "To avoid this, consider using regular columns instead of UDT. "
+                + "Find more mitigation options in description of `advanced.prepared-statements.skip-cql4-metadata-resolve-method` flag",
+            query);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private static boolean containsUDT(DataType dataType) {
+    if (dataType instanceof ContainerType) {
+      return containsUDT(((ContainerType) dataType).getElementType());
+    } else if (dataType instanceof TupleType) {
+      for (DataType elementType : ((TupleType) dataType).getComponentTypes()) {
+        if (containsUDT(elementType)) {
+          return true;
+        }
+      }
+      return false;
+    } else if (dataType instanceof MapType) {
+      return containsUDT(((MapType) dataType).getKeyType())
+          || containsUDT(((MapType) dataType).getValueType());
+    }
+    return dataType instanceof UserDefinedType;
+  }
+
+  private static boolean isWildcardSelect(String query) {
+    List<String> chunks = SPACE_SPLITTER.splitToList(query.trim().toLowerCase());
+    if (chunks.size() < 2) {
+      // Weird query, assuming no result expected
+      return false;
+    }
+
+    if (!chunks.get(0).equals("select")) {
+      // In case if non-select sneaks in, disable skip metadata for it no result expected.
+      return false;
+    }
+
+    for (String chunk : chunks) {
+      if (chunk.equals("from")) {
+        return false;
+      }
+      if (chunk.equals("*")) {
+        return true;
+      }
+      for (String part : COMMA_SPLITTER.split(chunk)) {
+        if (part.equals("*")) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

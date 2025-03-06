@@ -689,6 +689,34 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: boolean
    */
   PREPARE_ON_ALL_NODES("advanced.prepared-statements.prepare-on-all-nodes"),
+
+  /**
+   * CQL 4.x has a known issue where prepared statement invalidation may be bypassed on the client
+   * side. Reference: https://github.com/scylladb/scylladb/issues/20860
+   *
+   * <p>When this occurs, the client's metadata can become outdated, leading to various
+   * deserialization errors.
+   *
+   * <p>To mitigate this, the driver can disable the `skip metadata` flag, ensuring the server
+   * includes metadata with every bound statement RESULT query response.
+   *
+   * <p>This setting determines how the driver handles the `skip metadata` flag for CQL 4 prepared
+   * statements: - **"smart"** (default) – Disables the flag only for wildcard selects (`SELECT *
+   * FROM`) and queries that return UDTs (including UDT collections and maps containing UDTs). -
+   * **"enabled"** – Enables the `skip metadata` flag, preventing metadata from being sent. -
+   * **"disabled"** – Disables the `skip metadata` flag, ensuring metadata is included in every
+   * RESULT frame.
+   *
+   * <p>Sending metadata reduces performance on both the driver and server while increasing traffic.
+   * If you need to use UDTs or wildcard selects, you must either accept the performance impact or
+   * ensure: 1. No schema alterations are performed on tables or UDTs in use. 2. After any schema
+   * change, all relevant prepared statements are re-prepared.
+   *
+   * <p>Value-type: string
+   */
+  PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD(
+      "advanced.prepared-statements.skip-cql4-metadata-resolve-method"),
+
   /**
    * Whether the driver tries to prepare on new nodes at all.
    *

@@ -39,6 +39,7 @@ import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.cql.Conversions;
+import com.datastax.oss.driver.internal.core.cql.DefaultPreparedStatement;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.request.Execute;
 import com.datastax.oss.protocol.internal.request.Query;
@@ -115,8 +116,15 @@ public class DseConversions {
           protocolVersion, DefaultProtocolFeature.UNSET_BOUND_VALUES)) {
         Conversions.ensureAllSet(boundStatement);
       }
-      boolean skipMetadata =
-          boundStatement.getPreparedStatement().getResultSetDefinitions().size() > 0;
+
+      boolean skipMetadata;
+      if (boundStatement.getPreparedStatement() instanceof DefaultPreparedStatement) {
+        skipMetadata =
+            ((DefaultPreparedStatement) boundStatement.getPreparedStatement()).isSkipMetadata();
+      } else {
+        skipMetadata = boundStatement.getPreparedStatement().getResultSetDefinitions().size() > 0;
+        ;
+      }
       DseQueryOptions queryOptions =
           new DseQueryOptions(
               consistencyCode,

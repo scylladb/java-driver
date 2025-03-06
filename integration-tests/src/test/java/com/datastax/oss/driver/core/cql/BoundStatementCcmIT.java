@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assumptions.assumeThat;
 
+import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -36,6 +37,7 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.ColumnDefinition;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
@@ -56,11 +58,16 @@ import com.datastax.oss.driver.core.type.codec.CqlIntToStringCodec;
 import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.cql.DefaultPreparedStatement;
+import com.datastax.oss.driver.internal.core.type.DefaultUserDefinedType;
 import com.datastax.oss.driver.internal.core.util.RoutingKey;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
+import com.tngtech.java.junit.dataprovider.DataProvider;
+import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
@@ -75,8 +82,10 @@ import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestName;
 import org.junit.rules.TestRule;
+import org.junit.runner.RunWith;
 
 @Category(ParallelizableTests.class)
+@RunWith(DataProviderRunner.class)
 public class BoundStatementCcmIT {
 
   private CcmRule ccmRule = CcmRule.getInstance();
@@ -397,6 +406,149 @@ public class BoundStatementCcmIT {
     should_set_all_occurrences_of_variable(ps.boundStatementBuilder().setInt(id, 12).build());
   }
 
+  @DataProvider
+  public static Object[][] cql4SkipMetadataResolveMethod() {
+    return new Object[][] {
+      {
+        CQL4SkipMetadataResolveMethod.SMART,
+      },
+      {
+        CQL4SkipMetadataResolveMethod.ENABLED,
+      },
+      {
+        CQL4SkipMetadataResolveMethod.DISABLED,
+      }
+    };
+  }
+
+  @Test
+  @UseDataProvider(value = "cql4SkipMetadataResolveMethod")
+  public void prepared_stmt_metadata_update_loopholes_test(
+      CQL4SkipMetadataResolveMethod cql4SkipMetadataResolveMethod) {
+    // v0 is an int column, but we'll bind a String to it
+    try (CqlSession session =
+        sessionWithSkipCQL4MetadataResolveMethod(cql4SkipMetadataResolveMethod)) {
+      String udtName =
+          String.format(
+              "skip_metadata_test_%s_udt", cql4SkipMetadataResolveMethod.name().toLowerCase());
+      String udtTable =
+          String.format(
+              "skip_metadata_test_%s_udttable", cql4SkipMetadataResolveMethod.name().toLowerCase());
+      String table =
+          String.format(
+              "skip_metadata_test_%s_table", cql4SkipMetadataResolveMethod.name().toLowerCase());
+      session.execute(String.format("CREATE TYPE IF NOT EXISTS %s (x int, y int)", udtName));
+
+      session.execute(
+          String.format("CREATE TABLE %s (pk int, v %s, PRIMARY KEY (pk))", udtTable, udtName));
+      session.execute(String.format("CREATE TABLE %s (pk int, v int, PRIMARY KEY (pk))", table));
+
+      session.execute(String.format("INSERT INTO %s (pk, v) VALUES (1, 1)", table));
+      session.execute(String.format("INSERT INTO %s (pk, v) VALUES (1, {x: 1, y: 1})", udtTable));
+
+      PreparedStatement stmtRegularTableWCS =
+          session.prepare(String.format("SELECT * FROM %s WHERE pk = ?", table));
+      PreparedStatement stmtRegularTableTS =
+          session.prepare(String.format("SELECT pk, v FROM %s WHERE pk = ?", table));
+      PreparedStatement stmtUDTTableWCS =
+          session.prepare(String.format("SELECT * FROM %s WHERE pk = ?", udtTable));
+      PreparedStatement stmtUDTTableTS =
+          session.prepare(String.format("SELECT pk, v FROM %s WHERE pk = ?", udtTable));
+
+      // Metadata ID feature makes prepared statement invalidation works properly.
+      // It is mostly supported on CQL >= 5
+      boolean isMetadataIDFeatureSupported = stmtRegularTableWCS.getResultMetadataId() == null;
+      boolean isPreparedStatementInvalidationBroken =
+          isMetadataIDFeatureSupported
+              && cql4SkipMetadataResolveMethod == CQL4SkipMetadataResolveMethod.ENABLED;
+
+      if (isMetadataIDFeatureSupported) {
+        switch (cql4SkipMetadataResolveMethod) {
+          case ENABLED:
+            assertThat(((DefaultPreparedStatement) stmtRegularTableTS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtRegularTableWCS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableWCS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableTS).isSkipMetadata())
+                .isEqualTo(true);
+            break;
+          case DISABLED:
+            assertThat(((DefaultPreparedStatement) stmtRegularTableTS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtRegularTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableTS).isSkipMetadata())
+                .isEqualTo(false);
+            break;
+          default: // "SMART"
+            assertThat(((DefaultPreparedStatement) stmtRegularTableTS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtRegularTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableTS).isSkipMetadata())
+                .isEqualTo(false);
+        }
+      }
+
+      Row row = session.execute(stmtUDTTableWCS.bind(1)).one();
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1))).isEqualTo(2);
+      row = session.execute(stmtUDTTableTS.bind(1)).one();
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1))).isEqualTo(2);
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      row = session.execute(stmtRegularTableWCS.bind(1)).one();
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      row = session.execute(stmtRegularTableWCS.bind(1)).one();
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+
+      session.execute(String.format("ALTER TABLE %s ADD z int;", table));
+      session.execute(String.format("ALTER TYPE %s ADD z int;", udtName));
+
+      int expectedColumnCount = 3;
+      if (isPreparedStatementInvalidationBroken) {
+        // When case of CQL4 and skip metadata is set prepared statements will not be invalidated.
+        expectedColumnCount = 2;
+      }
+
+      row = session.execute(stmtUDTTableWCS.bind(1)).one();
+      try {
+        assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
+        // if isPreparedStatementInvalidationBroken is true it should throw exception
+        assertThat(isPreparedStatementInvalidationBroken).isFalse();
+      } catch (java.lang.IllegalArgumentException e) {
+        assertThat(isPreparedStatementInvalidationBroken).isTrue();
+      }
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1)))
+          .isEqualTo(expectedColumnCount);
+
+      row = session.execute(stmtUDTTableTS.bind(1)).one();
+      try {
+        assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
+        // if isPreparedStatementInvalidationBroken is true it should throw exception
+        assertThat(isPreparedStatementInvalidationBroken).isFalse();
+      } catch (java.lang.IllegalArgumentException e) {
+        assertThat(isPreparedStatementInvalidationBroken).isTrue();
+      }
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1)))
+          .isEqualTo(expectedColumnCount);
+
+      row = session.execute(stmtRegularTableWCS.bind(1)).one();
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(expectedColumnCount);
+    }
+  }
+
+  private int getUDTColumnCount(ColumnDefinition cd) {
+    return ((DefaultUserDefinedType) cd.getType()).getFieldTypes().size();
+  }
+
   private void should_set_all_occurrences_of_variable(BoundStatement bs) {
     assertThat(bs.getInt(0)).isEqualTo(12);
     assertThat(bs.getInt(1)).isEqualTo(12);
@@ -445,6 +597,21 @@ public class BoundStatementCcmIT {
             .addContactEndPoints(ccmRule.getContactPoints())
             .withKeyspace(sessionRule.keyspace())
             .addTypeCodecs(codec)
+            .build();
+  }
+
+  private CqlSession sessionWithSkipCQL4MetadataResolveMethod(
+      CQL4SkipMetadataResolveMethod cql4SkipMetadataResolveMethod) {
+    return (CqlSession)
+        SessionUtils.baseBuilder()
+            .addContactEndPoints(ccmRule.getContactPoints())
+            .withKeyspace(sessionRule.keyspace())
+            .withConfigLoader(
+                SessionUtils.configLoaderBuilder()
+                    .withString(
+                        DefaultDriverOption.PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD,
+                        cql4SkipMetadataResolveMethod.name())
+                    .build())
             .build();
   }
 
