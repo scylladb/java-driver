@@ -86,6 +86,17 @@ jobs:
           name: test-results
           path: "*/**/target/*-reports/*.xml"
 
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@v5
+        if: ${{ always() }}
+        with:
+          check_name: Unit tests report
+          require_tests: true
+          report_paths: "*/**/target/*-reports/*.xml"
+          follow_symlink: true
+          updateComment: false
+          skip_annotations: true
+
   setup-integration-tests:
     name: Setup ITs
     runs-on: ubuntu-20.04
@@ -168,6 +179,18 @@ jobs:
           name: ccm-logs-cassandra-${{ matrix.cassandra-version }}
           path: /tmp/*-0/ccm*/node*/logs/*
 
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@v5
+        if: ${{ always() }}
+        with:
+          check_name: Integration tests report for Cassandra ${{ matrix.cassandra-version }}
+          require_tests: true
+          report_paths: "*/**/target/*-reports/*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
+
   scylla-integration-tests:
     name: Scylla ITs
     runs-on: ubuntu-20.04
@@ -225,3 +248,15 @@ jobs:
         with:
           name: ccm-logs-scylla-${{ matrix.scylla-version }}
           path: /tmp/*-0/ccm*/node*/logs/*
+
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@v5
+        if: ${{ always() }}
+        with:
+          check_name: Integration tests report for Scylla ${{ matrix.scylla-version }}
+          require_tests: true
+          report_paths: "*/**/target/*-reports/*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
