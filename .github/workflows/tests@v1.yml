@@ -117,7 +117,7 @@ jobs:
         run: mvn -B test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
       - name: Copy test results
-        if: success() || failure()
+        if: always()
         run: |
           shopt -s globstar
           mkdir unit
@@ -125,10 +125,22 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: success() || failure()
+        if: always()
         with:
           name: test-results
           path: "*/**/target/*-reports/*.xml"
+
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          check_name: Unit tests report
+          require_tests: true
+          report_paths: "*/**/target/*-reports/*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
 
   setup-integration-tests:
     name: Setup ITs
@@ -239,6 +251,18 @@ jobs:
           name: ccm-log-cassandra-${{ matrix.java-version }}-${{ matrix.cassandra-version }}
           path: /tmp/ccm*/ccm*/node*/logs/*
 
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }}
+          require_tests: true
+          report_paths: "*/**/target/*-reports/*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
+
   scylla-integration-tests:
     name: Scylla ITs
     runs-on: ubuntu-latest
@@ -343,3 +367,15 @@ jobs:
         with:
           name: ccm-log-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}
           path: /tmp/ccm*/ccm*/node*/logs/*
+
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }}
+          require_tests: true
+          report_paths: "*/**/target/*-reports/*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
