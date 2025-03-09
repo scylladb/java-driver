@@ -24,14 +24,19 @@ package com.datastax.driver.core;
 import static com.datastax.driver.core.ProtocolVersion.V4;
 
 import com.datastax.driver.core.policies.RetryPolicy;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DefaultPreparedStatement implements PreparedStatement {
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultPreparedStatement.class);
   private static final String SCYLLA_CDC_LOG_SUFFIX = "_scylla_cdc_log";
+  private static final Splitter SPACE_SPLITTER = Splitter.onPattern("\\s+");
+  private static final Splitter COMMA_SPLITTER = Splitter.onPattern(",");
 
   final PreparedId preparedId;
 
@@ -50,6 +55,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   volatile RetryPolicy retryPolicy;
   volatile ImmutableMap<String, ByteBuffer> outgoingPayload;
   volatile Boolean idempotent;
+  volatile boolean skipMetadata;
 
   private DefaultPreparedStatement(
       PreparedId id,
@@ -66,6 +72,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
     this.cluster = cluster;
     this.isLWT = isLWT;
     this.partitioner = partitioner;
+    this.skipMetadata = this.calculateSkipMetadata();
   }
 
   static DefaultPreparedStatement fromMessage(
@@ -170,6 +177,62 @@ public class DefaultPreparedStatement implements PreparedStatement {
     }
 
     return null;
+  }
+
+  private boolean calculateSkipMetadata() {
+    if (cluster.manager.protocolVersion() == ProtocolVersion.V1
+        || preparedId.resultSetMetadata.variables == null) {
+      // CQL1 does not support it.
+      // If no rows returned there is no reason to send this flag, consequently, no metadata.
+      return false;
+    }
+
+    if (preparedId.resultSetMetadata.id != null
+        && preparedId.resultSetMetadata.id.bytes.length > 0) {
+      // It is CQL 5 or higher.
+      // Prepared statement invalidation works perfectly no need to disable skip metadata
+      return true;
+    }
+
+    switch (cluster.getConfiguration().getQueryOptions().getSkipCQL4MetadataResolveMethod()) {
+      case ENABLED:
+        return true;
+      case DISABLED:
+        return false;
+    }
+
+    if (isWildcardSelect(query)) {
+      LOGGER.warn(
+          "Prepared statement {} is a wildcard select, which can cause prepared statement invalidation issues when executed on CQL4. "
+              + "These issues may lead to broken deserialization or data corruption. "
+              + "To mitigate this, the driver ensures that the server returns metadata with each query for such statements, "
+              + "though this negatively impacts performance. "
+              + "To avoid this, consider using a targeted select instead. "
+              + "Alternatively, you can enable the skip-cql4-metadata-resolve-method option in the execution profile by setting it to `always-on`, "
+              + "allowing the driver to ignore this issue and proceed regardless, risking broken deserialization or data corruption.",
+          query);
+      return false;
+    }
+    // Disable skipping metadata if results contains udt and
+    for (ColumnDefinitions.Definition columnDefinition : preparedId.resultSetMetadata.variables) {
+      if (containsUDT(columnDefinition.getType())) {
+        LOGGER.warn(
+            "Prepared statement {} contains UDT in result, which can cause prepared statement invalidation issues when executed on CQL4. "
+                + "These issues may lead to broken deserialization or data corruption. "
+                + "To mitigate this, the driver ensures that the server returns metadata with each query for such statements, "
+                + "though this negatively impacts performance. "
+                + "To avoid this, consider using a targeted select instead. "
+                + "Alternatively, you can enable the skip-cql4-metadata-resolve-method option in the execution profile by setting it to `always-on`, "
+                + "allowing the driver to ignore this issue and proceed regardless, risking broken deserialization or data corruption.",
+            query);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public boolean isSkipMetadata() {
+    return skipMetadata;
   }
 
   @Override
@@ -314,5 +377,45 @@ public class DefaultPreparedStatement implements PreparedStatement {
   @Override
   public boolean isLWT() {
     return isLWT;
+  }
+
+  private static boolean containsUDT(DataType dataType) {
+    if (dataType.isCollection()) {
+      for (DataType elementType : dataType.getTypeArguments()) {
+        if (containsUDT(elementType)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return dataType instanceof UserType;
+  }
+
+  private static boolean isWildcardSelect(String query) {
+    List<String> chunks = SPACE_SPLITTER.splitToList(query.trim().toLowerCase());
+    if (chunks.size() < 2) {
+      // Weird query, assuming no result expected
+      return false;
+    }
+
+    if (!chunks.get(0).equals("select")) {
+      // In case if non-select sneaks in, disable skip metadata for it no result expected.
+      return false;
+    }
+
+    for (String chunk : chunks) {
+      if (chunk.equals("from")) {
+        return false;
+      }
+      if (chunk.equals("*")) {
+        return true;
+      }
+      for (String part : COMMA_SPLITTER.split(chunk)) {
+        if (part.equals("*")) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

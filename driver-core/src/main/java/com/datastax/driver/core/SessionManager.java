@@ -654,11 +654,16 @@ class SessionManager extends AbstractSession {
       }
       if (protocolVersion.compareTo(ProtocolVersion.V4) < 0) bs.ensureAllSet();
 
-      // skip resultset metadata if version > 1 (otherwise this feature is not supported)
-      // and if we already have metadata for the prepared statement being executed.
-      boolean skipMetadata =
-          protocolVersion != ProtocolVersion.V1
-              && bs.statement.getPreparedId().resultSetMetadata.variables != null;
+      boolean skipMetadata;
+      if (bs.statement instanceof DefaultPreparedStatement) {
+        skipMetadata = ((DefaultPreparedStatement) bs.statement).isSkipMetadata();
+      } else {
+        skipMetadata =
+            protocolVersion != ProtocolVersion.V1
+                && bs.statement.getPreparedId().resultSetMetadata.variables != null;
+        // skip resultset metadata if version > 1 (otherwise this feature is not supported)
+        // and if we already have metadata for the prepared statement being executed.
+      }
 
       Requests.QueryProtocolOptions options =
           new Requests.QueryProtocolOptions(
