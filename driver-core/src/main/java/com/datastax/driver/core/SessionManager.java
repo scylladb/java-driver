@@ -659,6 +659,7 @@ class SessionManager extends AbstractSession {
       boolean skipMetadata =
           protocolVersion != ProtocolVersion.V1
               && bs.statement.getPreparedId().resultSetMetadata.variables != null;
+
       Requests.QueryProtocolOptions options =
           new Requests.QueryProtocolOptions(
               Message.Request.Type.EXECUTE,

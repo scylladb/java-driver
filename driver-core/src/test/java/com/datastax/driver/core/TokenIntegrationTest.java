@@ -104,9 +104,10 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
 
     // Find the replica for a given partition key
     int testKey = 1;
-    Set<Host> replicas =
-        metadata.getReplicas(
+    List<Host> replicas =
+        metadata.getReplicasList(
             ks1,
+            null,
             null,
             TypeCodec.cint()
                 .serialize(
@@ -134,6 +135,7 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
           foundRange = range;
           // That range should be managed by the replica
           assertThat(metadata.getReplicas(ks1, range)).contains(replica);
+          assertThat(metadata.getReplicasList(ks1, range)).contains(replica);
         }
       }
     }

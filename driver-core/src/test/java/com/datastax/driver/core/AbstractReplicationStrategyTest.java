@@ -28,7 +28,6 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Base class for replication strategy tests. Currently only supports testing using the default
@@ -132,15 +131,15 @@ public class AbstractReplicationStrategyTest {
    * Hosts are checked in order, replica placement should be an ordered set
    */
   protected static void assertReplicaPlacement(
-      Map<Token, Set<Host>> replicaMap, Token token, InetSocketAddress... expected) {
-    Set<Host> replicaSet = replicaMap.get(token);
+      Map<Token, ImmutableList<Host>> replicaMap, Token token, InetSocketAddress... expected) {
+    List<Host> replicaSet = replicaMap.get(token);
     assertNotNull(replicaSet);
     assertReplicasForToken(replicaSet, expected);
   }
 
   /** Checks if a given ordered set of replicas matches the expected list of replica hosts */
   protected static void assertReplicasForToken(
-      Set<Host> replicaSet, InetSocketAddress... expected) {
+      List<Host> replicaSet, InetSocketAddress... expected) {
     final String message =
         "Contents of replica set: "
             + replicaSet

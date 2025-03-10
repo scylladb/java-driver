@@ -25,7 +25,6 @@ import com.google.common.collect.Maps;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.testng.annotations.Test;
@@ -189,7 +188,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 1), rf(DC2, 1));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2);
@@ -226,7 +225,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 1), rf(DC2, 1));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2);
@@ -263,7 +262,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 1), rf(DC2, 1), rf(DC3, 1));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2, IP3);
@@ -306,7 +305,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 2), rf(DC2, 2));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2, IP3, IP4);
@@ -365,7 +364,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 2), rf(DC2, 2));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2, IP3, IP4);
@@ -432,7 +431,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 3), rf(DC2, 3));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2, IP5, IP3, IP6, IP4);
@@ -497,7 +496,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 3), rf(DC2, 3));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP5, IP3, IP2, IP6, IP4);
@@ -564,7 +563,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
     // all nodes will contain all data, question is the replica order
     ReplicationStrategy strategy = networkTopologyStrategy(rf(DC1, 4), rf(DC2, 4));
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP5, IP3, IP7, IP2, IP6, IP4, IP8);
@@ -587,7 +586,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
   @Test(groups = "unit")
   public void networkTopologyStrategyExampleTopologyTest() {
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         exampleStrategy.computeTokenToReplicaMap(keyspace, exampleTokenToPrimary, exampleRing);
 
     // 105 and 106 will appear as replica for all as they're in separate racks
@@ -614,7 +613,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
   @Test(groups = "unit")
   public void networkTopologyStrategyNoNodesInDCTest() {
     long t1 = System.currentTimeMillis();
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         networkTopologyStrategy(rf(DC1, 2), rf(DC2, 2))
             .computeTokenToReplicaMap(keyspace, largeRingTokenToPrimary, largeRing);
     assertThat(System.currentTimeMillis() - t1).isLessThan(10000);
@@ -637,7 +636,7 @@ public class NetworkTopologyStrategyTest extends AbstractReplicationStrategyTest
 
   @Test(groups = "unit")
   public void networkTopologyStrategyExampleTopologyTooManyReplicasTest() {
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         exampleStrategyTooManyReplicas.computeTokenToReplicaMap(
             keyspace, exampleTokenToPrimary, exampleRing);
 

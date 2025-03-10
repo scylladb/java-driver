@@ -1,15 +1,14 @@
 package com.datastax.driver.core;
 
 import com.google.common.annotations.Beta;
+import com.google.common.collect.ImmutableList;
 import java.nio.ByteBuffer;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Objects;
-import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +25,7 @@ import org.slf4j.LoggerFactory;
 @Beta
 public class TabletMap {
   private static final Logger logger = LoggerFactory.getLogger(TabletMap.class);
+  private static final ImmutableList<Host> EMPTY_LIST = ImmutableList.of();
 
   // There are no additional locking mechanisms for the mapping field itself, however each TabletSet
   // inside has its own ReadWriteLock that should be used when dealing with its internals.
@@ -64,21 +64,22 @@ public class TabletMap {
    * @param keyspace the keyspace that table is in
    * @param table the table name
    * @param token the token to look for
-   * @return Set of Host instances that do have a tablet for the given token and table combination.
+   * @return List(immutable) of Host instances that do have a tablet for the given token and table
+   *     combination.
    */
-  public Set<Host> getReplicas(String keyspace, String table, long token) {
+  public List<Host> getReplicas(String keyspace, String table, long token) {
     TabletMap.KeyspaceTableNamePair key = new TabletMap.KeyspaceTableNamePair(keyspace, table);
 
     if (mapping == null) {
       logger.trace("This tablets map is null. Returning empty set.");
-      return Collections.emptySet();
+      return EMPTY_LIST;
     }
 
     TabletSet tabletSet = mapping.get(key);
     if (tabletSet == null) {
       logger.trace(
           "There is no tablets for {}.{} in this mapping. Returning empty set.", keyspace, table);
-      return Collections.emptySet();
+      return EMPTY_LIST;
     }
     Lock readLock = tabletSet.lock.readLock();
     try {
@@ -90,22 +91,22 @@ public class TabletMap {
             keyspace,
             table,
             token);
-        return Collections.emptySet();
+        return EMPTY_LIST;
       }
 
-      HashSet<Host> replicaSet = new HashSet<>();
+      ImmutableList.Builder<Host> replicas = new ImmutableList.Builder();
       for (HostShardPair hostShardPair : row.replicas) {
         Host replica = cluster.metadata.getHost(hostShardPair.getHost());
         if (replica == null) {
           // We've encountered a stale host. Return an empty set to
           // misroute the request. If misrouted then response will
           // contain up to date tablet information that will be processed.
-          return Collections.emptySet();
+          return EMPTY_LIST;
         } else {
-          replicaSet.add(replica);
+          replicas.add(replica);
         }
       }
-      return replicaSet;
+      return replicas.build();
     } finally {
       readLock.unlock();
     }
@@ -134,7 +135,7 @@ public class TabletMap {
         firstToken,
         lastToken);
 
-    Set<HostShardPair> replicas = new HashSet<>();
+    List<HostShardPair> replicas = new ArrayList<>();
     List<TupleValue> list = tupleValue.getList(2, TupleValue.class);
     for (TupleValue tuple : list) {
       HostShardPair hostShardPair = new HostShardPair(tuple.getUUID(0), tuple.getInt(1));
@@ -319,7 +320,7 @@ public class TabletMap {
     private final String tableName;
     private final long firstToken;
     private final long lastToken;
-    private final Set<HostShardPair> replicas;
+    private final List<HostShardPair> replicas;
 
     private Tablet(
         String keyspaceName,
@@ -327,7 +328,7 @@ public class TabletMap {
         String tableName,
         long firstToken,
         long lastToken,
-        Set<HostShardPair> replicas) {
+        List<HostShardPair> replicas) {
       this.keyspaceName = keyspaceName;
       this.tableId = tableId;
       this.tableName = tableName;
@@ -367,7 +368,7 @@ public class TabletMap {
       return lastToken;
     }
 
-    public Set<HostShardPair> getReplicas() {
+    public List<HostShardPair> getReplicas() {
       return replicas;
     }
 

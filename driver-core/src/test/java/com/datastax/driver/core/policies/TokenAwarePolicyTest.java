@@ -91,6 +91,8 @@ public class TokenAwarePolicyTest {
     when(cluster.getMetadata()).thenReturn(metadata);
     when(metadata.getReplicas(Metadata.quote("keyspace"), null, null, routingKey))
         .thenReturn(Sets.newLinkedHashSet(host1, host2));
+    when(metadata.getReplicasList(Metadata.quote("keyspace"), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2));
     when(childPolicy.newQueryPlan("keyspace", statement))
         .thenReturn(Sets.newLinkedHashSet(host4, host3, host2, host1).iterator());
     when(childPolicy.distance(any(Host.class))).thenReturn(HostDistance.LOCAL);

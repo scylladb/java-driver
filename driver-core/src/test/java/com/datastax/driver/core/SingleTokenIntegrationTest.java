@@ -25,6 +25,7 @@ import static com.datastax.driver.core.Assertions.assertThat;
 
 import com.datastax.driver.core.utils.Bytes;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.Set;
 import org.testng.annotations.Test;
 
@@ -53,9 +54,15 @@ public class SingleTokenIntegrationTest extends CCMTestsSupport {
     Host host1 = TestUtils.findHost(cluster(), 1);
     assertThat(hostsForRange).containsOnly(host1);
 
+    List<Host> hostsForRangeList = metadata.getReplicasList(keyspace, tokenRange);
+    assertThat(hostsForRangeList).containsOnly(host1);
+
     ByteBuffer randomPartitionKey = Bytes.fromHexString("0xCAFEBABE");
     Set<Host> hostsForKey = metadata.getReplicas(keyspace, null, randomPartitionKey);
     assertThat(hostsForKey).containsOnly(host1);
+
+    List<Host> hostsForKeyList = metadata.getReplicasList(keyspace, null, null, randomPartitionKey);
+    assertThat(hostsForKeyList).containsOnly(host1);
 
     Set<TokenRange> rangesForHost = metadata.getTokenRanges(keyspace, host1);
     assertThat(rangesForHost).containsOnly(tokenRange);

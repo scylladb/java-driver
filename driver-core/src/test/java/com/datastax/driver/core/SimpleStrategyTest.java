@@ -20,7 +20,6 @@ import com.google.common.collect.ImmutableMap;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.testng.annotations.Test;
 
 public class SimpleStrategyTest extends AbstractReplicationStrategyTest {
@@ -139,7 +138,7 @@ public class SimpleStrategyTest extends AbstractReplicationStrategyTest {
 
     ReplicationStrategy strategy = simpleStrategy(2);
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2);
@@ -163,7 +162,7 @@ public class SimpleStrategyTest extends AbstractReplicationStrategyTest {
 
     ReplicationStrategy strategy = simpleStrategy(2);
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2);
@@ -187,7 +186,7 @@ public class SimpleStrategyTest extends AbstractReplicationStrategyTest {
 
     ReplicationStrategy strategy = simpleStrategy(2);
 
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         strategy.computeTokenToReplicaMap(keyspace, tokenToPrimary, ring);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP2);
@@ -198,7 +197,7 @@ public class SimpleStrategyTest extends AbstractReplicationStrategyTest {
 
   @Test(groups = "unit")
   public void simpleStrategyExampleTopologyMapTest() {
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         exampleStrategy.computeTokenToReplicaMap(keyspace, exampleTokenToPrimary, exampleRing);
 
     assertReplicaPlacement(replicaMap, TOKEN01, IP1, IP5, IP3);
@@ -223,7 +222,7 @@ public class SimpleStrategyTest extends AbstractReplicationStrategyTest {
 
   @Test(groups = "unit")
   public void simpleStrategyExampleTopologyTooManyReplicasTest() {
-    Map<Token, Set<Host>> replicaMap =
+    Map<Token, ImmutableList<Host>> replicaMap =
         exampleStrategyTooManyReplicas.computeTokenToReplicaMap(
             keyspace, exampleTokenToPrimary, exampleRing);
 
