@@ -32,15 +32,16 @@
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
+import static com.datastax.driver.core.ProtocolVersion.V4;
 import static junit.framework.TestCase.fail;
 
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.utils.CassandraVersion;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-@CassandraVersion("4.0")
 public class PreparedStatementInvalidationTest extends CCMTestsSupport {
 
   @BeforeMethod(groups = "short", alwaysRun = true)
@@ -57,6 +58,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     execute("DROP TABLE prepared_statement_invalidation_test");
   }
 
+  @CassandraVersion("4.0")
   @Test(groups = "short")
   public void should_update_statement_id_when_metadata_changed_across_executions() {
     // given
@@ -79,6 +81,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     assertThat(rows.getColumnDefinitions()).hasSize(4).containsVariable("d", DataType.cint());
   }
 
+  @CassandraVersion("4.0")
   @Test(groups = "short")
   public void should_update_statement_id_when_metadata_changed_across_pages() throws Exception {
     // given
@@ -114,6 +117,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     assertThat(definitionsAfter).hasSize(4).containsVariable("d", DataType.cint());
   }
 
+  @CassandraVersion("4.0")
   @Test(groups = "short")
   public void should_update_statement_id_when_metadata_changed_across_sessions() {
     Session session1 = cluster().connect();
@@ -164,6 +168,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     assertThat(rows2.getColumnDefinitions()).hasSize(4).containsVariable("d", DataType.cint());
   }
 
+  @CassandraVersion("4.0")
   @Test(groups = "short", expectedExceptions = NoHostAvailableException.class)
   public void should_not_reprepare_invalid_statements() {
     // given
@@ -176,6 +181,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     session().execute(ps.bind());
   }
 
+  @CassandraVersion("4.0")
   @Test(groups = "short")
   public void should_never_update_statement_id_for_conditional_updates_in_modern_protocol() {
     should_never_update_statement_id_for_conditional_updates(session());
@@ -240,6 +246,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     assertThat(ps.getPreparedId().resultSetMetadata.id).isEqualTo(idBefore);
   }
 
+  @CassandraVersion("4.0")
   @Test(groups = "short")
   public void should_never_update_statement_for_conditional_updates_in_legacy_protocols() {
     // Given
@@ -248,9 +255,151 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
             Cluster.builder()
                 .addContactPoints(getContactPoints())
                 .withPort(ccm().getBinaryPort())
-                .withProtocolVersion(ccm().getProtocolVersion(ProtocolVersion.V4))
+                .withProtocolVersion(ccm().getProtocolVersion(V4))
                 .build());
     Session session = cluster.connect(keyspace);
     should_never_update_statement_id_for_conditional_updates(session);
+  }
+
+  @DataProvider(name = "resolverName")
+  public static Object[][] resolverName() {
+    return new Object[][] {
+      {
+        QueryOptions.CQL4SkipMetadataResolveMethod.SMART,
+      },
+      {
+        QueryOptions.CQL4SkipMetadataResolveMethod.ENABLED,
+      },
+      {
+        QueryOptions.CQL4SkipMetadataResolveMethod.DISABLED,
+      }
+    };
+  }
+
+  @Test(groups = "short", dataProvider = "resolverName")
+  public void prepared_stmt_metadata_update_loopholes_test(
+      QueryOptions.CQL4SkipMetadataResolveMethod resolver) {
+    // v0 is an int column, but we'll bind a String to it
+    try (Session session = sessionWithSkipCQL4MetadataResolveMethod(resolver)) {
+      String resolverNameFixed = resolver.name().toLowerCase().replace("-", "_");
+
+      String udtName = String.format("skip_metadata_test_%s_udt", resolverNameFixed);
+      String udtTable = String.format("skip_metadata_test_%s_udttable", resolverNameFixed);
+      String table = String.format("skip_metadata_test_%s_table", resolverNameFixed);
+      session.execute(String.format("CREATE TYPE IF NOT EXISTS %s (x int, y int)", udtName));
+
+      session.execute(
+          String.format("CREATE TABLE %s (pk int, v %s, PRIMARY KEY (pk))", udtTable, udtName));
+      session.execute(String.format("CREATE TABLE %s (pk int, v int, PRIMARY KEY (pk))", table));
+
+      session.execute(String.format("INSERT INTO %s (pk, v) VALUES (1, 1)", table));
+      session.execute(String.format("INSERT INTO %s (pk, v) VALUES (1, {x: 1, y: 1})", udtTable));
+
+      PreparedStatement stmtRegularTableWCS =
+          session.prepare(String.format("SELECT * FROM %s WHERE pk = ?", table));
+      PreparedStatement stmtRegularTableTS =
+          session.prepare(String.format("SELECT pk, v FROM %s WHERE pk = ?", table));
+      PreparedStatement stmtUDTTableWCS =
+          session.prepare(String.format("SELECT * FROM %s WHERE pk = ?", udtTable));
+      PreparedStatement stmtUDTTableTS =
+          session.prepare(String.format("SELECT pk, v FROM %s WHERE pk = ?", udtTable));
+
+      boolean isCQL4orLower = stmtRegularTableWCS.getPreparedId().resultSetMetadata.id == null;
+      boolean isPreparedStatementInvalidationBroken =
+          isCQL4orLower && resolver == QueryOptions.CQL4SkipMetadataResolveMethod.ENABLED;
+
+      if (isCQL4orLower) {
+        switch (resolver) {
+          case ENABLED:
+            assertThat(((DefaultPreparedStatement) stmtRegularTableTS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtRegularTableWCS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableWCS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableTS).isSkipMetadata())
+                .isEqualTo(true);
+            break;
+          case DISABLED:
+            assertThat(((DefaultPreparedStatement) stmtRegularTableTS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtRegularTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableTS).isSkipMetadata())
+                .isEqualTo(false);
+            break;
+          default: // SMART
+            assertThat(((DefaultPreparedStatement) stmtRegularTableTS).isSkipMetadata())
+                .isEqualTo(true);
+            assertThat(((DefaultPreparedStatement) stmtRegularTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableWCS).isSkipMetadata())
+                .isEqualTo(false);
+            assertThat(((DefaultPreparedStatement) stmtUDTTableTS).isSkipMetadata())
+                .isEqualTo(false);
+        }
+      }
+
+      Row row = session.execute(stmtUDTTableWCS.bind(1)).one();
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().asList().get(1))).isEqualTo(2);
+      row = session.execute(stmtUDTTableTS.bind(1)).one();
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().asList().get(1))).isEqualTo(2);
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      row = session.execute(stmtRegularTableWCS.bind(1)).one();
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+
+      session.execute(String.format("ALTER TABLE %s ADD z int;", table));
+      session.execute(String.format("ALTER TYPE %s ADD z int;", udtName));
+
+      int expectedUDTColumnCount = 3;
+      int expectedTableColumnCount = 3;
+      if (isPreparedStatementInvalidationBroken) {
+        // When case of CQL4 and skip metadata is set prepared statements will not be invalidated.
+        expectedUDTColumnCount = 2;
+        expectedTableColumnCount = 2;
+      }
+
+      row = session.execute(stmtUDTTableWCS.bind(1)).one();
+      assertThat(row.getUDTValue(1).getType().getFieldNames().size())
+          .isEqualTo(expectedUDTColumnCount);
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().asList().get(1)))
+          .isEqualTo(expectedUDTColumnCount);
+
+      row = session.execute(stmtUDTTableTS.bind(1)).one();
+      assertThat(row.getUDTValue(1).getType().getFieldNames().size())
+          .isEqualTo(expectedUDTColumnCount);
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
+      assertThat(getUDTColumnCount(row.getColumnDefinitions().asList().get(1)))
+          .isEqualTo(expectedUDTColumnCount);
+
+      row = session.execute(stmtRegularTableWCS.bind(1)).one();
+      assertThat(row.getColumnDefinitions().size()).isEqualTo(expectedTableColumnCount);
+    }
+  }
+
+  private int getUDTColumnCount(ColumnDefinitions.Definition cd) {
+    return ((UserType) cd.getType()).getFieldNames().size();
+  }
+
+  private Session sessionWithSkipCQL4MetadataResolveMethod(
+      QueryOptions.CQL4SkipMetadataResolveMethod resolver) {
+    Cluster cluster =
+        register(
+                Cluster.builder()
+                    .addContactPoints(getContactPoints())
+                    .withPort(ccm().getBinaryPort())
+                    .withProtocolVersion(V4)
+                    .withQueryOptions(new QueryOptions().setSkipCQL4MetadataResolveMethod(resolver))
+                    .build())
+            .init();
+    Session session = cluster.connect();
+    session.execute(
+        "CREATE KEYSPACE IF NOT EXISTS cql4_loopholes_test WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }");
+    session.execute("USE cql4_loopholes_test");
+    return session;
   }
 }

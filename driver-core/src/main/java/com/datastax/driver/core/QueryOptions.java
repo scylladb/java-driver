@@ -69,6 +69,8 @@ public class QueryOptions {
   private volatile boolean reprepareOnUp = true;
   private volatile Cluster.Manager manager;
   private volatile boolean prepareOnAllHosts = true;
+  private volatile CQL4SkipMetadataResolveMethod skipCQL4MetadataResolveMethod =
+      CQL4SkipMetadataResolveMethod.SMART;
 
   private volatile boolean schemaQueriesPaged = true;
 
@@ -191,6 +193,38 @@ public class QueryOptions {
    */
   public boolean getDefaultIdempotence() {
     return defaultIdempotence;
+  }
+
+  /**
+   * There is known problem in CQL 4.x when prepared statement invalidation could be voided: <a
+   * href="https://github.com/scylladb/scylladb/issues/20860">more info</a> When it happens metadata
+   * on client side does not match data and deserialization can go wrong in many ways To avoid
+   * driver can disable skip metadata flag to make server respond with metadata on every query.
+   * Unfortunately it causes excessive network traffic and CPU overhead on both server and driver
+   * side. This option controls how driver resolves skip metadata flag for CQL4 prepared statements.
+   * **SMART** - disable flag only for wildcard selects (select * from) and selects that return
+   * UDTs, including collections of UDTs and maps that contain UDTs **ENABLED** - flag is always set
+   * **DISABLED** - flag is always disabled Default is SMART Required: yes Modifiable at runtime:
+   * yes, the new value will be used for requests issued after the change. Overridable in a profile:
+   * yes
+   *
+   * @param method the new value to set as skip metadata resolve method.
+   * @return this {@code QueryOptions} instance.
+   */
+  public QueryOptions setSkipCQL4MetadataResolveMethod(CQL4SkipMetadataResolveMethod method) {
+    this.skipCQL4MetadataResolveMethod = method;
+    return this;
+  }
+
+  /**
+   * Skip metadata resolve method .
+   *
+   * <p>It defaults to {@link #skipCQL4MetadataResolveMethod.SMART}.
+   *
+   * @return the default idempotence for queries.
+   */
+  public CQL4SkipMetadataResolveMethod getSkipCQL4MetadataResolveMethod() {
+    return this.skipCQL4MetadataResolveMethod;
   }
 
   /**
@@ -582,5 +616,11 @@ public class QueryOptions {
 
   public boolean isConsistencySet() {
     return consistencySet;
+  }
+
+  public enum CQL4SkipMetadataResolveMethod {
+    ENABLED,
+    DISABLED,
+    SMART
   }
 }
