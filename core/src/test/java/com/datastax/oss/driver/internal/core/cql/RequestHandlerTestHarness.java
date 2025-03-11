@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
@@ -122,6 +123,8 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     when(defaultProfile.getBoolean(DefaultDriverOption.REQUEST_DEFAULT_IDEMPOTENCE))
         .thenReturn(builder.defaultIdempotence);
     when(defaultProfile.getBoolean(DefaultDriverOption.PREPARE_ON_ALL_NODES)).thenReturn(true);
+    when(defaultProfile.getString(DefaultDriverOption.PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD))
+        .thenReturn(CQL4SkipMetadataResolveMethod.SMART.toString());
 
     when(config.getDefaultProfile()).thenReturn(defaultProfile);
     when(context.getConfig()).thenReturn(config);

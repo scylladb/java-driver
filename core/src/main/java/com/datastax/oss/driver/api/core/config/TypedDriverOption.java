@@ -583,6 +583,10 @@ public class TypedDriverOption<ValueT> {
   /** Whether `Session.prepare` calls should be sent to all nodes in the cluster. */
   public static final TypedDriverOption<Boolean> PREPARE_ON_ALL_NODES =
       new TypedDriverOption<>(DefaultDriverOption.PREPARE_ON_ALL_NODES, GenericType.BOOLEAN);
+  /** Method to resolve skip metadata flag for CQL4. */
+  public static final TypedDriverOption<String> PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD =
+      new TypedDriverOption<>(
+          DefaultDriverOption.PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD, GenericType.STRING);
   /** Whether the driver tries to prepare on new nodes at all. */
   public static final TypedDriverOption<Boolean> REPREPARE_ENABLED =
       new TypedDriverOption<>(DefaultDriverOption.REPREPARE_ENABLED, GenericType.BOOLEAN);
