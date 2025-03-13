@@ -55,6 +55,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArraySet;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,7 +81,8 @@ public class MetadataManager implements AsyncAutoCloseable {
   private volatile KeyspaceFilter keyspaceFilter;
   private volatile Boolean schemaEnabledProgrammatically;
   private volatile boolean tokenMapEnabled;
-  private volatile Set<DefaultNode> contactPoints;
+  private volatile Set<EndPoint> contactPoints;
+  private volatile Set<DefaultNode> resolvedContactPoints;
   private volatile boolean wasImplicitContactPoint;
   private volatile TypeCodec<TupleValue> tabletPayloadCodec = null;
 
@@ -102,7 +104,7 @@ public class MetadataManager implements AsyncAutoCloseable {
             DefaultDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES, Collections.emptyList());
     this.keyspaceFilter = KeyspaceFilter.newInstance(logPrefix, refreshedKeyspaces);
     this.tokenMapEnabled = config.getBoolean(DefaultDriverOption.METADATA_TOKEN_MAP_ENABLED);
-
+    this.resolvedContactPoints = new CopyOnWriteArraySet<>();
     context.getEventBus().register(ConfigChangeEvent.class, this::onConfigChanged);
   }
 
@@ -145,18 +147,19 @@ public class MetadataManager implements AsyncAutoCloseable {
     // Convert the EndPoints to Nodes, but we can't put them into the Metadata yet, because we
     // don't know their host_id. So store them in a volatile field instead, they will get copied
     // during the first node refresh.
-    ImmutableSet.Builder<DefaultNode> contactPointsBuilder = ImmutableSet.builder();
+    ImmutableSet.Builder<EndPoint> contactPointsBuilder = ImmutableSet.builder();
     if (providedContactPoints == null || providedContactPoints.isEmpty()) {
       LOG.info(
           "[{}] No contact points provided, defaulting to {}", logPrefix, DEFAULT_CONTACT_POINT);
       this.wasImplicitContactPoint = true;
-      contactPointsBuilder.add(new DefaultNode(DEFAULT_CONTACT_POINT, context));
+      contactPointsBuilder.add(DEFAULT_CONTACT_POINT);
     } else {
       for (EndPoint endPoint : providedContactPoints) {
-        contactPointsBuilder.add(new DefaultNode(endPoint, context));
+        contactPointsBuilder.add(endPoint);
       }
     }
     this.contactPoints = contactPointsBuilder.build();
+    this.resolveContactPoints();
     LOG.debug("[{}] Adding initial contact points {}", logPrefix, contactPoints);
   }
 
@@ -167,7 +170,30 @@ public class MetadataManager implements AsyncAutoCloseable {
    * @see #wasImplicitContactPoint()
    */
   public Set<DefaultNode> getContactPoints() {
-    return contactPoints;
+    return resolvedContactPoints;
+  }
+
+  public synchronized void resolveContactPoints() {
+    ImmutableSet.Builder<EndPoint> resultBuilder = ImmutableSet.builder();
+    for (EndPoint endPoint : contactPoints) {
+      List<EndPoint> resolveEndpoints = endPoint.resolveAll();
+      if (resolveEndpoints.isEmpty()) {
+        LOG.error("failed to resolve contact endpoint {}", endPoint);
+      } else {
+        resultBuilder.addAll(resolveEndpoints);
+      }
+    }
+
+    Set<EndPoint> result = resultBuilder.build();
+    for (EndPoint endPoint : result) {
+      if (resolvedContactPoints.stream()
+          .anyMatch(resolved -> resolved.getEndPoint().equals(endPoint))) {
+        continue;
+      }
+      this.resolvedContactPoints.add(new DefaultNode(endPoint, context));
+    }
+
+    this.resolvedContactPoints.removeIf(endPoint -> !result.contains(endPoint.getEndPoint()));
   }
 
   /** Whether the default contact point was used (because none were provided explicitly). */
@@ -337,10 +363,13 @@ public class MetadataManager implements AsyncAutoCloseable {
     }
 
     private Void refreshNodes(Iterable<NodeInfo> nodeInfos) {
+      if (!didFirstNodeListRefresh) {
+        resolveContactPoints();
+      }
       MetadataRefresh refresh =
           didFirstNodeListRefresh
               ? new FullNodeListRefresh(nodeInfos)
-              : new InitialNodeListRefresh(nodeInfos, contactPoints);
+              : new InitialNodeListRefresh(nodeInfos, resolvedContactPoints);
       didFirstNodeListRefresh = true;
       return apply(refresh);
     }
