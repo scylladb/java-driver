@@ -975,9 +975,12 @@ class HostConnectionPool implements Connection.Owner {
 
     phase.set(Phase.CLOSING);
 
-    for (Queue<PendingBorrow> queue : pendingBorrows) {
-      for (PendingBorrow pendingBorrow : queue) {
-        pendingBorrow.setException(new ConnectionException(host.getEndPoint(), "Pool is shutdown"));
+    if (pendingBorrows != null) {
+      for (Queue<PendingBorrow> queue : pendingBorrows) {
+        for (PendingBorrow pendingBorrow : queue) {
+          pendingBorrow.setException(
+              new ConnectionException(host.getEndPoint(), "Pool is shutdown"));
+        }
       }
     }
 
