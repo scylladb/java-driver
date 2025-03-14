@@ -28,12 +28,12 @@ import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.datastax.oss.driver.api.mapper.annotations.ClusteringColumn;
 import com.datastax.oss.driver.api.mapper.annotations.Entity;
 import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
+import com.datastax.oss.driver.api.testinfra.ccm.BaseCcmRule;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
-import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 /** Factors common code for mapper tests that rely on a simple inventory model. */
@@ -65,7 +65,11 @@ public abstract class InventoryITBase {
   protected static ProductSale MP3_DOWNLOAD_SALE_1 =
       new ProductSale(MP3_DOWNLOAD.getId(), DATE_3, 7, Uuids.startOf(915192000), 0.99, 12);
 
-  protected static List<String> createStatements(CcmRule ccmRule) {
+  protected static List<String> createStatements(BaseCcmRule ccmRule) {
+    return createStatements(ccmRule, false);
+  }
+
+  protected static List<String> createStatements(BaseCcmRule ccmRule, boolean requiresSasiIndex) {
     ImmutableList.Builder<String> builder =
         ImmutableList.<String>builder()
             .add(
@@ -78,7 +82,7 @@ public abstract class InventoryITBase {
                 "CREATE TABLE product_sale(id uuid, day text, ts uuid, customer_id int, price "
                     + "double, count int, PRIMARY KEY ((id, day), customer_id, ts))");
 
-    if (supportsSASI(ccmRule) && !isSasiBroken(ccmRule)) {
+    if (requiresSasiIndex && supportsSASI(ccmRule) && !isSasiBroken(ccmRule)) {
       builder.add(
           "CREATE CUSTOM INDEX product_description ON product(description) "
               + "USING 'org.apache.cassandra.index.sasi.SASIIndex' "
@@ -96,16 +100,17 @@ public abstract class InventoryITBase {
     return builder.build();
   }
 
-  private static final Version MINIMUM_SASI_VERSION = Version.parse("3.4.0");
-  private static final Version BROKEN_SASI_VERSION = Version.parse("6.8.0");
+  private static final Version MINIMUM_SASI_VERSION =
+      Objects.requireNonNull(Version.parse("3.4.0"));
+  private static final Version BROKEN_SASI_VERSION = Objects.requireNonNull(Version.parse("6.8.0"));
 
-  protected static boolean isSasiBroken(CcmRule ccmRule) {
-    Optional<Version> dseVersion = ccmRule.getDseVersion();
+  protected static boolean isSasiBroken(BaseCcmRule ccmRule) {
     // creating SASI indexes is broken in DSE 6.8.0
-    return dseVersion.isPresent() && dseVersion.get().compareTo(BROKEN_SASI_VERSION) == 0;
+    return ccmRule.isDistributionOf(
+        BackendType.DSE, (dist, cass) -> dist.compareTo(BROKEN_SASI_VERSION) == 0);
   }
 
-  protected static boolean supportsSASI(CcmRule ccmRule) {
+  protected static boolean supportsSASI(BaseCcmRule ccmRule) {
     return ccmRule.getCassandraVersion().compareTo(MINIMUM_SASI_VERSION) >= 0
         && !CcmBridge
             .SCYLLA_ENABLEMENT /* @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */;

@@ -18,6 +18,8 @@
 package com.datastax.oss.driver.api.testinfra.ccm;
 
 import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A rule that creates a ccm cluster that can be used in a test. This should be used if you plan on
@@ -30,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class CustomCcmRule extends BaseCcmRule {
 
+  private static final Logger LOG = LoggerFactory.getLogger(CustomCcmRule.class);
   private static final AtomicReference<CustomCcmRule> CURRENT = new AtomicReference<>();
 
   CustomCcmRule(CcmBridge ccmBridge) {
@@ -42,10 +45,16 @@ public class CustomCcmRule extends BaseCcmRule {
       try {
         super.before();
       } catch (Exception e) {
-        // If exception is thrown in this rule, `after` is not going to be executed and test suit is
-        // going to become broken
-        // So we need to drop CURRENT to let other tests run
-        CURRENT.set(null);
+        // ExternalResource will not call after() when before() throws an exception
+        // Let's try and clean up and release the lock we have in CURRENT
+        LOG.warn(
+            "Error in CustomCcmRule before() method, attempting to clean up leftover state", e);
+        try {
+          after();
+        } catch (Exception e1) {
+          LOG.warn("Error cleaning up CustomCcmRule before() failure", e1);
+          e.addSuppressed(e1);
+        }
         throw e;
       }
     } else if (CURRENT.get() != this) {

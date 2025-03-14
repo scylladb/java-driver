@@ -31,6 +31,7 @@ import com.datastax.oss.driver.api.testinfra.CassandraSkip;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import java.util.Objects;
 import java.util.Optional;
 import org.junit.AssumptionViolatedException;
@@ -48,7 +49,7 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
             new Thread(
                 () -> {
                   try {
-                    ccmBridge.remove();
+                    ccmBridge.close();
                   } catch (Exception e) {
                     // silently remove as may have already been removed.
                   }
@@ -63,7 +64,7 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
 
   @Override
   protected void after() {
-    ccmBridge.remove();
+    ccmBridge.close();
   }
 
   private Statement buildErrorStatement(
@@ -182,17 +183,29 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     }
   }
 
-  public Version getCassandraVersion() {
-    return ccmBridge.getCassandraVersion();
+  public BackendType getDistribution() {
+    return CcmBridge.DISTRIBUTION;
   }
 
-  public Optional<Version> getDseVersion() {
-    return ccmBridge.getDseVersion();
+  public boolean isDistributionOf(BackendType type) {
+    return CcmBridge.isDistributionOf(type);
+  }
+
+  public boolean isDistributionOf(BackendType type, CcmBridge.VersionComparator comparator) {
+    return CcmBridge.isDistributionOf(type, comparator);
+  }
+
+  public Version getDistributionVersion() {
+    return CcmBridge.getDistributionVersion();
+  }
+
+  public Version getCassandraVersion() {
+    return CcmBridge.getCassandraVersion();
   }
 
   @Override
   public ProtocolVersion getHighestProtocolVersion() {
-    if (ccmBridge.getCassandraVersion().compareTo(Version.V2_2_0) >= 0) {
+    if (CcmBridge.getCassandraVersion().compareTo(Version.V2_2_0) >= 0) {
       return DefaultProtocolVersion.V4;
     } else {
       return DefaultProtocolVersion.V3;

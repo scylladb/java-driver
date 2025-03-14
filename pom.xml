@@ -27,7 +27,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.scylladb</groupId>
   <artifactId>java-driver-parent</artifactId>
-  <version>4.18.1.1-SNAPSHOT</version>
+  <version>4.19.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Java Driver for Scylla and Apache Cassandra</name>
   <description>A driver for Scylla and Apache Cassandra(R) 2.1+ that works exclusively with the Cassandra Query Language version 3 (CQL3) and Cassandra's native protocol versions 3 and above.</description>
@@ -41,6 +41,7 @@
     <module>mapper-processor</module>
     <module>metrics/micrometer</module>
     <module>metrics/microprofile</module>
+    <module>guava-shaded</module>
     <module>test-infra</module>
     <module>integration-tests</module>
     <module>osgi-tests</module>
@@ -113,10 +114,10 @@
         <version>${netty.version}</version>
       </dependency>
       <dependency>
-        <!-- Only for integration tests, use the shaded JAR for production code -->
+        <!-- Version of Guava used in shaded module and for integration tests. -->
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>32.0.0-jre</version>
+        <version>33.3.1-jre</version>
       </dependency>
       <dependency>
         <groupId>com.typesafe</groupId>
@@ -1013,6 +1014,17 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <activation>
         <jdk>[11,)</jdk>
       </activation>
+    </profile>
+    <profile>
+      <!-- workarounds for running tests with JDK14 -->
+      <id>test-jdk-14</id>
+      <activation>
+        <jdk>[14,)</jdk>
+      </activation>
+      <properties>
+        <!-- for DriverBlockHoundIntegrationIT when using JDK 13+, see https://github.com/reactor/BlockHound/issues/33 -->
+        <blockhound.argline>-XX:+AllowRedefinitionToAddDeleteMethods</blockhound.argline>
+      </properties>
     </profile>
     <profile>
       <!-- workarounds for running tests with JDK17 -->
