@@ -151,7 +151,7 @@ public class CcmBridge implements AutoCloseable {
   static {
     Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
     if (SCYLLA_ENABLEMENT) {
-      LOG.info("Overriding distribution variable because 'ccm.scylla = true' was passed");
+      LOG.debug("Overriding distribution variable because 'ccm.scylla = true' was passed");
       DISTRIBUTION = BackendType.SCYLLA;
 
       if (SCYLLA_ENTERPRISE) {
