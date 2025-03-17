@@ -87,8 +87,20 @@ abstract class ConvictionPolicy {
     @Override
     void signalConnectionClosed(Connection connection) {
       int remaining = openConnections.decrementAndGet();
-      assert remaining >= 0;
-      Host.statesLogger.debug("[{}] {} closed, remaining = {}", host, connection, remaining);
+      // There's a loose connection between `Connection` and `ConvictionPolicy` (i.e., `Host`),
+      // making it impossible to guarantee that a single connection always address same
+      // `openConnections` counter.
+      // This can occasionally lead to assertion failures in rare cases.
+      // assert remaining >= 0;
+      // Fixing this would require refactoring `Connection.java` to bind connections to `Host`
+      // instead of `Endpoint`,
+      //  which is not justified considering low impact of this issue.
+      if (remaining < 0) {
+        Host.statesLogger.error(
+            "[{}] {} closed, remaining is negative {}", host, connection, remaining);
+      } else {
+        Host.statesLogger.debug("[{}] {} closed, remaining = {}", host, connection, remaining);
+      }
     }
 
     @Override
@@ -98,12 +110,24 @@ abstract class ConvictionPolicy {
         if (host.state != Host.State.DOWN) updateReconnectionTime();
 
         remaining = openConnections.decrementAndGet();
-        assert remaining >= 0;
-        Host.statesLogger.debug("[{}] {} failed, remaining = {}", host, connection, remaining);
+        // There's a loose connection between `Connection` and `ConvictionPolicy` (i.e., `Host`),
+        // making it impossible to guarantee that a single connection always address same
+        // `openConnections` counter.
+        // This can occasionally lead to assertion failures in rare cases.
+        // assert remaining >= 0;
+        // Fixing this would require refactoring `Connection.java` to bind connections to `Host`
+        // instead of `Endpoint`,
+        //  which is not justified considering low impact of this issue.
+        if (remaining < 0) {
+          Host.statesLogger.error(
+              "[{}] {} failed, remaining is negative {}", host, connection, remaining);
+        } else {
+          Host.statesLogger.debug("[{}] {} failed, remaining = {}", host, connection, remaining);
+        }
       } else {
         remaining = openConnections.get();
       }
-      return remaining == 0;
+      return remaining <= 0;
     }
 
     private synchronized void updateReconnectionTime() {
