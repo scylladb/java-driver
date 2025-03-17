@@ -522,25 +522,15 @@ public class BoundStatementCcmIT {
       }
 
       row = session.execute(stmtUDTTableWCS.bind(1)).one();
-      try {
-        assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
-        // if isPreparedStatementInvalidationBroken is true it should throw exception
-        assertThat(isPreparedStatementInvalidationBroken).isFalse();
-      } catch (java.lang.IllegalArgumentException e) {
-        assertThat(isPreparedStatementInvalidationBroken).isTrue();
-      }
+
+      assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
       assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
       assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1)))
           .isEqualTo(expectedColumnCount);
 
       row = session.execute(stmtUDTTableTS.bind(1)).one();
-      try {
-        assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
-        // if isPreparedStatementInvalidationBroken is true it should throw exception
-        assertThat(isPreparedStatementInvalidationBroken).isFalse();
-      } catch (java.lang.IllegalArgumentException e) {
-        assertThat(isPreparedStatementInvalidationBroken).isTrue();
-      }
+
+      assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
       assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
       assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1)))
           .isEqualTo(expectedColumnCount);
