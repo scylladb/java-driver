@@ -48,7 +48,7 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
             new Thread(
                 () -> {
                   try {
-                    ccmBridge.remove();
+                    ccmBridge.removeOrStop();
                   } catch (Exception e) {
                     // silently remove as may have already been removed.
                   }
@@ -63,7 +63,7 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
 
   @Override
   protected void after() {
-    ccmBridge.remove();
+    ccmBridge.removeOrStop();
   }
 
   private Statement buildErrorStatement(
@@ -197,5 +197,9 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     } else {
       return DefaultProtocolVersion.V3;
     }
+  }
+
+  public CcmBridge getCcmBridge() {
+    return ccmBridge;
   }
 }
