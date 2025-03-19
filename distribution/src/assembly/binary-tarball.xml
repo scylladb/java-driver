@@ -71,8 +71,8 @@
               <exclude>com.scylladb:java-driver-core</exclude>
               <exclude>com.scylladb:java-driver-mapper-runtime</exclude>
               <exclude>com.scylladb:java-driver-mapper-processor</exclude>
+              <exclude>com.scylladb:java-driver-guava-shaded</exclude>
               <!-- Don't reinclude dependencies that core also has -->
-              <exclude>com.datastax.oss:java-driver-shaded-guava</exclude>
               <exclude>com.github.stephenc.jcip:jcip-annotations</exclude>
               <exclude>com.github.spotbugs:spotbugs-annotations</exclude>
             </excludes>
@@ -96,8 +96,8 @@
               <exclude>com.scylladb:java-driver-core</exclude>
               <exclude>com.scylladb:java-driver-query-builder</exclude>
               <exclude>com.scylladb:java-driver-mapper-processor</exclude>
+              <exclude>com.scylladb:java-driver-guava-shaded</exclude>
               <!-- Don't reinclude dependencies that core also has -->
-              <exclude>com.datastax.oss:java-driver-shaded-guava</exclude>
               <exclude>com.github.stephenc.jcip:jcip-annotations</exclude>
               <exclude>com.github.spotbugs:spotbugs-annotations</exclude>
             </excludes>
@@ -121,8 +121,8 @@
               <exclude>com.scylladb:java-driver-core</exclude>
               <exclude>com.scylladb:java-driver-query-builder</exclude>
               <exclude>com.scylladb:java-driver-mapper-runtime</exclude>
+              <exclude>com.scylladb:java-driver-guava-shaded</exclude>
               <!-- Don't reinclude dependencies that core also has -->
-              <exclude>com.datastax.oss:java-driver-shaded-guava</exclude>
               <exclude>com.github.stephenc.jcip:jcip-annotations</exclude>
               <exclude>com.github.spotbugs:spotbugs-annotations</exclude>
             </excludes>

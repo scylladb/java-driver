@@ -48,6 +48,7 @@ public class Version implements Comparable<Version>, Serializable {
 
   private static final Pattern pattern = Pattern.compile(VERSION_REGEXP);
 
+  @NonNull public static final Version V1_0_0 = Objects.requireNonNull(parse("1.0.0"));
   @NonNull public static final Version V2_1_0 = Objects.requireNonNull(parse("2.1.0"));
   @NonNull public static final Version V2_2_0 = Objects.requireNonNull(parse("2.2.0"));
   @NonNull public static final Version V3_0_0 = Objects.requireNonNull(parse("3.0.0"));
@@ -56,6 +57,7 @@ public class Version implements Comparable<Version>, Serializable {
   @NonNull public static final Version V5_0_0 = Objects.requireNonNull(parse("5.0.0"));
   @NonNull public static final Version V6_7_0 = Objects.requireNonNull(parse("6.7.0"));
   @NonNull public static final Version V6_8_0 = Objects.requireNonNull(parse("6.8.0"));
+  @NonNull public static final Version V6_9_0 = Objects.requireNonNull(parse("6.9.0"));
 
   private final int major;
   private final int minor;

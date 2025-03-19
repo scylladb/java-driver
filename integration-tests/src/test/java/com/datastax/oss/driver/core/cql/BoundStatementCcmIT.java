@@ -49,6 +49,7 @@ import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
@@ -111,40 +112,44 @@ public class BoundStatementCcmIT {
   @Before
   public void setupSchema() {
     // table where every column forms the primary key.
-    sessionRule
-        .session()
-        .execute(
-            SimpleStatement.builder(
-                    "CREATE TABLE IF NOT EXISTS test (k text, v int, PRIMARY KEY(k, v))")
-                .setExecutionProfile(sessionRule.slowProfile())
-                .build());
-    for (int i = 0; i < 100; i++) {
-      sessionRule
-          .session()
-          .execute(
-              SimpleStatement.builder("INSERT INTO test (k, v) VALUES (?, ?)")
-                  .addPositionalValues(KEY, i)
-                  .build());
-    }
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          sessionRule
+              .session()
+              .execute(
+                  SimpleStatement.builder(
+                          "CREATE TABLE IF NOT EXISTS test (k text, v int, PRIMARY KEY(k, v))")
+                      .setExecutionProfile(sessionRule.slowProfile())
+                      .build());
+          for (int i = 0; i < 100; i++) {
+            sessionRule
+                .session()
+                .execute(
+                    SimpleStatement.builder("INSERT INTO test (k, v) VALUES (?, ?)")
+                        .addPositionalValues(KEY, i)
+                        .build());
+          }
 
-    // table with simple primary key, single cell.
-    sessionRule
-        .session()
-        .execute(
-            SimpleStatement.builder("CREATE TABLE IF NOT EXISTS test2 (k text primary key, v0 int)")
-                .setExecutionProfile(sessionRule.slowProfile())
-                .build());
+          // table with simple primary key, single cell.
+          sessionRule
+              .session()
+              .execute(
+                  SimpleStatement.builder(
+                          "CREATE TABLE IF NOT EXISTS test2 (k text primary key, v0 int)")
+                      .setExecutionProfile(sessionRule.slowProfile())
+                      .build());
 
-    // table with composite partition key
-    sessionRule
-        .session()
-        .execute(
-            SimpleStatement.builder(
-                    "CREATE TABLE IF NOT EXISTS test3 "
-                        + "(pk1 int, pk2 int, v int, "
-                        + "PRIMARY KEY ((pk1, pk2)))")
-                .setExecutionProfile(sessionRule.slowProfile())
-                .build());
+          // table with composite partition key
+          sessionRule
+              .session()
+              .execute(
+                  SimpleStatement.builder(
+                          "CREATE TABLE IF NOT EXISTS test3 "
+                              + "(pk1 int, pk2 int, v int, "
+                              + "PRIMARY KEY ((pk1, pk2)))")
+                      .setExecutionProfile(sessionRule.slowProfile())
+                      .build());
+        });
   }
 
   @Test
@@ -517,25 +522,15 @@ public class BoundStatementCcmIT {
       }
 
       row = session.execute(stmtUDTTableWCS.bind(1)).one();
-      try {
-        assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
-        // if isPreparedStatementInvalidationBroken is true it should throw exception
-        assertThat(isPreparedStatementInvalidationBroken).isFalse();
-      } catch (java.lang.IllegalArgumentException e) {
-        assertThat(isPreparedStatementInvalidationBroken).isTrue();
-      }
+
+      assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
       assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
       assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1)))
           .isEqualTo(expectedColumnCount);
 
       row = session.execute(stmtUDTTableTS.bind(1)).one();
-      try {
-        assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
-        // if isPreparedStatementInvalidationBroken is true it should throw exception
-        assertThat(isPreparedStatementInvalidationBroken).isFalse();
-      } catch (java.lang.IllegalArgumentException e) {
-        assertThat(isPreparedStatementInvalidationBroken).isTrue();
-      }
+
+      assertThat(row.getUdtValue(1).size()).isEqualTo(expectedColumnCount);
       assertThat(row.getColumnDefinitions().size()).isEqualTo(2);
       assertThat(getUDTColumnCount(row.getColumnDefinitions().get(1)))
           .isEqualTo(expectedColumnCount);

@@ -24,6 +24,7 @@
 package com.datastax.oss.driver.api.testinfra.ccm;
 
 import com.datastax.oss.driver.api.core.Version;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.shaded.guava.common.base.Joiner;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
@@ -61,6 +62,10 @@ import org.slf4j.LoggerFactory;
 public class CcmBridge implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CcmBridge.class);
+
+  public static BackendType DISTRIBUTION =
+      BackendType.valueOf(
+          System.getProperty("ccm.distribution", BackendType.CASSANDRA.name()).toUpperCase());
 
   public static final Boolean SCYLLA_ENABLEMENT = Boolean.getBoolean("ccm.scylla");
 
@@ -128,30 +133,32 @@ public class CcmBridge implements AutoCloseable {
   // = createTempStore(DEFAULT_SERVER_LOCALHOST_KEYSTORE_PATH);
 
   // major DSE versions
-  private static final Version V6_0_0 = Version.parse("6.0.0");
-  private static final Version V5_1_0 = Version.parse("5.1.0");
-  private static final Version V5_0_0 = Version.parse("5.0.0");
+  public static final Version V6_0_0 = Version.parse("6.0.0");
+  public static final Version V5_1_0 = Version.parse("5.1.0");
+  public static final Version V5_0_0 = Version.parse("5.0.0");
 
   // mapped C* versions from DSE versions
-  private static final Version V4_0_0 = Version.parse("4.0.0");
-  private static final Version V3_10 = Version.parse("3.10");
-  private static final Version V3_0_15 = Version.parse("3.0.15");
-  private static final Version V2_1_19 = Version.parse("2.1.19");
+  public static final Version V4_0_0 = Version.parse("4.0.0");
+  public static final Version V3_10 = Version.parse("3.10");
+  public static final Version V3_0_15 = Version.parse("3.0.15");
+  public static final Version V2_1_19 = Version.parse("2.1.19");
+
+  // mapped C* versions from HCD versions
+  public static final Version V4_0_11 = Version.parse("4.0.11");
 
   private static final Map<String, String> ENVIRONMENT_MAP;
 
   static {
     Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
-    if (DSE_ENABLEMENT) {
-      LOG.info("CCM Bridge configured with DSE version {}", VERSION);
-    } else if (SCYLLA_ENABLEMENT) {
-      LOG.info("CCM Bridge configured with Scylla version {}", VERSION);
+    if (SCYLLA_ENABLEMENT) {
+      LOG.debug("Overriding distribution variable because 'ccm.scylla = true' was passed");
+      DISTRIBUTION = BackendType.SCYLLA;
+
       if (SCYLLA_ENTERPRISE) {
         envMap.put("SCYLLA_PRODUCT", "enterprise");
       }
-    } else {
-      LOG.info("CCM Bridge configured with Apache Cassandra version {}", VERSION);
     }
+    LOG.info("CCM Bridge configured with {} version {}", DISTRIBUTION.getFriendlyName(), VERSION);
 
     // If ccm.path is set, override the PATH variable with it.
     String ccmPath = System.getProperty("ccm.path");
@@ -285,24 +292,24 @@ public class CcmBridge implements AutoCloseable {
     return DSE_ENABLEMENT ? Optional.of(VERSION) : Optional.empty();
   }
 
-  public Version getCassandraVersion() {
-    if (DSE_ENABLEMENT) {
-      Version stableVersion = VERSION.nextStable();
-      if (stableVersion.compareTo(V6_0_0) >= 0) {
-        return V4_0_0;
-      } else if (stableVersion.compareTo(V5_1_0) >= 0) {
-        return V3_10;
-      } else if (stableVersion.compareTo(V5_0_0) >= 0) {
-        return V3_0_15;
-      } else {
-        return V2_1_19;
-      }
-    } else if (SCYLLA_ENABLEMENT) {
-      return V4_0_0;
-    } else {
-      // Regular Cassandra
+  public static boolean isDistributionOf(BackendType type) {
+    return DISTRIBUTION == type;
+  }
+
+  public static boolean isDistributionOf(BackendType type, VersionComparator comparator) {
+    return isDistributionOf(type)
+        && comparator.accept(getDistributionVersion(), getCassandraVersion());
+  }
+
+  public static Version getDistributionVersion() {
+    return VERSION;
+  }
+
+  public static Version getCassandraVersion() {
+    if (isDistributionOf(BackendType.CASSANDRA)) {
       return VERSION;
     }
+    return DistributionCassandraVersions.getCassandraVersion(DISTRIBUTION, VERSION);
   }
 
   private String getCcmVersionString(String propertyString) {
@@ -331,9 +338,10 @@ public class CcmBridge implements AutoCloseable {
       }
       return "release:" + versionString;
     }
-    // for 4.0 pre-releases, the CCM version string needs to be "4.0-alpha1" or "4.0-alpha2"
-    // Version.toString() always adds a patch value, even if it's not specified when parsing.
-    if (version.getMajor() == 4
+    // for 4.0 or 5.0 pre-releases, the CCM version string needs to be "4.0-alpha1", "4.0-alpha2" or
+    // "5.0-beta1" Version.toString() always adds a patch value, even if it's not specified when
+    // parsing.
+    if (version.getMajor() >= 4
         && version.getMinor() == 0
         && version.getPatch() == 0
         && version.getPreReleaseLabels() != null) {
@@ -358,12 +366,7 @@ public class CcmBridge implements AutoCloseable {
       } else {
         createOptions.add("-v " + getCcmVersionString(CCM_VERSION_PROPERTY));
       }
-      if (DSE_ENABLEMENT) {
-        createOptions.add("--dse");
-      }
-      if (SCYLLA_ENABLEMENT) {
-        createOptions.add("--scylla");
-      }
+      createOptions.addAll(Arrays.asList(DISTRIBUTION.getCcmOptions()));
       execute(
           "create",
           CLUSTER_NAME,
@@ -379,7 +382,7 @@ public class CcmBridge implements AutoCloseable {
 
       Version cassandraVersion = getCassandraVersion();
 
-      if (getCassandraVersion().compareTo(Version.V2_2_0) >= 0 && !SCYLLA_ENABLEMENT) {
+      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0 && !SCYLLA_ENABLEMENT) {
         // @IntegrationTestDisabledScyllaJVMArgs @IntegrationTestDisabledScyllaUDF
         cassandraConfiguration.put("enable_user_defined_functions", "true");
       }
@@ -397,7 +400,7 @@ public class CcmBridge implements AutoCloseable {
       }
 
       // Note that we aren't performing any substitution on DSE key/value props (at least for now)
-      if (DSE_ENABLEMENT) {
+      if (isDistributionOf(BackendType.DSE)) {
         for (Map.Entry<String, Object> conf : dseConfiguration.entrySet()) {
           execute("updatedseconf", String.format("%s:%s", conf.getKey(), conf.getValue()));
         }
@@ -494,11 +497,7 @@ public class CcmBridge implements AutoCloseable {
   public void addWithoutStart(int n, String dc) {
     String[] initialArgs = new String[] {"add", "-i", ipPrefix + n, "-d", dc, "node" + n};
     ArrayList<String> args = new ArrayList<>(Arrays.asList(initialArgs));
-    if (getDseVersion().isPresent()) {
-      args.add("--dse");
-    } else if (getScyllaVersion().isPresent()) {
-      args.add("--scylla");
-    }
+    args.addAll(Arrays.asList(DISTRIBUTION.getCcmOptions()));
     execute(args.toArray(new String[] {}));
   }
 
@@ -593,7 +592,9 @@ public class CcmBridge implements AutoCloseable {
 
   @Override
   public void close() {
-    remove();
+    if (created.compareAndSet(true, false)) {
+      remove();
+    }
   }
 
   /**
@@ -786,5 +787,9 @@ public class CcmBridge implements AutoCloseable {
           jvmArgs,
           dseWorkloads);
     }
+  }
+
+  public interface VersionComparator {
+    boolean accept(Version distribution, Version cassandra);
   }
 }

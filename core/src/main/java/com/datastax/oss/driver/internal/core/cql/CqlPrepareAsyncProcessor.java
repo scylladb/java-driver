@@ -34,6 +34,7 @@ import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
+import com.datastax.oss.driver.shaded.guava.common.base.Functions;
 import com.datastax.oss.driver.shaded.guava.common.cache.Cache;
 import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterables;
@@ -45,6 +46,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,14 +64,15 @@ public class CqlPrepareAsyncProcessor
   }
 
   public CqlPrepareAsyncProcessor(@NonNull Optional<? extends DefaultDriverContext> context) {
-    this(CacheBuilder.newBuilder().weakValues().build(), context);
+    this(context, Functions.identity());
   }
 
   protected CqlPrepareAsyncProcessor(
-      Cache<PrepareRequest, CompletableFuture<PreparedStatement>> cache,
-      Optional<? extends DefaultDriverContext> context) {
+      Optional<? extends DefaultDriverContext> context,
+      Function<CacheBuilder<Object, Object>, CacheBuilder<Object, Object>> decorator) {
 
-    this.cache = cache;
+    CacheBuilder<Object, Object> baseCache = CacheBuilder.newBuilder().weakValues();
+    this.cache = decorator.apply(baseCache).build();
     context.ifPresent(
         (ctx) -> {
           LOG.info("Adding handler to invalidate cached prepared statements on type changes");
@@ -159,7 +162,9 @@ public class CqlPrepareAsyncProcessor
                   });
         }
       }
-      return result;
+      // Return a defensive copy. So if a client cancels its request, the cache won't be impacted
+      // nor a potential concurrent request.
+      return result.thenApply(x -> x); // copy() is available only since Java 9
     } catch (ExecutionException e) {
       return CompletableFutures.failedFuture(e.getCause());
     }

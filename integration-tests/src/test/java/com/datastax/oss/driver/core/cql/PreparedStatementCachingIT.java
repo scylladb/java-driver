@@ -24,12 +24,12 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.context.DriverContext;
-import com.datastax.oss.driver.api.core.cql.PrepareRequest;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.core.session.SessionBuilder;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.IsolatedTests;
@@ -40,7 +40,6 @@ import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEv
 import com.datastax.oss.driver.internal.core.session.BuiltInRequestProcessors;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.RequestProcessorRegistry;
-import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder;
 import com.datastax.oss.driver.shaded.guava.common.cache.RemovalListener;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.Uninterruptibles;
 import com.google.common.collect.ImmutableList;
@@ -118,11 +117,12 @@ public class PreparedStatementCachingIT {
     private static final Logger LOG =
         LoggerFactory.getLogger(PreparedStatementCachingIT.TestCqlPrepareAsyncProcessor.class);
 
-    private static RemovalListener<PrepareRequest, CompletableFuture<PreparedStatement>>
-        buildCacheRemoveCallback(@NonNull Optional<DefaultDriverContext> context) {
+    private static RemovalListener<Object, Object> buildCacheRemoveCallback(
+        @NonNull Optional<DefaultDriverContext> context) {
       return (evt) -> {
         try {
-          CompletableFuture<PreparedStatement> future = evt.getValue();
+          CompletableFuture<PreparedStatement> future =
+              (CompletableFuture<PreparedStatement>) evt.getValue();
           ByteBuffer queryId = Uninterruptibles.getUninterruptibly(future).getId();
           context.ifPresent(
               ctx -> ctx.getEventBus().fire(new PreparedStatementRemovalEvent(queryId)));
@@ -135,9 +135,7 @@ public class PreparedStatementCachingIT {
     public TestCqlPrepareAsyncProcessor(@NonNull Optional<DefaultDriverContext> context) {
       // Default CqlPrepareAsyncProcessor uses weak values here as well.  We avoid doing so
       // to prevent cache entries from unexpectedly disappearing mid-test.
-      super(
-          CacheBuilder.newBuilder().removalListener(buildCacheRemoveCallback(context)).build(),
-          context);
+      super(context, builder -> builder.removalListener(buildCacheRemoveCallback(context)));
     }
   }
 
@@ -305,12 +303,19 @@ public class PreparedStatementCachingIT {
 
   @Test
   public void should_invalidate_cache_entry_on_basic_udt_change_result_set() {
-    invalidationResultSetTest(setupCacheEntryTestBasic, ImmutableSet.of("test_type_2"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationResultSetTest(setupCacheEntryTestBasic, ImmutableSet.of("test_type_2"));
+        });
   }
 
   @Test
   public void should_invalidate_cache_entry_on_basic_udt_change_variable_defs() {
-    invalidationVariableDefsTest(setupCacheEntryTestBasic, false, ImmutableSet.of("test_type_2"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationVariableDefsTest(
+              setupCacheEntryTestBasic, false, ImmutableSet.of("test_type_2"));
+        });
   }
 
   Consumer<CqlSession> setupCacheEntryTestCollection =
@@ -325,13 +330,19 @@ public class PreparedStatementCachingIT {
 
   @Test
   public void should_invalidate_cache_entry_on_collection_udt_change_result_set() {
-    invalidationResultSetTest(setupCacheEntryTestCollection, ImmutableSet.of("test_type_2"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationResultSetTest(setupCacheEntryTestCollection, ImmutableSet.of("test_type_2"));
+        });
   }
 
   @Test
   public void should_invalidate_cache_entry_on_collection_udt_change_variable_defs() {
-    invalidationVariableDefsTest(
-        setupCacheEntryTestCollection, true, ImmutableSet.of("test_type_2"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationVariableDefsTest(
+              setupCacheEntryTestCollection, true, ImmutableSet.of("test_type_2"));
+        });
   }
 
   Consumer<CqlSession> setupCacheEntryTestTuple =
@@ -346,12 +357,19 @@ public class PreparedStatementCachingIT {
 
   @Test
   public void should_invalidate_cache_entry_on_tuple_udt_change_result_set() {
-    invalidationResultSetTest(setupCacheEntryTestTuple, ImmutableSet.of("test_type_2"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationResultSetTest(setupCacheEntryTestTuple, ImmutableSet.of("test_type_2"));
+        });
   }
 
   @Test
   public void should_invalidate_cache_entry_on_tuple_udt_change_variable_defs() {
-    invalidationVariableDefsTest(setupCacheEntryTestTuple, false, ImmutableSet.of("test_type_2"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationVariableDefsTest(
+              setupCacheEntryTestTuple, false, ImmutableSet.of("test_type_2"));
+        });
   }
 
   Consumer<CqlSession> setupCacheEntryTestNested =
@@ -366,14 +384,20 @@ public class PreparedStatementCachingIT {
 
   @Test
   public void should_invalidate_cache_entry_on_nested_udt_change_result_set() {
-    invalidationResultSetTest(
-        setupCacheEntryTestNested, ImmutableSet.of("test_type_2", "test_type_4"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationResultSetTest(
+              setupCacheEntryTestNested, ImmutableSet.of("test_type_2", "test_type_4"));
+        });
   }
 
   @Test
   public void should_invalidate_cache_entry_on_nested_udt_change_variable_defs() {
-    invalidationVariableDefsTest(
-        setupCacheEntryTestNested, false, ImmutableSet.of("test_type_2", "test_type_4"));
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          invalidationVariableDefsTest(
+              setupCacheEntryTestNested, false, ImmutableSet.of("test_type_2", "test_type_4"));
+        });
   }
 
   /* ========================= Infrastructure copied from PreparedStatementIT ========================= */

@@ -25,6 +25,7 @@ package com.datastax.oss.driver.api.querybuilder.select;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.data.CqlDuration;
+import com.datastax.oss.driver.api.core.data.CqlVector;
 import com.datastax.oss.driver.api.core.metadata.schema.ClusteringOrder;
 import com.datastax.oss.driver.api.querybuilder.BindMarker;
 import com.datastax.oss.driver.api.querybuilder.BuildableQuery;
@@ -153,6 +154,16 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
     return orderBy(CqlIdentifier.fromCql(columnName), order);
   }
 
+  /**
+   * Shortcut for {@link #orderByAnnOf(CqlIdentifier, CqlVector)}, adding an ORDER BY ... ANN OF ...
+   * clause
+   */
+  @NonNull
+  Select orderByAnnOf(@NonNull String columnName, @NonNull CqlVector<?> ann);
+
+  /** Adds the ORDER BY ... ANN OF ... clause, usually used for vector search */
+  @NonNull
+  Select orderByAnnOf(@NonNull CqlIdentifier columnId, @NonNull CqlVector<?> ann);
   /**
    * Adds a LIMIT clause to this query with a literal value.
    *
