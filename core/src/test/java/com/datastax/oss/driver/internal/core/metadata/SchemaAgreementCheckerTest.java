@@ -139,7 +139,7 @@ public class SchemaAgreementCheckerTest {
         new StubbedQuery(
             "SELECT schema_version FROM system.local WHERE key='local'",
             mockResult(mockLocalRow(VERSION1))),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(/*empty*/ )));
+        new StubbedQuery("SELECT schema_version FROM system.peers", mockResult(/*empty*/ )));
 
     // When
     CompletionStage<Boolean> future = checker.run();
@@ -156,7 +156,8 @@ public class SchemaAgreementCheckerTest {
         new StubbedQuery(
             "SELECT schema_version FROM system.local WHERE key='local'",
             mockResult(mockLocalRow(VERSION1))),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(mockValidPeerRow(VERSION1))));
+        new StubbedQuery(
+            "SELECT schema_version FROM system.peers", mockResult(mockValidPeerRow(VERSION1))));
 
     // When
     CompletionStage<Boolean> future = checker.run();
@@ -174,7 +175,8 @@ public class SchemaAgreementCheckerTest {
         new StubbedQuery(
             "SELECT schema_version FROM system.local WHERE key='local'",
             mockResult(mockLocalRow(VERSION1))),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(mockValidPeerRow(VERSION2))));
+        new StubbedQuery(
+            "SELECT schema_version FROM system.peers", mockResult(mockValidPeerRow(VERSION2))));
 
     // When
     CompletionStage<Boolean> future = checker.run();
@@ -210,7 +212,7 @@ public class SchemaAgreementCheckerTest {
         new StubbedQuery(
             "SELECT schema_version FROM system.local WHERE key='local'",
             mockResult(mockLocalRow(VERSION1))),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(malformedPeer)));
+        new StubbedQuery("SELECT schema_version FROM system.peers", mockResult(malformedPeer)));
 
     // When
     CompletionStage<Boolean> future = checker.run();
@@ -228,13 +230,15 @@ public class SchemaAgreementCheckerTest {
         new StubbedQuery(
             "SELECT schema_version FROM system.local WHERE key='local'",
             mockResult(mockLocalRow(VERSION1))),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(mockValidPeerRow(VERSION2))),
+        new StubbedQuery(
+            "SELECT schema_version FROM system.peers", mockResult(mockValidPeerRow(VERSION2))),
 
         // Second round
         new StubbedQuery(
             "SELECT schema_version FROM system.local WHERE key='local'",
             mockResult(mockLocalRow(VERSION1))),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(mockValidPeerRow(VERSION1))));
+        new StubbedQuery(
+            "SELECT schema_version FROM system.peers", mockResult(mockValidPeerRow(VERSION1))));
 
     // When
     CompletionStage<Boolean> future = checker.run();
@@ -253,7 +257,8 @@ public class SchemaAgreementCheckerTest {
         new StubbedQuery(
             "SELECT schema_version FROM system.local WHERE key='local'",
             mockResult(mockLocalRow(VERSION1))),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(mockValidPeerRow(VERSION1))));
+        new StubbedQuery(
+            "SELECT schema_version FROM system.peers", mockResult(mockValidPeerRow(VERSION1))));
 
     // When
     CompletionStage<Boolean> future = checker.run();

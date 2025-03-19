@@ -108,7 +108,7 @@ class SchemaAgreementChecker {
     } else {
       CompletionStage<AdminResult> localQuery =
           query("SELECT schema_version FROM system.local WHERE key='local'");
-      CompletionStage<AdminResult> peersQuery = query("SELECT * FROM system.peers");
+      CompletionStage<AdminResult> peersQuery = query("SELECT schema_version FROM system.peers");
 
       localQuery
           .thenCombine(peersQuery, this::extractSchemaVersions)
