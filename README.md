@@ -90,6 +90,10 @@ The 'extras' module is also published as a separate artifact:
 We also provide a [shaded JAR](manual/shaded_jar/)
 to avoid the explicit dependency to Netty.
 
+On Fedora 30 or later you may need to install dependencies for `netty-tcnative-boringssl-static`
+by running `dnf -y install libxcrypt-compat`
+
+
 ## Compatibility
 
 The Java client driver 3.11.5.0 ([branch scylla-3.x](https://github.com/scylladb/java-driver/tree/scylla-3.x)) is compatible with 
