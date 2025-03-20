@@ -97,7 +97,11 @@
         <javadoc.opts />
         <!-- Append "-fedora" to os.detected.classifier for Fedora systems
              (see https://netty.io/wiki/forked-tomcat-native.html) -->
+        <!-- Commenting this out since artifact in use right now is statically
+             linked. There is no linux-x86_64-fedora variant like with
+             regular netty-tcnative.
         <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
+        -->
     </properties>
 
     <dependencyManagement>
