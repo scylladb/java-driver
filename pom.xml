@@ -25,7 +25,7 @@
 
     <groupId>com.scylladb</groupId>
     <artifactId>scylla-driver-parent</artifactId>
-    <version>3.11.5.7</version>
+    <version>3.11.5.8-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Java Driver for Scylla and Apache Cassandra</name>
     <description>
@@ -1146,7 +1146,7 @@
         <connection>scm:git:https://github.com/scylladb/java-driver</connection>
         <developerConnection>scm:git:https://github.com/scylladb/java-driver</developerConnection>
         <url>https://github.com/scylladb/java-driver</url>
-        <tag>3.11.5.7</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <developers>
