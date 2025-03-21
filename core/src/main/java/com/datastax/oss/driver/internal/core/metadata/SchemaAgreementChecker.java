@@ -108,7 +108,11 @@ class SchemaAgreementChecker {
     } else {
       CompletionStage<AdminResult> localQuery =
           query("SELECT schema_version FROM system.local WHERE key='local'");
-      CompletionStage<AdminResult> peersQuery = query("SELECT * FROM system.peers");
+
+      // `tokens` column is excluded, it is served from
+      // context.getMetadataManager().getMetadata().getTokenMap()
+      CompletionStage<AdminResult> peersQuery =
+          query("SELECT host_id, schema_version, rpc_address, data_center, rack FROM system.peers");
 
       localQuery
           .thenCombine(peersQuery, this::extractSchemaVersions)
@@ -142,9 +146,15 @@ class SchemaAgreementChecker {
           channel.getEndPoint());
     }
 
+    boolean allowZeroTokenNodes =
+        context
+            .getConfig()
+            .getDefaultProfile()
+            .getBoolean(DefaultDriverOption.METADATA_ALLOW_ZERO_TOKEN_PEERS);
+
     Map<UUID, Node> nodes = context.getMetadataManager().getMetadata().getNodes();
     for (AdminRow peerRow : peersResult) {
-      if (isPeerValid(peerRow, nodes)) {
+      if (isPeerValid(peerRow, nodes, allowZeroTokenNodes)) {
         UUID schemaVersion = Objects.requireNonNull(peerRow.getUuid("schema_version"));
         schemaVersions.add(schemaVersion);
       }
@@ -189,13 +199,13 @@ class SchemaAgreementChecker {
         .start();
   }
 
-  protected boolean isPeerValid(AdminRow peerRow, Map<UUID, Node> nodes) {
+  protected boolean isPeerValid(
+      AdminRow peerRow, Map<UUID, Node> nodes, boolean allowZeroTokenNodes) {
     if (PeerRowValidator.isValid(
         peerRow,
-        context
-            .getConfig()
-            .getDefaultProfile()
-            .getBoolean(DefaultDriverOption.METADATA_ALLOW_ZERO_TOKEN_PEERS))) {
+        // allowZeroTokenPeers is true since `tokens` column is not pulled, but it will make it
+        // ignore `tokens` column.
+        true)) {
       UUID hostId = peerRow.getUuid("host_id");
       Node node = nodes.get(hostId);
       if (node == null) {
@@ -205,7 +215,16 @@ class SchemaAgreementChecker {
         LOG.debug("[{}] Peer {} is down, excluding from schema agreement check", logPrefix, hostId);
         return false;
       }
-      return true;
+
+      if (allowZeroTokenNodes) {
+        return true;
+      }
+
+      if (!(node instanceof DefaultNode)) {
+        return true;
+      }
+
+      return !((DefaultNode) node).getRawTokens().isEmpty();
     } else {
       LOG.warn(
           "[{}] Found invalid system.peers row for peer: {}, excluding from schema agreement check.",
