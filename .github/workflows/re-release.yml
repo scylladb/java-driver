@@ -1,0 +1,62 @@
+name: Re-release ScyllaDB Java Driver
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        type: string
+        description: ''
+        required: true
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    env:
+      MVNCMD: mvn -B -X -ntp
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.version_tag }}~1
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: '8'
+        distribution: 'temurin'
+        server-id: ossrh
+        gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+        server-username: OSSRH_USERNAME
+        server-password: OSSRH_PASSWORD
+
+    - name: Configure Git user
+      run: |
+        git config user.name "ScyllaDB Promoter"
+        git config user.email "github-promoter@scylladb.com"
+
+    - name: Clean project
+      run: $MVNCMD clean
+
+    - name: Clean release
+      run: $MVNCMD release:clean
+
+    - name: Prepare release
+      env:
+        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      run: $MVNCMD release:prepare -DpushChanges=false -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+
+    - name: Perform release
+      env:
+        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+        OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+      run: $MVNCMD release:perform -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
