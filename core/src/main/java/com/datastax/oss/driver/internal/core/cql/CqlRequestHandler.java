@@ -43,6 +43,7 @@ import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
+import com.datastax.oss.driver.api.core.retry.BackoffRetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
@@ -431,6 +432,61 @@ public class CqlRequestHandler implements Throttled {
     }
     for (NodeResponseCallback callback : inFlightCallbacks) {
       callback.cancel();
+    }
+  }
+
+  /**
+   * Schedules the request to the next available node.
+   *
+   * @param statement The statement to execute.
+   * @param retriedNode if not null, it will be attempted first before the rest of the query plan.
+   * @param queryPlan the list of nodes to try (shared with all other executions)
+   * @param currentExecutionIndex 0 for the initial execution, 1 for the first speculative one, etc.
+   * @param retryCount the number of times that the retry policy was invoked for this execution
+   *     already (note that some internal retries don't go through the policy, and therefore don't
+   *     increment this counter)
+   * @param scheduleNextExecution whether to schedule the next speculative execution
+   */
+  private void scheduleRequest(
+      Statement<?> statement,
+      Node retriedNode,
+      Queue<Node> queryPlan,
+      int currentExecutionIndex,
+      int retryCount,
+      boolean scheduleNextExecution,
+      int backoffMs) {
+    try {
+      scheduledExecutions.add(
+          timer.newTimeout(
+              (Timeout timeout1) -> {
+                if (!result.isDone()) {
+                  LOG.trace(
+                      "[{}] Starting delayed (by {}) execution {}",
+                      CqlRequestHandler.this.logPrefix,
+                      backoffMs,
+                      currentExecutionIndex);
+                  activeExecutionsCount.incrementAndGet();
+                  startedSpeculativeExecutionsCount.incrementAndGet();
+                  // Note that `node` is the first node of the execution, it might not be the
+                  // "slow" one if there were retries, but in practice retries are rare.
+                  sendRequest(
+                      statement,
+                      retriedNode,
+                      queryPlan,
+                      currentExecutionIndex,
+                      retryCount,
+                      scheduleNextExecution);
+                }
+              },
+              backoffMs,
+              TimeUnit.MILLISECONDS));
+    } catch (IllegalStateException e) {
+      // If we're racing with session shutdown, the timer might be stopped already. We don't want
+      // to schedule more executions anyway, so swallow the error.
+      if (!"cannot be started once stopped".equals(e.getMessage())) {
+        Loggers.warnWithException(
+            LOG, "[{}] Error while scheduling delayed execution", logPrefix, e);
+      }
     }
   }
 
@@ -887,7 +943,10 @@ public class CqlRequestHandler implements Throttled {
         setFinalError(statement, error, node, execution);
       } else {
         RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(context, executionProfile);
+        BackoffRetryPolicy backoffPolicy =
+            Conversions.resolveBackoffRetryPolicy(context, executionProfile);
         RetryVerdict verdict;
+        int backoff;
         if (error instanceof ReadTimeoutException) {
           ReadTimeoutException readTimeout = (ReadTimeoutException) error;
           verdict =
@@ -898,6 +957,15 @@ public class CqlRequestHandler implements Throttled {
                   readTimeout.getReceived(),
                   readTimeout.wasDataPresent(),
                   retryCount);
+          backoff =
+              backoffPolicy.onReadTimeoutBackoffMs(
+                  statement,
+                  readTimeout.getConsistencyLevel(),
+                  readTimeout.getBlockFor(),
+                  readTimeout.getReceived(),
+                  readTimeout.wasDataPresent(),
+                  retryCount,
+                  verdict);
           updateErrorMetrics(
               metricUpdater,
               verdict,
@@ -916,6 +984,15 @@ public class CqlRequestHandler implements Throttled {
                       writeTimeout.getReceived(),
                       retryCount)
                   : RetryVerdict.RETHROW;
+          backoff =
+              backoffPolicy.onWriteTimeoutBackoffMs(
+                  statement,
+                  writeTimeout.getConsistencyLevel(),
+                  writeTimeout.getWriteType(),
+                  writeTimeout.getBlockFor(),
+                  writeTimeout.getReceived(),
+                  retryCount,
+                  verdict);
           updateErrorMetrics(
               metricUpdater,
               verdict,
@@ -931,6 +1008,14 @@ public class CqlRequestHandler implements Throttled {
                   unavailable.getRequired(),
                   unavailable.getAlive(),
                   retryCount);
+          backoff =
+              backoffPolicy.onUnavailableBackoffMs(
+                  statement,
+                  unavailable.getConsistencyLevel(),
+                  unavailable.getRequired(),
+                  unavailable.getAlive(),
+                  retryCount,
+                  verdict);
           updateErrorMetrics(
               metricUpdater,
               verdict,
@@ -942,6 +1027,7 @@ public class CqlRequestHandler implements Throttled {
               Conversions.resolveIdempotence(statement, executionProfile)
                   ? retryPolicy.onErrorResponseVerdict(statement, error, retryCount)
                   : RetryVerdict.RETHROW;
+          backoff = backoffPolicy.onErrorResponseBackoff(statement, error, retryCount, verdict);
           updateErrorMetrics(
               metricUpdater,
               verdict,
@@ -949,34 +1035,56 @@ public class CqlRequestHandler implements Throttled {
               DefaultNodeMetric.RETRIES_ON_OTHER_ERROR,
               DefaultNodeMetric.IGNORES_ON_OTHER_ERROR);
         }
-        processRetryVerdict(verdict, error);
+        processRetryVerdict(verdict, error, backoff);
       }
     }
 
-    private void processRetryVerdict(RetryVerdict verdict, Throwable error) {
+    private void processRetryVerdict(RetryVerdict verdict, Throwable error, int backoff) {
       LOG.trace("[{}] Processing retry decision {}", logPrefix, verdict);
       switch (verdict.getRetryDecision()) {
         case RETRY_SAME:
           recordError(node, error);
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
-          sendRequest(
-              verdict.getRetryRequest(statement),
-              node,
-              queryPlan,
-              execution,
-              retryCount + 1,
-              false);
+          if (backoff > 0) {
+            scheduleRequest(
+                verdict.getRetryRequest(statement),
+                node,
+                queryPlan,
+                execution,
+                retryCount + 1,
+                false,
+                backoff);
+          } else {
+            sendRequest(
+                verdict.getRetryRequest(statement),
+                node,
+                queryPlan,
+                execution,
+                retryCount + 1,
+                false);
+          }
           break;
         case RETRY_NEXT:
           recordError(node, error);
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
-          sendRequest(
-              verdict.getRetryRequest(statement),
-              null,
-              queryPlan,
-              execution,
-              retryCount + 1,
-              false);
+          if (backoff > 0) {
+            scheduleRequest(
+                verdict.getRetryRequest(statement),
+                null,
+                queryPlan,
+                execution,
+                retryCount + 1,
+                false,
+                backoff);
+          } else {
+            sendRequest(
+                verdict.getRetryRequest(statement),
+                null,
+                queryPlan,
+                execution,
+                retryCount + 1,
+                false);
+          }
           break;
         case RETHROW:
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
@@ -1018,13 +1126,18 @@ public class CqlRequestHandler implements Throttled {
       }
       LOG.trace("[{}] Request failure, processing: {}", logPrefix, error);
       RetryVerdict verdict;
+      int backoff;
       if (!Conversions.resolveIdempotence(statement, executionProfile)
           || error instanceof FrameTooLongException) {
         verdict = RetryVerdict.RETHROW;
+        backoff = 0;
       } else {
         try {
           RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(context, executionProfile);
+          BackoffRetryPolicy backoffPolicy =
+              Conversions.resolveBackoffRetryPolicy(context, executionProfile);
           verdict = retryPolicy.onRequestAbortedVerdict(statement, error, retryCount);
+          backoff = backoffPolicy.onRequestAbortedBackoffMs(statement, error, retryCount, verdict);
         } catch (Throwable cause) {
           setFinalError(
               statement,
@@ -1034,7 +1147,7 @@ public class CqlRequestHandler implements Throttled {
           return;
         }
       }
-      processRetryVerdict(verdict, error);
+      processRetryVerdict(verdict, error, backoff);
       updateErrorMetrics(
           ((DefaultNode) node).getMetricUpdater(),
           verdict,

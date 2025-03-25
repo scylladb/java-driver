@@ -43,6 +43,7 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
+import com.datastax.oss.driver.internal.core.retry.NoBackoffPolicy;
 import com.datastax.oss.simulacron.common.cluster.ClusterSpec;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
@@ -106,6 +107,10 @@ public class MapBasedConfigLoaderIT {
     String alternateProfile = "profile1";
     optionsMap.put(
         alternateProfile, TypedDriverOption.RETRY_POLICY_CLASS, IgnoreAllPolicy.class.getName());
+    optionsMap.put(
+        alternateProfile,
+        TypedDriverOption.BACKOFF_RETRY_POLICY_CLASS,
+        NoBackoffPolicy.class.getName());
 
     try (CqlSession session =
         CqlSession.builder()

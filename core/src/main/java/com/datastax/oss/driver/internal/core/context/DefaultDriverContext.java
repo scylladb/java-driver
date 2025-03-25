@@ -38,6 +38,7 @@ import com.datastax.oss.driver.api.core.loadbalancing.NodeDistanceEvaluator;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
 import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
+import com.datastax.oss.driver.api.core.retry.BackoffRetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
@@ -150,6 +151,8 @@ public class DefaultDriverContext implements InternalDriverContext {
       new LazyReference<>("reconnectionPolicy", this::buildReconnectionPolicy, cycleDetector);
   private final LazyReference<Map<String, RetryPolicy>> retryPoliciesRef =
       new LazyReference<>("retryPolicies", this::buildRetryPolicies, cycleDetector);
+  private final LazyReference<Map<String, BackoffRetryPolicy>> backoffRetryPoliciesRef =
+      new LazyReference<>("backoffRetryPolicies", this::buildBackoffRetryPolicies, cycleDetector);
   private final LazyReference<Map<String, SpeculativeExecutionPolicy>>
       speculativeExecutionPoliciesRef =
           new LazyReference<>(
@@ -364,6 +367,15 @@ public class DefaultDriverContext implements InternalDriverContext {
         DefaultDriverOption.RETRY_POLICY_CLASS,
         DefaultDriverOption.RETRY_POLICY,
         RetryPolicy.class,
+        "com.datastax.oss.driver.internal.core.retry");
+  }
+
+  protected Map<String, BackoffRetryPolicy> buildBackoffRetryPolicies() {
+    return Reflection.buildFromConfigProfiles(
+        this,
+        DefaultDriverOption.BACKOFF_RETRY_POLICY_CLASS,
+        DefaultDriverOption.BACKOFF_RETRY_POLICY,
+        BackoffRetryPolicy.class,
         "com.datastax.oss.driver.internal.core.retry");
   }
 
@@ -766,6 +778,12 @@ public class DefaultDriverContext implements InternalDriverContext {
   @Override
   public Map<String, RetryPolicy> getRetryPolicies() {
     return retryPoliciesRef.get();
+  }
+
+  @NonNull
+  @Override
+  public Map<String, BackoffRetryPolicy> getBackoffRetryPolicies() {
+    return backoffRetryPoliciesRef.get();
   }
 
   @NonNull

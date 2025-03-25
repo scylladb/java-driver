@@ -103,6 +103,8 @@ public class MapBasedDriverConfigLoaderTest {
         value = config.getDuration(option);
       } else if (type.equals(GenericType.INTEGER)) {
         value = config.getInt(option);
+      } else if (type.equals(GenericType.DOUBLE)) {
+        value = config.getDouble(option);
       } else if (type.equals(GenericType.BOOLEAN)) {
         value = config.getBoolean(option);
       } else if (type.equals(GenericType.LONG)) {

@@ -69,6 +69,31 @@ datastax-java-driver.advanced.retry-policy.class = ConsistencyDowngradingRetryPo
 You can also use your own policy by specifying for the above option the fully-qualified name of a 
 class that implements [RetryPolicy].
 
+### Built-in backoff retry policies
+
+The driver ships with two retry policies: `NoBackoffPolicy` –– the default ––  and
+`ExponentialBackoffPolicy`.
+
+The default backoff retry policy makes driver have no delay between retries.
+
+`ExponentialBackoffPolicy` is provided for cases where the application needs to slow down 
+to avoid overwhelming cluster with retry requests.
+The following needs to be added to the [configuration](../configuration/):
+
+```
+datastax-java-driver.advanced.backoff-retry-policy.class = ExponentialBackoffPolicy
+```
+
+You can also control following options for it:
+```
+datastax-java-driver.advanced.backoff-retry-policy.max-backoff-ms = 10000
+datastax-java-driver.advanced.backoff-retry-policy.base-backoff-ms = 100
+datastax-java-driver.advanced.backoff-retry-policy.jitter-ratio = 0.1
+```
+
+You can also use your own policy by specifying for the above option the fully-qualified name of a
+class that implements [BackoffRetryPolicy].
+
 ### Behavior
 
 The behavior of both policies will be detailed in the sections below. 

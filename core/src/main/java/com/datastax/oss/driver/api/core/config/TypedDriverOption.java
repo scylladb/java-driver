@@ -199,6 +199,20 @@ public class TypedDriverOption<ValueT> {
   /** The class of the retry policy. */
   public static final TypedDriverOption<String> RETRY_POLICY_CLASS =
       new TypedDriverOption<>(DefaultDriverOption.RETRY_POLICY_CLASS, GenericType.STRING);
+  /** The class of the retry policy. */
+  public static final TypedDriverOption<String> BACKOFF_RETRY_POLICY_CLASS =
+      new TypedDriverOption<>(DefaultDriverOption.BACKOFF_RETRY_POLICY_CLASS, GenericType.STRING);
+  /** The class of the retry policy. */
+  public static final TypedDriverOption<Integer> BACKOFF_RETRY_BASE_BACKOFF_MS =
+      new TypedDriverOption<>(
+          DefaultDriverOption.BACKOFF_RETRY_BASE_BACKOFF_MS, GenericType.INTEGER);
+  /** The class of the retry policy. */
+  public static final TypedDriverOption<Integer> BACKOFF_RETRY_MAX_BACKOFF_MS =
+      new TypedDriverOption<>(
+          DefaultDriverOption.BACKOFF_RETRY_MAX_BACKOFF_MS, GenericType.INTEGER);
+  /** The class of the retry policy. */
+  public static final TypedDriverOption<Double> BACKOFF_RETRY_JITTER_RATIO =
+      new TypedDriverOption<>(DefaultDriverOption.BACKOFF_RETRY_JITTER_RATIO, GenericType.DOUBLE);
   /** The class of the speculative execution policy. */
   public static final TypedDriverOption<String> SPECULATIVE_EXECUTION_POLICY_CLASS =
       new TypedDriverOption<>(

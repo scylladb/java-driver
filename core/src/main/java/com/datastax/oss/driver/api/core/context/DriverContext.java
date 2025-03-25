@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.detach.AttachmentPoint;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
 import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
+import com.datastax.oss.driver.api.core.retry.BackoffRetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
@@ -93,6 +94,26 @@ public interface DriverContext extends AttachmentPoint {
   default RetryPolicy getRetryPolicy(@NonNull String profileName) {
     RetryPolicy policy = getRetryPolicies().get(profileName);
     return (policy != null) ? policy : getRetryPolicies().get(DriverExecutionProfile.DEFAULT_NAME);
+  }
+
+  /**
+   * @return The driver's retry policies, keyed by profile name; the returned map is guaranteed to
+   *     never be {@code null} and to always contain an entry for the {@value
+   *     DriverExecutionProfile#DEFAULT_NAME} profile.
+   */
+  @NonNull
+  Map<String, BackoffRetryPolicy> getBackoffRetryPolicies();
+
+  /**
+   * @param profileName the profile name; never {@code null}.
+   * @return The driver's retry policy for the given profile; never {@code null}.
+   */
+  @NonNull
+  default BackoffRetryPolicy getBackoffRetryPolicy(@NonNull String profileName) {
+    BackoffRetryPolicy policy = getBackoffRetryPolicies().get(profileName);
+    return (policy != null)
+        ? policy
+        : getBackoffRetryPolicies().get(DriverExecutionProfile.DEFAULT_NAME);
   }
 
   /**

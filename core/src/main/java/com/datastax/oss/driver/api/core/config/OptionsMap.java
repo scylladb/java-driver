@@ -281,6 +281,10 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.RECONNECTION_BASE_DELAY, Duration.ofSeconds(1));
     map.put(TypedDriverOption.RECONNECTION_MAX_DELAY, Duration.ofSeconds(60));
     map.put(TypedDriverOption.RETRY_POLICY_CLASS, "DefaultRetryPolicy");
+    map.put(TypedDriverOption.BACKOFF_RETRY_POLICY_CLASS, "NoBackoffPolicy");
+    map.put(TypedDriverOption.BACKOFF_RETRY_BASE_BACKOFF_MS, 100);
+    map.put(TypedDriverOption.BACKOFF_RETRY_MAX_BACKOFF_MS, 10000);
+    map.put(TypedDriverOption.BACKOFF_RETRY_JITTER_RATIO, 0.1);
     map.put(TypedDriverOption.SPECULATIVE_EXECUTION_POLICY_CLASS, "NoSpeculativeExecutionPolicy");
     map.put(TypedDriverOption.TIMESTAMP_GENERATOR_CLASS, "AtomicTimestampGenerator");
     map.put(TypedDriverOption.TIMESTAMP_GENERATOR_DRIFT_WARNING_THRESHOLD, Duration.ofSeconds(1));
