@@ -597,7 +597,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       allRequests.addAll(requests);
       allRequests.add(MockRequest.send(pool));
 
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class));
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertPoolSize(pool, 2);
       Connection connection2 = pool.connections[0].get(1);
 
@@ -625,7 +625,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
 
       // Borrowing one more time should resurrect the trashed connection
       allRequests.addAll(MockRequest.sendMany(1, pool));
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class));
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertPoolSize(pool, 2);
 
       assertThat(pool.connections[0]).containsExactly(connection2, connection1);
@@ -664,7 +664,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       allRequests.addAll(requests);
       allRequests.add(MockRequest.send(pool));
 
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class));
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertPoolSize(pool, 2);
       reset(factory);
       Connection connection2 = pool.connections[0].get(1);
@@ -699,7 +699,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       allRequests.addAll(requests);
       allRequests.add(MockRequest.send(pool));
       assertThat(connection2.inFlight.get()).isEqualTo(101);
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class));
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertPoolSize(pool, 2);
 
       // Borrow again to get the new connection
@@ -742,7 +742,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       allRequests.addAll(requests);
       allRequests.add(MockRequest.send(pool));
 
-      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class));
+      verify(factory, after(2000).times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
       assertThat(pool.connections[0]).hasSize(2);
 
       // Return enough times to get back under the threshold where one connection is enough
