@@ -1348,6 +1348,9 @@ public class CCMBridge implements CCMAccess {
       String quote = isWindows() ? "\"" : "";
       for (String jvmArg : jvmArgs) {
         // Windows requires jvm arguments to be quoted, while *nix requires unquoted.
+        if (scylla && jvmArg.startsWith("-Dcassandra")) {
+          continue;
+        }
         allJvmArgs.append(" ");
         allJvmArgs.append(quote);
         allJvmArgs.append("--jvm_arg=");
