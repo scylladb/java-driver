@@ -30,6 +30,7 @@ import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BatchableStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -68,6 +69,7 @@ public class DefaultBatchStatement implements BatchStatement {
   private final Duration timeout;
   private final Node node;
   private final int nowInSeconds;
+  private final Boolean isLWT;
 
   public DefaultBatchStatement(
       BatchType batchType,
@@ -88,7 +90,8 @@ public class DefaultBatchStatement implements BatchStatement {
       ConsistencyLevel serialConsistencyLevel,
       Duration timeout,
       Node node,
-      int nowInSeconds) {
+      int nowInSeconds,
+      Boolean isLWT) {
     for (BatchableStatement<?> statement : statements) {
       if (statement != null
           && (statement.getConsistencyLevel() != null
@@ -120,6 +123,7 @@ public class DefaultBatchStatement implements BatchStatement {
     this.timeout = timeout;
     this.node = node;
     this.nowInSeconds = nowInSeconds;
+    this.isLWT = isLWT;
   }
 
   @NonNull
@@ -150,7 +154,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @NonNull
@@ -175,7 +180,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @NonNull
@@ -204,7 +210,8 @@ public class DefaultBatchStatement implements BatchStatement {
           serialConsistencyLevel,
           timeout,
           node,
-          nowInSeconds);
+          nowInSeconds,
+          isLWT);
     }
   }
 
@@ -237,7 +244,8 @@ public class DefaultBatchStatement implements BatchStatement {
           serialConsistencyLevel,
           timeout,
           node,
-          nowInSeconds);
+          nowInSeconds,
+          isLWT);
     }
   }
 
@@ -268,7 +276,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @NonNull
@@ -304,7 +313,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -334,7 +344,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Nullable
@@ -365,7 +376,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Nullable
@@ -397,7 +409,8 @@ public class DefaultBatchStatement implements BatchStatement {
         newSerialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -427,7 +440,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -457,7 +471,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -522,7 +537,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @NonNull
@@ -547,7 +563,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         newNode,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Nullable
@@ -593,7 +610,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -633,7 +651,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @NonNull
@@ -664,7 +683,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -700,7 +720,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -730,7 +751,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -760,7 +782,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @NonNull
@@ -785,7 +808,8 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         newTimeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   @Override
@@ -815,11 +839,39 @@ public class DefaultBatchStatement implements BatchStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        newNowInSeconds);
+        newNowInSeconds,
+        isLWT);
+  }
+
+  @NonNull
+  @Override
+  public BatchStatement setIsLWT(Boolean newIsLWT) {
+    return new DefaultBatchStatement(
+        batchType,
+        statements,
+        executionProfileName,
+        executionProfile,
+        keyspace,
+        routingKeyspace,
+        routingKey,
+        routingToken,
+        customPayload,
+        idempotent,
+        tracing,
+        timestamp,
+        pagingState,
+        pageSize,
+        consistencyLevel,
+        serialConsistencyLevel,
+        timeout,
+        node,
+        nowInSeconds,
+        newIsLWT);
   }
 
   @Override
   public boolean isLWT() {
-    return false;
+    if (isLWT != null) return isLWT;
+    return statements.stream().anyMatch(Statement::isLWT);
   }
 }
