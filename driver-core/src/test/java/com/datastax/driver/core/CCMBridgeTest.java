@@ -32,7 +32,6 @@ public class CCMBridgeTest extends CCMTestsSupport {
   @Test(groups = "short")
   @ScyllaVersion(
       maxOSS = "6.2.0",
-      maxEnterprise = "2024.1",
       description = "JMX was dropped in scylladb/3cd2a6173668c5a13b6e674f912ff597f76422f5")
   public void should_make_JMX_connection() throws Exception {
     InetSocketAddress addr1 = ccm().jmxAddressOfNode(1);
