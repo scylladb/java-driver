@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.entry;
 
 import com.datastax.driver.core.utils.CassandraVersion;
 import com.datastax.driver.core.utils.ScyllaSkip;
+import com.datastax.driver.core.utils.ScyllaVersion;
 import com.google.common.collect.ImmutableMap;
 import java.nio.ByteBuffer;
 import org.testng.annotations.Test;
@@ -149,6 +150,11 @@ public class TableMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaVersion(
+      maxOSS = "6.3.0",
+      maxEnterprise = "2025.1.0",
+      description =
+          "COMPACT STORAGE discontinued in https://github.com/scylladb/scylladb/pull/16403")
   public void should_parse_compact_static_table() {
     TestUtils.compactStorageSupportCheck(ccm());
     // given
@@ -190,6 +196,11 @@ public class TableMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaVersion(
+      maxOSS = "6.3.0",
+      maxEnterprise = "2025.1.0",
+      description =
+          "COMPACT STORAGE discontinued in https://github.com/scylladb/scylladb/pull/16403")
   public void should_parse_dense_table() {
     TestUtils.compactStorageSupportCheck(ccm());
     // given
@@ -215,6 +226,11 @@ public class TableMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaVersion(
+      maxOSS = "6.3.0",
+      maxEnterprise = "2025.1.0",
+      description =
+          "COMPACT STORAGE discontinued in https://github.com/scylladb/scylladb/pull/16403")
   public void should_parse_compact_dynamic_table() {
     TestUtils.compactStorageSupportCheck(ccm());
     // given
@@ -251,6 +267,11 @@ public class TableMetadataTest extends CCMTestsSupport {
   }
 
   @Test(groups = "short")
+  @ScyllaVersion(
+      maxOSS = "6.3.0",
+      maxEnterprise = "2025.1.0",
+      description =
+          "COMPACT STORAGE discontinued in https://github.com/scylladb/scylladb/pull/16403")
   public void should_parse_compact_table_with_multiple_clustering_columns() {
     TestUtils.compactStorageSupportCheck(ccm());
     // given
