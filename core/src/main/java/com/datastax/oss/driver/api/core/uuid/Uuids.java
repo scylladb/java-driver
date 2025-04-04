@@ -301,7 +301,13 @@ public final class Uuids {
   @NonNull
   public static UUID random(@NonNull Random random) {
     byte[] data = new byte[16];
-    random.nextBytes(data);
+    for (int i = 0; i < 16; i += 4) {
+      int rnd = random.nextInt();
+      data[i] = (byte) (rnd >>> 24);
+      data[i + 1] = (byte) (rnd >>> 16);
+      data[i + 2] = (byte) (rnd >>> 8);
+      data[i + 3] = (byte) rnd;
+    }
     return buildUuid(data, 4);
   }
 
