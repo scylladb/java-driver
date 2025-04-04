@@ -39,6 +39,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -232,7 +233,7 @@ public final class Uuids {
       }
     }
     if (pid == null) {
-      pid = new Random().nextInt();
+      pid = ThreadLocalRandom.current().nextInt();
       LOG.warn("Could not determine PID, falling back to a random integer: {}", pid);
     }
     ClassLoader loader = Uuids.class.getClassLoader();
@@ -281,7 +282,7 @@ public final class Uuids {
    */
   @NonNull
   public static UUID random() {
-    return random(new Random());
+    return random(ThreadLocalRandom.current());
   }
 
   /**
