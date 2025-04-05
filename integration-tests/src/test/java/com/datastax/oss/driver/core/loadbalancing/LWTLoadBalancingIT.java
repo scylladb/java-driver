@@ -27,8 +27,11 @@ import static org.junit.Assume.assumeTrue;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
+import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
@@ -106,6 +109,53 @@ public class LWTLoadBalancingIT {
     }
 
     // Because keyspace RF == 3
+    assertThat(coordinators.size()).isEqualTo(3);
+  }
+
+  @Test
+  public void should_use_only_one_node_when_lwt_batch_detected() {
+    assumeTrue(CcmBridge.SCYLLA_ENABLEMENT); // Functionality only available in Scylla
+    CqlSession session = SESSION_RULE.session();
+    int pk = 1234;
+    ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(pk, ProtocolVersion.DEFAULT);
+    TokenMap tokenMap = SESSION_RULE.session().getMetadata().getTokenMap().get();
+    Node owner = tokenMap.getReplicas(session.getKeyspace().get(), routingKey).iterator().next();
+    PreparedStatement statement =
+        SESSION_RULE
+            .session()
+            .prepare("INSERT INTO foo (pk, ck, v) VALUES (?, ?, ?) IF NOT EXISTS");
+    assertThat(statement.isLWT()).isTrue();
+
+    for (int i = 0; i < 30; i++) {
+      BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED);
+      SimpleStatement simpleStatement =
+          SimpleStatement.newInstance(
+              String.format(
+                  "INSERT INTO foo (pk, ck, v) VALUES (%s, %s, %s) IF NOT EXISTS", pk, i, 123));
+      assertThat(simpleStatement.isLWT()).isFalse();
+      batch = batch.add(simpleStatement);
+      batch = batch.add(statement.bind(pk, i, 123));
+      assertThat(batch.isLWT()).isTrue();
+      ResultSet result = session.execute(batch);
+      assertThat(result.getExecutionInfo().getCoordinator()).isEqualTo(owner);
+    }
+
+    // Check if multiple coordinators are used when forcibly set to non-LWT
+    Set<Node> coordinators = new HashSet<>();
+    for (int i = 0; i < 30; i++) {
+      BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED);
+      SimpleStatement simpleStatement =
+          SimpleStatement.newInstance(
+              String.format(
+                  "INSERT INTO foo (pk, ck, v) VALUES (%s, %s, %s) IF NOT EXISTS", pk, i, 123));
+      assertThat(simpleStatement.isLWT()).isFalse();
+      batch = batch.add(simpleStatement);
+      batch = batch.add(statement.bind(pk, i, 123));
+      batch = batch.setIsLWT(false);
+      assertThat(batch.isLWT()).isFalse();
+      ResultSet result = session.execute(batch);
+      coordinators.add(result.getExecutionInfo().getCoordinator());
+    }
     assertThat(coordinators.size()).isEqualTo(3);
   }
 }

@@ -533,6 +533,9 @@ public interface Statement<SelfT extends Statement<SelfT>> extends Request {
    * Scylla, using too old Scylla version, future changes in driver allowing channels to be created
    * without sending OPTIONS request.
    *
+   * <p>Provided implementations of BatchStatements will be considered by driver as LWT if any of
+   * the statements in a batch is LWT on its own.
+   *
    * <p>More information about LWT:
    *
    * @see <a href="https://docs.scylladb.com/using-scylla/lwt/">Docs about LWT</a>

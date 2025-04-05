@@ -24,6 +24,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.Iterables;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Arrays;
+import java.util.List;
 import net.jcip.annotations.NotThreadSafe;
 
 /**
@@ -38,6 +39,7 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @Nullable private CqlIdentifier keyspace;
   @NonNull private ImmutableList.Builder<BatchableStatement<?>> statementsBuilder;
   private int statementsCount;
+  @Nullable private Boolean isLWT = null;
 
   public BatchStatementBuilder(@NonNull BatchType batchType) {
     this.batchType = batchType;
@@ -72,6 +74,19 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @NonNull
   public BatchStatementBuilder setKeyspace(@NonNull String keyspaceName) {
     return setKeyspace(CqlIdentifier.fromCql(keyspaceName));
+  }
+
+  /**
+   * Forces driver to see this batch as LWT or non-LWT. Note that if never explicitly set or set to
+   * {@code null}, the resulting {@code DefaultBatchStatement} will decide its LWT state based on
+   * contained statements.
+   *
+   * @return this builder; never {@code null}.
+   */
+  @NonNull
+  public BatchStatementBuilder setIsLWT(Boolean newIsLWT) {
+    this.isLWT = newIsLWT;
+    return this;
   }
 
   /**
@@ -136,9 +151,10 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @Override
   @NonNull
   public BatchStatement build() {
+    List<BatchableStatement<?>> statements = statementsBuilder.build();
     return new DefaultBatchStatement(
         batchType,
-        statementsBuilder.build(),
+        statements,
         executionProfileName,
         executionProfile,
         keyspace,
@@ -155,7 +171,8 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        isLWT);
   }
 
   public int getStatementsCount() {
