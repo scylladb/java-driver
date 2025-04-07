@@ -480,17 +480,27 @@ public class CqlRequestHandler implements Throttled {
               totalLatencyNanos,
               TimeUnit.NANOSECONDS);
         }
-        if (resultSet.getColumnDefinitions().size() > 0
-            && resultSet
-                .getExecutionInfo()
-                .getIncomingPayload()
-                .containsKey(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY)) {
-          context
-              .getMetadataManager()
-              .addTabletFromPayload(
-                  resultSet.getColumnDefinitions().get(0).getKeyspace(),
-                  resultSet.getColumnDefinitions().get(0).getTable(),
-                  resultSet.getExecutionInfo().getIncomingPayload());
+        if (resultSet
+            .getExecutionInfo()
+            .getIncomingPayload()
+            .containsKey(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY)) {
+          CqlIdentifier keyspace = resultSet.getExecutionInfo().getRequest().getRoutingKeyspace();
+          if (keyspace == null) {
+            keyspace = resultSet.getExecutionInfo().getRequest().getKeyspace();
+            if (keyspace == null && resultSet.getColumnDefinitions().size() > 0) {
+              keyspace = resultSet.getColumnDefinitions().get(0).getKeyspace();
+            }
+          }
+          CqlIdentifier table = resultSet.getExecutionInfo().getRequest().getRoutingTable();
+          if (table == null && resultSet.getColumnDefinitions().size() > 0) {
+            table = resultSet.getColumnDefinitions().get(0).getTable();
+          }
+          if (keyspace != null && table != null) {
+            context
+                .getMetadataManager()
+                .addTabletFromPayload(
+                    keyspace, table, resultSet.getExecutionInfo().getIncomingPayload());
+          }
         }
       }
       // log the warnings if they have NOT been disabled
