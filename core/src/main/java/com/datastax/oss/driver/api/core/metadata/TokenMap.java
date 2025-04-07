@@ -189,4 +189,8 @@ public interface TokenMap {
   /** The name of the partitioner class in use, as reported by the Cassandra nodes. */
   @NonNull
   String getPartitionerName();
+
+  /** The partitioner class in use, as reported by the Cassandra nodes. */
+  @NonNull
+  Partitioner getPartitioner();
 }

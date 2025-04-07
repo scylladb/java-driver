@@ -207,6 +207,12 @@ public class DefaultTokenMap implements TokenMap {
     return tokenFactory.getPartitionerName();
   }
 
+  @NonNull
+  @Override
+  public Partitioner getPartitioner() {
+    return tokenFactory;
+  }
+
   private KeyspaceTokenMap getKeyspaceMap(CqlIdentifier keyspace) {
     Map<String, String> config = replicationConfigs.get(keyspace);
     return (config == null) ? null : keyspaceMaps.get(config);
