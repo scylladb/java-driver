@@ -333,6 +333,9 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
       }
 
       partitioner = request.getPartitioner();
+      if (partitioner == null && maybeTokenMap.isPresent()) {
+        partitioner = maybeTokenMap.get().getPartitioner();
+      }
     } catch (Exception e) {
       // Protect against poorly-implemented Request instances
       LOG.error("Unexpected error while trying to compute query plan", e);
