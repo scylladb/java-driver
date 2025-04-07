@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -272,6 +273,13 @@ public class DefaultMetadataTabletMapIT {
               String.format(
                   "Statement %s on session %s did not trigger session tablets update",
                   stmtEntry.getKey(), sessionEntry.getKey()));
+          continue;
+        }
+        if (!checkIfRoutedProperly(session, stmt)) {
+          testErrors.add(
+              String.format(
+                  "Statement %s on session %s was routed to different nodes",
+                  stmtEntry.getKey(), sessionEntry.getKey()));
         }
       }
     }
@@ -339,6 +347,20 @@ public class DefaultMetadataTabletMapIT {
       Thread.currentThread().interrupt();
     }
     return isSessionLearnedTabletInfo(session);
+  }
+
+  private static boolean checkIfRoutedProperly(CqlSession session, Statement stmt) {
+    // DefaultLoadBalancingPolicy suppose to prioritize nodes from replica list randomly shuffling
+    // them
+    // If routing goes wrong you will see more than REPLICATION_FACTOR unique first nodes in
+    // execution plan
+
+    int expectedNodesCount = stmt.isLWT() ? 1 : REPLICATION_FACTOR;
+    Set<Node> nodes = new HashSet<>();
+    for (int i = 0; i < REPLICATION_FACTOR * 3; i++) {
+      nodes.add(session.execute(stmt).getExecutionInfo().getCoordinator());
+    }
+    return nodes.size() <= expectedNodesCount;
   }
 
   private static boolean isSessionLearnedTabletInfo(CqlSession session) {
