@@ -123,7 +123,7 @@ public interface Metadata {
    * <p>Starts as an empty map that will gradually receive updates on each query of a yet unknown
    * tablet.
    */
-  TabletMap getTabletMap();
+  Optional<TabletMap> getTabletMap();
 
   /**
    * The cluster name to which this session is connected. The Optional returned should contain the

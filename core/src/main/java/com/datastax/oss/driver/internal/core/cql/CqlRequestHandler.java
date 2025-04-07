@@ -292,7 +292,6 @@ public class CqlRequestHandler implements Throttled {
   }
 
   public Integer getShardFromTabletMap(Statement statement, Node node, Token token) {
-    TabletMap tabletMap = context.getMetadataManager().getMetadata().getTabletMap();
     if (!(token instanceof TokenLong64)) {
       LOG.trace(
           "Token ({}) is not a TokenLong64. Not performing tablet shard lookup for statement {}.",
@@ -300,6 +299,14 @@ public class CqlRequestHandler implements Throttled {
           statement);
       return null;
     }
+    TabletMap tabletMap = context.getMetadataManager().getMetadata().getTabletMap().orElse(null);
+    if (tabletMap == null) {
+      LOG.trace(
+          "Tablet map is not initialized. Not performing tablet shard lookup for statement {}.",
+          statement);
+      return null;
+    }
+
     CqlIdentifier statementKeyspace = statement.getKeyspace();
     if (statementKeyspace == null) {
       statementKeyspace = statement.getRoutingKeyspace();
