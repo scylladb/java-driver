@@ -120,8 +120,9 @@ public class DefaultMetadataTabletMapIT {
     // With enough queries we should hit a wrong node for each tablet exactly once.
     Assert.assertEquals(INITIAL_TABLETS, counter);
 
+    Assert.assertTrue(session.getMetadata().getTabletMap().isPresent());
     ConcurrentMap<KeyspaceTableNamePair, ConcurrentSkipListSet<Tablet>> tabletMapping =
-        session.getMetadata().getTabletMap().getMapping();
+        session.getMetadata().getTabletMap().get().getMapping();
     KeyspaceTableNamePair ktPair =
         new KeyspaceTableNamePair(
             CqlIdentifier.fromCql(KEYSPACE_NAME), CqlIdentifier.fromCql(TABLE_NAME));

@@ -21,6 +21,7 @@ import com.datastax.oss.driver.internal.core.loadbalancing.BasicLoadBalancingPol
 import com.datastax.oss.driver.internal.core.metadata.schema.TabletMapSchemaChangeListener;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -118,12 +119,14 @@ public class TabletMapSchemaChangesIT {
         .atMost(30, TimeUnit.SECONDS)
         .until(
             () ->
-                SESSION_RULE
-                    .session()
-                    .getMetadata()
-                    .getTabletMap()
-                    .getMapping()
-                    .containsKey(TABLET_MAP_KEY));
+                SESSION_RULE.session().getMetadata().getTabletMap().isPresent()
+                    && SESSION_RULE
+                        .session()
+                        .getMetadata()
+                        .getTabletMap()
+                        .get()
+                        .getMapping()
+                        .containsKey(TABLET_MAP_KEY));
     // Reset invocations for the next test method
     Mockito.clearInvocations(listener);
   }
@@ -137,7 +140,8 @@ public class TabletMapSchemaChangesIT {
     Mockito.verify(listener, Mockito.timeout(NOTIF_TIMEOUT_MS).times(1))
         .onKeyspaceUpdated(Mockito.any(), previous.capture());
     assertThat(previous.getValue().getName()).isEqualTo(CqlIdentifier.fromCql(KEYSPACE_NAME));
-    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().getMapping().keySet())
+    Assert.assertTrue(SESSION_RULE.session().getMetadata().getTabletMap().isPresent());
+    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().get().getMapping().keySet())
         .doesNotContain(TABLET_MAP_KEY);
   }
 
@@ -148,7 +152,8 @@ public class TabletMapSchemaChangesIT {
     Mockito.verify(listener, Mockito.timeout(NOTIF_TIMEOUT_MS).times(1))
         .onKeyspaceDropped(keyspace.capture());
     assertThat(keyspace.getValue().getName()).isEqualTo(CqlIdentifier.fromCql(KEYSPACE_NAME));
-    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().getMapping().keySet())
+    Assert.assertTrue(SESSION_RULE.session().getMetadata().getTabletMap().isPresent());
+    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().get().getMapping().keySet())
         .doesNotContain(TABLET_MAP_KEY);
   }
 
@@ -161,7 +166,8 @@ public class TabletMapSchemaChangesIT {
     Mockito.verify(listener, Mockito.timeout(NOTIF_TIMEOUT_MS).times(1))
         .onTableUpdated(Mockito.any(), previous.capture());
     assertThat(previous.getValue().getName()).isEqualTo(CqlIdentifier.fromCql(TABLE_NAME));
-    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().getMapping().keySet())
+    Assert.assertTrue(SESSION_RULE.session().getMetadata().getTabletMap().isPresent());
+    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().get().getMapping().keySet())
         .doesNotContain(TABLET_MAP_KEY);
   }
 
@@ -172,7 +178,8 @@ public class TabletMapSchemaChangesIT {
     Mockito.verify(listener, Mockito.timeout(NOTIF_TIMEOUT_MS).times(1))
         .onTableDropped(table.capture());
     assertThat(table.getValue().getName()).isEqualTo(CqlIdentifier.fromCql(TABLE_NAME));
-    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().getMapping().keySet())
+    Assert.assertTrue(SESSION_RULE.session().getMetadata().getTabletMap().isPresent());
+    assertThat(SESSION_RULE.session().getMetadata().getTabletMap().get().getMapping().keySet())
         .doesNotContain(TABLET_MAP_KEY);
   }
 }

@@ -301,7 +301,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     }
 
     Optional<TokenMap> maybeTokenMap = context.getMetadataManager().getMetadata().getTokenMap();
-    TabletMap tabletMap = context.getMetadataManager().getMetadata().getTabletMap();
+    Optional<TabletMap> maybeTabletMap = context.getMetadataManager().getMetadata().getTabletMap();
 
     // Note: we're on the hot path and the getXxx methods are potentially more than simple getters,
     // so we only call each method when strictly necessary (which is why the code below looks a bit
@@ -345,13 +345,13 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
 
     Optional<KeyspaceMetadata> ksMetadata =
         context.getMetadataManager().getMetadata().getKeyspace(keyspace);
-    if (ksMetadata.isPresent() && ksMetadata.get().isUsingTablets()) {
+    if (ksMetadata.isPresent() && ksMetadata.get().isUsingTablets() && maybeTabletMap.isPresent()) {
       if (table == null) {
         return Collections.emptySet();
       }
       if (token instanceof TokenLong64) {
         Tablet targetTablet =
-            tabletMap.getTablet(keyspace, table, ((TokenLong64) token).getValue());
+            maybeTabletMap.get().getTablet(keyspace, table, ((TokenLong64) token).getValue());
         if (targetTablet != null) {
           return targetTablet.getReplicaNodes();
         }

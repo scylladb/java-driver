@@ -1,36 +1,48 @@
 package com.datastax.oss.driver.internal.core.metadata.schema;
 
-import com.datastax.oss.driver.api.core.metadata.TabletMap;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListenerBase;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
+import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 public class TabletMapSchemaChangeListener extends SchemaChangeListenerBase {
-  private final TabletMap tabletMap;
+  private final MetadataManager manager;
 
-  public TabletMapSchemaChangeListener(TabletMap tabletMap) {
-    this.tabletMap = tabletMap;
+  public TabletMapSchemaChangeListener(MetadataManager manager) {
+    this.manager = manager;
   }
 
   @Override
   public void onKeyspaceDropped(@NonNull KeyspaceMetadata keyspace) {
-    tabletMap.removeByKeyspace(keyspace.getName());
+    if (!manager.getMetadata().getTabletMap().isPresent()) {
+      return;
+    }
+    manager.getMetadata().getTabletMap().get().removeByKeyspace(keyspace.getName());
   }
 
   @Override
   public void onKeyspaceUpdated(
       @NonNull KeyspaceMetadata current, @NonNull KeyspaceMetadata previous) {
-    tabletMap.removeByKeyspace(previous.getName());
+    if (!manager.getMetadata().getTabletMap().isPresent()) {
+      return;
+    }
+    manager.getMetadata().getTabletMap().get().removeByKeyspace(previous.getName());
   }
 
   @Override
   public void onTableDropped(@NonNull TableMetadata table) {
-    tabletMap.removeByTable(table.getName());
+    if (!manager.getMetadata().getTabletMap().isPresent()) {
+      return;
+    }
+    manager.getMetadata().getTabletMap().get().removeByTable(table.getName());
   }
 
   @Override
   public void onTableUpdated(@NonNull TableMetadata current, @NonNull TableMetadata previous) {
-    tabletMap.removeByTable(previous.getName());
+    if (!manager.getMetadata().getTabletMap().isPresent()) {
+      return;
+    }
+    manager.getMetadata().getTabletMap().get().removeByTable(previous.getName());
   }
 }

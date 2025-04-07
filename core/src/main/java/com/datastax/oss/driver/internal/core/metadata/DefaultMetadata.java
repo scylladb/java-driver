@@ -49,8 +49,7 @@ import org.slf4j.LoggerFactory;
 public class DefaultMetadata implements Metadata {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultMetadata.class);
   public static DefaultMetadata EMPTY =
-      new DefaultMetadata(
-          Collections.emptyMap(), Collections.emptyMap(), null, null, DefaultTabletMap.emptyMap());
+      new DefaultMetadata(Collections.emptyMap(), Collections.emptyMap(), null, null, null);
 
   protected final Map<UUID, Node> nodes;
   protected final Map<CqlIdentifier, KeyspaceMetadata> keyspaces;
@@ -98,8 +97,8 @@ public class DefaultMetadata implements Metadata {
   }
 
   @Override
-  public TabletMap getTabletMap() {
-    return tabletMap;
+  public Optional<TabletMap> getTabletMap() {
+    return Optional.ofNullable(tabletMap);
   }
 
   @NonNull
@@ -137,7 +136,7 @@ public class DefaultMetadata implements Metadata {
         rebuildTokenMap(
             newNodes, keyspaces, tokenMapEnabled, forceFullRebuild, tokenFactory, context),
         context.getChannelFactory().getClusterName(),
-        this.tabletMap);
+        this.tabletMap == null ? DefaultTabletMap.emptyMap() : this.tabletMap);
   }
 
   /**

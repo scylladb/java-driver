@@ -661,8 +661,7 @@ public class DefaultDriverContext implements InternalDriverContext {
           .ifPresent(listeners::add);
     }
     if (getMetadataManager().isSchemaEnabled()) {
-      listeners.add(
-          new TabletMapSchemaChangeListener(getMetadataManager().getMetadata().getTabletMap()));
+      listeners.add(new TabletMapSchemaChangeListener(getMetadataManager()));
     }
     if (listeners.isEmpty()) {
       return new NoopSchemaChangeListener(this);
