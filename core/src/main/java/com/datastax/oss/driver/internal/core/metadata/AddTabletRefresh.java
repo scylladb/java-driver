@@ -20,7 +20,9 @@ public class AddTabletRefresh implements MetadataRefresh {
   @Override
   public Result compute(
       DefaultMetadata oldMetadata, boolean tokenMapEnabled, InternalDriverContext context) {
-    oldMetadata.tabletMap.addTablet(keyspace, table, tablet);
+    if (oldMetadata.tabletMap != null) {
+      oldMetadata.tabletMap.addTablet(keyspace, table, tablet);
+    }
     return new Result(oldMetadata);
   }
 }

@@ -67,7 +67,9 @@ public class RemoveNodeRefresh extends NodesRefresh {
       return new Result(oldMetadata);
     } else {
       LOG.debug("[{}] Removing node {}", logPrefix, removedNode);
-      oldMetadata.tabletMap.removeByNode(removedNode);
+      if (oldMetadata.tabletMap != null) {
+        oldMetadata.tabletMap.removeByNode(removedNode);
+      }
       return new Result(
           oldMetadata.withNodes(newNodesBuilder.build(), tokenMapEnabled, false, null, context),
           ImmutableList.of(NodeStateEvent.removed((DefaultNode) removedNode)));
