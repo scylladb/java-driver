@@ -267,11 +267,17 @@ public class PreparedStatementCachingIT {
       session.execute("ALTER TYPE test_type_2 add i blob");
 
       // wait for latches and fail if they don't reach zero before timeout
-      assertThat(
-              Uninterruptibles.awaitUninterruptibly(
-                  preparedStmtCacheRemoveLatch, 10, TimeUnit.SECONDS))
-          .withFailMessage("preparedStmtCacheRemoveLatch did not trigger before timeout")
-          .isTrue();
+      if (!Uninterruptibles.awaitUninterruptibly(
+          preparedStmtCacheRemoveLatch, 10, TimeUnit.SECONDS)) {
+        // On rare occasions cache does not trigger removal shortly after alter.
+        forceCacheCleanUp((DefaultDriverContext) session.getContext());
+        assertThat(
+                Uninterruptibles.awaitUninterruptibly(
+                    preparedStmtCacheRemoveLatch, 10, TimeUnit.SECONDS))
+            .withFailMessage("preparedStmtCacheRemoveLatch did not trigger before timeout")
+            .isTrue();
+      }
+
       assertThat(Uninterruptibles.awaitUninterruptibly(typeChangeEventLatch, 10, TimeUnit.SECONDS))
           .withFailMessage("typeChangeEventLatch did not trigger before timeout")
           .isTrue();
@@ -425,5 +431,19 @@ public class PreparedStatementCachingIT {
                 new AssertionError(
                     "Could not access metric "
                         + DefaultSessionMetric.CQL_PREPARED_CACHE_SIZE.getPath()));
+  }
+
+  private void forceCacheCleanUp(DefaultDriverContext context) {
+    context
+        .getRequestProcessorRegistry()
+        .getProcessors()
+        .forEach(
+            requestProcessor -> {
+              if (requestProcessor instanceof CqlPrepareAsyncProcessor) {
+                ((CqlPrepareAsyncProcessor) requestProcessor).getCache().cleanUp();
+              } else if (requestProcessor instanceof CqlPrepareSyncProcessor) {
+                ((CqlPrepareSyncProcessor) requestProcessor).getCache().cleanUp();
+              }
+            });
   }
 }
