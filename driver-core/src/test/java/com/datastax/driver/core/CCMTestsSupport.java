@@ -1043,6 +1043,12 @@ public class CCMTestsSupport {
       session = register(cluster.connect());
   }
 
+  public Session newSession() {
+    if (ccmTestConfig.createCcm() && ccmTestConfig.createCluster() && ccmTestConfig.createSession())
+      return register(cluster.connect());
+    return null;
+  }
+
   protected void initTestKeyspace() {
     if (ccmTestConfig.createCcm()
         && ccmTestConfig.createCluster()
