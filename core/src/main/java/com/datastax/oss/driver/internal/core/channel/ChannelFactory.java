@@ -29,8 +29,10 @@ import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.NodeShardingInfo;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
@@ -157,12 +159,27 @@ public class ChannelFactory {
     } else {
       nodeMetricUpdater = NoopNodeMetricUpdater.INSTANCE;
     }
-    return connect(node.getEndPoint(), options, nodeMetricUpdater);
+    return connect(node.getEndPoint(), null, null, options, nodeMetricUpdater);
+  }
+
+  public CompletionStage<DriverChannel> connect(
+      Node node, Integer shardId, DriverChannelOptions options) {
+    NodeMetricUpdater nodeMetricUpdater;
+    if (node instanceof DefaultNode) {
+      nodeMetricUpdater = ((DefaultNode) node).getMetricUpdater();
+    } else {
+      nodeMetricUpdater = NoopNodeMetricUpdater.INSTANCE;
+    }
+    return connect(node.getEndPoint(), node.getShardingInfo(), shardId, options, nodeMetricUpdater);
   }
 
   @VisibleForTesting
   CompletionStage<DriverChannel> connect(
-      EndPoint endPoint, DriverChannelOptions options, NodeMetricUpdater nodeMetricUpdater) {
+      EndPoint endPoint,
+      NodeShardingInfo shardingInfo,
+      Integer shardId,
+      DriverChannelOptions options,
+      NodeMetricUpdater nodeMetricUpdater) {
     CompletableFuture<DriverChannel> resultFuture = new CompletableFuture<>();
 
     ProtocolVersion currentVersion;
@@ -178,6 +195,8 @@ public class ChannelFactory {
 
     connect(
         endPoint,
+        shardingInfo,
+        shardId,
         options,
         nodeMetricUpdater,
         currentVersion,
@@ -189,6 +208,8 @@ public class ChannelFactory {
 
   private void connect(
       EndPoint endPoint,
+      NodeShardingInfo shardingInfo,
+      Integer shardId,
       DriverChannelOptions options,
       NodeMetricUpdater nodeMetricUpdater,
       ProtocolVersion currentVersion,
@@ -208,7 +229,20 @@ public class ChannelFactory {
 
     nettyOptions.afterBootstrapInitialized(bootstrap);
 
-    ChannelFuture connectFuture = bootstrap.connect(endPoint.resolve());
+    ChannelFuture connectFuture;
+    if (shardId == null || shardingInfo == null) {
+      if (shardId != null) {
+        LOG.debug(
+            "Requested connection to shard {} but shardingInfo is currently missing for Node at endpoint {}. Falling back to arbitrary local port.",
+            shardId,
+            endPoint);
+      }
+      connectFuture = bootstrap.connect(endPoint.resolve());
+    } else {
+      int localPort =
+          PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
+      connectFuture = bootstrap.connect(endPoint.resolve(), new InetSocketAddress(localPort));
+    }
 
     connectFuture.addListener(
         cf -> {
@@ -257,6 +291,8 @@ public class ChannelFactory {
                     downgraded.get());
                 connect(
                     endPoint,
+                    shardingInfo,
+                    shardId,
                     options,
                     nodeMetricUpdater,
                     downgraded.get(),
@@ -399,7 +435,17 @@ public class ChannelFactory {
   static class PortAllocator {
     private static final AtomicInteger lastPort = new AtomicInteger(-1);
 
-    public static int getNextAvailablePort(int shardCount, int shardId, int lowPort, int highPort) {
+    public static int getNextAvailablePort(int shardCount, int shardId, DriverContext context) {
+      int lowPort =
+          context
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW);
+      int highPort =
+          context
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH);
       int lastPortValue, foundPort = -1;
       do {
         lastPortValue = lastPort.get();
