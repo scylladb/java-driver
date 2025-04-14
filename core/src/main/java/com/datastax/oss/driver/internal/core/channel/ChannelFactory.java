@@ -241,7 +241,15 @@ public class ChannelFactory {
     } else {
       int localPort =
           PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
-      connectFuture = bootstrap.connect(endPoint.resolve(), new InetSocketAddress(localPort));
+      if (localPort == -1) {
+        LOG.warn(
+            "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
+            shardId,
+            endPoint);
+        connectFuture = bootstrap.connect(endPoint.resolve());
+      } else {
+        connectFuture = bootstrap.connect(endPoint.resolve(), new InetSocketAddress(localPort));
+      }
     }
 
     connectFuture.addListener(
@@ -434,6 +442,7 @@ public class ChannelFactory {
 
   static class PortAllocator {
     private static final AtomicInteger lastPort = new AtomicInteger(-1);
+    private static final Logger LOG = LoggerFactory.getLogger(PortAllocator.class);
 
     public static int getNextAvailablePort(int shardCount, int shardId, DriverContext context) {
       int lowPort =
@@ -446,6 +455,13 @@ public class ChannelFactory {
               .getConfig()
               .getDefaultProfile()
               .getInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH);
+      if (highPort - lowPort < shardCount) {
+        LOG.error(
+            "There is not enough ports in range [{},{}] for {} shards. Update your configuration.",
+            lowPort,
+            highPort,
+            shardCount);
+      }
       int lastPortValue, foundPort = -1;
       do {
         lastPortValue = lastPort.get();
@@ -462,7 +478,7 @@ public class ChannelFactory {
 
         // Scan from scanStart upwards to highPort.
         for (int port = scanStart; port <= highPort; port += shardCount) {
-          if (isTcpPortAvailable(port)) {
+          if (isTcpPortAvailable(port, context)) {
             foundPort = port;
             break;
           }
@@ -476,7 +492,7 @@ public class ChannelFactory {
           scanStart = lowPort + (shardCount - lowPort % shardCount) + shardId;
 
           for (int port = scanStart; port <= highPort; port += shardCount) {
-            if (isTcpPortAvailable(port)) {
+            if (isTcpPortAvailable(port, context)) {
               foundPort = port;
               break;
             }
@@ -492,11 +508,15 @@ public class ChannelFactory {
       return foundPort;
     }
 
-    public static boolean isTcpPortAvailable(int port) {
+    public static boolean isTcpPortAvailable(int port, DriverContext context) {
       try {
         ServerSocket serverSocket = new ServerSocket();
         try {
-          serverSocket.setReuseAddress(false);
+          serverSocket.setReuseAddress(
+              context
+                  .getConfig()
+                  .getDefaultProfile()
+                  .getBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, false));
           serverSocket.bind(new InetSocketAddress(port), 1);
           return true;
         } finally {
