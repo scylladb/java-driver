@@ -51,6 +51,9 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +61,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -388,6 +392,72 @@ public class ChannelFactory {
         // want to propagate it instead, so fail the outer future (the result of connect()).
         resultFuture.completeExceptionally(t);
         throw t;
+      }
+    }
+  }
+
+  static class PortAllocator {
+    private static final AtomicInteger lastPort = new AtomicInteger(-1);
+
+    public static int getNextAvailablePort(int shardCount, int shardId, int lowPort, int highPort) {
+      int lastPortValue, foundPort = -1;
+      do {
+        lastPortValue = lastPort.get();
+
+        // We will scan from lastPortValue
+        // (or lowPort is there was no lastPort or lastPort is too low)
+        int scanStart = lastPortValue == -1 ? lowPort : lastPortValue;
+        if (scanStart < lowPort) {
+          scanStart = lowPort;
+        }
+
+        // Round it up to "% shardCount == shardId"
+        scanStart += (shardCount - scanStart % shardCount) + shardId;
+
+        // Scan from scanStart upwards to highPort.
+        for (int port = scanStart; port <= highPort; port += shardCount) {
+          if (isTcpPortAvailable(port)) {
+            foundPort = port;
+            break;
+          }
+        }
+
+        // If we started scanning from a high scanStart port
+        // there might have been not enough ports left that are
+        // smaller than highPort. Scan from the beginning
+        // from the lowPort.
+        if (foundPort == -1) {
+          scanStart = lowPort + (shardCount - lowPort % shardCount) + shardId;
+
+          for (int port = scanStart; port <= highPort; port += shardCount) {
+            if (isTcpPortAvailable(port)) {
+              foundPort = port;
+              break;
+            }
+          }
+        }
+
+        // No luck! All ports taken!
+        if (foundPort == -1) {
+          return -1;
+        }
+      } while (!lastPort.compareAndSet(lastPortValue, foundPort));
+
+      return foundPort;
+    }
+
+    public static boolean isTcpPortAvailable(int port) {
+      try {
+        ServerSocket serverSocket = new ServerSocket();
+        try {
+          serverSocket.setReuseAddress(false);
+          serverSocket.bind(new InetSocketAddress(port), 1);
+          return true;
+        } finally {
+          serverSocket.close();
+        }
+      } catch (IOException ex) {
+        return false;
       }
     }
   }
