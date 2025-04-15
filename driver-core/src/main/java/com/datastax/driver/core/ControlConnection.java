@@ -1007,12 +1007,12 @@ class ControlConnection implements Connection.Owner {
               && !peerRow.isNull("data_center")
               && peerRow.getColumnDefinitions().contains("rack")
               && !peerRow.isNull("rack")
-              && peerRow.getColumnDefinitions().contains("tokens")
-              && (!peerRow.isNull("tokens")
-                  || cluster
-                      .configuration
-                      .getQueryOptions()
-                      .shouldConsiderZeroTokenNodesValidPeers());
+              && peerRow.getColumnDefinitions().contains("tokens");
+
+      if (isValid && peerRow.isNull("tokens")) {
+        // Don't log invalid row for zero token nodes, but report it if it is configured so.
+        return cluster.configuration.getQueryOptions().shouldConsiderZeroTokenNodesValidPeers();
+      }
     }
     if (!isValid && logIfInvalid)
       logger.warn(
