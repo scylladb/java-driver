@@ -10,6 +10,8 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.testinfra.CassandraSkip;
+import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import java.net.InetAddress;
@@ -41,6 +43,11 @@ public class ZeroTokenNodesIT {
   }
 
   @Test
+  @CassandraSkip
+  @ScyllaRequirement(
+      minEnterprise = "2025.1.1",
+      minOSS = "6.2.0",
+      description = "Zero token nodes support needed")
   public void should_not_ignore_zero_token_peer_when_option_is_enabled() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
@@ -65,12 +72,18 @@ public class ZeroTokenNodesIT {
           nodes.stream().map(Node::getEndPoint).map(EndPoint::toString).collect(Collectors.toSet());
       assertThat(toStrings)
           .containsOnly("/127.0.1.1:9042", "/127.0.1.2:9042", "/127.0.1.3:9042", "/127.0.1.4:9042");
+      session.execute("select * from system.peers");
     } finally {
       if (session != null) session.close();
     }
   }
 
   @Test
+  @CassandraSkip
+  @ScyllaRequirement(
+      minEnterprise = "2025.1.1",
+      minOSS = "6.2.0",
+      description = "Zero token nodes support needed")
   public void should_not_discover_zero_token_DC_when_option_is_disabled() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
@@ -108,6 +121,11 @@ public class ZeroTokenNodesIT {
   }
 
   @Test
+  @CassandraSkip
+  @ScyllaRequirement(
+      minEnterprise = "2025.1.1",
+      minOSS = "6.2.0",
+      description = "Zero token nodes support needed")
   public void should_discover_zero_token_DC_when_option_is_enabled() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
@@ -149,6 +167,11 @@ public class ZeroTokenNodesIT {
   }
 
   @Test
+  @CassandraSkip
+  @ScyllaRequirement(
+      minEnterprise = "2025.1.1",
+      minOSS = "6.2.0",
+      description = "Zero token nodes support needed")
   public void should_connect_to_zero_token_contact_point() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
@@ -176,6 +199,11 @@ public class ZeroTokenNodesIT {
   }
 
   @Test
+  @CassandraSkip
+  @ScyllaRequirement(
+      minEnterprise = "2025.1.1",
+      minOSS = "6.2.0",
+      description = "Zero token nodes support needed")
   public void should_connect_to_zero_token_DC() {
     // This test is similar but not exactly the same as should_connect_to_zero_token_contact_point.
     // In the future we may want to have different behavior for arbiter DCs and adjust this test
