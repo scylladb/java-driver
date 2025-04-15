@@ -351,7 +351,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       long latencyNanos,
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
-      @NonNull String logPrefix) {
+      @NonNull String nodeRequestLogPrefix) {
     updateResponseTimes(node);
   }
 
@@ -362,7 +362,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       long latencyNanos,
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
-      @NonNull String logPrefix) {
+      @NonNull String nodeRequestLogPrefix) {
     updateResponseTimes(node);
   }
 

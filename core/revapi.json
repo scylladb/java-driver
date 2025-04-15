@@ -7383,6 +7383,11 @@
         "old": "method <T extends java.lang.Number> com.datastax.oss.driver.api.core.type.reflect.GenericType<com.datastax.oss.driver.api.core.data.CqlVector<T>> com.datastax.oss.driver.api.core.type.reflect.GenericType<T>::vectorOf(java.lang.Class<T>)",
         "new": "method <T> com.datastax.oss.driver.api.core.type.reflect.GenericType<com.datastax.oss.driver.api.core.data.CqlVector<T>> com.datastax.oss.driver.api.core.type.reflect.GenericType<T>::vectorOf(java.lang.Class<T>)",
         "justification": "JAVA-3143: Extend driver vector support to arbitrary subtypes and fix handling of variable length types (OSS C* 5.0)"
+      },
+      {
+        "code": "java.method.addedToInterface",
+        "new": "method java.util.Optional<com.datastax.oss.driver.api.core.tracker.RequestIdGenerator> com.datastax.oss.driver.api.core.context.DriverContext::getRequestIdGenerator()",
+        "justification": "CASSJAVA-97: Let users inject an ID for each request and write to the custom payload"
       }
     ]
   }

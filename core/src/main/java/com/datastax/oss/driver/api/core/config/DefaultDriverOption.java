@@ -1075,6 +1075,12 @@ public enum DefaultDriverOption implements DriverOption {
   LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD(
       "advanced.load-balancing-policy.default-lwt-request-routing-method"),
   /**
+   * The class of session-wide component that generates request IDs.
+   *
+   * <p>Value-type: {@link String}
+   */
+  REQUEST_ID_GENERATOR_CLASS("advanced.request-id.generator.class"),
+  /**
    * An address to always translate all node addresses to that same proxy hostname no matter what IP
    * address a node has, but still using its native transport port.
    *
