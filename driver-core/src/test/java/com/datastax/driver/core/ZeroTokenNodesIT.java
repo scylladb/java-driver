@@ -19,9 +19,9 @@ public class ZeroTokenNodesIT {
   @DataProvider(name = "loadBalancingPolicies")
   public static Object[][] loadBalancingPolicies() {
     return new Object[][] {
-      {DCAwareRoundRobinPolicy.builder().build()},
-      {new TokenAwarePolicy(DCAwareRoundRobinPolicy.builder().build())},
-      {new TokenAwarePolicy(new RoundRobinPolicy())}
+      {DCAwareRoundRobinPolicy.builder().build(), true},
+      {new TokenAwarePolicy(DCAwareRoundRobinPolicy.builder().build()), true},
+      {new TokenAwarePolicy(new RoundRobinPolicy()), false}
     };
   }
 
@@ -76,7 +76,7 @@ public class ZeroTokenNodesIT {
     CCMBridge ccmBridge = null;
     try {
       ccmBridge =
-          CCMBridge.builder().withNodes(2).withIpPrefix("127.0.1.").withBinaryPort(9042).build();
+          CCMBridge.builder().withNodes(2, 0).withIpPrefix("127.0.1.").withBinaryPort(9042).build();
       ccmBridge.start();
       ccmBridge.add(2, 3);
       ccmBridge.updateNodeConfig(3, "join_ring", false);
@@ -102,7 +102,7 @@ public class ZeroTokenNodesIT {
       // Queries should not land on any of the zero-token DC nodes
       session.execute("DROP KEYSPACE IF EXISTS ZeroTokenNodesIT");
       session.execute(
-          "CREATE KEYSPACE ZeroTokenNodesIT WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': 2};");
+          "CREATE KEYSPACE ZeroTokenNodesIT WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 0};");
       session.execute("CREATE TABLE ZeroTokenNodesIT.tab (id INT PRIMARY KEY)");
       for (int i = 0; i < 30; i++) {
         ResultSet rs = session.execute("INSERT INTO ZeroTokenNodesIT.tab (id) VALUES (" + i + ")");
@@ -128,7 +128,7 @@ public class ZeroTokenNodesIT {
       minEnterprise = "2024.2.2",
       description = "Zero-token nodes introduced in scylladb/scylladb#19684")
   public void should_discover_zero_token_DC_when_option_is_enabled(
-      LoadBalancingPolicy loadBalancingPolicy) {
+      LoadBalancingPolicy loadBalancingPolicy, boolean isDcAware) {
     // Makes sure that with QueryOptions.setConsiderZeroTokenNodesValidPeers(true)
     // the zero-token peers will be discovered and added to metadata
     Cluster cluster = null;
@@ -136,7 +136,7 @@ public class ZeroTokenNodesIT {
     CCMBridge ccmBridge = null;
     try {
       ccmBridge =
-          CCMBridge.builder().withNodes(2).withIpPrefix("127.0.1.").withBinaryPort(9042).build();
+          CCMBridge.builder().withNodes(2, 0).withIpPrefix("127.0.1.").withBinaryPort(9042).build();
       ccmBridge.start();
       ccmBridge.add(2, 3);
       ccmBridge.updateNodeConfig(3, "join_ring", false);
@@ -164,19 +164,26 @@ public class ZeroTokenNodesIT {
       // Later on we may want to adjust the LBP behavior to be more sophisticated.
       session.execute("DROP KEYSPACE IF EXISTS ZeroTokenNodesIT");
       session.execute(
-          "CREATE KEYSPACE ZeroTokenNodesIT WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor': 2};");
+          "CREATE KEYSPACE ZeroTokenNodesIT WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 0};");
       session.execute("CREATE TABLE ZeroTokenNodesIT.tab (id INT PRIMARY KEY)");
+      PreparedStatement ps = session.prepare("INSERT INTO ZeroTokenNodesIT.tab (id) VALUES (?)");
       Set<InetSocketAddress> queriedNodes = new HashSet<>();
       for (int i = 0; i < 30; i++) {
-        ResultSet rs = session.execute("INSERT INTO ZeroTokenNodesIT.tab (id) VALUES (" + i + ")");
+        ResultSet rs = session.execute(ps.bind(i).setConsistencyLevel(ConsistencyLevel.TWO));
         queriedNodes.add(rs.getExecutionInfo().getQueriedHost().getEndPoint().resolve());
       }
-      assertThat(queriedNodes)
-          .containsExactly(
-              ccmBridge.addressOfNode(1),
-              ccmBridge.addressOfNode(2),
-              ccmBridge.addressOfNode(3),
-              ccmBridge.addressOfNode(4));
+
+      if (isDcAware) {
+        assertThat(queriedNodes)
+            .containsExactly(ccmBridge.addressOfNode(1), ccmBridge.addressOfNode(2));
+      } else {
+        assertThat(queriedNodes)
+            .containsExactly(
+                ccmBridge.addressOfNode(1),
+                ccmBridge.addressOfNode(2),
+                ccmBridge.addressOfNode(3),
+                ccmBridge.addressOfNode(4));
+      }
 
       Set<Host> hosts = cluster.getMetadata().getAllHosts();
       Set<String> toStrings = hosts.stream().map(Host::toString).collect(Collectors.toSet());
@@ -248,7 +255,7 @@ public class ZeroTokenNodesIT {
 
     try {
       ccmBridge =
-          CCMBridge.builder().withNodes(2).withIpPrefix("127.0.1.").withBinaryPort(9042).build();
+          CCMBridge.builder().withNodes(2, 0).withIpPrefix("127.0.1.").withBinaryPort(9042).build();
       ccmBridge.start();
       ccmBridge.add(2, 3);
       ccmBridge.updateNodeConfig(3, "join_ring", false);
