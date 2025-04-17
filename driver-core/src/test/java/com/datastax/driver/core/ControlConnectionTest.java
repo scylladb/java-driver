@@ -378,7 +378,12 @@ public class ControlConnectionTest extends CCMTestsSupport {
             .extractingResultOf("getAddress")
             .doesNotContain(node2Address);
 
-        assertThat(log).containsOnlyOnce(expectedError);
+        if (columns.equals("tokens")) {
+          // For zero token nodes driver does not log an error
+          assertThat(log).doesNotContain(expectedError);
+        } else {
+          assertThat(log).containsOnlyOnce(expectedError);
+        }
       }
     } finally {
       cLogger.removeAppender(logs);
