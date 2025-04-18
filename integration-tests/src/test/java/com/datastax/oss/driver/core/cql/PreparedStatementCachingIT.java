@@ -40,6 +40,7 @@ import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEv
 import com.datastax.oss.driver.internal.core.session.BuiltInRequestProcessors;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.RequestProcessorRegistry;
+import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder;
 import com.datastax.oss.driver.shaded.guava.common.cache.RemovalListener;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.Uninterruptibles;
 import com.google.common.collect.ImmutableList;
@@ -135,7 +136,9 @@ public class PreparedStatementCachingIT {
     public TestCqlPrepareAsyncProcessor(@NonNull Optional<DefaultDriverContext> context) {
       // Default CqlPrepareAsyncProcessor uses weak values here as well.  We avoid doing so
       // to prevent cache entries from unexpectedly disappearing mid-test.
-      super(context, builder -> builder.removalListener(buildCacheRemoveCallback(context)));
+      super(
+          context,
+          builder -> CacheBuilder.newBuilder().removalListener(buildCacheRemoveCallback(context)));
     }
   }
 
@@ -267,13 +270,13 @@ public class PreparedStatementCachingIT {
       session.execute("ALTER TYPE test_type_2 add i blob");
 
       // wait for latches and fail if they don't reach zero before timeout
+      assertThat(Uninterruptibles.awaitUninterruptibly(typeChangeEventLatch, 10, TimeUnit.SECONDS))
+          .withFailMessage("typeChangeEventLatch did not trigger before timeout")
+          .isTrue();
       assertThat(
               Uninterruptibles.awaitUninterruptibly(
                   preparedStmtCacheRemoveLatch, 10, TimeUnit.SECONDS))
           .withFailMessage("preparedStmtCacheRemoveLatch did not trigger before timeout")
-          .isTrue();
-      assertThat(Uninterruptibles.awaitUninterruptibly(typeChangeEventLatch, 10, TimeUnit.SECONDS))
-          .withFailMessage("typeChangeEventLatch did not trigger before timeout")
           .isTrue();
 
       /* Okay, the latch triggered so cache processing should now be done.  Let's validate :allthethings: */
