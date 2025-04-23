@@ -331,7 +331,7 @@ jobs:
         uses: actions/cache/restore@v4
         id: ccm-cache
         with:
-          path: ~/.ccm/repository
+          path: ~/.ccm/scylla-repository
           key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
 
       - name: Download Scylla (${{ steps.scylla-version.outputs.value }}) image
@@ -346,7 +346,7 @@ jobs:
         uses: actions/cache/save@v4
         if: steps.ccm-cache.outputs.cache-hit != 'true'
         with:
-          path: ~/.ccm/repository
+          path: ~/.ccm/scylla-repository
           key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
 
       - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
