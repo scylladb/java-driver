@@ -24,6 +24,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
@@ -77,6 +78,8 @@ abstract class ChannelPoolTestBase {
     when(nettyOptions.adminEventExecutorGroup()).thenReturn(adminEventLoopGroup);
     when(context.getConfig()).thenReturn(config);
     when(config.getDefaultProfile()).thenReturn(defaultProfile);
+    when(defaultProfile.getBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED))
+        .thenReturn(false);
     this.eventBus = spy(new EventBus("test"));
     when(context.getEventBus()).thenReturn(eventBus);
     when(context.getChannelFactory()).thenReturn(channelFactory);

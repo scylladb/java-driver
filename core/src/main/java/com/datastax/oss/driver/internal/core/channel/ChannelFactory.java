@@ -29,8 +29,10 @@ import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.NodeShardingInfo;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
@@ -51,6 +53,9 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +63,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -153,12 +159,27 @@ public class ChannelFactory {
     } else {
       nodeMetricUpdater = NoopNodeMetricUpdater.INSTANCE;
     }
-    return connect(node.getEndPoint(), options, nodeMetricUpdater);
+    return connect(node.getEndPoint(), null, null, options, nodeMetricUpdater);
+  }
+
+  public CompletionStage<DriverChannel> connect(
+      Node node, Integer shardId, DriverChannelOptions options) {
+    NodeMetricUpdater nodeMetricUpdater;
+    if (node instanceof DefaultNode) {
+      nodeMetricUpdater = ((DefaultNode) node).getMetricUpdater();
+    } else {
+      nodeMetricUpdater = NoopNodeMetricUpdater.INSTANCE;
+    }
+    return connect(node.getEndPoint(), node.getShardingInfo(), shardId, options, nodeMetricUpdater);
   }
 
   @VisibleForTesting
   CompletionStage<DriverChannel> connect(
-      EndPoint endPoint, DriverChannelOptions options, NodeMetricUpdater nodeMetricUpdater) {
+      EndPoint endPoint,
+      NodeShardingInfo shardingInfo,
+      Integer shardId,
+      DriverChannelOptions options,
+      NodeMetricUpdater nodeMetricUpdater) {
     CompletableFuture<DriverChannel> resultFuture = new CompletableFuture<>();
 
     ProtocolVersion currentVersion;
@@ -174,6 +195,8 @@ public class ChannelFactory {
 
     connect(
         endPoint,
+        shardingInfo,
+        shardId,
         options,
         nodeMetricUpdater,
         currentVersion,
@@ -185,6 +208,8 @@ public class ChannelFactory {
 
   private void connect(
       EndPoint endPoint,
+      NodeShardingInfo shardingInfo,
+      Integer shardId,
       DriverChannelOptions options,
       NodeMetricUpdater nodeMetricUpdater,
       ProtocolVersion currentVersion,
@@ -204,7 +229,28 @@ public class ChannelFactory {
 
     nettyOptions.afterBootstrapInitialized(bootstrap);
 
-    ChannelFuture connectFuture = bootstrap.connect(endPoint.resolve());
+    ChannelFuture connectFuture;
+    if (shardId == null || shardingInfo == null) {
+      if (shardId != null) {
+        LOG.debug(
+            "Requested connection to shard {} but shardingInfo is currently missing for Node at endpoint {}. Falling back to arbitrary local port.",
+            shardId,
+            endPoint);
+      }
+      connectFuture = bootstrap.connect(endPoint.resolve());
+    } else {
+      int localPort =
+          PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
+      if (localPort == -1) {
+        LOG.warn(
+            "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
+            shardId,
+            endPoint);
+        connectFuture = bootstrap.connect(endPoint.resolve());
+      } else {
+        connectFuture = bootstrap.connect(endPoint.resolve(), new InetSocketAddress(localPort));
+      }
+    }
 
     connectFuture.addListener(
         cf -> {
@@ -253,6 +299,8 @@ public class ChannelFactory {
                     downgraded.get());
                 connect(
                     endPoint,
+                    shardingInfo,
+                    shardId,
                     options,
                     nodeMetricUpdater,
                     downgraded.get(),
@@ -388,6 +436,94 @@ public class ChannelFactory {
         // want to propagate it instead, so fail the outer future (the result of connect()).
         resultFuture.completeExceptionally(t);
         throw t;
+      }
+    }
+  }
+
+  static class PortAllocator {
+    private static final AtomicInteger lastPort = new AtomicInteger(-1);
+    private static final Logger LOG = LoggerFactory.getLogger(PortAllocator.class);
+
+    public static int getNextAvailablePort(int shardCount, int shardId, DriverContext context) {
+      int lowPort =
+          context
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW);
+      int highPort =
+          context
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH);
+      if (highPort - lowPort < shardCount) {
+        LOG.error(
+            "There is not enough ports in range [{},{}] for {} shards. Update your configuration.",
+            lowPort,
+            highPort,
+            shardCount);
+      }
+      int lastPortValue, foundPort = -1;
+      do {
+        lastPortValue = lastPort.get();
+
+        // We will scan from lastPortValue
+        // (or lowPort is there was no lastPort or lastPort is too low)
+        int scanStart = lastPortValue == -1 ? lowPort : lastPortValue;
+        if (scanStart < lowPort) {
+          scanStart = lowPort;
+        }
+
+        // Round it up to "% shardCount == shardId"
+        scanStart += (shardCount - scanStart % shardCount) + shardId;
+
+        // Scan from scanStart upwards to highPort.
+        for (int port = scanStart; port <= highPort; port += shardCount) {
+          if (isTcpPortAvailable(port, context)) {
+            foundPort = port;
+            break;
+          }
+        }
+
+        // If we started scanning from a high scanStart port
+        // there might have been not enough ports left that are
+        // smaller than highPort. Scan from the beginning
+        // from the lowPort.
+        if (foundPort == -1) {
+          scanStart = lowPort + (shardCount - lowPort % shardCount) + shardId;
+
+          for (int port = scanStart; port <= highPort; port += shardCount) {
+            if (isTcpPortAvailable(port, context)) {
+              foundPort = port;
+              break;
+            }
+          }
+        }
+
+        // No luck! All ports taken!
+        if (foundPort == -1) {
+          return -1;
+        }
+      } while (!lastPort.compareAndSet(lastPortValue, foundPort));
+
+      return foundPort;
+    }
+
+    public static boolean isTcpPortAvailable(int port, DriverContext context) {
+      try {
+        ServerSocket serverSocket = new ServerSocket();
+        try {
+          serverSocket.setReuseAddress(
+              context
+                  .getConfig()
+                  .getDefaultProfile()
+                  .getBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, false));
+          serverSocket.bind(new InetSocketAddress(port), 1);
+          return true;
+        } finally {
+          serverSocket.close();
+        }
+      } catch (IOException ex) {
+        return false;
       }
     }
   }

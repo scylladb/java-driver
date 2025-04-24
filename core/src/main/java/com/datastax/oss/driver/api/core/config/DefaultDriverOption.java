@@ -142,6 +142,17 @@ public enum DefaultDriverOption implements DriverOption {
    */
   CONNECTION_WARN_INIT_ERROR("advanced.connection.warn-on-init-error"),
   /**
+   * Whether to use advanced shard awareness.
+   *
+   * <p>Value-type: boolean
+   */
+  CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED(
+      "advanced.connection.advanced-shard-awareness.enabled"),
+  /** Inclusive lower bound of port range to use in advanced shard awareness */
+  ADVANCED_SHARD_AWARENESS_PORT_LOW("advanced.connection.advanced-shard-awareness.port-low"),
+  /** Inclusive upper bound of port range to use in advanced shard awareness */
+  ADVANCED_SHARD_AWARENESS_PORT_HIGH("advanced.connection.advanced-shard-awareness.port-high"),
+  /**
    * The number of connections in the LOCAL pool.
    *
    * <p>Value-type: int

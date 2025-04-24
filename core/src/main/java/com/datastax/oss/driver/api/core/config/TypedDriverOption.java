@@ -175,6 +175,18 @@ public class TypedDriverOption<ValueT> {
   /** Whether to log non-fatal errors when the driver tries to open a new connection. */
   public static final TypedDriverOption<Boolean> CONNECTION_WARN_INIT_ERROR =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR, GenericType.BOOLEAN);
+  /** Whether to use advanced shard awareness */
+  public static final TypedDriverOption<Boolean> CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, GenericType.BOOLEAN);
+  /** Inclusive lower bound of port range to use in advanced shard awareness */
+  public static final TypedDriverOption<Integer> ADVANCED_SHARD_AWARENESS_PORT_LOW =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, GenericType.INTEGER);
+  /** Inclusive upper bound of port range to use in advanced shard awareness */
+  public static final TypedDriverOption<Integer> ADVANCED_SHARD_AWARENESS_PORT_HIGH =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, GenericType.INTEGER);
   /** The number of connections in the LOCAL pool. */
   public static final TypedDriverOption<Integer> CONNECTION_POOL_LOCAL_SIZE =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, GenericType.INTEGER);

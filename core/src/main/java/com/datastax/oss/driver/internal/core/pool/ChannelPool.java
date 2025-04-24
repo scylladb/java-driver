@@ -58,6 +58,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -489,9 +490,23 @@ public class ChannelPool implements AsyncAutoCloseable {
           channels.length * wantedCount - Arrays.stream(channels).mapToInt(ChannelSet::size).sum();
       LOG.debug("[{}] Trying to create {} missing channels", logPrefix, missing);
       DriverChannelOptions options = buildDriverOptions();
-      for (int i = 0; i < missing; i++) {
-        CompletionStage<DriverChannel> channelFuture = channelFactory.connect(node, options);
-        pendingChannels.add(channelFuture);
+      for (int shard = 0; shard < channels.length; shard++) {
+        LOG.trace(
+            "[{}] Missing {} channels for shard {}",
+            logPrefix,
+            wantedCount - channels[shard].size(),
+            shard);
+        for (int p = channels[shard].size(); p < wantedCount; p++) {
+          CompletionStage<DriverChannel> channelFuture;
+          if (config
+              .getDefaultProfile()
+              .getBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED)) {
+            channelFuture = channelFactory.connect(node, shard, options);
+          } else {
+            channelFuture = channelFactory.connect(node, options);
+          }
+          pendingChannels.add(channelFuture);
+        }
       }
       return CompletableFutures.allDone(pendingChannels)
           .thenApplyAsync(this::onAllConnected, adminExecutor);
@@ -551,6 +566,23 @@ public class ChannelPool implements AsyncAutoCloseable {
                 channel);
             channel.forceClose();
           } else {
+            if (config
+                    .getDefaultProfile()
+                    .getBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED)
+                && channel.localAddress() instanceof InetSocketAddress
+                && channel.getShardingInfo() != null) {
+              int port = ((InetSocketAddress) channel.localAddress()).getPort();
+              int actualShard = channel.getShardId();
+              int targetShard = port % channel.getShardingInfo().getShardsCount();
+              if (actualShard != targetShard) {
+                LOG.warn(
+                    "[{}] New channel {} connected to shard {}, but shard {} was requested. If this is not transient check your driver AND cluster configuration of shard aware port.",
+                    logPrefix,
+                    channel,
+                    actualShard,
+                    targetShard);
+              }
+            }
             LOG.debug("[{}] New channel added {}", logPrefix, channel);
             if (channels[channel.getShardId()].size() < wantedCount) {
               addChannel(channel);
