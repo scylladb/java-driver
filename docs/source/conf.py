@@ -184,7 +184,11 @@ def setup(app):
     current_slug = os.getenv("SPHINX_MULTIVERSION_NAME", "stable")
     replacements = {
         r'docs.datastax.com/en/drivers/java\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/api/",
-        r'java-driver.docs.scylladb.com\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/"
+        r'java-driver.docs.scylladb.com\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/",
+        r'github.com\/apache\/cassandra-java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
+        r'github.com\/apache\/cassandra-java-driver\/tree\/4.x\/': "github.com/scylladb/java-driver/tree/scylla-4.x/",
+        r'github.com\/datastax\/java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
+        r'github.com\/datastax\/java-driver\/tree\/4.x\/': "github.com/scylladb/java-driver/tree/scylla-4.x/"
     }
     app.add_config_value('replacements', replacements, True)
     app.connect('source-read', replace_relative_links)
