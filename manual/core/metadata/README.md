@@ -79,7 +79,7 @@ refreshed. See the [Performance](../performance/#debouncing) page for more detai
 [Metadata]:                                     https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/metadata/Metadata.html
 [Node]:                                         https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/metadata/Node.html
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :hidden:
    :glob:
