@@ -213,7 +213,7 @@ For a complete tour of the API, browse the child pages in this manual:
 [DseQueryBuilder]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/querybuilder/DseQueryBuilder.html
 [DseSchemaBuilder]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/querybuilder/DseSchemaBuilder.html
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :hidden:
    :glob:
