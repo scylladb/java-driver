@@ -34,7 +34,7 @@ Common topics:
 * [Case sensitivity](case_sensitivity/)
 * [OSGi](osgi/)
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :hidden:
    :glob:
