@@ -5,7 +5,7 @@ name: "Docs / Publish"
 on:
   push:
     branches:
-    - scylla-3.x
+    - scylla-4.x
     - 'scylla-**'
     paths:
     - 'docs/**'
@@ -18,6 +18,10 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    concurrency:
+      group: single
+      cancel-in-progress: true
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,10 +40,13 @@ jobs:
           distribution: 'temurin'
       - name: Set up env
         run: make -C docs setupenv
+
       - name: Build redirects
         run: make -C docs redirects
+
       - name: Build docs
         run: make -C docs multiversion
+
       - name: Deploy docs to GitHub Pages
         run: ./docs/_utils/deploy.sh
         env:
