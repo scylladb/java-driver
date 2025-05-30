@@ -84,7 +84,7 @@ Note that the session is not accessible until it is fully ready: the `CqlSession
 call &mdash; or the future returned by `buildAsync()` &mdash; will not complete until the connection
 was established.
 
-[ConstantReconnectionPolicy]:    https://docs.datastax.com/en/drivers/java/4.14/com/datastax/oss/driver/internal/core/connection/ConstantReconnectionPolicy.html
-[DriverContext]:                 https://docs.datastax.com/en/drivers/java/4.14/com/datastax/oss/driver/api/core/context/DriverContext.html
-[ExponentialReconnectionPolicy]: https://docs.datastax.com/en/drivers/java/4.14/com/datastax/oss/driver/internal/core/connection/ExponentialReconnectionPolicy.html
-[ReconnectionPolicy]:            https://docs.datastax.com/en/drivers/java/4.14/com/datastax/oss/driver/api/core/connection/ReconnectionPolicy.html
+[ConstantReconnectionPolicy]:    https://github.com/scylladb/java-driver/blob/scylla-4.15.0.x/core/src/main/java/com/datastax/oss/driver/internal/core/connection/ConstantReconnectionPolicy.java
+[DriverContext]:                 https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/context/DriverContext.html
+[ExponentialReconnectionPolicy]: https://github.com/scylladb/java-driver/blob/scylla-4.15.0.x/core/src/main/java/com/datastax/oss/driver/internal/core/connection/ExponentialReconnectionPolicy.java
+[ReconnectionPolicy]:            https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/connection/ReconnectionPolicy.html
