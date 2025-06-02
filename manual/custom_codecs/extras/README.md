@@ -1,4 +1,4 @@
-```{eval-rst}
+```eval_rst
 :orphan:
 ```
 ## Optional codecs

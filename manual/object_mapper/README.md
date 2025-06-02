@@ -21,7 +21,7 @@ See the child pages for more information:
 * [using the mapper](using/)
 * [using custom codecs](custom_codecs/)
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :hidden:
    :glob:
