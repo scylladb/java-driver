@@ -541,7 +541,7 @@
                             <link>http://www.joda.org/joda-time/apidocs/</link>
                             <link>http://fasterxml.github.io/jackson-core/javadoc/2.8/</link>
                             <link>http://fasterxml.github.io/jackson-databind/javadoc/2.7/</link>
-                            <link>https://javaee-spec.java.net/nonav/javadocs/</link>
+                            <link>https://javaee.github.io/javaee-spec/javadocs/</link>
                         </links>
                         <!-- optional dependencies from other modules (must be explicitly declared here in order to be correctly resolved) -->
                         <additionalDependencies>
