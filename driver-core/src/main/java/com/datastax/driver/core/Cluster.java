@@ -1522,6 +1522,36 @@ public class Cluster implements Closeable {
     }
 
     /**
+     * Sets application name that will be sent to the server on startup.
+     *
+     * @param applicationName name of the application.
+     */
+    public Builder withApplicationName(String applicationName) {
+      configurationBuilder.withApplicationName(applicationName);
+      return this;
+    }
+
+    /**
+     * Sets application version that will be sent to the server on startup.
+     *
+     * @param applicationVersion version of the application.
+     */
+    public Builder withApplicationVersion(String applicationVersion) {
+      configurationBuilder.withApplicationVersion(applicationVersion);
+      return this;
+    }
+
+    /**
+     * Sets client id that will be sent to the server on startup.
+     *
+     * @param clientId id of the application.
+     */
+    public Builder withClientId(String clientId) {
+      configurationBuilder.withClientId(clientId);
+      return this;
+    }
+
+    /**
      * The configuration that will be used for the new cluster.
      *
      * <p>You <b>should not</b> modify this object directly because changes made to the returned
@@ -1675,6 +1705,9 @@ public class Cluster implements Closeable {
                 .withThreadingOptions(configuration.getThreadingOptions())
                 .withNettyOptions(configuration.getNettyOptions())
                 .withCodecRegistry(configuration.getCodecRegistry())
+                .withApplicationName(configuration.getApplicationName())
+                .withApplicationVersion(configuration.getApplicationVersion())
+                .withClientId(configuration.getClientId())
                 .build();
       } else {
         this.configuration = configuration;

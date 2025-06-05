@@ -59,6 +59,9 @@ public class Configuration {
   private final NettyOptions nettyOptions;
   private final CodecRegistry codecRegistry;
   private final String defaultKeyspace;
+  private final String applicationName;
+  private final String applicationVersion;
+  private final String clientId;
 
   private Configuration(
       Policies policies,
@@ -70,7 +73,10 @@ public class Configuration {
       ThreadingOptions threadingOptions,
       NettyOptions nettyOptions,
       CodecRegistry codecRegistry,
-      String defaultKeyspace) {
+      String defaultKeyspace,
+      String applicationName,
+      String applicationVersion,
+      String clientId) {
     this.policies = policies;
     this.protocolOptions = protocolOptions;
     this.poolingOptions = poolingOptions;
@@ -81,6 +87,9 @@ public class Configuration {
     this.nettyOptions = nettyOptions;
     this.codecRegistry = codecRegistry;
     this.defaultKeyspace = defaultKeyspace;
+    this.applicationName = applicationName;
+    this.applicationVersion = applicationVersion;
+    this.clientId = clientId;
   }
 
   /**
@@ -99,7 +108,10 @@ public class Configuration {
         toCopy.getThreadingOptions(),
         toCopy.getNettyOptions(),
         toCopy.getCodecRegistry(),
-        toCopy.getDefaultKeyspace());
+        toCopy.getDefaultKeyspace(),
+        toCopy.getApplicationName(),
+        toCopy.getApplicationVersion(),
+        toCopy.getClientId());
   }
 
   void register(Cluster.Manager manager) {
@@ -213,6 +225,19 @@ public class Configuration {
   public String getDefaultKeyspace() {
     return defaultKeyspace;
   }
+
+  public String getApplicationName() {
+    return applicationName;
+  }
+
+  public String getApplicationVersion() {
+    return applicationVersion;
+  }
+
+  public String getClientId() {
+    return clientId;
+  }
+
   /**
    * Returns the {@link CodecRegistry} instance for this configuration.
    *
@@ -239,6 +264,42 @@ public class Configuration {
     private NettyOptions nettyOptions;
     private CodecRegistry codecRegistry;
     private String defaultKeyspace;
+    private String applicationName;
+    private String applicationVersion;
+    private String clientId;
+
+    /**
+     * Sets application name, to be reported to server
+     *
+     * @param applicationName application name.
+     * @return this builder.
+     */
+    public Builder withApplicationName(String applicationName) {
+      this.applicationName = applicationName;
+      return this;
+    }
+
+    /**
+     * Sets application version, to be reported to server
+     *
+     * @param applicationVersion application version.
+     * @return this builder.
+     */
+    public Builder withApplicationVersion(String applicationVersion) {
+      this.applicationVersion = applicationVersion;
+      return this;
+    }
+
+    /**
+     * Sets client id, to be reported to server
+     *
+     * @param clientId application version.
+     * @return this builder.
+     */
+    public Builder withClientId(String clientId) {
+      this.clientId = clientId;
+      return this;
+    }
 
     /**
      * Sets the policies for this cluster.
@@ -370,7 +431,10 @@ public class Configuration {
           threadingOptions != null ? threadingOptions : new ThreadingOptions(),
           nettyOptions != null ? nettyOptions : NettyOptions.DEFAULT_INSTANCE,
           codecRegistry != null ? codecRegistry : CodecRegistry.DEFAULT_INSTANCE,
-          defaultKeyspace);
+          defaultKeyspace,
+          applicationName,
+          applicationVersion,
+          clientId);
     }
   }
 }

@@ -516,6 +516,20 @@ class Connection {
           logger.debug("Enabling tablet support in OPTIONS message");
           TabletInfo.addOption(extraOptions);
         }
+
+        if (factory.configuration.getApplicationName() != null
+            && !factory.configuration.getApplicationName().isEmpty()) {
+          extraOptions.put("APPLICATION_NAME", factory.configuration.getApplicationName());
+        }
+        if (factory.configuration.getApplicationVersion() != null
+            && !factory.configuration.getApplicationVersion().isEmpty()) {
+          extraOptions.put("APPLICATION_VERSION", factory.configuration.getApplicationVersion());
+        }
+        if (factory.configuration.getClientId() != null
+            && !factory.configuration.getClientId().isEmpty()) {
+          extraOptions.put("CLIENT_ID", factory.configuration.getClientId());
+        }
+
         Future startupResponseFuture =
             write(
                 new Requests.Startup(
