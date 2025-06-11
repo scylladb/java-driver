@@ -154,6 +154,7 @@ class Connection {
       new AtomicReference<ConnectionCloseFuture>();
 
   private final AtomicReference<Owner> ownerRef = new AtomicReference<Owner>();
+  private final ApplicationInfo applicationInfo;
 
   /**
    * Create a new connection to a Cassandra node and associate it with the given pool.
@@ -173,6 +174,7 @@ class Connection {
     ListenableFuture<Connection> thisFuture = Futures.immediateFuture(this);
     this.defaultKeyspaceAttempt = new SetKeyspaceAttempt(null, thisFuture);
     this.targetKeyspace = new AtomicReference<SetKeyspaceAttempt>(defaultKeyspaceAttempt);
+    this.applicationInfo = factory.configuration.getApplicationInfo();
   }
 
   /** Create a new connection to a Cassandra node. */
@@ -505,6 +507,9 @@ class Connection {
       public ListenableFuture<Void> apply(Void input) throws Exception {
         ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
         Map<String, String> extraOptions = new HashMap<String, String>();
+        if (applicationInfo != null) {
+          applicationInfo.addOption(extraOptions);
+        }
         LwtInfo lwtInfo = getHost().getLwtInfo();
         if (lwtInfo != null) {
           lwtInfo.addOption(extraOptions);
@@ -515,19 +520,6 @@ class Connection {
             && ProtocolFeature.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)) {
           logger.debug("Enabling tablet support in OPTIONS message");
           TabletInfo.addOption(extraOptions);
-        }
-
-        if (factory.configuration.getApplicationName() != null
-            && !factory.configuration.getApplicationName().isEmpty()) {
-          extraOptions.put("APPLICATION_NAME", factory.configuration.getApplicationName());
-        }
-        if (factory.configuration.getApplicationVersion() != null
-            && !factory.configuration.getApplicationVersion().isEmpty()) {
-          extraOptions.put("APPLICATION_VERSION", factory.configuration.getApplicationVersion());
-        }
-        if (factory.configuration.getClientId() != null
-            && !factory.configuration.getClientId().isEmpty()) {
-          extraOptions.put("CLIENT_ID", factory.configuration.getClientId());
         }
 
         Future startupResponseFuture =

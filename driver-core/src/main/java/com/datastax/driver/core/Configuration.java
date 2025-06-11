@@ -32,8 +32,8 @@ import java.util.List;
  *   <li>Netty layer customization options.
  * </ul>
  *
- * This is also where you get the configured policies, though those cannot be changed (they are set
- * during the built of the Cluster object).
+ * <p>This is also where you get the configured policies, though those cannot be changed (they are
+ * set during the built of the Cluster object).
  */
 public class Configuration {
 
@@ -59,9 +59,7 @@ public class Configuration {
   private final NettyOptions nettyOptions;
   private final CodecRegistry codecRegistry;
   private final String defaultKeyspace;
-  private final String applicationName;
-  private final String applicationVersion;
-  private final String clientId;
+  private final ApplicationInfo applicationInfo;
 
   private Configuration(
       Policies policies,
@@ -74,9 +72,7 @@ public class Configuration {
       NettyOptions nettyOptions,
       CodecRegistry codecRegistry,
       String defaultKeyspace,
-      String applicationName,
-      String applicationVersion,
-      String clientId) {
+      ApplicationInfo applicationInfo) {
     this.policies = policies;
     this.protocolOptions = protocolOptions;
     this.poolingOptions = poolingOptions;
@@ -87,9 +83,7 @@ public class Configuration {
     this.nettyOptions = nettyOptions;
     this.codecRegistry = codecRegistry;
     this.defaultKeyspace = defaultKeyspace;
-    this.applicationName = applicationName;
-    this.applicationVersion = applicationVersion;
-    this.clientId = clientId;
+    this.applicationInfo = applicationInfo;
   }
 
   /**
@@ -109,9 +103,7 @@ public class Configuration {
         toCopy.getNettyOptions(),
         toCopy.getCodecRegistry(),
         toCopy.getDefaultKeyspace(),
-        toCopy.getApplicationName(),
-        toCopy.getApplicationVersion(),
-        toCopy.getClientId());
+        toCopy.getApplicationInfo());
   }
 
   void register(Cluster.Manager manager) {
@@ -226,16 +218,8 @@ public class Configuration {
     return defaultKeyspace;
   }
 
-  public String getApplicationName() {
-    return applicationName;
-  }
-
-  public String getApplicationVersion() {
-    return applicationVersion;
-  }
-
-  public String getClientId() {
-    return clientId;
+  public ApplicationInfo getApplicationInfo() {
+    return applicationInfo;
   }
 
   /**
@@ -262,42 +246,18 @@ public class Configuration {
     private QueryOptions queryOptions;
     private ThreadingOptions threadingOptions;
     private NettyOptions nettyOptions;
+    private ApplicationInfo applicationInfo;
     private CodecRegistry codecRegistry;
     private String defaultKeyspace;
-    private String applicationName;
-    private String applicationVersion;
-    private String clientId;
 
     /**
-     * Sets application name, to be reported to server
+     * Sets application information provider.
      *
-     * @param applicationName application name.
+     * @param applicationInfo application information provider.
      * @return this builder.
      */
-    public Builder withApplicationName(String applicationName) {
-      this.applicationName = applicationName;
-      return this;
-    }
-
-    /**
-     * Sets application version, to be reported to server
-     *
-     * @param applicationVersion application version.
-     * @return this builder.
-     */
-    public Builder withApplicationVersion(String applicationVersion) {
-      this.applicationVersion = applicationVersion;
-      return this;
-    }
-
-    /**
-     * Sets client id, to be reported to server
-     *
-     * @param clientId application version.
-     * @return this builder.
-     */
-    public Builder withClientId(String clientId) {
-      this.clientId = clientId;
+    public Builder withApplicationInfo(ApplicationInfo applicationInfo) {
+      this.applicationInfo = applicationInfo;
       return this;
     }
 
@@ -432,9 +392,7 @@ public class Configuration {
           nettyOptions != null ? nettyOptions : NettyOptions.DEFAULT_INSTANCE,
           codecRegistry != null ? codecRegistry : CodecRegistry.DEFAULT_INSTANCE,
           defaultKeyspace,
-          applicationName,
-          applicationVersion,
-          clientId);
+          applicationInfo);
     }
   }
 }
