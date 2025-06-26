@@ -94,17 +94,13 @@ public class AdvancedShardAwarenessIT {
   public void should_initialize_all_channels(boolean reuseAddress) {
     Map<Pattern, Integer> expectedOccurences =
         ImmutableMap.of(
-            Pattern.compile(
-                    ".*127\\.0\\.0\\.2:19042.*Reconnection attempt complete, 6/6 channels.*"),
-                1,
-            Pattern.compile(
-                    ".*127\\.0\\.0\\.1:19042.*Reconnection attempt complete, 6/6 channels.*"),
-                1,
+            Pattern.compile(".*\\.2:19042.*Reconnection attempt complete, 6/6 channels.*"), 1,
+            Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 6/6 channels.*"), 1,
             Pattern.compile(".*Reconnection attempt complete.*"), 2,
-            Pattern.compile(".*127\\.0\\.0\\.1:19042.*New channel added \\[.*"), 5,
-            Pattern.compile(".*127\\.0\\.0\\.2:19042.*New channel added \\[.*"), 5,
-            Pattern.compile(".*127\\.0\\.0\\.1:19042\\] Trying to create 5 missing channels.*"), 1,
-            Pattern.compile(".*127\\.0\\.0\\.2:19042\\] Trying to create 5 missing channels.*"), 1);
+            Pattern.compile(".*\\.1:19042.*New channel added \\[.*"), 5,
+            Pattern.compile(".*\\.2:19042.*New channel added \\[.*"), 5,
+            Pattern.compile(".*\\.1:19042\\] Trying to create 5 missing channels.*"), 1,
+            Pattern.compile(".*\\.2:19042\\] Trying to create 5 missing channels.*"), 1);
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, reuseAddress)
@@ -204,20 +200,15 @@ public class AdvancedShardAwarenessIT {
       int tolerance = 2; // Sometimes socket ends up already in use
       Map<Pattern, Integer> expectedOccurences =
           ImmutableMap.of(
-              Pattern.compile(
-                      ".*127\\.0\\.0\\.2:19042.*Reconnection attempt complete, 66/66 channels.*"),
+              Pattern.compile(".*\\.2:19042.*Reconnection attempt complete, 66/66 channels.*"),
                   1 * sessions,
-              Pattern.compile(
-                      ".*127\\.0\\.0\\.1:19042.*Reconnection attempt complete, 66/66 channels.*"),
+              Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 66/66 channels.*"),
                   1 * sessions,
               Pattern.compile(".*Reconnection attempt complete.*"), 2 * sessions,
-              Pattern.compile(".*127\\.0\\.0\\.1:19042.*New channel added \\[.*"),
-                  65 * sessions - tolerance,
-              Pattern.compile(".*127\\.0\\.0\\.2:19042.*New channel added \\[.*"),
-                  65 * sessions - tolerance,
-              Pattern.compile(".*127\\.0\\.0\\.1:19042\\] Trying to create 65 missing channels.*"),
-                  1 * sessions,
-              Pattern.compile(".*127\\.0\\.0\\.2:19042\\] Trying to create 65 missing channels.*"),
+              Pattern.compile(".*.1:19042.*New channel added \\[.*"), 65 * sessions - tolerance,
+              Pattern.compile(".*.2:19042.*New channel added \\[.*"), 65 * sessions - tolerance,
+              Pattern.compile(".*.1:19042\\] Trying to create 65 missing channels.*"), 1 * sessions,
+              Pattern.compile(".*.2:19042\\] Trying to create 65 missing channels.*"),
                   1 * sessions);
       expectedOccurences.forEach(
           (pattern, times) -> assertMatchesAtLeast(pattern, times, appender.list));
