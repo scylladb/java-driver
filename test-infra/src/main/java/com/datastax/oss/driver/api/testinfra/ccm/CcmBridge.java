@@ -48,6 +48,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
@@ -62,6 +63,7 @@ import org.slf4j.LoggerFactory;
 public class CcmBridge implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CcmBridge.class);
+  private static final AtomicInteger CLUSTER_ID = new AtomicInteger();
 
   public static BackendType DISTRIBUTION =
       BackendType.valueOf(
@@ -202,7 +204,14 @@ public class CcmBridge implements AutoCloseable {
     } else {
       this.nodes = nodes;
     }
-    this.ipPrefix = ipPrefix;
+
+    if (ipPrefix == null || ipPrefix.isEmpty()) {
+      Integer clusterId = CLUSTER_ID.addAndGet(1);
+      this.ipPrefix = String.format("127.%d.%d.", clusterId / 255, (clusterId % 255) + 1);
+    } else {
+      this.ipPrefix = ipPrefix;
+    }
+
     this.cassandraConfiguration = cassandraConfiguration;
     this.dseConfiguration = dseConfiguration;
     this.rawDseYaml = dseConfigurationRawYaml;
@@ -663,7 +672,7 @@ public class CcmBridge implements AutoCloseable {
     private final Map<String, Object> dseConfiguration = new LinkedHashMap<>();
     private final List<String> dseRawYaml = new ArrayList<>();
     private final List<String> jvmArgs = new ArrayList<>();
-    private String ipPrefix = "127.0.0.";
+    private String ipPrefix;
     private final List<String> createOptions = new ArrayList<>();
     private final List<String> dseWorkloads = new ArrayList<>();
 

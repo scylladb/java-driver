@@ -26,14 +26,19 @@ package com.datastax.oss.driver.api.testinfra.ccm;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.Version;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
 import com.datastax.oss.driver.api.testinfra.CassandraSkip;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import java.net.InetSocketAddress;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.AssumptionViolatedException;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -210,5 +215,11 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     } else {
       return DefaultProtocolVersion.V3;
     }
+  }
+
+  @Override
+  public Set<EndPoint> getContactPoints() {
+    return Collections.singleton(
+        new DefaultEndPoint(new InetSocketAddress(ccmBridge.getNodeIpAddress(1), 9042)));
   }
 }
