@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
-@CCMConfig(numberOfNodes = 2, dirtiesContext = true, createCluster = false)
+@CCMConfig(numberOfNodes = 3, dirtiesContext = true, createCluster = false)
 public class SchemaChangesCCTest extends CCMTestsSupport {
 
   private static final int NOTIF_TIMEOUT_MS = 5000;
