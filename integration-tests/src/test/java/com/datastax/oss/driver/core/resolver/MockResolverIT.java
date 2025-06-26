@@ -63,7 +63,7 @@ public class MockResolverIT {
 
   @Test
   public void should_connect_with_mocked_hostname() {
-    CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder().withNodes(1).withIpPrefix("127.0.1.");
+    CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder().withNodes(1);
     try (CcmBridge ccmBridge = ccmBridgeBuilder.build()) {
       MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
       MultimapHostResolverProvider.addResolverEntry(
@@ -258,7 +258,7 @@ public class MockResolverIT {
     CqlSession session;
     Collection<Node> nodes;
     Set<Node> filteredNodes;
-    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).withIpPrefix("127.0.1.").build()) {
+    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).build()) {
       MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
       MultimapHostResolverProvider.addResolverEntry(
           "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
@@ -319,8 +319,7 @@ public class MockResolverIT {
       LOG.warn(
           "Launching another cluster until we lose resolved socket from metadata (run {}).",
           counter);
-      try (CcmBridge ccmBridge =
-          CcmBridge.builder().withNodes(3).withIpPrefix("127.0." + counter + ".").build()) {
+      try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).build()) {
         MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
         MultimapHostResolverProvider.addResolverEntry(
             "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
@@ -374,7 +373,7 @@ public class MockResolverIT {
       InetSocketAddress address = (InetSocketAddress) iterator.next().getEndPoint().resolve();
       assertFalse(address.isUnresolved());
     }
-    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).withIpPrefix("127.1.1.").build()) {
+    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(3).build()) {
       MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
       MultimapHostResolverProvider.addResolverEntry(
           "test.cluster.fake", ccmBridge.getNodeIpAddress(1));

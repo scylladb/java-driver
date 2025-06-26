@@ -24,7 +24,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ZeroTokenNodesIT {
-
   @Before
   public void checkScyllaVersion() {
     // minOSS = "6.2.0",
@@ -45,7 +44,7 @@ public class ZeroTokenNodesIT {
   public void should_not_ignore_zero_token_peer_when_option_is_enabled() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
-    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(3).withIpPrefix("127.0.1.").build()) {
+    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(3).build()) {
       ccmBridge.create();
       ccmBridge.startWithArgs("--wait-for-binary-proto");
       ccmBridge.addWithoutStart(4, "dc1");
@@ -64,8 +63,13 @@ public class ZeroTokenNodesIT {
       Collection<Node> nodes = session.getMetadata().getNodes().values();
       Set<String> toStrings =
           nodes.stream().map(Node::getEndPoint).map(EndPoint::toString).collect(Collectors.toSet());
+
       assertThat(toStrings)
-          .containsOnly("/127.0.1.1:9042", "/127.0.1.2:9042", "/127.0.1.3:9042", "/127.0.1.4:9042");
+          .containsOnly(
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(1)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(2)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(3)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(4)));
     } finally {
       if (session != null) session.close();
     }
@@ -75,7 +79,7 @@ public class ZeroTokenNodesIT {
   public void should_not_discover_zero_token_DC_when_option_is_disabled() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
-    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2, 2).withIpPrefix("127.0.1.").build()) {
+    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2, 2).build()) {
       ccmBridge.create();
       ccmBridge.updateNodeConfig(3, "join_ring", false);
       ccmBridge.updateNodeConfig(4, "join_ring", false);
@@ -98,11 +102,15 @@ public class ZeroTokenNodesIT {
             Objects.requireNonNull(rs.one()).getInetAddress("rpc_address");
         landedOn.add(Objects.requireNonNull(broadcastRpcInetAddress).toString());
       }
-      assertThat(landedOn).containsOnly("/127.0.1.1", "/127.0.1.2");
+      assertThat(landedOn)
+          .containsOnly("/" + ccmBridge.getNodeIpAddress(1), "/" + ccmBridge.getNodeIpAddress(2));
       Collection<Node> nodes = session.getMetadata().getNodes().values();
       Set<String> toStrings =
           nodes.stream().map(Node::getEndPoint).map(EndPoint::toString).collect(Collectors.toSet());
-      assertThat(toStrings).containsOnly("/127.0.1.1:9042", "/127.0.1.2:9042");
+      assertThat(toStrings)
+          .containsOnly(
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(1)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(2)));
     } finally {
       if (session != null) session.close();
     }
@@ -112,7 +120,7 @@ public class ZeroTokenNodesIT {
   public void should_discover_zero_token_DC_when_option_is_enabled() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
-    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2, 2).withIpPrefix("127.0.1.").build()) {
+    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2, 2).build()) {
       ccmBridge.create();
       ccmBridge.updateNodeConfig(3, "join_ring", false);
       ccmBridge.updateNodeConfig(4, "join_ring", false);
@@ -137,13 +145,18 @@ public class ZeroTokenNodesIT {
         landedOn.add(Objects.requireNonNull(broadcastRpcInetAddress).toString());
       }
       // LBP should still target local datacenter:
-      assertThat(landedOn).containsOnly("/127.0.1.1", "/127.0.1.2");
+      assertThat(landedOn)
+          .containsOnly("/" + ccmBridge.getNodeIpAddress(1), "/" + ccmBridge.getNodeIpAddress(2));
       Collection<Node> nodes = session.getMetadata().getNodes().values();
       Set<String> toStrings =
           nodes.stream().map(Node::getEndPoint).map(EndPoint::toString).collect(Collectors.toSet());
       // Metadata should have all nodes:
       assertThat(toStrings)
-          .containsOnly("/127.0.1.1:9042", "/127.0.1.2:9042", "/127.0.1.3:9042", "/127.0.1.4:9042");
+          .containsOnly(
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(1)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(2)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(3)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(4)));
     } finally {
       if (session != null) session.close();
     }
@@ -153,7 +166,7 @@ public class ZeroTokenNodesIT {
   public void should_connect_to_zero_token_contact_point() {
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
-    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2).withIpPrefix("127.0.1.").build()) {
+    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2).build()) {
       ccmBridge.create();
       ccmBridge.startWithArgs("--wait-for-binary-proto");
       ccmBridge.addWithoutStart(3, "dc1");
@@ -170,7 +183,11 @@ public class ZeroTokenNodesIT {
       Collection<Node> nodes = session.getMetadata().getNodes().values();
       Set<String> toStrings =
           nodes.stream().map(Node::getEndPoint).map(EndPoint::toString).collect(Collectors.toSet());
-      assertThat(toStrings).containsOnly("/127.0.1.1:9042", "/127.0.1.2:9042", "/127.0.1.3:9042");
+      assertThat(toStrings)
+          .containsOnly(
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(1)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(2)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(3)));
     } finally {
       if (session != null) session.close();
     }
@@ -183,7 +200,7 @@ public class ZeroTokenNodesIT {
     // method.
     CqlSession session = null;
     CcmBridge.Builder ccmBridgeBuilder = CcmBridge.builder();
-    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2, 2).withIpPrefix("127.0.1.").build()) {
+    try (CcmBridge ccmBridge = ccmBridgeBuilder.withNodes(2, 2).build()) {
       ccmBridge.create();
       ccmBridge.updateNodeConfig(3, "join_ring", false);
       ccmBridge.updateNodeConfig(4, "join_ring", false);
@@ -208,12 +225,17 @@ public class ZeroTokenNodesIT {
         landedOn.add(Objects.requireNonNull(broadcastRpcInetAddress).toString());
       }
       // LBP should still target local datacenter:
-      assertThat(landedOn).containsOnly("/127.0.1.1", "/127.0.1.2");
+      assertThat(landedOn)
+          .containsOnly("/" + ccmBridge.getNodeIpAddress(1), "/" + ccmBridge.getNodeIpAddress(2));
       Collection<Node> nodes = session.getMetadata().getNodes().values();
       Set<String> toStrings =
           nodes.stream().map(Node::getEndPoint).map(EndPoint::toString).collect(Collectors.toSet());
       // Metadata should have valid ordinary peers plus zero-token contact point:
-      assertThat(toStrings).containsOnly("/127.0.1.1:9042", "/127.0.1.2:9042", "/127.0.1.3:9042");
+      assertThat(toStrings)
+          .containsOnly(
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(1)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(2)),
+              String.format("/%s:9042", ccmBridge.getNodeIpAddress(3)));
     } finally {
       if (session != null) session.close();
     }
