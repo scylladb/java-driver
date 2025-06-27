@@ -23,6 +23,7 @@ import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import java.util.Objects;
 import java.util.Optional;
 import org.junit.AssumptionViolatedException;
@@ -110,11 +111,11 @@ public class CcmPaxExam extends PaxExam {
             String.format(
                 "Test requires %s %s %s but %s is configured.  Description: %s",
                 lessThan ? "less than" : "at least",
-                dse ? "DSE" : (CcmBridge.SCYLLA_ENABLEMENT ? "SCYLLA" : "C*"),
+                dse ? "DSE" : (CcmBridge.isDistributionOf(BackendType.SCYLLA) ? "SCYLLA" : "C*"),
                 requirement,
                 dse
                     ? CCM_BRIDGE.getDseVersion().orElse(null)
-                    : (CcmBridge.SCYLLA_ENABLEMENT
+                    : (CcmBridge.isDistributionOf(BackendType.SCYLLA)
                         ? CCM_BRIDGE.getScyllaVersion().orElse(null)
                         : CCM_BRIDGE.getCassandraVersion()),
                 description));

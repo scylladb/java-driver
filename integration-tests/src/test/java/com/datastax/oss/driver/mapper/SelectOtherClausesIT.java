@@ -111,7 +111,8 @@ public class SelectOtherClausesIT {
 
   @Test
   public void should_select_with_per_partition_limit() {
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT).isFalse(); // @IntegrationTestDisabledScyllaFailure
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
+        .isFalse(); // @IntegrationTestDisabledScyllaFailure
 
     PagingIterable<Simple> elements = dao.selectWithPerPartitionLimit(5);
     assertThat(elements.isFullyFetched()).isTrue();

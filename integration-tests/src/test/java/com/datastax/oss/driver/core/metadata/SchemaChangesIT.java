@@ -250,7 +250,8 @@ public class SchemaChangesIT {
   public void should_handle_view_creation() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V3_0_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT).isFalse(); // @IntegrationTestDisabledScyllaFailure
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
+        .isFalse(); // @IntegrationTestDisabledScyllaFailure
     should_handle_creation(
         "CREATE TABLE scores(user text, game text, score int, PRIMARY KEY (user, game))",
         "CREATE MATERIALIZED VIEW highscores "
@@ -325,7 +326,7 @@ public class SchemaChangesIT {
   public void should_handle_function_creation() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_creation(
         null,
@@ -351,7 +352,7 @@ public class SchemaChangesIT {
   public void should_handle_function_drop() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_drop(
         ImmutableList.of(
@@ -369,7 +370,7 @@ public class SchemaChangesIT {
   public void should_handle_function_update() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_update_via_drop_and_recreate(
         ImmutableList.of(
@@ -391,7 +392,7 @@ public class SchemaChangesIT {
   public void should_handle_aggregate_creation() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_creation(
         "CREATE FUNCTION plus(i int, j int) RETURNS NULL ON NULL INPUT RETURNS int "
@@ -419,7 +420,7 @@ public class SchemaChangesIT {
   public void should_handle_aggregate_drop() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_drop(
         ImmutableList.of(
@@ -438,7 +439,7 @@ public class SchemaChangesIT {
   public void should_handle_aggregate_update() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_update_via_drop_and_recreate(
         ImmutableList.of(

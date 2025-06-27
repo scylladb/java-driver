@@ -206,7 +206,8 @@ public class SchemaValidationIT extends InventoryITBase {
 
   @Test
   public void should_throw_general_driver_exception_when_schema_validation_check_is_disabled() {
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT).isFalse(); // @IntegrationTestDisabledScyllaFailure
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
+        .isFalse(); // @IntegrationTestDisabledScyllaFailure
     // @IntegrationTestDisabledScyllaDifferentText
     assertThatThrownBy(
             () -> mapperDisabledValidation.productDaoValidationDisabled(sessionRule.keyspace()))

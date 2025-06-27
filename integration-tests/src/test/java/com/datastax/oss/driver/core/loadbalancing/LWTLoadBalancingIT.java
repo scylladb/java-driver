@@ -38,6 +38,7 @@ import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import java.nio.ByteBuffer;
@@ -76,7 +77,8 @@ public class LWTLoadBalancingIT {
 
   @Test
   public void should_use_only_one_node_when_lwt_detected() {
-    assumeTrue(CcmBridge.SCYLLA_ENABLEMENT); // Functionality only available in Scylla
+    assumeTrue(
+        CcmBridge.isDistributionOf(BackendType.SCYLLA)); // Functionality only available in Scylla
     CqlSession session = SESSION_RULE.session();
     int pk = 1234;
     ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(pk, ProtocolVersion.DEFAULT);
@@ -97,7 +99,7 @@ public class LWTLoadBalancingIT {
   // Sanity check for the previous test - non-LWT queries should
   // not always be sent to same node
   public void should_not_use_only_one_node_when_non_lwt() {
-    assumeTrue(CcmBridge.SCYLLA_ENABLEMENT);
+    assumeTrue(CcmBridge.isDistributionOf(BackendType.SCYLLA));
     CqlSession session = SESSION_RULE.session();
     int pk = 1234;
     PreparedStatement statement = session.prepare("INSERT INTO foo (pk, ck, v) VALUES (?, ?, ?)");
@@ -114,7 +116,8 @@ public class LWTLoadBalancingIT {
 
   @Test
   public void should_use_only_one_node_when_lwt_batch_detected() {
-    assumeTrue(CcmBridge.SCYLLA_ENABLEMENT); // Functionality only available in Scylla
+    assumeTrue(
+        CcmBridge.isDistributionOf(BackendType.SCYLLA)); // Functionality only available in Scylla
     CqlSession session = SESSION_RULE.session();
     int pk = 1234;
     ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(pk, ProtocolVersion.DEFAULT);

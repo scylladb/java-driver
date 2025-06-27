@@ -77,11 +77,11 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
             String.format(
                 "Test requires %s %s %s but %s is configured.  Description: %s",
                 lessThan ? "less than" : "at least",
-                dse ? "DSE" : (CcmBridge.SCYLLA_ENABLEMENT ? "SCYLLA" : "C*"),
+                dse ? "DSE" : (CcmBridge.isDistributionOf(BackendType.SCYLLA) ? "SCYLLA" : "C*"),
                 requirement,
                 dse
                     ? ccmBridge.getDseVersion().orElse(null)
-                    : (CcmBridge.SCYLLA_ENABLEMENT
+                    : (CcmBridge.isDistributionOf(BackendType.SCYLLA)
                         ? ccmBridge.getScyllaVersion().orElse(null)
                         : ccmBridge.getCassandraVersion()),
                 description));
@@ -97,7 +97,7 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     // Scylla-specific annotations
     ScyllaSkip scyllaSkip = description.getAnnotation(ScyllaSkip.class);
     if (scyllaSkip != null) {
-      if (CcmBridge.SCYLLA_ENABLEMENT) {
+      if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         return new Statement() {
 
           @Override
@@ -112,7 +112,7 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
 
     CassandraSkip cassandraSkip = description.getAnnotation(CassandraSkip.class);
     if (cassandraSkip != null) {
-      if (!CcmBridge.SCYLLA_ENABLEMENT) {
+      if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         return new Statement() {
 
           @Override
