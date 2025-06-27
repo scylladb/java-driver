@@ -11,6 +11,7 @@ import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -31,7 +32,7 @@ public class ZeroTokenNodesIT {
     // Zero-token nodes introduced in scylladb/scylladb#19684
     // 2025.1 is an estimated future version and it still may not have this change in.
     // This number may need to be adjusted once CI picks up this test.
-    assumeTrue(CcmBridge.SCYLLA_ENABLEMENT);
+    assumeTrue(CcmBridge.isDistributionOf(BackendType.SCYLLA));
     if (CcmBridge.SCYLLA_ENTERPRISE) {
       assumeTrue(
           CcmBridge.VERSION.compareTo(Objects.requireNonNull(Version.parse("2025.1.0"))) >= 0);

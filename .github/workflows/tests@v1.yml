@@ -351,7 +351,7 @@ jobs:
 
       - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
         id: run-integration-tests
-        run: mvn -B verify -Dccm.version=${{ steps.scylla-version.outputs.value }} -Dccm.scylla=true -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+        run: mvn -B verify -Dccm.version=${{ steps.scylla-version.outputs.value }} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
       - name: Copy test results
         if: steps.run-integration-tests.outcome == 'failure'

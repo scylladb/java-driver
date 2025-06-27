@@ -67,8 +67,6 @@ public class CcmBridge implements AutoCloseable {
       BackendType.valueOf(
           System.getProperty("ccm.distribution", BackendType.CASSANDRA.name()).toUpperCase());
 
-  public static final Boolean SCYLLA_ENABLEMENT = Boolean.getBoolean("ccm.scylla");
-
   public static final String CCM_VERSION_PROPERTY = System.getProperty("ccm.version", "4.0.0");
 
   public static final Version VERSION = Objects.requireNonNull(parseCcmVersion());
@@ -150,13 +148,8 @@ public class CcmBridge implements AutoCloseable {
 
   static {
     Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
-    if (SCYLLA_ENABLEMENT) {
-      LOG.debug("Overriding distribution variable because 'ccm.scylla = true' was passed");
-      DISTRIBUTION = BackendType.SCYLLA;
-
-      if (SCYLLA_ENTERPRISE) {
-        envMap.put("SCYLLA_PRODUCT", "enterprise");
-      }
+    if (isDistributionOf(BackendType.SCYLLA) && SCYLLA_ENTERPRISE) {
+      envMap.put("SCYLLA_PRODUCT", "enterprise");
     }
     LOG.info("CCM Bridge configured with {} version {}", DISTRIBUTION.getFriendlyName(), VERSION);
 
@@ -260,7 +253,9 @@ public class CcmBridge implements AutoCloseable {
           CommandLine.parse(
               String.format(
                   "ccm create get_version -n 1 %s --version %s --config-dir=%s",
-                  (SCYLLA_ENABLEMENT ? "--scylla" : " "), versionString, configDir)));
+                  (isDistributionOf(BackendType.SCYLLA) ? "--scylla" : " "),
+                  versionString,
+                  configDir)));
       String output =
           execute(
               CommandLine.parse(
@@ -281,11 +276,13 @@ public class CcmBridge implements AutoCloseable {
   }
 
   public Optional<Version> getScyllaVersion() {
-    return SCYLLA_ENABLEMENT ? Optional.of(VERSION) : Optional.empty();
+    return isDistributionOf(BackendType.SCYLLA) ? Optional.of(VERSION) : Optional.empty();
   }
 
   public Optional<String> getScyllaUnparsedVersion() {
-    return SCYLLA_ENABLEMENT ? Optional.of(System.getProperty("ccm.version")) : Optional.empty();
+    return isDistributionOf(BackendType.SCYLLA)
+        ? Optional.of(System.getProperty("ccm.version"))
+        : Optional.empty();
   }
 
   public Optional<Version> getDseVersion() {
@@ -321,7 +318,7 @@ public class CcmBridge implements AutoCloseable {
       // If parseCcmVersion has not failed execution it should be usable.
       return propertyString;
     }
-    if (SCYLLA_ENABLEMENT) {
+    if (isDistributionOf(BackendType.SCYLLA)) {
       // Scylla OSS versions before 5.1 had RC versioning scheme of 5.0.rc3.
       // Scylla OSS versions after (and including 5.1) have RC versioning of 5.1.0-rc3.
       // A similar situation occurs with Scylla Enterprise after 2022.2.
@@ -382,7 +379,8 @@ public class CcmBridge implements AutoCloseable {
 
       Version cassandraVersion = getCassandraVersion();
 
-      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0 && !SCYLLA_ENABLEMENT) {
+      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0
+          && !isDistributionOf(BackendType.SCYLLA)) {
         // @IntegrationTestDisabledScyllaJVMArgs @IntegrationTestDisabledScyllaUDF
         cassandraConfiguration.put("enable_user_defined_functions", "true");
       }
@@ -723,7 +721,7 @@ public class CcmBridge implements AutoCloseable {
     /** Enables SSL encryption. */
     public Builder withSsl() {
       cassandraConfiguration.put("client_encryption_options.enabled", "true");
-      if (SCYLLA_ENABLEMENT) {
+      if (isDistributionOf(BackendType.SCYLLA)) {
         cassandraConfiguration.put(
             "client_encryption_options.certificate",
             DEFAULT_SERVER_CERT_CHAIN_FILE.getAbsolutePath());
@@ -756,7 +754,7 @@ public class CcmBridge implements AutoCloseable {
     public Builder withSslAuth() {
       withSsl();
       cassandraConfiguration.put("client_encryption_options.require_client_auth", "true");
-      if (SCYLLA_ENABLEMENT) {
+      if (isDistributionOf(BackendType.SCYLLA)) {
         cassandraConfiguration.put(
             "client_encryption_options.truststore",
             DEFAULT_SERVER_TRUSTSTORE_PEM_FILE.getAbsolutePath());
