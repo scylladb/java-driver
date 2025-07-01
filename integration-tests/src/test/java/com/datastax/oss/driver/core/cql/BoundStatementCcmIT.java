@@ -26,6 +26,7 @@ package com.datastax.oss.driver.core.cql;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assumptions.assumeThat;
+import static org.junit.Assert.assertThrows;
 
 import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
@@ -48,6 +49,7 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
@@ -301,7 +303,9 @@ public class BoundStatementCcmIT {
   }
 
   @Test
-  @ScyllaSkip(description = "@IntegrationTestDisabledScyllaFailure")
+  @ScyllaSkip(description = "scylladb/scylla-driver#567 - fails by unknown reason")
+  @BackendRequirement(type = BackendType.CASSANDRA)
+  @BackendRequirement(type = BackendType.DSE)
   public void should_propagate_attributes_when_preparing_a_simple_statement() {
     CqlSession session = sessionRule.session();
 
@@ -381,6 +385,7 @@ public class BoundStatementCcmIT {
   // Test for JAVA-2066
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_compute_routing_key_when_indices_randomly_distributed() {
     try (CqlSession session = SessionUtils.newSession(ccmRule, sessionRule.keyspace())) {
 
@@ -398,13 +403,26 @@ public class BoundStatementCcmIT {
   }
 
   @Test
-  @ScyllaSkip /* Skipping due to https://github.com/scylladb/scylla/issues/10956. */
   public void should_set_all_occurrences_of_variable() {
     CqlSession session = sessionRule.session();
     PreparedStatement ps = session.prepare("INSERT INTO test3 (pk1, pk2, v) VALUES (:i, :i, :i)");
 
     CqlIdentifier id = CqlIdentifier.fromCql("i");
     ColumnDefinitions variableDefinitions = ps.getVariableDefinitions();
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      // Scylla has different behavior, see https://github.com/scylladb/scylladb/pull/10813 and for
+      // more details.
+      assertThat(variableDefinitions.allIndicesOf(id)).containsExactly(0);
+      assertThrows(
+          Exception.class, () -> should_set_all_occurrences_of_variable(ps.bind().setInt(id, 12)));
+      assertThrows(
+          Exception.class,
+          () ->
+              should_set_all_occurrences_of_variable(
+                  ps.boundStatementBuilder().setInt(id, 12).build()));
+      return;
+    }
+
     assertThat(variableDefinitions.allIndicesOf(id)).containsExactly(0, 1, 2);
 
     should_set_all_occurrences_of_variable(ps.bind().setInt(id, 12));

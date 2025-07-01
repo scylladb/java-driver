@@ -29,15 +29,12 @@ import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
 import com.datastax.oss.driver.api.testinfra.CassandraSkip;
-import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import java.net.InetSocketAddress;
 import java.util.Collections;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import org.junit.AssumptionViolatedException;
 import org.junit.runner.Description;
@@ -72,33 +69,8 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     ccmBridge.close();
   }
 
-  private Statement buildErrorStatement(
-      Version requirement, String description, boolean lessThan, boolean dse) {
-    return new Statement() {
-
-      @Override
-      public void evaluate() {
-        throw new AssumptionViolatedException(
-            String.format(
-                "Test requires %s %s %s but %s is configured.  Description: %s",
-                lessThan ? "less than" : "at least",
-                dse ? "DSE" : (CcmBridge.isDistributionOf(BackendType.SCYLLA) ? "SCYLLA" : "C*"),
-                requirement,
-                dse
-                    ? ccmBridge.getDseVersion().orElse(null)
-                    : (CcmBridge.isDistributionOf(BackendType.SCYLLA)
-                        ? ccmBridge.getScyllaVersion().orElse(null)
-                        : ccmBridge.getCassandraVersion()),
-                description));
-      }
-    };
-  }
-
   @Override
   public Statement apply(Statement base, Description description) {
-
-    // Legacy skipping:
-
     // Scylla-specific annotations
     ScyllaSkip scyllaSkip = description.getAnnotation(ScyllaSkip.class);
     if (scyllaSkip != null) {
@@ -127,50 +99,6 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
                     "Test skipped when running with Cassandra.  Description: %s", description));
           }
         };
-      }
-    }
-
-    ScyllaRequirement scyllaRequirement = description.getAnnotation(ScyllaRequirement.class);
-    if (scyllaRequirement != null) {
-      Optional<Version> scyllaVersionOption = ccmBridge.getScyllaVersion();
-      if (!scyllaVersionOption.isPresent()) {
-        return new Statement() {
-          @Override
-          public void evaluate() {
-            throw new AssumptionViolatedException(
-                "Test has Scylla version requirement, but CCMBridge is not configured for Scylla.");
-          }
-        };
-      }
-      Version scyllaVersion = scyllaVersionOption.get();
-      if (CcmBridge.SCYLLA_ENTERPRISE) {
-        if (!scyllaRequirement.minEnterprise().isEmpty()) {
-          Version minVersion =
-              Objects.requireNonNull(Version.parse(scyllaRequirement.minEnterprise()));
-          if (minVersion.compareTo(scyllaVersion) > 0) {
-            return buildErrorStatement(minVersion, scyllaRequirement.description(), false, false);
-          }
-        }
-        if (!scyllaRequirement.maxEnterprise().isEmpty()) {
-          Version maxVersion =
-              Objects.requireNonNull(Version.parse(scyllaRequirement.maxEnterprise()));
-          if (maxVersion.compareTo(scyllaVersion) <= 0) {
-            return buildErrorStatement(maxVersion, scyllaRequirement.description(), true, false);
-          }
-        }
-      } else {
-        if (!scyllaRequirement.minOSS().isEmpty()) {
-          Version minVersion = Objects.requireNonNull(Version.parse(scyllaRequirement.minOSS()));
-          if (minVersion.compareTo(scyllaVersion) > 0) {
-            return buildErrorStatement(minVersion, scyllaRequirement.description(), false, false);
-          }
-        }
-        if (!scyllaRequirement.maxOSS().isEmpty()) {
-          Version maxVersion = Objects.requireNonNull(Version.parse(scyllaRequirement.maxOSS()));
-          if (maxVersion.compareTo(CcmBridge.VERSION) <= 0) {
-            return buildErrorStatement(maxVersion, scyllaRequirement.description(), true, false);
-          }
-        }
       }
     }
 

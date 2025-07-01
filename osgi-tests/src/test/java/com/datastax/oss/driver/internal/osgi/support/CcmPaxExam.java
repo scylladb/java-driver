@@ -17,15 +17,7 @@
  */
 package com.datastax.oss.driver.internal.osgi.support;
 
-import static com.datastax.oss.driver.internal.osgi.support.CcmStagedReactor.CCM_BRIDGE;
-
-import com.datastax.oss.driver.api.core.Version;
-import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
-import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
-import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
-import java.util.Objects;
-import java.util.Optional;
 import org.junit.AssumptionViolatedException;
 import org.junit.runner.Description;
 import org.junit.runner.notification.Failure;
@@ -42,53 +34,6 @@ public class CcmPaxExam extends PaxExam {
   @Override
   public void run(RunNotifier notifier) {
     Description description = getDescription();
-    ScyllaRequirement scyllaRequirement = description.getAnnotation(ScyllaRequirement.class);
-    if (scyllaRequirement != null) {
-      Optional<Version> scyllaVersionOption = CCM_BRIDGE.getScyllaVersion();
-      if (!scyllaVersionOption.isPresent()) {
-        notifier.fireTestAssumptionFailed(
-            new Failure(
-                description,
-                new AssumptionViolatedException("Test Requires Scylla but it is not configured.")));
-        return;
-      }
-      Version scyllaVersion = scyllaVersionOption.get();
-      if (CcmBridge.SCYLLA_ENTERPRISE) {
-        if (!scyllaRequirement.minEnterprise().isEmpty()) {
-          Version minVersion =
-              Objects.requireNonNull(Version.parse(scyllaRequirement.minEnterprise()));
-          if (minVersion.compareTo(scyllaVersion) > 0) {
-            fireRequirementsNotMet(
-                notifier, description, scyllaRequirement.minEnterprise(), false, false);
-            return;
-          }
-        }
-        if (!scyllaRequirement.maxEnterprise().isEmpty()) {
-          Version maxVersion =
-              Objects.requireNonNull(Version.parse(scyllaRequirement.maxEnterprise()));
-          if (maxVersion.compareTo(scyllaVersion) <= 0) {
-            fireRequirementsNotMet(
-                notifier, description, scyllaRequirement.maxEnterprise(), true, false);
-            return;
-          }
-        }
-      } else {
-        if (!scyllaRequirement.minOSS().isEmpty()) {
-          Version minVersion = Objects.requireNonNull(Version.parse(scyllaRequirement.minOSS()));
-          if (minVersion.compareTo(scyllaVersion) > 0) {
-            fireRequirementsNotMet(notifier, description, scyllaRequirement.minOSS(), false, false);
-            return;
-          }
-        }
-        if (!scyllaRequirement.maxOSS().isEmpty()) {
-          Version maxVersion = Objects.requireNonNull(Version.parse(scyllaRequirement.maxOSS()));
-          if (maxVersion.compareTo(CcmBridge.VERSION) <= 0) {
-            fireRequirementsNotMet(notifier, description, scyllaRequirement.maxOSS(), true, false);
-            return;
-          }
-        }
-      }
-    }
 
     if (BackendRequirementRule.meetsDescriptionRequirements(description)) {
       super.run(notifier);
@@ -98,27 +43,5 @@ public class CcmPaxExam extends PaxExam {
           new AssumptionViolatedException(BackendRequirementRule.buildReasonString(description));
       notifier.fireTestAssumptionFailed(new Failure(description, e));
     }
-  }
-
-  private void fireRequirementsNotMet(
-      RunNotifier notifier,
-      Description description,
-      String requirement,
-      boolean lessThan,
-      boolean dse) {
-    AssumptionViolatedException e =
-        new AssumptionViolatedException(
-            String.format(
-                "Test requires %s %s %s but %s is configured.  Description: %s",
-                lessThan ? "less than" : "at least",
-                dse ? "DSE" : (CcmBridge.isDistributionOf(BackendType.SCYLLA) ? "SCYLLA" : "C*"),
-                requirement,
-                dse
-                    ? CCM_BRIDGE.getDseVersion().orElse(null)
-                    : (CcmBridge.isDistributionOf(BackendType.SCYLLA)
-                        ? CCM_BRIDGE.getScyllaVersion().orElse(null)
-                        : CCM_BRIDGE.getCassandraVersion()),
-                description));
-    notifier.fireTestAssumptionFailed(new Failure(description, e));
   }
 }

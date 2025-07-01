@@ -36,6 +36,7 @@ import org.junit.rules.TestRule;
     maxExclusive = "4.0-beta4",
     // TODO Re-enable when CASSANDRA-16364 is fixed
     description = "TODO Re-enable when CASSANDRA-16364 is fixed")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class Murmur3TokenVnodesIT extends TokenITBase {
 
   private static final CustomCcmRule CCM_RULE =

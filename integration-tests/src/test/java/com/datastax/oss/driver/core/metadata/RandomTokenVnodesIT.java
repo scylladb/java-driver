@@ -43,9 +43,7 @@ import org.junit.rules.TestRule;
     maxExclusive = "4.0-beta4",
     // TODO Re-enable when CASSANDRA-16364 is fixed
     description = "TODO Re-enable when CASSANDRA-16364 is fixed")
-@ScyllaSkip(
-    description =
-        "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality")
+@ScyllaSkip(description = "scylladb/java-driver#568 - fails to start scylla")
 public class RandomTokenVnodesIT extends TokenITBase {
 
   private static final CustomCcmRule CCM_RULE =

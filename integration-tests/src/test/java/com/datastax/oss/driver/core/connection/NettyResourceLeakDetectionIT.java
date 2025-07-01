@@ -133,6 +133,7 @@ public class NettyResourceLeakDetectionIT {
       type = BackendType.CASSANDRA,
       maxExclusive = "4.0.0",
       description = "Snappy is not supported in OSS C* 4.0+ with protocol v5")
+  @BackendRequirement(type = BackendType.SCYLLA)
   @Test
   public void should_not_leak_compressed_snappy() {
     DriverConfigLoader loader =

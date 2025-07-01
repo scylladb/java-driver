@@ -58,6 +58,7 @@ import org.junit.rules.TestRule;
     type = BackendType.CASSANDRA,
     minInclusive = "3.0",
     description = ">= in WHERE clause not supported in legacy versions")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class DeleteIT extends InventoryITBase {
 
   private static CustomCcmRule CCM_RULE = CustomCcmRule.builder().build();

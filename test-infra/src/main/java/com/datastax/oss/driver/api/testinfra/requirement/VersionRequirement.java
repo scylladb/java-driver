@@ -20,6 +20,8 @@ package com.datastax.oss.driver.api.testinfra.requirement;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.testinfra.CassandraRequirement;
 import com.datastax.oss.driver.api.testinfra.DseRequirement;
+import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
+import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -97,15 +99,33 @@ public class VersionRequirement {
         BackendType.DSE, requirement.min(), requirement.max(), requirement.description());
   }
 
+  public static VersionRequirement fromScyllaOssRequirement(ScyllaRequirement requirement) {
+    return new VersionRequirement(
+        BackendType.SCYLLA,
+        requirement.minOSS(),
+        !requirement.maxOSS().isEmpty() ? requirement.maxOSS() : "2000.0.0",
+        requirement.description());
+  }
+
+  public static VersionRequirement fromScyllaEnterpriseRequirement(ScyllaRequirement requirement) {
+    return new VersionRequirement(
+        BackendType.SCYLLA,
+        !requirement.minEnterprise().isEmpty() ? requirement.minEnterprise() : "2000.0.0",
+        requirement.maxEnterprise(),
+        requirement.description());
+  }
+
   public static Collection<VersionRequirement> fromAnnotations(Description description) {
     // collect all requirement annotation types
     CassandraRequirement cassandraRequirement =
         description.getAnnotation(CassandraRequirement.class);
     DseRequirement dseRequirement = description.getAnnotation(DseRequirement.class);
+    ScyllaRequirement scyllaRequirement = description.getAnnotation(ScyllaRequirement.class);
     // matches methods/classes with one @BackendRequirement annotation
     BackendRequirement backendRequirement = description.getAnnotation(BackendRequirement.class);
     // matches methods/classes with two or more @BackendRequirement annotations
     BackendRequirements backendRequirements = description.getAnnotation(BackendRequirements.class);
+    ScyllaSkip scyllaSkip = description.getAnnotation(ScyllaSkip.class);
 
     // build list of required versions
     Collection<VersionRequirement> requirements = new ArrayList<>();
@@ -114,6 +134,19 @@ public class VersionRequirement {
     }
     if (dseRequirement != null) {
       requirements.add(VersionRequirement.fromDseRequirement(dseRequirement));
+    }
+    if (scyllaSkip != null) {
+      requirements.add(
+          new VersionRequirement(BackendType.SCYLLA, "0.0.0", "1.0.0", scyllaSkip.description()));
+    }
+    if (scyllaRequirement != null) {
+      if (!scyllaRequirement.minEnterprise().isEmpty()
+          || !scyllaRequirement.maxEnterprise().isEmpty()) {
+        requirements.add(VersionRequirement.fromScyllaEnterpriseRequirement(scyllaRequirement));
+      }
+      if (!scyllaRequirement.minOSS().isEmpty() || !scyllaRequirement.maxOSS().isEmpty()) {
+        requirements.add(VersionRequirement.fromScyllaOssRequirement(scyllaRequirement));
+      }
     }
     if (backendRequirement != null) {
       requirements.add(VersionRequirement.fromBackendRequirement(backendRequirement));

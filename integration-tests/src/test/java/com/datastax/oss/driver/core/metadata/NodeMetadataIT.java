@@ -31,7 +31,6 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
@@ -55,9 +54,6 @@ public class NodeMetadataIT {
   @Rule public CcmRule ccmRule = CcmRule.getInstance();
 
   @Test
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaDifferentText")
   public void should_expose_node_metadata() {
     try (CqlSession session = SessionUtils.newSession(ccmRule)) {
 
@@ -71,7 +67,11 @@ public class NodeMetadataIT {
                   assertThat(broadcastAddress.getAddress()).isEqualTo(connectAddress.getAddress()));
       assertThat(node.getListenAddress().get().getAddress()).isEqualTo(connectAddress.getAddress());
       assertThat(node.getDatacenter()).isEqualTo("dc1");
-      assertThat(node.getRack()).isEqualTo("r1");
+      if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+        assertThat(node.getRack()).isEqualTo("RAC1");
+      } else {
+        assertThat(node.getRack()).isEqualTo("r1");
+      }
       if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
         // CcmBridge does not report accurate C* versions for other distributions (e.g. DSE), only
         // approximated values

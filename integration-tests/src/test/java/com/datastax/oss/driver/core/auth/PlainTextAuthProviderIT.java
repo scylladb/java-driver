@@ -31,8 +31,9 @@ import com.datastax.oss.driver.api.core.auth.ProgrammaticPlainTextAuthProvider;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.session.SessionBuilder;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.auth.PlainTextAuthProvider;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.Uninterruptibles;
@@ -41,16 +42,19 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 
-@ScyllaSkip(
-    description = "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaJVMArgs")
 public class PlainTextAuthProviderIT {
 
-  @ClassRule
-  public static final CustomCcmRule CCM_RULE =
-      CustomCcmRule.builder()
-          .withCassandraConfiguration("authenticator", "PasswordAuthenticator")
-          .withJvmArgs("-Dcassandra.superuser_setup_delay_ms=0")
-          .build();
+  @ClassRule public static final CustomCcmRule CCM_RULE = getCCMRule();
+
+  private static CustomCcmRule getCCMRule() {
+    CustomCcmRule.Builder builder =
+        CustomCcmRule.builder()
+            .withCassandraConfiguration("authenticator", "PasswordAuthenticator");
+    if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      builder = builder.withJvmArgs("-Dcassandra.superuser_setup_delay_ms=0");
+    }
+    return builder.build();
+  }
 
   @BeforeClass
   public static void sleepForAuth() {

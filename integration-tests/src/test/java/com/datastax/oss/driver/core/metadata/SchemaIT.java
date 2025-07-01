@@ -39,7 +39,6 @@ import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
@@ -199,9 +198,6 @@ public class SchemaIT {
       type = BackendType.CASSANDRA,
       minInclusive = "4.0",
       description = "virtual tables introduced in 4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality")
   @Test
   public void should_get_virtual_metadata() {
     skipIfDse60();
@@ -316,9 +312,6 @@ public class SchemaIT {
       type = BackendType.CASSANDRA,
       minInclusive = "4.0",
       description = "virtual tables introduced in 4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality")
   @Test
   public void should_exclude_virtual_keyspaces_from_token_map() {
     skipIfDse60();
