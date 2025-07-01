@@ -28,7 +28,7 @@ import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
-import com.datastax.oss.driver.api.testinfra.CassandraSkip;
+import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
@@ -87,8 +87,8 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
       }
     }
 
-    CassandraSkip cassandraSkip = description.getAnnotation(CassandraSkip.class);
-    if (cassandraSkip != null) {
+    ScyllaOnly scyllaOnly = description.getAnnotation(ScyllaOnly.class);
+    if (scyllaOnly != null) {
       if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         return new Statement() {
 
@@ -96,7 +96,8 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
           public void evaluate() {
             throw new AssumptionViolatedException(
                 String.format(
-                    "Test skipped when running with Cassandra.  Description: %s", description));
+                    "Test skipped when running against non-scylla backend.  Description: %s",
+                    description));
           }
         };
       }
