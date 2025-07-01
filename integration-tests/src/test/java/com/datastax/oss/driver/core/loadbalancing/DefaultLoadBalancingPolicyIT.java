@@ -31,6 +31,7 @@ import static org.awaitility.Awaitility.await;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
@@ -42,7 +43,10 @@ import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
@@ -60,13 +64,13 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
-@ScyllaSkip(
-    description = "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledCCMFailure")
 public class DefaultLoadBalancingPolicyIT {
+  @Rule public final BackendRequirementRule backendRequirementRule = new BackendRequirementRule();
 
   private static final String LOCAL_DC = "dc1";
 
@@ -87,9 +91,20 @@ public class DefaultLoadBalancingPolicyIT {
   @BeforeClass
   public static void setup() {
     CqlSession session = SESSION_RULE.session();
-    session.execute(
-        "CREATE KEYSPACE test "
-            + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1}");
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)
+        && ((CcmBridge.SCYLLA_ENTERPRISE
+                && CcmBridge.getDistributionVersion().compareTo(Version.parse("2023.1.0")) >= 0)
+            || (!CcmBridge.SCYLLA_ENTERPRISE
+                && CcmBridge.getDistributionVersion().compareTo(Version.parse("6.1.0")) >= 0))) {
+      session.execute(
+          "CREATE KEYSPACE test "
+              + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1} "
+              + "AND tablets = { 'enabled': false }");
+    } else {
+      session.execute(
+          "CREATE KEYSPACE test "
+              + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2, 'dc2': 1} ");
+    }
     session.execute("CREATE TABLE test.foo (k int PRIMARY KEY)");
   }
 
@@ -99,8 +114,13 @@ public class DefaultLoadBalancingPolicyIT {
       if (LOCAL_DC.equals(node.getDatacenter())) {
         assertThat(node.getDistance()).isEqualTo(NodeDistance.LOCAL);
         assertThat(node.getState()).isEqualTo(NodeState.UP);
-        // 1 regular connection, maybe 1 control connection
-        assertThat(node.getOpenConnections()).isBetween(1, 2);
+        if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+          // 2 per-shard connections and 1 for control connection
+          assertThat(node.getOpenConnections()).isBetween(2, 3);
+        } else {
+          // 1 regular connection, maybe 1 control connection
+          assertThat(node.getOpenConnections()).isBetween(1, 2);
+        }
         assertThat(node.isReconnecting()).isFalse();
       } else {
         assertThat(node.getDistance()).isEqualTo(NodeDistance.IGNORED);
@@ -243,6 +263,7 @@ public class DefaultLoadBalancingPolicyIT {
     }
   }
 
+  @ScyllaSkip(description = "scylladb/java-driver#574 - randomly fails")
   @Test
   public void should_apply_node_filter() {
     Set<Node> localNodes = new HashSet<>();

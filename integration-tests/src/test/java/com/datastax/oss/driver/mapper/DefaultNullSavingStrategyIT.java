@@ -60,6 +60,7 @@ import org.junit.rules.TestRule;
     type = BackendType.CASSANDRA,
     minInclusive = "2.2",
     description = "support for unset values")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class DefaultNullSavingStrategyIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();

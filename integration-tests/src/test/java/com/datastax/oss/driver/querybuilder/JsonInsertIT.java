@@ -56,6 +56,7 @@ import org.junit.rules.TestRule;
     type = BackendType.CASSANDRA,
     minInclusive = "2.2",
     description = "JSON support in Cassandra was added in 2.2")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class JsonInsertIT {
   private static final CcmRule CCM_RULE = CcmRule.getInstance();
 

@@ -36,6 +36,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
@@ -65,9 +66,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Category(ParallelizableTests.class)
-@ScyllaSkip(
-    description =
-        "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality") //  'additional_write_policy' unsupported by Scylla in setupDatabase()
+@ScyllaSkip(description = "scylladb/java-driver#566 - needs to be adopted to scylla")
+@BackendRequirement(type = BackendType.CASSANDRA)
+@BackendRequirement(type = BackendType.DSE)
 public class DescribeIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(DescribeIT.class);

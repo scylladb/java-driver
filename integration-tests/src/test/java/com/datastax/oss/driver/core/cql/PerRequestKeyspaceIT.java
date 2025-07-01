@@ -36,7 +36,6 @@ import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
@@ -89,6 +88,7 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_reject_simple_statement_with_keyspace_in_protocol_v4() {
     should_reject_statement_with_keyspace_in_protocol_v4(
         SimpleStatement.newInstance("SELECT * FROM foo").setKeyspace(sessionRule.keyspace()));
@@ -96,6 +96,7 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_reject_batch_statement_with_explicit_keyspace_in_protocol_v4() {
     SimpleStatement statementWithoutKeyspace =
         SimpleStatement.newInstance(
@@ -109,6 +110,7 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_reject_batch_statement_with_inferred_keyspace_in_protocol_v4() {
     SimpleStatement statementWithKeyspace =
         SimpleStatement.newInstance(
@@ -135,9 +137,6 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_execute_simple_statement_with_keyspace() {
     CqlSession session = sessionRule.session();
     session.execute(
@@ -156,9 +155,6 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_execute_batch_with_explicit_keyspace() {
     CqlSession session = sessionRule.session();
     session.execute(
@@ -183,9 +179,6 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_execute_batch_with_inferred_keyspace() {
     CqlSession session = sessionRule.session();
     session.execute(
@@ -218,9 +211,6 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_prepare_statement_with_keyspace() {
     CqlSession session = sessionRule.session();
     PreparedStatement prepared =
@@ -241,9 +231,6 @@ public class PerRequestKeyspaceIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_reprepare_statement_with_keyspace_on_the_fly() {
     // Create a separate session because we don't want it to have a default keyspace
     SchemaChangeSynchronizer.withLock(

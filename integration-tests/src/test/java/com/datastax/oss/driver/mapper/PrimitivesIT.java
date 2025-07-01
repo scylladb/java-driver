@@ -49,6 +49,7 @@ import org.junit.rules.TestRule;
     type = BackendType.CASSANDRA,
     minInclusive = "2.2",
     description = "smallint is a reserved keyword in 2.1")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class PrimitivesIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();

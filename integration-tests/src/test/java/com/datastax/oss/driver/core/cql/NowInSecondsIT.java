@@ -48,9 +48,7 @@ import org.junit.rules.TestRule;
     type = BackendType.DSE,
     minInclusive = "7.0",
     description = "Feature not available in DSE yet")
-@ScyllaSkip(
-    description =
-        "Scylla keeps negotiating protocol version v4, but \"Can't use nowInSeconds with protocol V4\". Remove skip once Scylla supports protocol version v5.")
+@ScyllaSkip(description = "scylladb/java-driver#573 - to be enabled")
 public class NowInSecondsIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();

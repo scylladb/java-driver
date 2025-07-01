@@ -34,7 +34,6 @@ import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
@@ -77,6 +76,7 @@ public class ProtocolVersionInitialNegotiationIT {
       minInclusive = "5.0",
       maxExclusive = "5.1",
       description = "Only DSE in [5.0,5.1[ has V4 as its highest version")
+  @BackendRequirement(type = BackendType.SCYLLA)
   @Test
   public void should_downgrade_to_v4() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
@@ -90,9 +90,6 @@ public class ProtocolVersionInitialNegotiationIT {
       minInclusive = "4.0-rc1",
       description = "Only C* in [4.0-rc1,*[ has V5 as its highest version")
   @Test
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_downgrade_to_v5_oss() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion().getCode()).isEqualTo(5);
@@ -216,9 +213,6 @@ public class ProtocolVersionInitialNegotiationIT {
       minInclusive = "4.0",
       description = "Only C* in [4.0,*[ has V5 supported")
   @Test
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_not_downgrade_if_server_supports_latest_version() {
     try (CqlSession session = SessionUtils.newSession(ccm)) {
       assertThat(session.getContext().getProtocolVersion()).isEqualTo(ProtocolVersion.V5);
@@ -247,6 +241,7 @@ public class ProtocolVersionInitialNegotiationIT {
       type = BackendType.DSE,
       minInclusive = "4.8",
       description = "Only DSE in [4.8,*[ has V3 supported")
+  @BackendRequirement(type = BackendType.SCYLLA)
   @Test
   public void should_use_explicitly_provided_v3() {
     DriverConfigLoader loader =
@@ -267,6 +262,7 @@ public class ProtocolVersionInitialNegotiationIT {
       type = BackendType.DSE,
       minInclusive = "5.0",
       description = "Only DSE in [5.0,*[ has V4 supported")
+  @BackendRequirement(type = BackendType.SCYLLA)
   @Test
   public void should_use_explicitly_provided_v4() {
     DriverConfigLoader loader =
@@ -288,9 +284,6 @@ public class ProtocolVersionInitialNegotiationIT {
       minInclusive = "7.0",
       description = "Only DSE in [7.0,*[ has V5 supported")
   @Test
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaProtocolV5")
   public void should_use_explicitly_provided_v5() {
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()

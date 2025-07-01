@@ -64,6 +64,7 @@ import org.junit.rules.TestRule;
     type = BackendType.CASSANDRA,
     minInclusive = "3.6",
     description = "Uses PER PARTITION LIMIT")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class SelectOtherClausesIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();

@@ -1,17 +1,16 @@
 package com.datastax.oss.driver.core.metadata;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assume.assumeTrue;
 
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
-import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -20,25 +19,14 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Test;
 
+@ScyllaRequirement(minOSS = "6.2.0", minEnterprise = "2025.1.0")
 public class ZeroTokenNodesIT {
-  @Before
-  public void checkScyllaVersion() {
-    // minOSS = "6.2.0",
-    // minEnterprise = "2025.1.0",
-    // Zero-token nodes introduced in scylladb/scylladb#19684
-    // 2025.1 is an estimated future version and it still may not have this change in.
-    // This number may need to be adjusted once CI picks up this test.
-    assumeTrue(CcmBridge.isDistributionOf(BackendType.SCYLLA));
-    if (CcmBridge.SCYLLA_ENTERPRISE) {
-      assumeTrue(
-          CcmBridge.VERSION.compareTo(Objects.requireNonNull(Version.parse("2025.1.0"))) >= 0);
-    } else {
-      assumeTrue(CcmBridge.VERSION.compareTo(Objects.requireNonNull(Version.parse("6.2.0"))) >= 0);
-    }
-  }
+  // For tests to pick up @ScyllaRequirement annotation
+  @ClassRule
+  public static final BackendRequirementRule backendRequirementRule = new BackendRequirementRule();
 
   @Test
   public void should_not_ignore_zero_token_peer_when_option_is_enabled() {

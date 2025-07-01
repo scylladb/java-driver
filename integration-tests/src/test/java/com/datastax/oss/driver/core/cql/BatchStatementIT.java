@@ -168,6 +168,7 @@ public class BatchStatementIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_execute_batch_of_bound_statements_with_unset_values() {
     // Build a batch of batchCount statements with bound statements, each with their own positional
     // variables.
