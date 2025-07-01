@@ -10,7 +10,7 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.KeyspaceTableNamePair;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.Tablet;
-import com.datastax.oss.driver.api.testinfra.CassandraSkip;
+import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
     minOSS = "6.0.0",
     minEnterprise = "2024.2",
     description = "Needs to support tablets")
-@CassandraSkip(description = "Tablets are ScyllaDB-only extension")
+@ScyllaOnly(description = "Tablets are ScyllaDB-only extension")
 public class DefaultMetadataTabletMapIT {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultMetadataTabletMapIT.class);
   private static final CustomCcmRule CCM_RULE =
