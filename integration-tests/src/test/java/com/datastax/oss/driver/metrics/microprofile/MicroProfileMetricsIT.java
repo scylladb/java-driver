@@ -25,7 +25,6 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
-import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.core.metrics.MetricsITBase;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metrics.MetricId;
@@ -44,9 +43,9 @@ import org.eclipse.microprofile.metrics.MetricRegistry;
 import org.eclipse.microprofile.metrics.Tag;
 import org.eclipse.microprofile.metrics.Timer;
 import org.junit.ClassRule;
-import org.junit.experimental.categories.Category;
 
-@Category(ParallelizableTests.class)
+// Not parallelizable because of unsynchronized concurrent access to the
+// AbstractMetricUpdater.MIN_EXPIRE_AFTER
 public class MicroProfileMetricsIT extends MetricsITBase {
 
   @ClassRule

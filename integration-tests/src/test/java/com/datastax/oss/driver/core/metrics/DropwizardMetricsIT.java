@@ -32,7 +32,6 @@ import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
-import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metrics.MetricId;
 import com.datastax.oss.driver.internal.core.metrics.MetricIdGenerator;
@@ -40,9 +39,9 @@ import com.datastax.oss.simulacron.common.cluster.ClusterSpec;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.ClassRule;
-import org.junit.experimental.categories.Category;
 
-@Category(ParallelizableTests.class)
+// Not parallelizable because of unsynchronized concurrent access to the
+// AbstractMetricUpdater.MIN_EXPIRE_AFTER
 public class DropwizardMetricsIT extends MetricsITBase {
 
   @ClassRule
