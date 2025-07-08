@@ -25,7 +25,6 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
-import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.core.metrics.MetricsITBase;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metrics.MetricId;
@@ -40,11 +39,9 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.ClassRule;
-import org.junit.Ignore;
-import org.junit.experimental.categories.Category;
 
-@Ignore("@IntegrationTestDisabledFlaky")
-@Category(ParallelizableTests.class)
+// Not parallelizable because of unsynchronized concurrent access to the
+// AbstractMetricUpdater.MIN_EXPIRE_AFTER
 public class MicrometerMetricsIT extends MetricsITBase {
 
   @ClassRule
