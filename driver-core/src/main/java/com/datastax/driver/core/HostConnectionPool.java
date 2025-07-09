@@ -514,6 +514,7 @@ class HostConnectionPool implements Connection.Owner {
 
     int shardId = 0;
     if (host.getShardingInfo() != null) {
+      maxQueueSize = host.getShardingInfo().getShardsCount() * maxQueueSize;
       if (routingKey != null) {
         Metadata metadata = manager.cluster.getMetadata();
         Token t = metadata.newToken(partitioner, routingKey);
