@@ -102,6 +102,8 @@
              regular netty-tcnative.
         <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
         -->
+        <gpg.passphrase/>
+        <release.autopublish>false</release.autopublish>
     </properties>
 
     <dependencyManagement>
@@ -645,7 +647,7 @@
                         <deployAtEnd>true</deployAtEnd>
                         <pushChanges>${pushChanges}</pushChanges>
                         <mavenExecutorId>forked-path</mavenExecutorId>
-                        <arguments>-Dgpg.passphrase=${gpg.passphrase}</arguments>
+                        <arguments>-Dgpg.passphrase=${gpg.passphrase} -Drelease.autopublish=${release.autopublish}</arguments>
                     </configuration>
                     <dependencies>
                         <dependency>
@@ -837,18 +839,6 @@
                             </configuration>
                         </execution>
                     </executions>
-                </plugin>
-
-                <plugin>
-                    <groupId>org.sonatype.plugins</groupId>
-                    <artifactId>nexus-staging-maven-plugin</artifactId>
-                    <version>1.6.8</version>
-                    <extensions>true</extensions>
-                    <configuration>
-                        <serverId>ossrh</serverId>
-                        <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                        <autoReleaseAfterClose>true</autoReleaseAfterClose>
-                    </configuration>
                 </plugin>
 
                 <plugin>
@@ -1055,14 +1045,14 @@
                         </executions>
                     </plugin>
                     <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
                         <extensions>true</extensions>
                         <configuration>
-                            <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
-                            <!-- skipLocalStaging>true</skipLocalStaging -->
+                            <publishingServerId>central</publishingServerId>
+                            <excludeArtifacts>scylla-driver-tests-parent,scylla-driver-dist,scylla-driver-examples</excludeArtifacts>
+                            <autoPublish>${release.autopublish}</autoPublish>
+                            <waitUntil>validated</waitUntil>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -1130,12 +1120,12 @@
 
     <distributionManagement>
         <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>central</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots</url>
         </snapshotRepository>
         <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+            <id>central</id>
+            <url>https://central.sonatype.com/repository/maven-releases</url>
         </repository>
     </distributionManagement>
 
