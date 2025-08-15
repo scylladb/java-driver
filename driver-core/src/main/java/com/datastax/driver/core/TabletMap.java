@@ -141,7 +141,7 @@ public class TabletMap {
       HostShardPair hostShardPair = new HostShardPair(tuple.getUUID(0), tuple.getInt(1));
       replicas.add(hostShardPair);
     }
-    Tablet newTablet = new Tablet(keyspace, null, table, firstToken, lastToken, replicas);
+    Tablet newTablet = new Tablet(keyspace, table, firstToken, lastToken, replicas);
 
     TabletSet tabletSet = mapping.computeIfAbsent(ktPair, k -> new TabletSet());
     Lock writeLock = tabletSet.lock.writeLock();
@@ -316,7 +316,6 @@ public class TabletMap {
    */
   public static class Tablet implements Comparable<Tablet> {
     private final String keyspaceName;
-    private final UUID tableId; // currently null almost everywhere
     private final String tableName;
     private final long firstToken;
     private final long lastToken;
@@ -324,13 +323,11 @@ public class TabletMap {
 
     private Tablet(
         String keyspaceName,
-        UUID tableId,
         String tableName,
         long firstToken,
         long lastToken,
         List<HostShardPair> replicas) {
       this.keyspaceName = keyspaceName;
-      this.tableId = tableId;
       this.tableName = tableName;
       this.firstToken = firstToken;
       this.lastToken = lastToken;
@@ -345,15 +342,11 @@ public class TabletMap {
      * @return New {@link Tablet} object
      */
     public static Tablet malformedTablet(long lastToken) {
-      return new Tablet(null, null, null, lastToken, lastToken, null);
+      return new Tablet(null, null, lastToken, lastToken, null);
     }
 
     public String getKeyspaceName() {
       return keyspaceName;
-    }
-
-    public UUID getTableId() {
-      return tableId;
     }
 
     public String getTableName() {
@@ -378,8 +371,6 @@ public class TabletMap {
           + "keyspaceName='"
           + keyspaceName
           + '\''
-          + ", tableId="
-          + tableId
           + ", tableName='"
           + tableName
           + '\''
@@ -400,14 +391,13 @@ public class TabletMap {
       return firstToken == that.firstToken
           && lastToken == that.lastToken
           && keyspaceName.equals(that.keyspaceName)
-          && Objects.equals(tableId, that.tableId)
           && tableName.equals(that.tableName)
           && Objects.equals(replicas, that.replicas);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(keyspaceName, tableId, tableName, firstToken, lastToken, replicas);
+      return Objects.hash(keyspaceName, tableName, firstToken, lastToken, replicas);
     }
 
     @Override
