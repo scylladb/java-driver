@@ -141,7 +141,7 @@ public class TabletMap {
       HostShardPair hostShardPair = new HostShardPair(tuple.getUUID(0), tuple.getInt(1));
       replicas.add(hostShardPair);
     }
-    Tablet newTablet = new Tablet(keyspace, table, firstToken, lastToken, replicas);
+    Tablet newTablet = new Tablet(firstToken, lastToken, replicas);
 
     TabletSet tabletSet = mapping.computeIfAbsent(ktPair, k -> new TabletSet());
     Lock writeLock = tabletSet.lock.writeLock();
@@ -315,20 +315,11 @@ public class TabletMap {
    * for quick lookup on sorted Collections based just on the token value.
    */
   public static class Tablet implements Comparable<Tablet> {
-    private final String keyspaceName;
-    private final String tableName;
     private final long firstToken;
     private final long lastToken;
     private final List<HostShardPair> replicas;
 
-    private Tablet(
-        String keyspaceName,
-        String tableName,
-        long firstToken,
-        long lastToken,
-        List<HostShardPair> replicas) {
-      this.keyspaceName = keyspaceName;
-      this.tableName = tableName;
+    private Tablet(long firstToken, long lastToken, List<HostShardPair> replicas) {
       this.firstToken = firstToken;
       this.lastToken = lastToken;
       this.replicas = replicas;
@@ -342,15 +333,7 @@ public class TabletMap {
      * @return New {@link Tablet} object
      */
     public static Tablet malformedTablet(long lastToken) {
-      return new Tablet(null, null, lastToken, lastToken, null);
-    }
-
-    public String getKeyspaceName() {
-      return keyspaceName;
-    }
-
-    public String getTableName() {
-      return tableName;
+      return new Tablet(lastToken, lastToken, null);
     }
 
     public long getFirstToken() {
@@ -368,13 +351,7 @@ public class TabletMap {
     @Override
     public String toString() {
       return "LazyTablet{"
-          + "keyspaceName='"
-          + keyspaceName
-          + '\''
-          + ", tableName='"
-          + tableName
-          + '\''
-          + ", firstToken="
+          + "firstToken="
           + firstToken
           + ", lastToken="
           + lastToken
@@ -390,14 +367,12 @@ public class TabletMap {
       Tablet that = (Tablet) o;
       return firstToken == that.firstToken
           && lastToken == that.lastToken
-          && keyspaceName.equals(that.keyspaceName)
-          && tableName.equals(that.tableName)
           && Objects.equals(replicas, that.replicas);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(keyspaceName, tableName, firstToken, lastToken, replicas);
+      return Objects.hash(firstToken, lastToken, replicas);
     }
 
     @Override
