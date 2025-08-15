@@ -350,7 +350,7 @@ public class TabletMap {
 
     @Override
     public String toString() {
-      return "LazyTablet{"
+      return "Tablet{"
           + "firstToken="
           + firstToken
           + ", lastToken="
