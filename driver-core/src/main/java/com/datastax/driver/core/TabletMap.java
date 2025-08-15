@@ -84,7 +84,7 @@ public class TabletMap {
     Lock readLock = tabletSet.lock.readLock();
     try {
       readLock.lock();
-      Tablet row = mapping.get(key).tablets.ceiling(Tablet.malformedTablet(token));
+      Tablet row = tabletSet.tablets.ceiling(Tablet.malformedTablet(token));
       if (row == null || row.firstToken >= token) {
         logger.trace(
             "Could not find tablet for {}.{} that owns token {}. Returning empty set.",
