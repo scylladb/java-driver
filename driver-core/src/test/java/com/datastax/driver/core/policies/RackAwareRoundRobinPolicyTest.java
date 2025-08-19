@@ -28,27 +28,29 @@ import static com.datastax.driver.core.TestUtils.findHost;
 import static com.datastax.driver.core.TestUtils.nonQuietClusterCloseOptions;
 import static com.google.common.collect.Lists.newArrayList;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
-import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.DataProviders;
-import com.datastax.driver.core.Host;
-import com.datastax.driver.core.MemoryAppender;
-import com.datastax.driver.core.QueryTracker;
-import com.datastax.driver.core.ScassandraCluster;
-import com.datastax.driver.core.Session;
+import com.datastax.driver.core.*;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.assertj.core.api.Assertions;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 public class RackAwareRoundRobinPolicyTest {
@@ -59,6 +61,57 @@ public class RackAwareRoundRobinPolicyTest {
   private QueryTracker queryTracker;
 
   @Captor private ArgumentCaptor<Collection<Host>> initHostsCaptor;
+
+  private LoadBalancingPolicy childPolicy;
+  private Cluster cluster;
+  private Host host1 = mock(Host.class);
+  private Host host2 = mock(Host.class);
+  private Host host3 = mock(Host.class);
+  private Host host4 = mock(Host.class);
+  private Host host5 = mock(Host.class);
+  private Host host6 = mock(Host.class);
+  private ByteBuffer routingKey = ByteBuffer.wrap(new byte[] {1, 2, 3, 4});
+  private final Statement noneLocalConsistencyStatement =
+      new SimpleStatement("irrelevant")
+          .setRoutingKey(routingKey)
+          .setConsistencyLevel(ConsistencyLevel.ONE);
+  private final Statement localConsistencyStatement =
+      new SimpleStatement("irrelevant")
+          .setRoutingKey(routingKey)
+          .setConsistencyLevel(ConsistencyLevel.LOCAL_ONE);
+
+  @BeforeMethod(groups = "unit")
+  public void setUpUnitTests() {
+    CodecRegistry codecRegistry = new CodecRegistry();
+    cluster = mock(Cluster.class);
+    Configuration configuration = mock(Configuration.class);
+    ProtocolOptions protocolOptions = mock(ProtocolOptions.class);
+    Metadata metadata = mock(Metadata.class);
+    childPolicy = mock(LoadBalancingPolicy.class);
+    when(cluster.getConfiguration()).thenReturn(configuration);
+    when(configuration.getCodecRegistry()).thenReturn(codecRegistry);
+    when(configuration.getProtocolOptions()).thenReturn(protocolOptions);
+    when(protocolOptions.getProtocolVersion()).thenReturn(ProtocolVersion.DEFAULT);
+    when(cluster.getMetadata()).thenReturn(metadata);
+    when(host1.isUp()).thenReturn(true);
+    when(host1.getRack()).thenReturn("localRack");
+    when(host1.getDatacenter()).thenReturn("localDC");
+    when(host2.isUp()).thenReturn(true);
+    when(host2.getRack()).thenReturn("localRack");
+    when(host2.getDatacenter()).thenReturn("localDC");
+    when(host3.isUp()).thenReturn(true);
+    when(host3.getRack()).thenReturn("remoteRack");
+    when(host3.getDatacenter()).thenReturn("localDC");
+    when(host4.isUp()).thenReturn(true);
+    when(host4.getRack()).thenReturn("remoteRack");
+    when(host4.getDatacenter()).thenReturn("localDC");
+    when(host5.isUp()).thenReturn(true);
+    when(host5.getRack()).thenReturn("remoteRack");
+    when(host5.getDatacenter()).thenReturn("remoteDC");
+    when(host6.isUp()).thenReturn(true);
+    when(host6.getRack()).thenReturn("remoteRack");
+    when(host6.getDatacenter()).thenReturn("remoteDC");
+  }
 
   @BeforeMethod(groups = "short")
   public void setUp() {
@@ -970,5 +1023,138 @@ public class RackAwareRoundRobinPolicyTest {
       cluster.close();
       sCluster.stop();
     }
+  }
+
+  @DataProvider(name = "queryPlanTestCases")
+  public Object[][] queryPlanTestCases() {
+    return new Object[][] {
+      {
+        0,
+        false,
+        ImmutableList.of(host1, host2, host3, host4),
+        ImmutableList.of(host2, host1, host4, host3),
+        ImmutableList.of(host1, host2, host3, host4),
+        ImmutableList.of(host2, host1, host4, host3)
+      },
+      {
+        1,
+        false,
+        ImmutableList.of(host1, host2, host3, host4),
+        ImmutableList.of(host2, host1, host4, host3),
+        ImmutableList.of(host1, host2, host3, host4, host5),
+        ImmutableList.of(host2, host1, host4, host3, host5)
+      },
+      {
+        0,
+        true,
+        ImmutableList.of(host1, host2, host3, host4),
+        ImmutableList.of(host2, host1, host4, host3),
+        ImmutableList.of(host1, host2, host3, host4),
+        ImmutableList.of(host2, host1, host4, host3)
+      },
+      {
+        1,
+        true,
+        ImmutableList.of(host1, host2, host3, host4, host5),
+        ImmutableList.of(host2, host1, host4, host3, host5),
+        ImmutableList.of(host1, host2, host3, host4, host5),
+        ImmutableList.of(host2, host1, host4, host3, host5)
+      },
+      {
+        2,
+        true,
+        ImmutableList.of(host1, host2, host3, host4, host5, host6),
+        ImmutableList.of(host2, host1, host4, host3, host6, host5),
+        ImmutableList.of(host1, host2, host3, host4, host5, host6),
+        ImmutableList.of(host2, host1, host4, host3, host6, host5)
+      },
+    };
+  }
+
+  @Test(groups = "unit", dataProvider = "queryPlanTestCases")
+  public void should_follow_configuration_on_query_planning(
+      int usedHostsPerRemoteDC,
+      boolean allowRemoteDCsForLocalConsistencyLevel,
+      List<Host> queryPlanForLocalConsistencyLevel1,
+      List<Host> queryPlanForLocalConsistencyLevel2,
+      List<Host> queryPlanForNonLocalConsistencyLevel1,
+      List<Host> queryPlanForNonLocalConsistencyLevel2) {
+    RackAwareRoundRobinPolicy policy =
+        new RackAwareRoundRobinPolicy(
+            "localDC",
+            "localRack",
+            usedHostsPerRemoteDC,
+            allowRemoteDCsForLocalConsistencyLevel,
+            false,
+            false);
+    policy.init(cluster, ImmutableList.of(host1, host3, host4, host2, host5, host6));
+
+    policy.index.set(0);
+    ArrayList<Host> queryPlan =
+        Lists.newArrayList(policy.newQueryPlan("keyspace", localConsistencyStatement));
+    Assertions.assertThat(queryPlan)
+        .containsExactly(queryPlanForLocalConsistencyLevel1.toArray(new Host[0]));
+    queryPlan = Lists.newArrayList(policy.newQueryPlan("keyspace", localConsistencyStatement));
+    Assertions.assertThat(queryPlan)
+        .containsExactly(queryPlanForLocalConsistencyLevel2.toArray(new Host[0]));
+
+    policy.index.set(0);
+    queryPlan = Lists.newArrayList(policy.newQueryPlan("keyspace", noneLocalConsistencyStatement));
+    Assertions.assertThat(queryPlan)
+        .containsExactly(queryPlanForNonLocalConsistencyLevel1.toArray(new Host[0]));
+    queryPlan = Lists.newArrayList(policy.newQueryPlan("keyspace", noneLocalConsistencyStatement));
+    Assertions.assertThat(queryPlan)
+        .containsExactly(queryPlanForNonLocalConsistencyLevel2.toArray(new Host[0]));
+  }
+
+  @DataProvider(name = "distanceTestCases")
+  public Object[][] distanceTestCases() {
+    return new Object[][] {
+      {
+        0,
+        ImmutableList.of(
+            HostDistance.LOCAL,
+            HostDistance.LOCAL,
+            HostDistance.REMOTE,
+            HostDistance.REMOTE,
+            HostDistance.IGNORED,
+            HostDistance.IGNORED)
+      },
+      {
+        1,
+        ImmutableList.of(
+            HostDistance.LOCAL,
+            HostDistance.LOCAL,
+            HostDistance.REMOTE,
+            HostDistance.REMOTE,
+            HostDistance.REMOTE,
+            HostDistance.IGNORED)
+      },
+      {
+        2,
+        ImmutableList.of(
+            HostDistance.LOCAL,
+            HostDistance.LOCAL,
+            HostDistance.REMOTE,
+            HostDistance.REMOTE,
+            HostDistance.REMOTE,
+            HostDistance.REMOTE)
+      },
+    };
+  }
+
+  @Test(groups = "unit", dataProvider = "distanceTestCases")
+  public void should_respect_topology_on_distance(
+      int usedHostsPerRemoteDC, List<HostDistance> distances) {
+    RackAwareRoundRobinPolicy policy =
+        new RackAwareRoundRobinPolicy(
+            "localDC", "localRack", usedHostsPerRemoteDC, false, false, false);
+    policy.init(cluster, ImmutableList.of(host1, host3, host4, host2, host5, host6));
+    List<HostDistance> resultedDistances =
+        ImmutableList.of(host1, host2, host3, host4, host5, host6).stream()
+            .map(policy::distance)
+            .collect(Collectors.toList());
+    Assertions.assertThat(resultedDistances)
+        .containsExactly(distances.toArray(new HostDistance[0]));
   }
 }
