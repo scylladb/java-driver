@@ -78,7 +78,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
       new CopyOnWriteArrayList<Host>();
   private final CopyOnWriteArrayList<Host> liveHostsRemoteRacksLocalDC =
       new CopyOnWriteArrayList<Host>();
-  private final AtomicInteger index = new AtomicInteger();
+  @VisibleForTesting final AtomicInteger index = new AtomicInteger();
 
   @VisibleForTesting volatile String localDc;
   @VisibleForTesting volatile String localRack;
@@ -205,7 +205,13 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
   @Override
   public HostDistance distance(Host host) {
     String dc = dc(host);
-    if (dc == UNSET || dc.equals(localDc)) return HostDistance.LOCAL;
+    String rack = rack(host);
+    if (dc == UNSET || dc.equals(localDc)) {
+      if (rack == UNSET || rack.equals(localRack)) {
+        return HostDistance.LOCAL;
+      }
+      return HostDistance.REMOTE;
+    }
 
     CopyOnWriteArrayList<Host> dcHosts = perDcLiveHosts.get(dc);
     if (dcHosts == null || usedHostsPerRemoteDc == 0) return HostDistance.IGNORED;
