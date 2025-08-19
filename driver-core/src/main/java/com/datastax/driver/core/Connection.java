@@ -1592,7 +1592,13 @@ class Connection {
             "{} was inactive for {} seconds, sending heartbeat",
             Connection.this,
             factory.configuration.getPoolingOptions().getHeartbeatIntervalSeconds());
-        write(HEARTBEAT_CALLBACK);
+        try {
+          write(HEARTBEAT_CALLBACK);
+        } catch (ConnectionException e) {
+          if (!e.getMessage().contains("Connection has been closed")) {
+            throw e;
+          }
+        }
       }
     }
 
