@@ -87,8 +87,8 @@
         <scassandra.version>1.1.2</scassandra.version>
         <logback.version>1.2.13</logback.version>
         <byteman.version>3.0.8</byteman.version>
-        <burningwave.tools.version>0.26.2</burningwave.tools.version>
-        <surefire.version>3.0.0-M6</surefire.version>
+        <burningwave.tools.version>0.27.2</burningwave.tools.version>
+        <surefire.version>3.5.3</surefire.version>
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
@@ -430,7 +430,7 @@
             <extension>
                 <groupId>kr.motd.maven</groupId>
                 <artifactId>os-maven-plugin</artifactId>
-                <version>1.4.1.Final</version>
+                <version>1.7.1</version>
             </extension>
 
         </extensions>
@@ -445,34 +445,34 @@
 
                 <plugin>
                     <artifactId>maven-clean-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.5.0</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-resources-plugin</artifactId>
-                    <version>3.0.2</version>
+                    <version>3.3.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-site-plugin</artifactId>
-                    <version>3.6</version>
+                    <version>3.21.0</version>
                 </plugin>
 
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>build-helper-maven-plugin</artifactId>
-                    <!-- last version compatible with Java 6 -->
-                    <version>1.9.1</version>
+                    <!-- last version compatible with Java 8 -->
+                    <version>3.6.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>1.4.1</version>
+                    <version>3.6.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.6.1</version>
+                    <version>3.14.0</version>
                     <configuration>
                         <source>${java.version}</source>
                         <target>${java.version}</target>
@@ -522,7 +522,7 @@
 
                 <plugin>
                     <artifactId>maven-source-plugin</artifactId>
-                    <version>3.0.1</version>
+                    <version>3.3.1</version>
                     <executions>
                         <execution>
                             <id>attach-sources</id>
@@ -536,12 +536,14 @@
 
                 <plugin>
                     <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>2.10.4</version>
+                    <version>3.11.3</version>
                     <inherited>true</inherited>
                     <configuration>
                         <quiet>true</quiet>
                         <verbose>false</verbose>
-                        <additionalparam>${javadoc.opts}</additionalparam>
+                        <additionalJOptions>
+                            <additionalJOption>${javadoc.opts}</additionalJOption>
+                        </additionalJOptions>
                         <detectJavaApiLink>true</detectJavaApiLink>
                         <links>
                             <link>https://javadoc.io/doc/javax/javaee-api/8.0/</link>
@@ -608,15 +610,15 @@
 
                 <plugin>
                     <artifactId>maven-jar-plugin</artifactId>
-                    <version>3.0.2</version>
+                    <version>3.4.2</version>
                 </plugin>
 
                 <plugin>
                     <groupId>org.apache.felix</groupId>
                     <artifactId>maven-bundle-plugin</artifactId>
                     <extensions>true</extensions>
-                    <!-- last version compatible with Java 6 -->
-                    <version>2.5.4</version>
+                    <!-- last version compatible with Java 8 -->
+                    <version>5.1.9</version>
                     <configuration>
                         <instructions>
                             <Bundle-Version>${project.version}</Bundle-Version>
@@ -632,12 +634,12 @@
 
                 <plugin>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.6.0</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-release-plugin</artifactId>
-                    <version>2.5.3</version>
+                    <version>3.1.1</version>
                     <configuration>
                         <tagNameFormat>@{project.version}</tagNameFormat>
                         <autoVersionSubmodules>true</autoVersionSubmodules>
@@ -652,24 +654,24 @@
                         <dependency>
                             <groupId>org.apache.maven.scm</groupId>
                             <artifactId>maven-scm-provider-gitexe</artifactId>
-                            <version>1.9.5</version>
+                            <version>2.1.0</version>
                         </dependency>
                     </dependencies>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-assembly-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.7.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-install-plugin</artifactId>
-                    <version>2.5.2</version>
+                    <version>3.1.4</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-deploy-plugin</artifactId>
-                    <version>2.8.2</version>
+                    <version>3.1.4</version>
                     <executions>
                         <execution>
                             <id>default-deploy</id>
@@ -782,8 +784,7 @@
 
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
-                    <!-- do not upgrade until https://issues.apache.org/jira/browse/SUREFIRE-1302 is fixed -->
-                    <version>2.18</version>
+                    <version>3.5.3</version>
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
