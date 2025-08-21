@@ -476,7 +476,6 @@
                     <configuration>
                         <source>${java.version}</source>
                         <target>${java.version}</target>
-                        <optimize>true</optimize>
                         <showDeprecation>true</showDeprecation>
                         <showWarnings>true</showWarnings>
                         <!--
@@ -546,7 +545,6 @@
                         </additionalJOptions>
                         <detectJavaApiLink>true</detectJavaApiLink>
                         <links>
-                            <link>https://javadoc.io/doc/javax/javaee-api/8.0/</link>
                             <link>https://google.github.io/guava/releases/19.0/api/docs/</link>
                             <link>http://netty.io/4.0/api/</link>
                             <link>http://www.joda.org/joda-time/apidocs/</link>
