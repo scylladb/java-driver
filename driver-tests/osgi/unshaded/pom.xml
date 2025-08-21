@@ -25,7 +25,7 @@
         <version>3.11.5.8-SNAPSHOT</version>
     </parent>
 
-    <artifactId>cassandra-driver-tests-osgi-unshaded</artifactId>
+    <artifactId>scylla-driver-tests-osgi-unshaded</artifactId>
     <name>Java Driver for Scylla and Apache Cassandra Tests - OSGi - Unshaded</name>
     <description>A test for the unshaded Java Driver in an OSGi container.</description>
 
