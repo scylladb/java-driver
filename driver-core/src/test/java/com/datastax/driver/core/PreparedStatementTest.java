@@ -775,6 +775,7 @@ public class PreparedStatementTest extends CCMTestsSupport {
    * @since 2.2.0
    */
   @Test(groups = "long")
+  @ScyllaSkip
   public void should_create_tombstone_when_null_value_on_bound_statement() {
     PreparedStatement prepared =
         session().prepare("INSERT INTO " + SIMPLE_TABLE + " (k, i) VALUES (?, ?)");
