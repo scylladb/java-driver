@@ -119,13 +119,14 @@ public class ControlConnectionTest extends CCMTestsSupport {
     Cluster cluster = register(createClusterBuilder().build());
     Session session = cluster.connect();
     session.execute(
-        "create keyspace ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
-    session.execute("create type ks.foo (i int)");
+        "create keyspace ControlConnectionTest_ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+    session.execute("create type ControlConnectionTest_ks.foo (i int)");
     cluster.close();
 
     // Second driver instance: read UDT definition
     Cluster cluster2 = register(createClusterBuilder().build());
-    UserType fooType = cluster2.getMetadata().getKeyspace("ks").getUserType("foo");
+    UserType fooType =
+        cluster2.getMetadata().getKeyspace("ControlConnectionTest_ks").getUserType("foo");
 
     assertThat(fooType.getFieldNames()).containsExactly("i");
   }
