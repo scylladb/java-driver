@@ -193,6 +193,10 @@ public class TypedDriverOption<ValueT> {
   /** The number of connections in the REMOTE pool. */
   public static final TypedDriverOption<Integer> CONNECTION_POOL_REMOTE_SIZE =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE, GenericType.INTEGER);
+  /** The maximum number of connections to create at once when filling the connection pool. */
+  public static final TypedDriverOption<Integer> CONNECTION_POOL_INIT_BATCH_SIZE =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_POOL_INIT_BATCH_SIZE, GenericType.INTEGER);
   /**
    * Whether to schedule reconnection attempts if all contact points are unreachable on the first
    * initialization attempt.

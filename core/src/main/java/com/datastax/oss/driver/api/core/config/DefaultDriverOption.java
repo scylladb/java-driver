@@ -166,6 +166,21 @@ public enum DefaultDriverOption implements DriverOption {
   CONNECTION_POOL_REMOTE_SIZE("advanced.connection.pool.remote.size"),
 
   /**
+   * The maximum number of connections to create at once when filling the connection pool. Relevant
+   * during channel pool creation and reconnections.
+   *
+   * <p>Value 0 means unlimited - all missing channels will be created at once. Any other value
+   * means that driver will create connections in batches of at most that size and the batches will
+   * be handled sequentially one after another. The actual batch size may be smaller, to ensure that
+   * at least two batches are created.
+   *
+   * <p>It is advised to use advanced shard awareness with this feature.
+   *
+   * <p>Value-type: int
+   */
+  CONNECTION_POOL_INIT_BATCH_SIZE("advanced.connection.pool.init-batch-size"),
+
+  /**
    * Whether to schedule reconnection attempts if all contact points are unreachable on the first
    * initialization attempt.
    *
