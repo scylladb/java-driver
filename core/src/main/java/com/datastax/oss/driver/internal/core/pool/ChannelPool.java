@@ -490,6 +490,11 @@ public class ChannelPool implements AsyncAutoCloseable {
           channels.length * wantedCount - Arrays.stream(channels).mapToInt(ChannelSet::size).sum();
       LOG.debug("[{}] Trying to create {} missing channels", logPrefix, missing);
       DriverChannelOptions options = buildDriverOptions();
+      int batchSize =
+          config.getDefaultProfile().getInt(DefaultDriverOption.CONNECTION_POOL_INIT_BATCH_SIZE);
+      batchSize = Integer.min(batchSize, (channels.length * wantedCount + 1) / 2);
+      List<CompletionStage<DriverChannel>> previousBatch = new ArrayList<>();
+      List<CompletionStage<DriverChannel>> currentBatch = new ArrayList<>();
       for (int shard = 0; shard < channels.length; shard++) {
         LOG.trace(
             "[{}] Missing {} channels for shard {}",
@@ -501,11 +506,26 @@ public class ChannelPool implements AsyncAutoCloseable {
           if (config
               .getDefaultProfile()
               .getBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED)) {
-            channelFuture = channelFactory.connect(node, shard, options);
+            int finalShard = shard;
+            channelFuture =
+                CompletableFutures.allDone(previousBatch)
+                    .thenComposeAsync(
+                        ignored -> channelFactory.connect(node, finalShard, options),
+                        adminExecutor);
           } else {
-            channelFuture = channelFactory.connect(node, options);
+            channelFuture =
+                CompletableFutures.allDone(previousBatch)
+                    .thenComposeAsync(
+                        ignored -> channelFactory.connect(node, options), adminExecutor);
           }
           pendingChannels.add(channelFuture);
+          if (batchSize != 0) {
+            currentBatch.add(channelFuture);
+            if (currentBatch.size() >= batchSize) {
+              previousBatch = currentBatch;
+              currentBatch = new ArrayList<>();
+            }
+          }
         }
       }
       return CompletableFutures.allDone(pendingChannels)
