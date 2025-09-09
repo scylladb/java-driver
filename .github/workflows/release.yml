@@ -102,7 +102,7 @@ jobs:
           path: /tmp/logs-stderr.log
 
       - name: Push changes to SCM
-        if: ${{ inputs.dry-run == 'false' && inputs.target-tag == 'scylla-3.x' }}
+        if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
         run: |
           git status && git log -3
           git push origin --follow-tags -v
