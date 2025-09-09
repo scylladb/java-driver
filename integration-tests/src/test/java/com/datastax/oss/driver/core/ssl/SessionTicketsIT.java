@@ -13,6 +13,7 @@ import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.IsolatedTests;
+import com.datastax.oss.driver.internal.core.connection.ConstantReconnectionPolicy;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.Uninterruptibles;
 import com.google.common.collect.ImmutableList;
 import java.io.ByteArrayOutputStream;
@@ -22,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -180,6 +182,65 @@ public class SessionTicketsIT {
     Assert.assertEquals(
         "PSK should have been used for each resumption on reconnection",
         reconnectionHellos,
+        reconnectionPsks);
+  }
+
+  @Test
+  public void all_reconnections_but_one_should_use_tickets_when_throttled_TLSv13()
+      throws Exception {
+    int initialResumptions, reconnectionResumptions;
+    int initialHellos, reconnectionHellos;
+    int initialPsks, reconnectionPsks;
+    try {
+      SSLContext context = createSslContext("TLSv1.3");
+      try (DriverConfigLoader configLoader =
+              SessionUtils.configLoaderBuilder()
+                  .withString(
+                      DefaultDriverOption.PROTOCOL_VERSION, DefaultProtocolVersion.V4.name())
+                  .withClass(
+                      DefaultDriverOption.RECONNECTION_POLICY_CLASS,
+                      ConstantReconnectionPolicy.class)
+                  .withDuration(DefaultDriverOption.RECONNECTION_BASE_DELAY, Duration.ofSeconds(1))
+                  .withInt(DefaultDriverOption.CONNECTION_POOL_INIT_BATCH_SIZE, 1)
+                  .build();
+          CqlSession session =
+              (CqlSession)
+                  SessionUtils.baseBuilder()
+                      .addContactEndPoints(CCM_RULE.getContactPointsWithShardAwarePort())
+                      .withSslContext(context)
+                      .withConfigLoader(configLoader)
+                      .build()) {
+        healthCheck(session);
+
+        // Perform a node restart to force all connections to be re-established
+        initialResumptions = resumptions.get();
+        initialHellos = serverHellos.get();
+        initialPsks = pskUses.get();
+        CCM_RULE.getCcmBridge().stop();
+        Uninterruptibles.sleepUninterruptibly(3, TimeUnit.SECONDS);
+        CCM_RULE.getCcmBridge().start();
+        healthCheck(session);
+        reconnectionResumptions = resumptions.get() - initialResumptions;
+        reconnectionHellos = serverHellos.get() - initialHellos;
+        reconnectionPsks = pskUses.get() - initialPsks;
+      }
+    } finally {
+      handler.flush();
+    }
+
+    Assert.assertEquals(
+        "Each connection should have negotiated TLSv1.3.",
+        serverHellos.get(),
+        negotiatedTls13.get());
+    Assert.assertTrue("Client should have received some tickets.", ticketsReceived.get() > 0);
+    Assert.assertTrue(
+        String.format(
+            "Each reconnection but first should be a resumption. Meanwhile found %s ServerHellos and %s resumptions.",
+            reconnectionHellos, reconnectionResumptions),
+        reconnectionResumptions >= reconnectionHellos - 1);
+    Assert.assertEquals(
+        "PSK should have been used for each resumption on reconnection.",
+        reconnectionResumptions,
         reconnectionPsks);
   }
 
