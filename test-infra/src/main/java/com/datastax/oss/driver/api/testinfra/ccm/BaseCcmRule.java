@@ -151,4 +151,12 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     return Collections.singleton(
         new DefaultEndPoint(new InetSocketAddress(ccmBridge.getNodeIpAddress(1), 9042)));
   }
+
+  public Set<EndPoint> getContactPointsWithShardAwarePort() {
+    if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      throw new UnsupportedOperationException("Shard aware port is only supported in Scylla");
+    }
+    return Collections.singleton(
+        new DefaultEndPoint(new InetSocketAddress(ccmBridge.getNodeIpAddress(1), 19042)));
+  }
 }
