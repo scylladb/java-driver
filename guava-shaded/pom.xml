@@ -146,7 +146,7 @@
         with Class.forName(). In the end, more packages will be imported in MANIFEST.MF
         and OSGi integration tests will break.
         -->
-        <version>3.5.0</version>
+        <version>3.5.1</version>
         <extensions>true</extensions>
         <executions>
           <execution>
