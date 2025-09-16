@@ -37,7 +37,7 @@ public class LwtInfo {
     return (flags & mask) == mask;
   }
 
-  public static LwtInfo parseLwtInfo(Map<String, List<String>> supported) {
+  public static LwtInfo loadFromSupportedOptions(Map<String, List<String>> supported) {
     if (!supported.containsKey(SCYLLA_LWT_ADD_METADATA_MARK_KEY)) {
       return null;
     }
@@ -67,7 +67,7 @@ public class LwtInfo {
     return new LwtInfo((int) mask);
   }
 
-  public void addOption(Map<String, String> options) {
+  public void populateStartupOptions(Map<String, String> options) {
     options.put(SCYLLA_LWT_ADD_METADATA_MARK_KEY, Integer.toString(mask));
   }
 }
