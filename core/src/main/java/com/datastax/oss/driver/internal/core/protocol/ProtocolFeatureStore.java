@@ -14,6 +14,8 @@ public class ProtocolFeatureStore {
   private final ShardingInfo.ConnectionShardingInfo shardingInfo;
   private final TabletInfo tabletInfo;
 
+  public static final ProtocolFeatureStore Empty = new ProtocolFeatureStore(null, null, null);
+
   ProtocolFeatureStore(
       LwtInfo lwtInfo, ShardingInfo.ConnectionShardingInfo shardingInfo, TabletInfo tabletInfo) {
     this.lwtInfo = lwtInfo;

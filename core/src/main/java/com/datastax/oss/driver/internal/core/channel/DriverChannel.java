@@ -76,6 +76,7 @@ public class DriverChannel {
   private final ProtocolVersion protocolVersion;
   private final AtomicBoolean closing = new AtomicBoolean();
   private final AtomicBoolean forceClosing = new AtomicBoolean();
+  private ProtocolFeatureStore featureStore;
 
   DriverChannel(
       EndPoint endPoint,
@@ -146,18 +147,35 @@ public class DriverChannel {
     return channel.attr(OPTIONS_KEY).get();
   }
 
+  public ProtocolFeatureStore getSupportedFeatures() {
+    if (featureStore != null) {
+      return featureStore;
+    }
+
+    ProtocolFeatureStore fromChannel = ProtocolFeatureStore.loadFromChannel(channel);
+    if (fromChannel == null) {
+      return ProtocolFeatureStore.Empty;
+    }
+    // Features can't be renegotiated.
+    // Once features is populated into channel it is enough to update cache and no need to
+    // invalidate it further.
+
+    featureStore = fromChannel;
+    return featureStore;
+  }
+
   public int getShardId() {
-    ConnectionShardingInfo info = ProtocolFeatureStore.loadFromChannel(channel).getShardingInfo();
+    ConnectionShardingInfo info = getSupportedFeatures().getShardingInfo();
     return info != null ? info.shardId : 0;
   }
 
   public ShardingInfo getShardingInfo() {
-    ConnectionShardingInfo info = ProtocolFeatureStore.loadFromChannel(channel).getShardingInfo();
+    ConnectionShardingInfo info = getSupportedFeatures().getShardingInfo();
     return info != null ? info.shardingInfo : null;
   }
 
   public LwtInfo getLwtInfo() {
-    return ProtocolFeatureStore.loadFromChannel(channel).getLwtFeatureInfo();
+    return getSupportedFeatures().getLwtFeatureInfo();
   }
 
   /**
