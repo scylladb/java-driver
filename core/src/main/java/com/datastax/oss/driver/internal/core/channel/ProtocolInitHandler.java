@@ -41,7 +41,6 @@ import com.datastax.oss.driver.internal.core.protocol.FrameToSegmentEncoder;
 import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
-import com.datastax.oss.driver.internal.core.protocol.TabletInfo;
 import com.datastax.oss.driver.internal.core.util.ProtocolUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.protocol.internal.Message;
@@ -93,7 +92,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
   private ChannelHandlerContext ctx;
   private final boolean querySupportedOptions;
   private ProtocolFeatureStore featureStore;
-  private TabletInfo tabletInfo;
 
   /**
    * @param querySupportedOptions whether to send OPTIONS as the first message, to request which
@@ -191,9 +189,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
           if (featureStore != null) {
             featureStore.populateStartupOptions(startupOptions);
           }
-          if (tabletInfo != null && tabletInfo.isEnabled()) {
-            TabletInfo.addOption(startupOptions);
-          }
           return request = new Startup(startupOptions);
         case GET_CLUSTER_NAME:
           return request = CLUSTER_NAME_QUERY;
@@ -226,7 +221,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
           channel.attr(DriverChannel.OPTIONS_KEY).set(((Supported) response).options);
           Supported res = (Supported) response;
           featureStore = ProtocolFeatureStore.parseSupportedOptions(res.options);
-          tabletInfo = TabletInfo.parseTabletInfo(res.options);
           featureStore.storeInChannel(channel);
           step = Step.STARTUP;
           send();

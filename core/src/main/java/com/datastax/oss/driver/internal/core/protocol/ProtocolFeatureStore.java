@@ -12,10 +12,13 @@ public class ProtocolFeatureStore {
 
   private final LwtInfo lwtInfo;
   private final ShardingInfo.ConnectionShardingInfo shardingInfo;
+  private final TabletInfo tabletInfo;
 
-  ProtocolFeatureStore(LwtInfo lwtInfo, ShardingInfo.ConnectionShardingInfo shardingInfo) {
+  ProtocolFeatureStore(
+      LwtInfo lwtInfo, ShardingInfo.ConnectionShardingInfo shardingInfo, TabletInfo tabletInfo) {
     this.lwtInfo = lwtInfo;
     this.shardingInfo = shardingInfo;
+    this.tabletInfo = tabletInfo;
   }
 
   public LwtInfo getLwtFeatureInfo() {
@@ -26,16 +29,24 @@ public class ProtocolFeatureStore {
     return shardingInfo;
   }
 
+  public TabletInfo getTabletFeatureInfo() {
+    return tabletInfo;
+  }
+
   public static ProtocolFeatureStore parseSupportedOptions(
       @NonNull Map<String, List<String>> options) {
     LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(options);
     ShardingInfo.ConnectionShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(options);
-    return new ProtocolFeatureStore(lwtInfo, shardingInfo);
+    TabletInfo tabletInfo = TabletInfo.loadFromSupportedOptions(options);
+    return new ProtocolFeatureStore(lwtInfo, shardingInfo, tabletInfo);
   }
 
   public void populateStartupOptions(@NonNull Map<String, String> options) {
     if (lwtInfo != null) {
       lwtInfo.populateStartupOptions(options);
+    }
+    if (tabletInfo != null && tabletInfo.isEnabled()) {
+      TabletInfo.populateStartupOptions(options);
     }
   }
 
