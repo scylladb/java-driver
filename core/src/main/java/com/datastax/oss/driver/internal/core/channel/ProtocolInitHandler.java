@@ -23,8 +23,6 @@
  */
 package com.datastax.oss.driver.internal.core.channel;
 
-import static com.datastax.oss.driver.internal.core.channel.DriverChannel.LWT_INFO_KEY;
-
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.InvalidKeyspaceException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
@@ -40,7 +38,7 @@ import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.protocol.BytesToSegmentDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameToSegmentEncoder;
-import com.datastax.oss.driver.internal.core.protocol.LwtInfo;
+import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.ShardingInfo;
@@ -96,7 +94,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
   private String logPrefix;
   private ChannelHandlerContext ctx;
   private final boolean querySupportedOptions;
-  private LwtInfo lwtInfo;
+  private ProtocolFeatureStore featureStore;
   private TabletInfo tabletInfo;
 
   /**
@@ -192,8 +190,8 @@ class ProtocolInitHandler extends ConnectInitHandler {
           return request = Options.INSTANCE;
         case STARTUP:
           Map<String, String> startupOptions = new HashMap<>(context.getStartupOptions());
-          if (lwtInfo != null) {
-            lwtInfo.addOption(startupOptions);
+          if (featureStore != null) {
+            featureStore.populateStartupOptions(startupOptions);
           }
           if (tabletInfo != null && tabletInfo.isEnabled()) {
             TabletInfo.addOption(startupOptions);
@@ -229,15 +227,13 @@ class ProtocolInitHandler extends ConnectInitHandler {
         if (step == Step.OPTIONS && response instanceof Supported) {
           channel.attr(DriverChannel.OPTIONS_KEY).set(((Supported) response).options);
           Supported res = (Supported) response;
+          featureStore = ProtocolFeatureStore.parseSupportedOptions(res.options);
           ConnectionShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(res.options);
           if (shardingInfo != null) {
             channel.attr(DriverChannel.SHARDING_INFO_KEY).set(shardingInfo);
           }
-          lwtInfo = LwtInfo.parseLwtInfo(res.options);
-          if (lwtInfo != null) {
-            channel.attr(LWT_INFO_KEY).set(lwtInfo);
-          }
           tabletInfo = TabletInfo.parseTabletInfo(res.options);
+          featureStore.storeInChannel(channel);
           step = Step.STARTUP;
           send();
         } else if (step == Step.STARTUP && response instanceof Ready) {
