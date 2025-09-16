@@ -41,8 +41,6 @@ import com.datastax.oss.driver.internal.core.protocol.FrameToSegmentEncoder;
 import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
-import com.datastax.oss.driver.internal.core.protocol.ShardingInfo;
-import com.datastax.oss.driver.internal.core.protocol.ShardingInfo.ConnectionShardingInfo;
 import com.datastax.oss.driver.internal.core.protocol.TabletInfo;
 import com.datastax.oss.driver.internal.core.util.ProtocolUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
@@ -228,10 +226,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
           channel.attr(DriverChannel.OPTIONS_KEY).set(((Supported) response).options);
           Supported res = (Supported) response;
           featureStore = ProtocolFeatureStore.parseSupportedOptions(res.options);
-          ConnectionShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(res.options);
-          if (shardingInfo != null) {
-            channel.attr(DriverChannel.SHARDING_INFO_KEY).set(shardingInfo);
-          }
           tabletInfo = TabletInfo.parseTabletInfo(res.options);
           featureStore.storeInChannel(channel);
           step = Step.STARTUP;

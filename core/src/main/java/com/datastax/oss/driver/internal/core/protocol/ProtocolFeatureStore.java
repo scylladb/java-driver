@@ -11,19 +11,26 @@ public class ProtocolFeatureStore {
       AttributeKey.valueOf("protocol_feature_store");
 
   private final LwtInfo lwtInfo;
+  private final ShardingInfo.ConnectionShardingInfo shardingInfo;
 
-  ProtocolFeatureStore(LwtInfo lwtInfo) {
+  ProtocolFeatureStore(LwtInfo lwtInfo, ShardingInfo.ConnectionShardingInfo shardingInfo) {
     this.lwtInfo = lwtInfo;
+    this.shardingInfo = shardingInfo;
   }
 
   public LwtInfo getLwtFeatureInfo() {
     return lwtInfo;
   }
 
+  public ShardingInfo.ConnectionShardingInfo getShardingInfo() {
+    return shardingInfo;
+  }
+
   public static ProtocolFeatureStore parseSupportedOptions(
       @NonNull Map<String, List<String>> options) {
     LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(options);
-    return new ProtocolFeatureStore(lwtInfo);
+    ShardingInfo.ConnectionShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(options);
+    return new ProtocolFeatureStore(lwtInfo, shardingInfo);
   }
 
   public void populateStartupOptions(@NonNull Map<String, String> options) {

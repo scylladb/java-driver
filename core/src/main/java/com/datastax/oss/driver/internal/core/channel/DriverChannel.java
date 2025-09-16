@@ -62,8 +62,6 @@ public class DriverChannel {
   static final AttributeKey<String> CLUSTER_NAME_KEY = AttributeKey.valueOf("cluster_name");
   static final AttributeKey<Map<String, List<String>>> OPTIONS_KEY =
       AttributeKey.valueOf("options");
-  static final AttributeKey<ConnectionShardingInfo> SHARDING_INFO_KEY =
-      AttributeKey.valueOf("sharding_info");
 
   @SuppressWarnings("RedundantStringConstructorCall")
   static final Object GRACEFUL_CLOSE_MESSAGE = new String("GRACEFUL_CLOSE_MESSAGE");
@@ -149,13 +147,13 @@ public class DriverChannel {
   }
 
   public int getShardId() {
-    return channel.hasAttr(SHARDING_INFO_KEY) ? channel.attr(SHARDING_INFO_KEY).get().shardId : 0;
+    ConnectionShardingInfo info = ProtocolFeatureStore.loadFromChannel(channel).getShardingInfo();
+    return info != null ? info.shardId : 0;
   }
 
   public ShardingInfo getShardingInfo() {
-    return channel.hasAttr(SHARDING_INFO_KEY)
-        ? channel.attr(SHARDING_INFO_KEY).get().shardingInfo
-        : null;
+    ConnectionShardingInfo info = ProtocolFeatureStore.loadFromChannel(channel).getShardingInfo();
+    return info != null ? info.shardingInfo : null;
   }
 
   public LwtInfo getLwtInfo() {
