@@ -415,9 +415,9 @@
         <version>1.0.0-M26</version>
       </dependency>
       <dependency>
-        <groupId>com.github.tomakehurst</groupId>
+        <groupId>org.wiremock</groupId>
         <artifactId>wiremock</artifactId>
-        <version>2.25.0</version>
+        <version>3.0.1</version>
       </dependency>
       <dependency>
         <groupId>org.graalvm.sdk</groupId>
