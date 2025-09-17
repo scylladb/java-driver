@@ -538,7 +538,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-gpg-plugin</artifactId>
-          <version>1.6</version>
+          <version>3.2.8</version>
         </plugin>
         <plugin>
           <artifactId>maven-release-plugin</artifactId>
