@@ -19,3 +19,7 @@ docs/_build
 docs/_source
 target/
 dependency-reduced-pom.xml
+
+# Claude / AI assistant metadata
+CLAUDE.md
+.claude/
