@@ -79,9 +79,9 @@ import org.junit.rules.TestRule;
 @Category(ParallelizableTests.class)
 public class PreparedStatementIT {
 
-  private CcmRule ccmRule = CcmRule.getInstance();
+  private final CcmRule ccmRule = CcmRule.getInstance();
 
-  private SessionRule<CqlSession> sessionRule =
+  private final SessionRule<CqlSession> sessionRule =
       SessionRule.builder(ccmRule)
           .withConfigLoader(
               SessionUtils.configLoaderBuilder()
@@ -159,8 +159,8 @@ public class PreparedStatementIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @BackendRequirement(type = BackendType.SCYLLA)
-  public void should_update_metadata_when_schema_changed_across_executions() {
+  @BackendRequirement(type = BackendType.SCYLLA, maxExclusive = "2025.3")
+  public void should_update_metadata_when_schema_changed_across_executions_with_no_metadata_id_feature() {
     // Given
     CqlSession session = sessionRule.session();
     PreparedStatement ps = session.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
@@ -200,6 +200,37 @@ public class PreparedStatementIT {
             ps.getResultSetDefinitions(),
             bs.getPreparedStatement().getResultSetDefinitions(),
             rows.getColumnDefinitions())) {
+      assertThat(columnDefinitions).hasSize(4);
+      assertThat(columnDefinitions.get("d").getType()).isEqualTo(DataTypes.INT);
+    }
+  }
+
+  @Test
+  @BackendRequirement(type = BackendType.SCYLLA, minInclusive = "2025.3", description = "SCYLLA_USE_METADATA_ID feature is added in Scylla 2025.3")
+  public void should_update_metadata_when_schema_changed_across_executions_with_metadata_id_feature_support() {
+    // Given
+    CqlSession session = sessionRule.session();
+    PreparedStatement ps = session.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
+    ByteBuffer idBefore = ps.getResultMetadataId();
+    assertThat(idBefore).isNotNull();
+
+    // When
+    session.execute(
+      SimpleStatement.builder("ALTER TABLE prepared_statement_test ADD d int")
+        .setExecutionProfile(sessionRule.slowProfile())
+        .build());
+    BoundStatement bs = ps.bind(1);
+    ResultSet rows = session.execute(bs);
+
+    // Then
+    ByteBuffer idAfter = ps.getResultMetadataId();
+    assertThat(idAfter).isNotNull();
+    assertThat(Bytes.toHexString(idAfter)).isNotEqualTo(Bytes.toHexString(idBefore));
+    for (ColumnDefinitions columnDefinitions :
+      ImmutableList.of(
+        ps.getResultSetDefinitions(),
+        bs.getPreparedStatement().getResultSetDefinitions(),
+        rows.getColumnDefinitions())) {
       assertThat(columnDefinitions).hasSize(4);
       assertThat(columnDefinitions.get("d").getType()).isEqualTo(DataTypes.INT);
     }

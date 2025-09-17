@@ -47,6 +47,7 @@ import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -256,7 +257,7 @@ public class ChannelFactory {
         cf -> {
           if (connectFuture.isSuccess()) {
             Channel channel = connectFuture.channel();
-            DriverChannel driverChannel =
+            DriverChannel driverChannel = // driver channel init
                 new DriverChannel(endPoint, channel, context.getWriteCoalescer(), currentVersion);
             // If this is the first successful connection, remember the protocol version and
             // cluster name for future connections.
@@ -330,7 +331,7 @@ public class ChannelFactory {
       CompletableFuture<DriverChannel> resultFuture) {
     return new ChannelFactoryInitializer(
         endPoint, protocolVersion, options, nodeMetricUpdater, resultFuture);
-  };
+  }
 
   class ChannelFactoryInitializer extends ChannelInitializer<Channel> {
 
@@ -422,10 +423,10 @@ public class ChannelFactory {
         pipeline
             .addLast(
                 FRAME_TO_BYTES_ENCODER_NAME,
-                new FrameEncoder(context.getFrameCodec(), maxFrameLength))
+                new FrameEncoder(context.getFrameCodec(), new ProtocolFeatures(), maxFrameLength))
             .addLast(
                 BYTES_TO_FRAME_DECODER_NAME,
-                new FrameDecoder(context.getFrameCodec(), maxFrameLength))
+                new FrameDecoder(context.getFrameCodec(), new ProtocolFeatures(), maxFrameLength))
             // Note: HeartbeatHandler is inserted here once init completes
             .addLast(INFLIGHT_HANDLER_NAME, inFlightHandler)
             .addLast(INIT_HANDLER_NAME, initHandler);

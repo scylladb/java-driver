@@ -25,6 +25,7 @@ import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.ProtocolV5ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV5ServerCodecs;
 import com.datastax.oss.protocol.internal.Segment;
@@ -93,6 +94,6 @@ public class SegmentToFrameDecoderTest {
             Collections.emptyMap(),
             Collections.emptyList(),
             message);
-    return FRAME_CODEC.encode(frame);
+    return FRAME_CODEC.encode(frame, new ProtocolFeatures());
   }
 }

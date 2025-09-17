@@ -26,6 +26,7 @@ import com.datastax.oss.driver.internal.core.util.ByteBufs;
 import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.response.AuthSuccess;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -63,7 +64,7 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
   @Test
   public void should_decode_valid_payload() {
     // Given
-    FrameDecoder decoder = new FrameDecoder(frameCodec, 1024);
+    FrameDecoder decoder = new FrameDecoder(frameCodec, new ProtocolFeatures(), 1024);
     channel.pipeline().addLast(decoder);
 
     // When
@@ -83,7 +84,8 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
   @Test
   public void should_fail_to_decode_if_payload_is_valid_but_too_long() {
     // Given
-    FrameDecoder decoder = new FrameDecoder(frameCodec, VALID_PAYLOAD.readableBytes() - 1);
+    FrameDecoder decoder =
+        new FrameDecoder(frameCodec, new ProtocolFeatures(), VALID_PAYLOAD.readableBytes() - 1);
     channel.pipeline().addLast(decoder);
 
     // When
@@ -102,7 +104,7 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
   @Test
   public void should_fail_to_decode_if_payload_cannot_be_decoded() {
     // Given
-    FrameDecoder decoder = new FrameDecoder(frameCodec, 1024);
+    FrameDecoder decoder = new FrameDecoder(frameCodec, new ProtocolFeatures(), 1024);
     channel.pipeline().addLast(decoder);
 
     // When

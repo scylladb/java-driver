@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.protocol;
 
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.Segment;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.buffer.ByteBuf;
@@ -73,7 +74,7 @@ public class SegmentToFrameDecoder extends MessageToMessageDecoder<Segment<ByteB
     int frameCount = 0;
     try {
       do {
-        Frame frame = frameCodec.decode(payload);
+        Frame frame = frameCodec.decode(payload, new ProtocolFeatures());
         LOG.trace(
             "[{}] Decoded response frame {} from self-contained segment",
             logPrefix,
@@ -110,7 +111,7 @@ public class SegmentToFrameDecoder extends MessageToMessageDecoder<Segment<ByteB
       encodedFrame.addComponents(true, accumulatedSlices);
       Frame frame;
       try {
-        frame = frameCodec.decode(encodedFrame);
+        frame = frameCodec.decode(encodedFrame, new ProtocolFeatures());
       } finally {
         encodedFrame.release();
         // Reset our state
