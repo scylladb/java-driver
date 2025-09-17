@@ -54,7 +54,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <config.version>1.4.1</config.version>
+    <config.version>1.4.5</config.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <hdrhistogram.version>2.1.12</hdrhistogram.version>
     <metrics.version>4.1.18</metrics.version>
