@@ -13,14 +13,20 @@ public class ProtocolFeatureStore {
   private final LwtInfo lwtInfo;
   private final ShardingInfo.ConnectionShardingInfo shardingInfo;
   private final TabletInfo tabletInfo;
+  private final boolean metadataIdEnabled;
 
-  public static final ProtocolFeatureStore Empty = new ProtocolFeatureStore(null, null, null);
+  public static final ProtocolFeatureStore Empty =
+      new ProtocolFeatureStore(null, null, null, false);
 
   ProtocolFeatureStore(
-      LwtInfo lwtInfo, ShardingInfo.ConnectionShardingInfo shardingInfo, TabletInfo tabletInfo) {
+      LwtInfo lwtInfo,
+      ShardingInfo.ConnectionShardingInfo shardingInfo,
+      TabletInfo tabletInfo,
+      boolean metadataIdEnabled) {
     this.lwtInfo = lwtInfo;
     this.shardingInfo = shardingInfo;
     this.tabletInfo = tabletInfo;
+    this.metadataIdEnabled = metadataIdEnabled;
   }
 
   public LwtInfo getLwtFeatureInfo() {
@@ -35,12 +41,17 @@ public class ProtocolFeatureStore {
     return tabletInfo;
   }
 
+  public boolean isMetadataIdEnabled() {
+    return metadataIdEnabled;
+  }
+
   public static ProtocolFeatureStore parseSupportedOptions(
       @NonNull Map<String, List<String>> options) {
     LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(options);
     ShardingInfo.ConnectionShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(options);
     TabletInfo tabletInfo = TabletInfo.loadFromSupportedOptions(options);
-    return new ProtocolFeatureStore(lwtInfo, shardingInfo, tabletInfo);
+    boolean metadataIdEnabled = MetadataIdInfo.parseMetadataId(options);
+    return new ProtocolFeatureStore(lwtInfo, shardingInfo, tabletInfo, metadataIdEnabled);
   }
 
   public void populateStartupOptions(@NonNull Map<String, String> options) {
@@ -49,6 +60,9 @@ public class ProtocolFeatureStore {
     }
     if (tabletInfo != null && tabletInfo.isEnabled()) {
       TabletInfo.populateStartupOptions(options);
+    }
+    if (metadataIdEnabled) {
+      MetadataIdInfo.addOption(options);
     }
   }
 
