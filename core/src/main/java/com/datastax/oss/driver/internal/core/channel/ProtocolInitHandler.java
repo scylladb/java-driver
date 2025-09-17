@@ -37,7 +37,11 @@ import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.protocol.BytesToSegmentDecoder;
+import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
+import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameToSegmentEncoder;
+import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureManager;
+import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureParser;
 import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
@@ -46,6 +50,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.ProtocolConstants.ErrorCode;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.request.AuthResponse;
 import com.datastax.oss.protocol.internal.request.Options;
 import com.datastax.oss.protocol.internal.request.Query;
@@ -66,6 +71,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import net.jcip.annotations.NotThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,6 +97,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
   private String logPrefix;
   private ChannelHandlerContext ctx;
   private final boolean querySupportedOptions;
+  private ProtocolFeatureManager protocolFeatureManager;
   private ProtocolFeatureStore featureStore;
 
   /**
@@ -189,6 +196,12 @@ class ProtocolInitHandler extends ConnectInitHandler {
           if (featureStore != null) {
             featureStore.populateStartupOptions(startupOptions);
           }
+          Optional.ofNullable(protocolFeatureManager)
+              .ifPresent(m -> m.optionallyAddLwtInfoOption(startupOptions));
+          Optional.ofNullable(protocolFeatureManager)
+              .ifPresent(m -> m.optionallyAddTabletInfoOption(startupOptions));
+          Optional.ofNullable(protocolFeatureManager)
+              .ifPresent(m -> m.optionallyAddMetadataIdOption(startupOptions));
           return request = new Startup(startupOptions);
         case GET_CLUSTER_NAME:
           return request = CLUSTER_NAME_QUERY;
@@ -222,6 +235,14 @@ class ProtocolInitHandler extends ConnectInitHandler {
           Supported res = (Supported) response;
           featureStore = ProtocolFeatureStore.parseSupportedOptions(res.options);
           featureStore.storeInChannel(channel);
+          Supported supported = (Supported) response;
+          ProtocolFeatureParser featureParser =
+              ProtocolFeatureParser.Builder.fromOptions(supported).build();
+          protocolFeatureManager = featureParser.parse();
+          protocolFeatureManager.updateOptionsAttributeForChannel(channel);
+          protocolFeatureManager.updateShardingInfoAttributeForChannel(channel);
+          protocolFeatureManager.updateLwtInfoAttributeForChannel(channel);
+          maybeUpdatePipelineWithProtocolOptions(protocolFeatureManager.isMetadataIdEnabled());
           step = Step.STARTUP;
           send();
         } else if (step == Step.STARTUP && response instanceof Ready) {
@@ -428,6 +449,29 @@ class ProtocolInitHandler extends ConnectInitHandler {
           ChannelFactory.BYTES_TO_SEGMENT_DECODER_NAME,
           ChannelFactory.SEGMENT_TO_FRAME_DECODER_NAME,
           new SegmentToFrameDecoder(context.getFrameCodec(), logPrefix));
+    }
+  }
+
+  private void maybeUpdatePipelineWithProtocolOptions(boolean metadataIdEnabled) {
+    if (metadataIdEnabled) {
+      ProtocolFeatures protocolFeatures = new ProtocolFeatures();
+      protocolFeatures.addFeature(ProtocolFeatures.Feature.SCYLLA_USE_METADATA_ID);
+      int maxFrameLength =
+        (int)
+          context
+            .getConfig()
+            .getDefaultProfile()
+            .getBytes(DefaultDriverOption.PROTOCOL_MAX_FRAME_LENGTH);
+
+      ChannelPipeline pipeline = ctx.pipeline();
+      pipeline.replace(
+        ChannelFactory.FRAME_TO_BYTES_ENCODER_NAME,
+        ChannelFactory.FRAME_TO_BYTES_ENCODER_NAME,
+        new FrameEncoder(context.getFrameCodec(), protocolFeatures, maxFrameLength));
+      pipeline.replace(
+        ChannelFactory.BYTES_TO_FRAME_DECODER_NAME,
+        ChannelFactory.BYTES_TO_FRAME_DECODER_NAME,
+        new FrameDecoder(context.getFrameCodec(), protocolFeatures, maxFrameLength));
     }
   }
 

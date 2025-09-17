@@ -164,8 +164,7 @@ public class PreparedStatementIT {
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
   @BackendRequirement(type = BackendType.SCYLLA)
-  public void
-      should_update_metadata_when_schema_changed_across_executions() {
+  public void should_update_metadata_when_schema_changed_across_executions() {
     // Given
     CqlSession session = sessionRule.session();
     PreparedStatement ps = session.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
@@ -463,11 +462,13 @@ public class PreparedStatementIT {
     } else if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
       assertThat(nextRow.isNull("d")).isTrue();
       assertThat(ps.getResultSetDefinitions()).hasSize(5);
-      assertThat(Bytes.toHexString(ps.getResultMetadataId())).isNotEqualTo(Bytes.toHexString(idBefore));
+      assertThat(Bytes.toHexString(ps.getResultMetadataId()))
+          .isNotEqualTo(Bytes.toHexString(idBefore));
     } else {
       assertThat(nextRow.isNull("d")).isTrue();
       assertThat(ps.getResultSetDefinitions()).hasSize(0);
-      assertThat(Bytes.toHexString(ps.getResultMetadataId())).isEqualTo(Bytes.toHexString(idBefore));
+      assertThat(Bytes.toHexString(ps.getResultMetadataId()))
+          .isEqualTo(Bytes.toHexString(idBefore));
     }
   }
 
@@ -712,7 +713,7 @@ public class PreparedStatementIT {
 
   private static boolean hasNoScyllaMetadataIdSupport() {
     return CcmBridge.isDistributionOf(BackendType.SCYLLA)
-      && CcmBridge.getScyllaVersion().isPresent()
-      && CcmBridge.getScyllaVersion().get().compareTo(SCYLLA_METADATA_ID_SUPPORT_VERSION) < 0;
+        && CcmBridge.getScyllaVersion().isPresent()
+        && CcmBridge.getScyllaVersion().get().compareTo(SCYLLA_METADATA_ID_SUPPORT_VERSION) < 0;
   }
 }
