@@ -93,7 +93,7 @@
     <jsr353-ri.version>1.1.4</jsr353-ri.version>
     <rxjava.version>2.2.2</rxjava.version>
     <awaitility.version>4.0.3</awaitility.version>
-    <apacheds.version>2.0.0-M19</apacheds.version>
+    <apacheds.version>2.0.0.AM27</apacheds.version>
     <surefire.version>3.0.0</surefire.version>
     <graalapi.version>22.0.0.2</graalapi.version>
     <skipTests>false</skipTests>
