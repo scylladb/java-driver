@@ -22,6 +22,7 @@ import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.response.Error;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -41,11 +42,16 @@ public class FrameDecoder extends LengthFieldBasedFrameDecoder {
   private static final int LENGTH_FIELD_LENGTH = 4;
 
   private final FrameCodec<ByteBuf> frameCodec;
+  private final ProtocolFeatures protocolFeatures;
   private boolean isFirstResponse;
 
-  public FrameDecoder(FrameCodec<ByteBuf> frameCodec, int maxFrameLengthInBytes) {
+  public FrameDecoder(
+      FrameCodec<ByteBuf> frameCodec,
+      ProtocolFeatures protocolFeatures,
+      int maxFrameLengthInBytes) {
     super(maxFrameLengthInBytes, LENGTH_FIELD_OFFSET, LENGTH_FIELD_LENGTH, 0, 0, true);
     this.frameCodec = frameCodec;
+    this.protocolFeatures = protocolFeatures;
   }
 
   @Override
@@ -87,7 +93,7 @@ public class FrameDecoder extends LengthFieldBasedFrameDecoder {
       ByteBuf buffer = (ByteBuf) super.decode(ctx, in);
       return (buffer == null)
           ? null // did not receive whole frame yet, keep reading
-          : frameCodec.decode(buffer);
+          : frameCodec.decode(buffer, protocolFeatures);
     } catch (Exception e) {
       // If decoding failed, try to read at least the stream id, so that the error can be
       // propagated to the client request matching that id (otherwise we have to fail all

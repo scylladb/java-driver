@@ -38,6 +38,7 @@ import com.datastax.oss.driver.internal.core.protocol.ShardingInfo.ConnectionSha
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.protocol.internal.Message;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelFuture;

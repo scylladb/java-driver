@@ -84,7 +84,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   @Mock private DriverExecutionProfile defaultProfile;
   @Mock private Appender<ILoggingEvent> appender;
 
-  private ProtocolVersionRegistry protocolVersionRegistry =
+  private final ProtocolVersionRegistry protocolVersionRegistry =
       new DefaultProtocolVersionRegistry("test");
   private HeartbeatHandler heartbeatHandler;
 
@@ -365,7 +365,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   }
 
   @Test
-  public void should_fail_to_initialize_if_server_sends_auth_error() throws Throwable {
+  public void should_fail_to_initialize_if_server_sends_auth_error() {
     channel
         .pipeline()
         .addLast(
@@ -443,7 +443,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   }
 
   @Test
-  public void should_fail_to_initialize_if_cluster_name_does_not_match() throws Throwable {
+  public void should_fail_to_initialize_if_cluster_name_does_not_match() {
     channel
         .pipeline()
         .addLast(

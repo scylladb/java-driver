@@ -284,7 +284,7 @@ public class CcmBridge implements AutoCloseable {
     return result;
   }
 
-  public Optional<Version> getScyllaVersion() {
+  public static Optional<Version> getScyllaVersion() {
     return isDistributionOf(BackendType.SCYLLA) ? Optional.of(VERSION) : Optional.empty();
   }
 
@@ -628,12 +628,12 @@ public class CcmBridge implements AutoCloseable {
     return ipPrefix + nodeId;
   }
 
-  private static String IN_MS_STR = "_in_ms";
-  private static int IN_MS_STR_LENGTH = IN_MS_STR.length();
-  private static String ENABLE_STR = "enable_";
-  private static int ENABLE_STR_LENGTH = ENABLE_STR.length();
-  private static String IN_KB_STR = "_in_kb";
-  private static int IN_KB_STR_LENGTH = IN_KB_STR.length();
+  private static final String IN_MS_STR = "_in_ms";
+  private static final int IN_MS_STR_LENGTH = IN_MS_STR.length();
+  private static final String ENABLE_STR = "enable_";
+  private static final int ENABLE_STR_LENGTH = ENABLE_STR.length();
+  private static final String IN_KB_STR = "_in_kb";
+  private static final int IN_KB_STR_LENGTH = IN_KB_STR.length();
 
   @SuppressWarnings("unused")
   private String getConfigKey(String originalKey, Object originalValue, Version cassandraVersion) {
