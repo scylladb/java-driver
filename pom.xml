@@ -876,7 +876,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <dependency>
             <groupId>org.apache.maven.scm</groupId>
             <artifactId>maven-scm-provider-gitexe</artifactId>
-            <version>1.9.5</version>
+            <version>2.1.0</version>
           </dependency>
         </dependencies>
       </plugin>
