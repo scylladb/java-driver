@@ -23,3 +23,7 @@ notes
 bom/
 core-shaded/
 guava-shaded/
+
+# Claude / AI assistant metadata
+CLAUDE.md
+.claude/
