@@ -94,6 +94,6 @@ public class SegmentToFrameDecoderTest {
             Collections.emptyMap(),
             Collections.emptyList(),
             message);
-    return FRAME_CODEC.encode(frame, new ProtocolFeatures());
+    return FRAME_CODEC.encode(frame, ProtocolFeatures.EMPTY);
   }
 }
