@@ -46,7 +46,7 @@
   </dependencyManagement>
   <dependencies>
     <dependency>
-      <groupId>com.datastax.oss</groupId>
+      <groupId>com.scylladb</groupId>
       <artifactId>native-protocol</artifactId>
     </dependency>
     <dependency>

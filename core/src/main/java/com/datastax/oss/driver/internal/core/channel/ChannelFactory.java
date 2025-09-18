@@ -423,10 +423,10 @@ public class ChannelFactory {
         pipeline
             .addLast(
                 FRAME_TO_BYTES_ENCODER_NAME,
-                new FrameEncoder(context.getFrameCodec(), new ProtocolFeatures(), maxFrameLength))
+                new FrameEncoder(context.getFrameCodec(), ProtocolFeatures.EMPTY, maxFrameLength))
             .addLast(
                 BYTES_TO_FRAME_DECODER_NAME,
-                new FrameDecoder(context.getFrameCodec(), new ProtocolFeatures(), maxFrameLength))
+                new FrameDecoder(context.getFrameCodec(), ProtocolFeatures.EMPTY, maxFrameLength))
             // Note: HeartbeatHandler is inserted here once init completes
             .addLast(INFLIGHT_HANDLER_NAME, inFlightHandler)
             .addLast(INIT_HANDLER_NAME, initHandler);

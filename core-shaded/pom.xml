@@ -58,7 +58,7 @@
     option of the shade plugin because it promotes all dependencies, even nested ones, to top level).
     -->
     <dependency>
-      <groupId>com.datastax.oss</groupId>
+      <groupId>com.scylladb</groupId>
       <artifactId>native-protocol</artifactId>
     </dependency>
     <dependency>

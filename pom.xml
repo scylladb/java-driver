@@ -99,6 +99,7 @@
     <skipTests>false</skipTests>
     <skipUnitTests>${skipTests}</skipUnitTests>
     <pushChanges>false</pushChanges>
+    <mockitoopens.argline/>
   </properties>
   <dependencyManagement>
     <dependencies>

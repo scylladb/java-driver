@@ -64,7 +64,7 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
   @Test
   public void should_decode_valid_payload() {
     // Given
-    FrameDecoder decoder = new FrameDecoder(frameCodec, new ProtocolFeatures(), 1024);
+    FrameDecoder decoder = new FrameDecoder(frameCodec, ProtocolFeatures.EMPTY, 1024);
     channel.pipeline().addLast(decoder);
 
     // When
@@ -85,7 +85,7 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
   public void should_fail_to_decode_if_payload_is_valid_but_too_long() {
     // Given
     FrameDecoder decoder =
-        new FrameDecoder(frameCodec, new ProtocolFeatures(), VALID_PAYLOAD.readableBytes() - 1);
+        new FrameDecoder(frameCodec, ProtocolFeatures.EMPTY, VALID_PAYLOAD.readableBytes() - 1);
     channel.pipeline().addLast(decoder);
 
     // When
@@ -104,7 +104,7 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
   @Test
   public void should_fail_to_decode_if_payload_cannot_be_decoded() {
     // Given
-    FrameDecoder decoder = new FrameDecoder(frameCodec, new ProtocolFeatures(), 1024);
+    FrameDecoder decoder = new FrameDecoder(frameCodec, ProtocolFeatures.EMPTY, 1024);
     channel.pipeline().addLast(decoder);
 
     // When

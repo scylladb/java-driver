@@ -437,8 +437,8 @@ class ProtocolInitHandler extends ConnectInitHandler {
 
   private void maybeUpdatePipelineWithProtocolOptions(boolean metadataIdEnabled) {
     if (metadataIdEnabled) {
-      ProtocolFeatures protocolFeatures = new ProtocolFeatures();
-      protocolFeatures.addFeature(ProtocolFeatures.Feature.SCYLLA_USE_METADATA_ID);
+      ProtocolFeatures protocolFeatures =
+          new ProtocolFeatures.Builder().setScyllaUseMetadataId().build();
       int maxFrameLength =
           (int)
               context

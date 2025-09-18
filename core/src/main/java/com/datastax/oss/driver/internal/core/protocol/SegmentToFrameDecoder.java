@@ -74,7 +74,7 @@ public class SegmentToFrameDecoder extends MessageToMessageDecoder<Segment<ByteB
     int frameCount = 0;
     try {
       do {
-        Frame frame = frameCodec.decode(payload, new ProtocolFeatures());
+        Frame frame = frameCodec.decode(payload, ProtocolFeatures.EMPTY);
         LOG.trace(
             "[{}] Decoded response frame {} from self-contained segment",
             logPrefix,
@@ -111,7 +111,7 @@ public class SegmentToFrameDecoder extends MessageToMessageDecoder<Segment<ByteB
       encodedFrame.addComponents(true, accumulatedSlices);
       Frame frame;
       try {
-        frame = frameCodec.decode(encodedFrame, new ProtocolFeatures());
+        frame = frameCodec.decode(encodedFrame, ProtocolFeatures.EMPTY);
       } finally {
         encodedFrame.release();
         // Reset our state
