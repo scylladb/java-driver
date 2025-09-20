@@ -3,8 +3,30 @@ name: Tests
 on:
   push:
     branches: [ scylla-3.*x ]
+    paths-ignore:
+      - "docs/**"
+      - .github/workflows/docs-pages.yml
+      - .github/workflows/docs-pr.yml
+      - .github/workflows/re-release.yml
+      - .github/workflows/release.yml
+      - "*.md"
+      - "*.sh"
+      - "renovate.json"
+      - ".snyk"
+      - ".gitignore"
   pull_request:
     branches: [ scylla-3.*x ]
+    paths-ignore:
+      - "docs/**"
+      - .github/workflows/docs-pages.yml
+      - .github/workflows/docs-pr.yml
+      - .github/workflows/re-release.yml
+      - .github/workflows/release.yml
+      - "*.md"
+      - "*.sh"
+      - "renovate.json"
+      - ".snyk"
+      - ".gitignore"
   workflow_dispatch:
 
 jobs:
