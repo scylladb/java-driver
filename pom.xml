@@ -581,24 +581,42 @@
         <plugin>
           <groupId>org.revapi</groupId>
           <artifactId>revapi-maven-plugin</artifactId>
-          <version>0.10.5</version>
+          <version>0.15.1</version>
           <configuration>
             <outputNonIdentifyingDifferenceInfo>false</outputNonIdentifyingDifferenceInfo>
-            <versionFormat>\d+\.\d+\.\d+</versionFormat>
+            <versionFormat>\d+\.\d+\.\d+.\d+</versionFormat>
             <analysisConfiguration>
-              <revapi.ignore>
+              <revapi.filter>
+                <archives>
+                  <include>
+                    <regex>true</regex>
+                    <item>^com.scylladb:.*$</item>
+                  </include>
+                </archives>
+                <classes>
+                  <include>
+                    <regex>true</regex>
+                    <item>^com.datastax(\..*)?$</item>
+                  </include>
+                </classes>
+              </revapi.filter>
+              <revapi.differences>
                 <item>
-                  <!-- We don't consider this a problem -->
-                  <code>java.class.externalClassExposedInAPI</code>
+                  <code>java.method.varargOverloadsOnlyDifferInVarargParameter</code>
+                  <justification>We don't consider this a problem</justification>
                 </item>
-              </revapi.ignore>
+                <item>
+                  <code>java.class.externalClassExposedInAPI</code>
+                  <justification>We don't consider this a problem</justification>
+                </item>
+              </revapi.differences>
             </analysisConfiguration>
           </configuration>
           <dependencies>
             <dependency>
               <groupId>org.revapi</groupId>
               <artifactId>revapi-java</artifactId>
-              <version>0.22.1</version>
+              <version>0.28.4</version>
             </dependency>
           </dependencies>
         </plugin>
