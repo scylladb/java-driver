@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2025 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;

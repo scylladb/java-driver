@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2025 ScyllaDB
+ *
+ * Modified by ScyllaDB
+ */
 package com.datastax.driver.core;
 
 import io.netty.buffer.ByteBuf;
