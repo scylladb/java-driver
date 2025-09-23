@@ -306,8 +306,8 @@ public class ProfileIT {
             when(query(
                     "UPDATE ks.simple SET data=:data WHERE pk=:pk",
                     Lists.newArrayList(
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_ONE,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ONE,
-                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ANY,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.TWO),
                     params,
                     paramTypes))
