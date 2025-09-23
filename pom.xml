@@ -51,7 +51,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <cassandra.version>3.11.2</cassandra.version>
         <scylla.version />
-        <java.version>1.8</java.version>
+        <java.version>8</java.version>
         <log4j.version>1.2.17</log4j.version>
         <slf4j.version>1.7.25</slf4j.version>
         <slf4j-log4j12.version>1.7.25</slf4j-log4j12.version>
@@ -88,7 +88,7 @@
         <logback.version>1.2.13</logback.version>
         <byteman.version>3.0.8</byteman.version>
         <burningwave.tools.version>0.27.2</burningwave.tools.version>
-        <surefire.version>3.5.3</surefire.version>
+        <surefire.version>3.5.4</surefire.version>
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
@@ -474,8 +474,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.14.0</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
+                        <release>${java.version}</release>
                         <showDeprecation>true</showDeprecation>
                         <showWarnings>true</showWarnings>
                         <!--
@@ -724,7 +723,7 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>animal-sniffer-maven-plugin</artifactId>
-                    <version>1.18</version>
+                    <version>1.24</version>
                     <executions>
                         <execution>
                             <id>check-jdk8</id>
@@ -782,7 +781,7 @@
 
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>3.5.3</version>
+                    <version>3.5.4</version>
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
