@@ -307,7 +307,8 @@ public class ProfileIT {
                     "UPDATE ks.simple SET data=:data WHERE pk=:pk",
                     Lists.newArrayList(
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ONE,
-                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ANY),
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ANY,
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.TWO),
                     params,
                     paramTypes))
                 .then(noRows()));
