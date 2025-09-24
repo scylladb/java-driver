@@ -40,7 +40,7 @@ public class BundleOptions {
             mavenBundle("org.slf4j", "slf4j-api").versionAsInProject(),
             mavenBundle("org.hdrhistogram", "HdrHistogram").versionAsInProject(),
             mavenBundle("com.typesafe", "config").versionAsInProject(),
-            mavenBundle("com.datastax.oss", "native-protocol").versionAsInProject(),
+            mavenBundle("com.scylladb", "native-protocol").versionAsInProject(),
             logbackBundles(),
             debugOptions());
   }
