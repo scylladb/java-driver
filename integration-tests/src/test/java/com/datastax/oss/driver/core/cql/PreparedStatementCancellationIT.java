@@ -31,8 +31,13 @@ import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
 import com.datastax.oss.driver.shaded.guava.common.base.Predicates;
 import com.datastax.oss.driver.shaded.guava.common.cache.Cache;
+import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterables;
+import java.lang.reflect.Field;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -118,6 +123,20 @@ public class PreparedStatementCancellationIT {
 
     CqlSession session = SessionUtils.newSession(ccmRule, sessionRule.keyspace());
     CqlPrepareAsyncProcessor processor = findProcessor(session);
+    AtomicInteger removals = new AtomicInteger();
+
+    // Forcibly replace the cache with one that has a removal listener
+    Field cacheField = CqlPrepareAsyncProcessor.class.getDeclaredField("cache");
+    cacheField.setAccessible(true);
+    Cache<PrepareRequest, CompletableFuture<PreparedStatement>> newCache =
+        CacheBuilder.newBuilder()
+            .removalListener(
+                (evt) -> {
+                  removals.incrementAndGet();
+                })
+            .weakValues()
+            .build();
+    cacheField.set(processor, newCache);
     Cache<PrepareRequest, CompletableFuture<PreparedStatement>> cache = processor.getCache();
     assertThat(cache.size()).isEqualTo(0);
 
@@ -133,8 +152,9 @@ public class PreparedStatementCancellationIT {
       fail();
     } catch (Exception e) {
     }
-
-    assertThat(cache.size()).isEqualTo(1);
+    cache.cleanUp();
+    // If an entry was evicted, it had to be cached first
+    Awaitility.await().atMost(5, TimeUnit.SECONDS).until(() -> removals.get() == 1);
   }
 
   @Test
