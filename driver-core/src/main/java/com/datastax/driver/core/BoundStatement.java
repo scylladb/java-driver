@@ -325,7 +325,8 @@ public class BoundStatement extends Statement
     try {
       size +=
           CBUtil.sizeOfShortBytes(preparedStatement().getPreparedId().boundValuesMetadata.id.bytes);
-      if (ProtocolFeature.PREPARED_METADATA_CHANGES.isSupportedBy(protocolVersion)) {
+      ProtocolFeatureStore featureStore = getHost().getProtocolFeatureStore();
+      if (ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(protocolVersion, featureStore)) {
         size +=
             CBUtil.sizeOfShortBytes(preparedStatement().getPreparedId().resultSetMetadata.id.bytes);
       }
@@ -353,10 +354,10 @@ public class BoundStatement extends Statement
             size += CBUtil.sizeOfValue(getPagingState());
           }
           size += CBUtil.sizeOfConsistencyLevel(getSerialConsistencyLevel());
-          if (ProtocolFeature.CLIENT_TIMESTAMPS.isSupportedBy(protocolVersion)) {
+          if (ProtocolFeatures.CLIENT_TIMESTAMPS.isSupportedBy(protocolVersion)) {
             size += 8; // timestamp
           }
-          if (ProtocolFeature.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)
+          if (ProtocolFeatures.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)
               && getOutgoingPayload() != null) {
             size += CBUtil.sizeOfBytesMap(getOutgoingPayload());
           }

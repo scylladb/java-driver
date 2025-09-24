@@ -155,6 +155,7 @@ class Connection {
 
   private final AtomicReference<Owner> ownerRef = new AtomicReference<Owner>();
   private final ApplicationInfo applicationInfo;
+  private ProtocolFeatureStore protocolFeatureStore;
 
   /**
    * Create a new connection to a Cassandra node and associate it with the given pool.
@@ -449,35 +450,31 @@ class Connection {
       final ProtocolVersion protocolVersion, final Executor initExecutor) {
     return new AsyncFunction<Message.Response, Void>() {
       @Override
-      public ListenableFuture<Void> apply(Message.Response response) throws Exception {
+      public ListenableFuture<Void> apply(Message.Response response) {
         switch (response.type) {
           case SUPPORTED:
-            Responses.Supported msg = (Supported) response;
-            ShardingInfo.ConnectionShardingInfo sharding =
-                ShardingInfo.parseShardingInfo(msg.supported);
-            if (sharding != null) {
-              getHost().setShardingInfo(sharding.shardingInfo);
-              Connection.this.shardId = sharding.shardId;
+            Supported supported = (Supported) response;
+            protocolFeatureStore = ProtocolFeatureStore.parseSupportedOptions(supported.supported);
+            protocolFeatureStore.storeInChannel(channel);
+            getHost().setProtocolFeatureStore(protocolFeatureStore);
+
+            ShardingInfo.ConnectionShardingInfo shardingInfo =
+                protocolFeatureStore.getConnectionShardingInfo();
+            if (protocolFeatureStore.getConnectionShardingInfo() != null) {
+              Connection.this.shardId = shardingInfo.shardId;
               if (Connection.this.requestedShardId != -1
-                  && Connection.this.requestedShardId != sharding.shardId) {
+                  && Connection.this.requestedShardId != shardingInfo.shardId) {
                 logger.warn(
                     "Advanced shard awareness: requested connection to shard {}, but connected to {}. Is there a NAT between client and server?",
                     Connection.this.requestedShardId,
-                    sharding.shardId);
+                    shardingInfo.shardId);
                 // Owner is a HostConnectionPool if we are using adv. shard awareness
                 ((HostConnectionPool) Connection.this.ownerRef.get())
                     .tempBlockAdvShardAwareness(ADV_SHARD_AWARENESS_BLOCK_ON_NAT);
               }
             } else {
-              getHost().setShardingInfo(null);
               Connection.this.shardId = 0;
             }
-            LwtInfo lwt = LwtInfo.parseLwtInfo(msg.supported);
-            if (lwt != null) {
-              getHost().setLwtInfo(lwt);
-            }
-            TabletInfo tabletInfo = TabletInfo.parseTabletInfo(msg.supported);
-            getHost().setTabletInfo(tabletInfo);
             return MoreFutures.VOID_SUCCESS;
           case ERROR:
             Responses.Error error = (Responses.Error) response;
@@ -506,20 +503,13 @@ class Connection {
       @Override
       public ListenableFuture<Void> apply(Void input) throws Exception {
         ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
-        Map<String, String> extraOptions = new HashMap<String, String>();
+        Map<String, String> extraOptions = new HashMap<>();
         if (applicationInfo != null) {
           applicationInfo.addOption(extraOptions);
         }
-        LwtInfo lwtInfo = getHost().getLwtInfo();
-        if (lwtInfo != null) {
-          lwtInfo.addOption(extraOptions);
-        }
-        TabletInfo tabletInfo = getHost().getTabletInfo();
-        if (tabletInfo != null
-            && tabletInfo.isEnabled()
-            && ProtocolFeature.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)) {
-          logger.debug("Enabling tablet support in OPTIONS message");
-          TabletInfo.addOption(extraOptions);
+
+        if (protocolFeatureStore != null) {
+          protocolFeatureStore.populateStartupOptions(protocolVersion, extraOptions);
         }
 
         Future startupResponseFuture =
@@ -1063,6 +1053,10 @@ class Connection {
 
   public int shardId() {
     return shardId == null ? 0 : shardId;
+  }
+
+  public ProtocolFeatureStore getProtocolFeatureStore() {
+    return protocolFeatureStore;
   }
 
   /**
@@ -1955,21 +1949,6 @@ class Connection {
   }
 
   private static class Initializer extends ChannelInitializer<SocketChannel> {
-    // Stateless handlers
-    private static final Message.ProtocolDecoder messageDecoder = new Message.ProtocolDecoder();
-    private static final Message.ProtocolEncoder messageEncoderV1 =
-        new Message.ProtocolEncoder(ProtocolVersion.V1);
-    private static final Message.ProtocolEncoder messageEncoderV2 =
-        new Message.ProtocolEncoder(ProtocolVersion.V2);
-    private static final Message.ProtocolEncoder messageEncoderV3 =
-        new Message.ProtocolEncoder(ProtocolVersion.V3);
-    private static final Message.ProtocolEncoder messageEncoderV4 =
-        new Message.ProtocolEncoder(ProtocolVersion.V4);
-    private static final Message.ProtocolEncoder messageEncoderV5 =
-        new Message.ProtocolEncoder(ProtocolVersion.V5);
-    private static final Message.ProtocolEncoder messageEncoderV6 =
-        new Message.ProtocolEncoder(ProtocolVersion.V6);
-    private static final Frame.Encoder frameEncoder = new Frame.Encoder();
 
     private final ProtocolVersion protocolVersion;
     private final Connection connection;
@@ -2033,7 +2012,7 @@ class Connection {
       }
 
       pipeline.addLast("frameDecoder", new Frame.Decoder());
-      pipeline.addLast("frameEncoder", frameEncoder);
+      pipeline.addLast("frameEncoder", new Frame.Encoder());
 
       pipeline.addLast("framingFormatHandler", new FramingFormatHandler(connection.factory));
 
@@ -2046,7 +2025,7 @@ class Connection {
         pipeline.addLast("frameCompressor", new Frame.Compressor(compressor));
       }
 
-      pipeline.addLast("messageDecoder", messageDecoder);
+      pipeline.addLast("messageDecoder", new Message.ProtocolDecoder(null));
       pipeline.addLast("messageEncoder", messageEncoderFor(protocolVersion));
 
       pipeline.addLast("idleStateHandler", idleStateHandler);
@@ -2056,23 +2035,11 @@ class Connection {
       nettyOptions.afterChannelInitialized(channel);
     }
 
-    private Message.ProtocolEncoder messageEncoderFor(ProtocolVersion version) {
-      switch (version) {
-        case V1:
-          return messageEncoderV1;
-        case V2:
-          return messageEncoderV2;
-        case V3:
-          return messageEncoderV3;
-        case V4:
-          return messageEncoderV4;
-        case V5:
-          return messageEncoderV5;
-        case V6:
-          return messageEncoderV6;
-        default:
-          throw new DriverInternalError("Unsupported protocol version " + protocolVersion);
+    private static Message.ProtocolEncoder messageEncoderFor(ProtocolVersion version) {
+      if (version.toInt() > ProtocolVersion.V6.toInt()) {
+        throw new DriverInternalError("Unsupported protocol version " + version);
       }
+      return new Message.ProtocolEncoder(version, null);
     }
   }
 

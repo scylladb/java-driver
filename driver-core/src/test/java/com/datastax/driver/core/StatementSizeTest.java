@@ -116,7 +116,11 @@ public class StatementSizeTest {
 
   @Test(groups = "unit")
   public void should_measure_size_of_bound_statement() {
+    Host host = Mockito.mock(Host.class);
+    Mockito.when(host.getProtocolFeatureStore()).thenReturn(ProtocolFeatureStore.EMPTY);
     BoundStatement statement = new BoundStatement(preparedStatement);
+    statement.setHost(host);
+
     int expectedSize =
         9 // header size
             + (2 + PREPARED_ID.length)

@@ -214,10 +214,10 @@ public abstract class RegularStatement extends Statement {
             size += CBUtil.sizeOfValue(getPagingState());
           }
           size += CBUtil.sizeOfConsistencyLevel(getSerialConsistencyLevel());
-          if (ProtocolFeature.CLIENT_TIMESTAMPS.isSupportedBy(protocolVersion)) {
+          if (ProtocolFeatures.CLIENT_TIMESTAMPS.isSupportedBy(protocolVersion)) {
             size += 8; // timestamp
           }
-          if (ProtocolFeature.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)
+          if (ProtocolFeatures.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)
               && getOutgoingPayload() != null) {
             size += CBUtil.sizeOfBytesMap(getOutgoingPayload());
           }

@@ -68,7 +68,8 @@ abstract class ArrayBackedResultSet implements ResultSet {
       SessionManager session,
       ProtocolVersion protocolVersion,
       ExecutionInfo info,
-      Statement statement) {
+      Statement statement,
+      ProtocolFeatureStore featureStore) {
 
     switch (msg.kind) {
       case ROWS:
@@ -94,7 +95,8 @@ abstract class ArrayBackedResultSet implements ResultSet {
           // CASSANDRA-10786).
           MD5Digest newMetadataId = r.metadata.metadataId;
           assert !(actualStatement instanceof BoundStatement)
-              || ProtocolFeature.PREPARED_METADATA_CHANGES.isSupportedBy(protocolVersion)
+              || ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(
+                  protocolVersion, featureStore)
               || newMetadataId == null;
           if (newMetadataId != null) {
             BoundStatement bs = ((BoundStatement) actualStatement);
