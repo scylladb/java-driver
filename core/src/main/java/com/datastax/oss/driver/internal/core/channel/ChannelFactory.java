@@ -257,7 +257,7 @@ public class ChannelFactory {
         cf -> {
           if (connectFuture.isSuccess()) {
             Channel channel = connectFuture.channel();
-            DriverChannel driverChannel = // driver channel init
+            DriverChannel driverChannel =
                 new DriverChannel(endPoint, channel, context.getWriteCoalescer(), currentVersion);
             // If this is the first successful connection, remember the protocol version and
             // cluster name for future connections.
