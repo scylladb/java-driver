@@ -435,6 +435,13 @@ class ProtocolInitHandler extends ConnectInitHandler {
     }
   }
 
+  /**
+   * If <code>SCYLLA_USE_METADATA_ID</code> feature was negotiated we need to replace {@link
+   * FrameEncoder} and {@link FrameDecoder} handlers with instances aware of a negotiated protocol
+   * feature.
+   *
+   * @param metadataIdEnabled indicates if feature is successfully negotiated
+   */
   private void maybeUpdatePipelineWithProtocolOptions(boolean metadataIdEnabled) {
     if (metadataIdEnabled) {
       ProtocolFeatures protocolFeatures =
