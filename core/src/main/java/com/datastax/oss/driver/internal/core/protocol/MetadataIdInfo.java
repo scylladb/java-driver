@@ -9,7 +9,7 @@ public class MetadataIdInfo {
 
   private MetadataIdInfo() {}
 
-  public static boolean parseMetadataId(Map<String, List<String>> supported) {
+  public static boolean loadFromSupportedOptions(Map<String, List<String>> supported) {
     if (!supported.containsKey(SCYLLA_USE_METADATA_ID_STARTUP_OPTION_KEY)) {
       return false;
     }
@@ -19,7 +19,7 @@ public class MetadataIdInfo {
         && values.get(0).equals(SCYLLA_USE_METADATA_ID_STARTUP_OPTION_VALUE);
   }
 
-  public static void addOption(Map<String, String> options) {
+  public static void populateStartupOptions(Map<String, String> options) {
     options.put(
         SCYLLA_USE_METADATA_ID_STARTUP_OPTION_KEY, SCYLLA_USE_METADATA_ID_STARTUP_OPTION_VALUE);
   }
