@@ -50,12 +50,17 @@ class Requests {
     static final Message.Coder<Startup> coder =
         new Message.Coder<Startup>() {
           @Override
-          public void encode(Startup msg, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              Startup msg,
+              ByteBuf dest,
+              ProtocolVersion version,
+              ProtocolFeatureStore featureStore) {
             CBUtil.writeStringMap(msg.options, dest);
           }
 
           @Override
-          public int encodedSize(Startup msg, ProtocolVersion version) {
+          public int encodedSize(
+              Startup msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             return CBUtil.sizeOfStringMap(msg.options);
           }
         };
@@ -107,13 +112,18 @@ class Requests {
         new Message.Coder<Credentials>() {
 
           @Override
-          public void encode(Credentials msg, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              Credentials msg,
+              ByteBuf dest,
+              ProtocolVersion version,
+              ProtocolFeatureStore featureStore) {
             assert version == ProtocolVersion.V1;
             CBUtil.writeStringMap(msg.credentials, dest);
           }
 
           @Override
-          public int encodedSize(Credentials msg, ProtocolVersion version) {
+          public int encodedSize(
+              Credentials msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             assert version == ProtocolVersion.V1;
             return CBUtil.sizeOfStringMap(msg.credentials);
           }
@@ -137,10 +147,15 @@ class Requests {
     static final Message.Coder<Options> coder =
         new Message.Coder<Options>() {
           @Override
-          public void encode(Options msg, ByteBuf dest, ProtocolVersion version) {}
+          public void encode(
+              Options msg,
+              ByteBuf dest,
+              ProtocolVersion version,
+              ProtocolFeatureStore featureStore) {}
 
           @Override
-          public int encodedSize(Options msg, ProtocolVersion version) {
+          public int encodedSize(
+              Options msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             return 0;
           }
         };
@@ -165,13 +180,15 @@ class Requests {
     static final Message.Coder<Query> coder =
         new Message.Coder<Query>() {
           @Override
-          public void encode(Query msg, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              Query msg, ByteBuf dest, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             CBUtil.writeLongString(msg.query, dest);
             msg.options.encode(dest, version);
           }
 
           @Override
-          public int encodedSize(Query msg, ProtocolVersion version) {
+          public int encodedSize(
+              Query msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             return CBUtil.sizeOfLongString(msg.query) + msg.options.encodedSize(version);
           }
         };
@@ -210,17 +227,22 @@ class Requests {
     static final Message.Coder<Execute> coder =
         new Message.Coder<Execute>() {
           @Override
-          public void encode(Execute msg, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              Execute msg,
+              ByteBuf dest,
+              ProtocolVersion version,
+              ProtocolFeatureStore featureStore) {
             CBUtil.writeShortBytes(msg.statementId.bytes, dest);
-            if (ProtocolFeature.PREPARED_METADATA_CHANGES.isSupportedBy(version))
+            if (ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(version, featureStore))
               CBUtil.writeShortBytes(msg.resultMetadataId.bytes, dest);
             msg.options.encode(dest, version);
           }
 
           @Override
-          public int encodedSize(Execute msg, ProtocolVersion version) {
+          public int encodedSize(
+              Execute msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             int size = CBUtil.sizeOfShortBytes(msg.statementId.bytes);
-            if (ProtocolFeature.PREPARED_METADATA_CHANGES.isSupportedBy(version))
+            if (ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(version, featureStore))
               size += CBUtil.sizeOfShortBytes(msg.resultMetadataId.bytes);
             size += msg.options.encodedSize(version);
             return size;
@@ -485,7 +507,8 @@ class Requests {
     static final Message.Coder<Batch> coder =
         new Message.Coder<Batch>() {
           @Override
-          public void encode(Batch msg, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              Batch msg, ByteBuf dest, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             int queries = msg.queryOrIdList.size();
             assert queries <= 0xFFFF;
 
@@ -505,7 +528,8 @@ class Requests {
           }
 
           @Override
-          public int encodedSize(Batch msg, ProtocolVersion version) {
+          public int encodedSize(
+              Batch msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             int size = 3; // type + nb queries
             for (int i = 0; i < msg.queryOrIdList.size(); i++) {
               Object q = msg.queryOrIdList.get(i);
@@ -661,7 +685,11 @@ class Requests {
         new Message.Coder<Prepare>() {
 
           @Override
-          public void encode(Prepare msg, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              Prepare msg,
+              ByteBuf dest,
+              ProtocolVersion version,
+              ProtocolFeatureStore featureStore) {
             CBUtil.writeLongString(msg.query, dest);
 
             if (version.compareTo(ProtocolVersion.V5) >= 0) {
@@ -671,7 +699,8 @@ class Requests {
           }
 
           @Override
-          public int encodedSize(Prepare msg, ProtocolVersion version) {
+          public int encodedSize(
+              Prepare msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             int size = CBUtil.sizeOfLongString(msg.query);
 
             if (version.compareTo(ProtocolVersion.V5) >= 0) {
@@ -704,13 +733,18 @@ class Requests {
     static final Message.Coder<Register> coder =
         new Message.Coder<Register>() {
           @Override
-          public void encode(Register msg, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              Register msg,
+              ByteBuf dest,
+              ProtocolVersion version,
+              ProtocolFeatureStore featureStore) {
             dest.writeShort(msg.eventTypes.size());
             for (ProtocolEvent.Type type : msg.eventTypes) CBUtil.writeEnumValue(type, dest);
           }
 
           @Override
-          public int encodedSize(Register msg, ProtocolVersion version) {
+          public int encodedSize(
+              Register msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             int size = 2;
             for (ProtocolEvent.Type type : msg.eventTypes) size += CBUtil.sizeOfEnumValue(type);
             return size;
@@ -741,12 +775,17 @@ class Requests {
         new Message.Coder<AuthResponse>() {
 
           @Override
-          public void encode(AuthResponse response, ByteBuf dest, ProtocolVersion version) {
+          public void encode(
+              AuthResponse response,
+              ByteBuf dest,
+              ProtocolVersion version,
+              ProtocolFeatureStore featureStore) {
             CBUtil.writeValue(response.token, dest);
           }
 
           @Override
-          public int encodedSize(AuthResponse response, ProtocolVersion version) {
+          public int encodedSize(
+              AuthResponse response, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             return CBUtil.sizeOfValue(response.token);
           }
         };

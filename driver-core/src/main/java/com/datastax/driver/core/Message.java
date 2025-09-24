@@ -42,13 +42,18 @@ abstract class Message {
       AttributeKey.valueOf("com.datastax.driver.core.CodecRegistry");
 
   interface Coder<R extends Request> {
-    void encode(R request, ByteBuf dest, ProtocolVersion version);
+    void encode(
+        R request, ByteBuf dest, ProtocolVersion version, ProtocolFeatureStore featureStore);
 
-    int encodedSize(R request, ProtocolVersion version);
+    int encodedSize(R request, ProtocolVersion version, ProtocolFeatureStore featureStore);
   }
 
   interface Decoder<R extends Response> {
-    R decode(ByteBuf body, ProtocolVersion version, CodecRegistry codecRegistry);
+    R decode(
+        ByteBuf body,
+        ProtocolVersion version,
+        CodecRegistry codecRegistry,
+        ProtocolFeatureStore protocolFeatureStore);
   }
 
   private volatile int streamId = -1;
@@ -268,6 +273,12 @@ abstract class Message {
   @ChannelHandler.Sharable
   static class ProtocolDecoder extends MessageToMessageDecoder<Frame> {
 
+    private final ProtocolFeatureStore protocolFeatureStore;
+
+    ProtocolDecoder(ProtocolFeatureStore protocolFeatureStore) {
+      this.protocolFeatureStore = protocolFeatureStore;
+    }
+
     @Override
     protected void decode(ChannelHandlerContext ctx, Frame frame, List<Object> out)
         throws Exception {
@@ -294,7 +305,7 @@ abstract class Message {
         Response response =
             Response.Type.fromOpcode(frame.header.opcode)
                 .decoder
-                .decode(frame.body, frame.header.version, codecRegistry);
+                .decode(frame.body, frame.header.version, codecRegistry, protocolFeatureStore);
         response
             .setTracingId(tracingId)
             .setWarnings(warnings)
@@ -311,9 +322,11 @@ abstract class Message {
   static class ProtocolEncoder extends MessageToMessageEncoder<Request> {
 
     final ProtocolVersion protocolVersion;
+    final ProtocolFeatureStore protocolFeatureStore;
 
-    ProtocolEncoder(ProtocolVersion version) {
+    ProtocolEncoder(ProtocolVersion version, ProtocolFeatureStore protocolFeatureStore) {
       this.protocolVersion = version;
+      this.protocolFeatureStore = protocolFeatureStore;
     }
 
     @Override
@@ -353,7 +366,7 @@ abstract class Message {
     int encodedSize(Request request) {
       @SuppressWarnings("unchecked")
       Coder<Request> coder = (Coder<Request>) request.type.coder;
-      int messageSize = coder.encodedSize(request, protocolVersion);
+      int messageSize = coder.encodedSize(request, protocolVersion, protocolFeatureStore);
       int payloadLength = -1;
       if (request.getCustomPayload() != null) {
         payloadLength = CBUtil.sizeOfBytesMap(request.getCustomPayload());
@@ -377,7 +390,7 @@ abstract class Message {
         }
       }
 
-      coder.encode(request, destination, protocolVersion);
+      coder.encode(request, destination, protocolVersion, protocolFeatureStore);
     }
   }
 

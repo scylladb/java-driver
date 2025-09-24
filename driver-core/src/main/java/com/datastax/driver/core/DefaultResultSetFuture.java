@@ -87,15 +87,29 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
                     table,
                     rm.getCustomPayload().get(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY));
           }
+
           switch (rm.kind) {
             case SET_KEYSPACE:
               // propagate the keyspace change to other connections
               session.poolsState.setKeyspace(((Responses.Result.SetKeyspace) rm).keyspace);
-              set(ArrayBackedResultSet.fromMessage(rm, session, protocolVersion, info, statement));
+              set(
+                  ArrayBackedResultSet.fromMessage(
+                      rm,
+                      session,
+                      protocolVersion,
+                      info,
+                      statement,
+                      connection.getProtocolFeatureStore()));
               break;
             case SCHEMA_CHANGE:
               ResultSet rs =
-                  ArrayBackedResultSet.fromMessage(rm, session, protocolVersion, info, statement);
+                  ArrayBackedResultSet.fromMessage(
+                      rm,
+                      session,
+                      protocolVersion,
+                      info,
+                      statement,
+                      connection.getProtocolFeatureStore());
               final Cluster.Manager cluster = session.cluster.manager;
               if (!cluster.configuration.getQueryOptions().isMetadataEnabled()) {
                 cluster.waitForSchemaAgreementAndSignal(connection, this, rs);
@@ -224,7 +238,14 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
               }
               break;
             default:
-              set(ArrayBackedResultSet.fromMessage(rm, session, protocolVersion, info, statement));
+              set(
+                  ArrayBackedResultSet.fromMessage(
+                      rm,
+                      session,
+                      protocolVersion,
+                      info,
+                      statement,
+                      connection.getProtocolFeatureStore()));
               break;
           }
           break;

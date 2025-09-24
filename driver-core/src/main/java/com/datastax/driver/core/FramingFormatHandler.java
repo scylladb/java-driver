@@ -16,6 +16,7 @@
 package com.datastax.driver.core;
 
 import com.datastax.driver.core.Message.Response.Type;
+import com.datastax.driver.core.exceptions.DriverInternalError;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.MessageToMessageDecoder;
@@ -43,14 +44,27 @@ public class FramingFormatHandler extends MessageToMessageDecoder<Frame> {
       // By default, the pipeline is configured for legacy framing since this is the format used
       // by all protocol versions until handshake; after handshake however, we need to switch to
       // modern framing for protocol v5 and higher.
+      ProtocolFeatureStore featureStore = ProtocolFeatureStore.loadFromChannel(ctx.channel());
       if (frame.header.version.compareTo(ProtocolVersion.V5) >= 0) {
         switchToModernFraming(ctx);
+      } else if (featureStore != null && featureStore.isUseMetadataId()) {
+        switchToCQL4MetadataId(ctx, frame.header.version, featureStore);
       }
       // once the handshake is successful, the framing format cannot change anymore;
       // we can safely remove ourselves from the pipeline.
       ctx.pipeline().remove("framingFormatHandler");
     }
     out.add(frame);
+  }
+
+  private void switchToCQL4MetadataId(
+      ChannelHandlerContext ctx,
+      ProtocolVersion protocolVersion,
+      ProtocolFeatureStore featureStore) {
+    ChannelPipeline pipeline = ctx.pipeline();
+    pipeline.replace("messageDecoder", "messageDecoder", new Message.ProtocolDecoder(featureStore));
+    pipeline.replace(
+        "messageEncoder", "messageEncoder", messageEncoderFor(protocolVersion, featureStore));
   }
 
   private void switchToModernFraming(ChannelHandlerContext ctx) {
@@ -74,5 +88,13 @@ public class FramingFormatHandler extends MessageToMessageDecoder<Frame> {
         "frameDecoder", "bytesToSegmentDecoder", new BytesToSegmentDecoder(segmentCodec));
     pipeline.addAfter(
         "bytesToSegmentDecoder", "segmentToFrameDecoder", new SegmentToFrameDecoder());
+  }
+
+  private static Message.ProtocolEncoder messageEncoderFor(
+      ProtocolVersion version, ProtocolFeatureStore protocolFeatureStore) {
+    if (version.toInt() > ProtocolVersion.V6.toInt()) {
+      throw new DriverInternalError("Unsupported protocol version " + version);
+    }
+    return new Message.ProtocolEncoder(version, protocolFeatureStore);
   }
 }
