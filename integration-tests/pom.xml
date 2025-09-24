@@ -194,7 +194,7 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.datastax.oss.simulacron</groupId>
+      <groupId>com.scylladb.oss.simulacron</groupId>
       <artifactId>simulacron-native-server</artifactId>
       <scope>test</scope>
     </dependency>

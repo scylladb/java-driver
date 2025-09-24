@@ -65,7 +65,7 @@
     </dependency>
     <!-- only required for Simulacron tests -->
     <dependency>
-      <groupId>com.datastax.oss.simulacron</groupId>
+      <groupId>com.scylladb.oss.simulacron</groupId>
       <artifactId>simulacron-native-server</artifactId>
       <optional>true</optional>
     </dependency>
