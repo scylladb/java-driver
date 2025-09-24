@@ -50,7 +50,7 @@ public class ProtocolFeatureStore {
     LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(options);
     ShardingInfo.ConnectionShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(options);
     TabletInfo tabletInfo = TabletInfo.loadFromSupportedOptions(options);
-    boolean metadataIdEnabled = MetadataIdInfo.parseMetadataId(options);
+    boolean metadataIdEnabled = MetadataIdInfo.loadFromSupportedOptions(options);
     return new ProtocolFeatureStore(lwtInfo, shardingInfo, tabletInfo, metadataIdEnabled);
   }
 
@@ -62,7 +62,7 @@ public class ProtocolFeatureStore {
       TabletInfo.populateStartupOptions(options);
     }
     if (metadataIdEnabled) {
-      MetadataIdInfo.addOption(options);
+      MetadataIdInfo.populateStartupOptions(options);
     }
   }
 
