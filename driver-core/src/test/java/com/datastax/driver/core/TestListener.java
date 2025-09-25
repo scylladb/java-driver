@@ -45,6 +45,12 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
 
   @Override
   public void onTestFailure(ITestResult tr) {
+    if (tr.getThrowable() instanceof SkipException) {
+      // Workaround for testng 6.13.x bug https://github.com/testng-team/testng/issues/1632
+      // When SkipException thrown from beforeInvocation marks test as FAILED
+      tr.setStatus(ITestResult.SKIP);
+      return;
+    }
     long elapsedTime = TimeUnit.NANOSECONDS.toSeconds((System.nanoTime() - start_time));
     long testTime = tr.getEndMillis() - tr.getStartMillis();
     tr.getThrowable().printStackTrace();
