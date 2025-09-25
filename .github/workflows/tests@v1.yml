@@ -49,17 +49,7 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-
-      - name: Get POM hash
-        id: get-pom-hash
-        run: echo "value=${{ hashFiles('**/pom.xml') }}" >> "$GITHUB_OUTPUT"
-
-      - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
-        id: java-cache
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
+          cache: maven
 
       - name: Install guava-shaded
         run: mvn install -pl guava-shaded
@@ -101,12 +91,7 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-
-      - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          cache: maven
 
       - name: Full verify
         run: mvn -B verify -DskipTests
@@ -131,12 +116,7 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-
-      - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          cache: maven
 
       - name: Install guava-shaded
         run: mvn install -pl guava-shaded
@@ -205,12 +185,19 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
+          cache: maven
 
-      - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
+      - name: Resolve scylla-ccm master SHA
+        id: ccm
+        run: |
+          SHA="$(git ls-remote https://github.com/scylladb/scylla-ccm.git refs/heads/master | cut -f1)"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Cache scylla-ccm pip
+        uses: actions/cache@v4
         with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          path: /home/runner/.cache/pip
+          key: scylla-ccm-pip-${{ steps.ccm.outputs.sha }}
 
       - name: Setup Python 3
         uses: actions/setup-python@v6
@@ -312,12 +299,19 @@ jobs:
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
+          cache: maven
 
-      - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
+      - name: Resolve scylla-ccm master SHA
+        id: ccm
+        run: |
+          SHA="$(git ls-remote https://github.com/scylladb/scylla-ccm.git refs/heads/master | cut -f1)"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Cache scylla-ccm pip
+        uses: actions/cache@v4
         with:
-          path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          path: /home/runner/.cache/pip
+          key: scylla-ccm-pip-${{ steps.ccm.outputs.sha }}
 
       - name: Setup Python 3
         uses: actions/setup-python@v6

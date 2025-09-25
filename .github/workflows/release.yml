@@ -32,6 +32,7 @@ jobs:
         gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
         server-username: OSSRH_USERNAME
         server-password: OSSRH_PASSWORD
+        cache: maven
 
     - name: Configure Git user
       run: |
