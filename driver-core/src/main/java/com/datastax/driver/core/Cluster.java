@@ -60,14 +60,9 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URL;
 import java.net.UnknownHostException;
-import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1382,92 +1377,6 @@ public class Cluster implements Closeable {
     public Builder withNoCompact() {
       this.noCompact = true;
       return this;
-    }
-
-    /**
-     * Configure for Scylla Cloud Serverless cluster using configuration bundle.
-     *
-     * @param configurationFile configuration bundle file.
-     * @return this builder.
-     * @throws IOException
-     * @see Builder#withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig)
-     */
-    public Builder withScyllaCloudConnectionConfig(File configurationFile) throws IOException {
-      return withScyllaCloudConnectionConfig(configurationFile.toURI().toURL());
-    }
-
-    /**
-     * Configure for Scylla Cloud Serverless cluster using URL to configuration bundle.
-     *
-     * @param configurationUrl URL from which configuration bundle can be read.
-     * @return this builder.
-     * @throws IOException
-     * @see Builder#withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig)
-     */
-    public Builder withScyllaCloudConnectionConfig(URL configurationUrl) throws IOException {
-      return withScyllaCloudConnectionConfig(configurationUrl.openStream());
-    }
-
-    /**
-     * Configure for Scylla Cloud Serverless cluster using InputStream of configuration bundle.
-     *
-     * @param inputStream input stream containing configuration bundle format data.
-     * @return this builder.
-     * @throws IOException
-     * @see Builder#withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig)
-     */
-    public Builder withScyllaCloudConnectionConfig(InputStream inputStream) throws IOException {
-      return withScyllaCloudConnectionConfig(
-          ScyllaCloudConnectionConfig.fromInputStream(inputStream));
-    }
-
-    /**
-     * Sets a collection of options for connecting to Scylla Cloud Serverless cluster.
-     *
-     * <p>Sets several options according to provided {@link ScyllaCloudConnectionConfig}. This
-     * includes calling {@link Builder#withEndPointFactory(EndPointFactory)}, {@link
-     * Builder#withSSL(SSLOptions)}, {@link Builder#withAuthProvider(AuthProvider)}, {@link
-     * Builder#withoutAdvancedShardAwareness()} with parameters derived from the config.
-     *
-     * <p>Cannot be combined with {@link Builder#addContactPoint}. All contact points should already
-     * be provided in {@link ScyllaCloudConnectionConfig}.
-     *
-     * @param config instantiated ScyllaCloudConnectionConfig.
-     * @return this builder.
-     */
-    protected Builder withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig config) {
-      try {
-        ScyllaCloudDatacenter currentDatacenter = config.getCurrentDatacenter();
-        InetSocketAddress proxyAddress = currentDatacenter.getServer();
-
-        Builder builder =
-            withEndPointFactory(
-                    new ScyllaCloudSniEndPointFactory(
-                        proxyAddress, currentDatacenter.getNodeDomain()))
-                .withSSL(
-                    (config.getCurrentDatacenter().isInsecureSkipTlsVerify()
-                        ? config.createBundle().getInsecureSSLOptions()
-                        : config.createBundle().getSSLOptions()))
-                .withAuthProvider(
-                    new PlainTextAuthProvider(
-                        config.getCurrentAuthInfo().getUsername(),
-                        config.getCurrentAuthInfo().getPassword()))
-                .withoutAdvancedShardAwareness();
-
-        if (builder.rawHostContactPoints.size() > 0
-            || builder.rawHostAndPortContactPoints.size() > 0
-            || builder.contactPoints.size() > 0) {
-          throw new IllegalStateException(
-              "Can't use withCloudSecureConnectBundle if you've already called addContactPoint(s)");
-        }
-        builder.addContactPoint(new SniEndPoint(proxyAddress, currentDatacenter.getNodeDomain()));
-
-        return builder;
-      } catch (IOException e) {
-        throw new IllegalStateException("Cannot construct cloud config", e);
-      } catch (GeneralSecurityException e) {
-        throw new IllegalStateException("Cannot construct cloud config", e);
-      }
     }
 
     /**
