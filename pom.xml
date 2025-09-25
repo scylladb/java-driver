@@ -581,7 +581,7 @@
         <plugin>
           <groupId>org.revapi</groupId>
           <artifactId>revapi-maven-plugin</artifactId>
-          <version>0.10.5</version>
+          <version>0.15.1</version>
           <configuration>
             <outputNonIdentifyingDifferenceInfo>false</outputNonIdentifyingDifferenceInfo>
             <versionFormat>\d+\.\d+\.\d+</versionFormat>
