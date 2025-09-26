@@ -66,6 +66,16 @@
     </difference>
 
     <difference>
+        <differenceType>7002</differenceType> <!-- method removed -->
+        <className>com/datastax/driver/core/Host</className>
+        <method>void setEndPoint(com.datastax.driver.core.EndPoint)</method>
+        <justification>Originally endPoint field was made non-final to work around serverless limitations.
+            We're making it final again for clarity. Driver always used to treat the EndPoint as something that
+            does not change for given Host outside that specific case.
+        </justification>
+    </difference>
+
+    <difference>
         <differenceType>7004</differenceType> <!-- the number of arguments has changed -->
         <className>com/datastax/driver/core/Metadata</className>
         <method>java.util.Set getReplicas(java.lang.String, java.nio.ByteBuffer)</method>
