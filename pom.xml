@@ -74,7 +74,7 @@
     <jackson-databind.version>2.13.4.2</jackson-databind.version>
     <legacy-jackson.version>1.9.12</legacy-jackson.version>
     <!-- optional dependencies -->
-    <snappy.version>1.1.10.5</snappy.version>
+    <snappy.version>1.1.10.8</snappy.version>
     <lz4.version>1.7.1</lz4.version>
     <!-- test dependencies -->
     <assertj.version>3.19.0</assertj.version>
