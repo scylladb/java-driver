@@ -1,5 +1,6 @@
 package com.datastax.oss.driver.internal.core.protocol;
 
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
@@ -14,8 +15,9 @@ public class ProtocolFeatureStore {
   private final ShardingInfo.ConnectionShardingInfo shardingInfo;
   private final TabletInfo tabletInfo;
   private final boolean metadataIdEnabled;
+  private ProtocolFeatures protocolFeatures;
 
-  public static final ProtocolFeatureStore Empty =
+  public static final ProtocolFeatureStore EMPTY =
       new ProtocolFeatureStore(null, null, null, false);
 
   ProtocolFeatureStore(
@@ -72,5 +74,20 @@ public class ProtocolFeatureStore {
 
   public void storeInChannel(@NonNull Channel channel) {
     channel.attr(ProtocolFeatureStore.CHANNEL_KEY).set(this);
+  }
+
+  public ProtocolFeatures getProtocolFeatures() {
+    if (protocolFeatures == null) {
+      protocolFeatures = buildProtocolFeatures();
+    }
+    return protocolFeatures;
+  }
+
+  private ProtocolFeatures buildProtocolFeatures() {
+    if (metadataIdEnabled) {
+      return new ProtocolFeatures.Builder().setScyllaUseMetadataId().build();
+    } else {
+      return ProtocolFeatures.EMPTY;
+    }
   }
 }

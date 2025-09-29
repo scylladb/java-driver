@@ -154,7 +154,7 @@ public class DriverChannel {
 
     ProtocolFeatureStore fromChannel = ProtocolFeatureStore.loadFromChannel(channel);
     if (fromChannel == null) {
-      return ProtocolFeatureStore.Empty;
+      return ProtocolFeatureStore.EMPTY;
     }
     // Features can't be renegotiated.
     // Once features is populated into channel it is enough to update cache and no need to
