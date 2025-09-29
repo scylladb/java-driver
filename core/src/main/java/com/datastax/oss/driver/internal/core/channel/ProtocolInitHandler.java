@@ -45,6 +45,7 @@ import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
 import com.datastax.oss.driver.internal.core.util.ProtocolUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.ProtocolConstants.ErrorCode;
@@ -225,16 +226,15 @@ class ProtocolInitHandler extends ConnectInitHandler {
           channel.attr(DriverChannel.OPTIONS_KEY).set(supported.options);
           featureStore = ProtocolFeatureStore.parseSupportedOptions(supported.options);
           featureStore.storeInChannel(channel);
-          maybeUpdatePipelineWithProtocolOptions(featureStore.isMetadataIdEnabled());
           step = Step.STARTUP;
           send();
         } else if (step == Step.STARTUP && response instanceof Ready) {
-          maybeSwitchToModernFraming();
+          maybeUpdatePipeline();
           context.getAuthProvider().ifPresent(provider -> provider.onMissingChallenge(endPoint));
           step = Step.GET_CLUSTER_NAME;
           send();
         } else if (step == Step.STARTUP && response instanceof Authenticate) {
-          maybeSwitchToModernFraming();
+          maybeUpdatePipeline();
           Authenticate authenticate = (Authenticate) response;
           authenticator = buildAuthenticator(endPoint, authenticate.authenticator);
           authenticator
@@ -400,11 +400,18 @@ class ProtocolInitHandler extends ConnectInitHandler {
   }
 
   /**
-   * Rearranges the pipeline to deal with the new framing structure in protocol v5 and above. The
+   * Conditionally rebuilds pipeline.
+   *
+   * <p>Rearranges the pipeline to deal with the new framing structure in protocol v5 and above. The
    * first messages still use the legacy format, we only do this after a successful response to the
    * first STARTUP message.
+   *
+   * <p>If <code>SCYLLA_USE_METADATA_ID</code> feature was negotiated we need to replace {@link
+   * FrameEncoder} and {@link FrameDecoder} handlers with instances aware of a negotiated protocol
+   * feature.
    */
-  private void maybeSwitchToModernFraming() {
+  private void maybeUpdatePipeline() {
+    ProtocolFeatures protocolFeatures = featureStore.getProtocolFeatures();
     if (context
         .getProtocolVersionRegistry()
         .supports(initialProtocolVersion, DefaultProtocolFeature.MODERN_FRAMING)) {
@@ -432,20 +439,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
           ChannelFactory.BYTES_TO_SEGMENT_DECODER_NAME,
           ChannelFactory.SEGMENT_TO_FRAME_DECODER_NAME,
           new SegmentToFrameDecoder(context.getFrameCodec(), logPrefix));
-    }
-  }
-
-  /**
-   * If <code>SCYLLA_USE_METADATA_ID</code> feature was negotiated we need to replace {@link
-   * FrameEncoder} and {@link FrameDecoder} handlers with instances aware of a negotiated protocol
-   * feature.
-   *
-   * @param metadataIdEnabled indicates if feature is successfully negotiated
-   */
-  private void maybeUpdatePipelineWithProtocolOptions(boolean metadataIdEnabled) {
-    if (metadataIdEnabled) {
-      ProtocolFeatures protocolFeatures =
-          new ProtocolFeatures.Builder().setScyllaUseMetadataId().build();
+    } else if (protocolFeatures.isScyllaUseMetadataId()) {
       int maxFrameLength =
           (int)
               context
@@ -457,7 +451,10 @@ class ProtocolInitHandler extends ConnectInitHandler {
       pipeline.replace(
           ChannelFactory.FRAME_TO_BYTES_ENCODER_NAME,
           ChannelFactory.FRAME_TO_BYTES_ENCODER_NAME,
-          new FrameEncoder(context.getFrameCodec(), protocolFeatures, maxFrameLength));
+          new FrameEncoder(
+              context.getFrameCodec(),
+              protocolFeatures, // Passing updated protocol features to alter codecs behaviors
+              maxFrameLength));
       pipeline.replace(
           ChannelFactory.BYTES_TO_FRAME_DECODER_NAME,
           ChannelFactory.BYTES_TO_FRAME_DECODER_NAME,
@@ -467,5 +464,10 @@ class ProtocolInitHandler extends ConnectInitHandler {
 
   private String getString(List<ByteBuffer> row, int i) {
     return TypeCodecs.TEXT.decode(row.get(i), DefaultProtocolVersion.DEFAULT);
+  }
+
+  @VisibleForTesting
+  void setFeatureStore(ProtocolFeatureStore featureStore) {
+    this.featureStore = featureStore;
   }
 }
