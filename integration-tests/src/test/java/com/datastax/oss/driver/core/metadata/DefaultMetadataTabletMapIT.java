@@ -232,7 +232,7 @@ public class DefaultMetadataTabletMapIT {
           // Preparation of the statements without KS will fail on the session with no ks specified
           continue;
         }
-        CqlSession session = sessionEntry.getValue().get();
+        try (CqlSession session = sessionEntry.getValue().get()) {
         // Empty out tablets information
         if (session.getMetadata().getTabletMap().isPresent()) {
           session
@@ -281,6 +281,7 @@ public class DefaultMetadataTabletMapIT {
                   "Statement %s on session %s was routed to different nodes",
                   stmtEntry.getKey(), sessionEntry.getKey()));
         }
+        }
       }
     }
 
@@ -293,9 +294,9 @@ public class DefaultMetadataTabletMapIT {
 
   @Test
   public void should_receive_each_tablet_exactly_once() {
-    CqlSession session =
-        CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build();
     int counter = 0;
+    try (CqlSession session =
+      CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build()) {
     PreparedStatement preparedStatement = session.prepare(STMT_INSERT);
     for (int i = 1; i <= QUERIES; i++) {
       if (executeAndReturnIfResultHasTabletsInfo(session, preparedStatement.bind(i, i))) {
@@ -304,11 +305,11 @@ public class DefaultMetadataTabletMapIT {
     }
     Assert.assertEquals(INITIAL_TABLETS, counter);
     assertSessionTabletMapIsFilled(session);
-    session.close();
+    }
 
-    session = CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build();
+    try (CqlSession session = CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build()) {
     counter = 0;
-    preparedStatement = session.prepare(STMT_SELECT);
+    PreparedStatement preparedStatement = session.prepare(STMT_SELECT);
     for (int i = 1; i <= QUERIES; i++) {
       if (executeAndReturnIfResultHasTabletsInfo(session, preparedStatement.bind(i, i))) {
         counter++;
@@ -333,6 +334,7 @@ public class DefaultMetadataTabletMapIT {
         throw new RuntimeException(
             "Received non empty payload with tablets routing information: " + payload);
       }
+    }
     }
   }
 
