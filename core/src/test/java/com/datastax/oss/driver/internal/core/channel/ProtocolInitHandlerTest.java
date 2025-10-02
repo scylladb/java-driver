@@ -42,7 +42,6 @@ import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.TestResponses;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
-import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
@@ -120,17 +119,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
   @Test
   public void should_initialize() {
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            DriverChannelOptions.DEFAULT,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
 
     ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
 
@@ -208,7 +208,6 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
             DriverChannelOptions.DEFAULT,
             heartbeatHandler,
             false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
 
     channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
 
@@ -268,17 +267,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
   @Test
   public void should_initialize_with_authentication() {
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            DriverChannelOptions.DEFAULT,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
 
     String serverAuthenticator = "mockServerAuthenticator";
     AuthProvider authProvider = mock(AuthProvider.class);
@@ -332,17 +332,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
   @Test
   public void should_invoke_auth_provider_when_server_does_not_send_challenge() {
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            DriverChannelOptions.DEFAULT,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
 
     AuthProvider authProvider = mock(AuthProvider.class);
     when(internalDriverContext.getAuthProvider()).thenReturn(Optional.of(authProvider));
@@ -365,17 +366,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
   @Test
   public void should_fail_to_initialize_if_server_sends_auth_error() {
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            DriverChannelOptions.DEFAULT,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
 
     String serverAuthenticator = "mockServerAuthenticator";
     AuthProvider authProvider = mock(AuthProvider.class);
@@ -411,17 +413,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
   @Test
   public void should_check_cluster_name_if_provided() {
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            "expectedClusterName",
-            END_POINT,
-            DriverChannelOptions.DEFAULT,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                "expectedClusterName",
+                END_POINT,
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
 
     ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
 
@@ -441,18 +444,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
   @Test
   public void should_fail_to_initialize_if_cluster_name_does_not_match() {
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            "expectedClusterName",
-            END_POINT,
-            DriverChannelOptions.DEFAULT,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                "expectedClusterName",
+                END_POINT,
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
 
     ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
 
@@ -475,17 +478,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   public void should_initialize_with_keyspace() {
     DriverChannelOptions options =
         DriverChannelOptions.builder().withKeyspace(CqlIdentifier.fromCql("ks")).build();
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            options,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                options,
+                heartbeatHandler,
+                false));
 
     ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
 
@@ -506,17 +510,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     EventCallback eventCallback = mock(EventCallback.class);
     DriverChannelOptions driverChannelOptions =
         DriverChannelOptions.builder().withEvents(eventTypes, eventCallback).build();
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            driverChannelOptions,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                driverChannelOptions,
+                heartbeatHandler,
+                false));
 
     ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
 
@@ -540,17 +545,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
             .withKeyspace(CqlIdentifier.fromCql("ks"))
             .withEvents(eventTypes, eventCallback)
             .build();
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            driverChannelOptions,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                driverChannelOptions,
+                heartbeatHandler,
+                false));
 
     ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
 
@@ -574,17 +580,18 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   public void should_fail_to_initialize_if_keyspace_is_invalid() {
     DriverChannelOptions driverChannelOptions =
         DriverChannelOptions.builder().withKeyspace(CqlIdentifier.fromCql("ks")).build();
-    ProtocolInitHandler protocolInitHandler =
-        new ProtocolInitHandler(
-            internalDriverContext,
-            DefaultProtocolVersion.V4,
-            null,
-            END_POINT,
-            driverChannelOptions,
-            heartbeatHandler,
-            false);
-    protocolInitHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
-    channel.pipeline().addLast(ChannelFactory.INIT_HANDLER_NAME, protocolInitHandler);
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                driverChannelOptions,
+                heartbeatHandler,
+                false));
 
     ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
 

@@ -45,7 +45,6 @@ import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
 import com.datastax.oss.driver.internal.core.util.ProtocolUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
-import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.ProtocolConstants.ErrorCode;
@@ -95,7 +94,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
   private String logPrefix;
   private ChannelHandlerContext ctx;
   private final boolean querySupportedOptions;
-  private ProtocolFeatureStore featureStore;
+  private ProtocolFeatureStore featureStore = ProtocolFeatureStore.EMPTY;
 
   /**
    * @param querySupportedOptions whether to send OPTIONS as the first message, to request which
@@ -464,10 +463,5 @@ class ProtocolInitHandler extends ConnectInitHandler {
 
   private String getString(List<ByteBuffer> row, int i) {
     return TypeCodecs.TEXT.decode(row.get(i), DefaultProtocolVersion.DEFAULT);
-  }
-
-  @VisibleForTesting
-  void setFeatureStore(ProtocolFeatureStore featureStore) {
-    this.featureStore = featureStore;
   }
 }

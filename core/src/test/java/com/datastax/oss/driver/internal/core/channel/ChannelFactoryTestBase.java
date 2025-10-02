@@ -34,7 +34,6 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.protocol.ByteBufPrimitiveCodec;
-import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
@@ -272,7 +271,6 @@ public abstract class ChannelFactoryTestBase {
                     options,
                     heartbeatHandler,
                     productType == null);
-            initHandler.setFeatureStore(ProtocolFeatureStore.EMPTY);
             channel
                 .pipeline()
                 .addLast(ChannelFactory.INFLIGHT_HANDLER_NAME, inFlightHandler)
