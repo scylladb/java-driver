@@ -443,6 +443,9 @@ abstract class ArrayBackedResultSet implements ResultSet {
                         bs.preparedStatement().getPreparedId().resultSetMetadata =
                             new PreparedId.PreparedMetadata(
                                 rows.metadata.metadataId, rows.metadata.columns);
+                      } else if (rows.metadata.columns != null
+                          && rows.metadata.columns.size() > 0) {
+                        newMetadata = rows.metadata.columns;
                       }
                       MultiPage.this.nextPages.offer(new NextPage(newMetadata, rows.data));
                       MultiPage.this.fetchState =
