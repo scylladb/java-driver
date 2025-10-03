@@ -39,6 +39,7 @@ import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
+import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.LifecycleListener;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
@@ -336,6 +337,10 @@ public class DefaultSession implements CqlSession {
     private boolean forceCloseWasCalled;
 
     private SingleThreaded(InternalDriverContext context, Set<EndPoint> contactPoints) {
+      if (context instanceof DefaultDriverContext) {
+        SessionRegistry sessionRegistry = ((DefaultDriverContext) context).getSessionRegistry();
+        if (sessionRegistry != null) sessionRegistry.registerSession(this);
+      }
       this.context = context;
       this.nodeStateManager = new NodeStateManager(context);
       this.initialContactPoints = contactPoints;
@@ -656,6 +661,10 @@ public class DefaultSession implements CqlSession {
     }
 
     private void closePolicies() {
+      if (context instanceof DefaultDriverContext) {
+        SessionRegistry sessionRegistry = ((DefaultDriverContext) context).getSessionRegistry();
+        if (sessionRegistry != null) sessionRegistry.closeSession(this);
+      }
       // This is a bit tricky: we might be closing the session because of an initialization error.
       // This error might have been triggered by a policy failing to initialize. If we try to access
       // the policy here to close it, it will fail again. So make sure we ignore that error and
