@@ -37,12 +37,16 @@ import static junit.framework.TestCase.fail;
 
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.utils.CassandraVersion;
+import com.datastax.driver.core.utils.ScyllaVersion;
+import java.util.Objects;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 public class PreparedStatementInvalidationTest extends CCMTestsSupport {
+
+  private final VersionNumber SCYLLA_METADATA_ID_SUPPORT_VERSION = VersionNumber.parse("2025.3");
 
   @BeforeMethod(groups = "short", alwaysRun = true)
   public void setup() throws Exception {
@@ -59,39 +63,64 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
   }
 
   @CassandraVersion("4.0")
+  @ScyllaVersion()
   @Test(groups = "short")
   public void should_update_statement_id_when_metadata_changed_across_executions() {
     // given
+    boolean supportsUseMetadataId = isSupportsUseMetadataId();
     PreparedStatement ps =
         session().prepare("SELECT * FROM prepared_statement_invalidation_test WHERE a = ?");
     MD5Digest idBefore = ps.getPreparedId().resultSetMetadata.id;
+
     // when
     session().execute("ALTER TABLE prepared_statement_invalidation_test ADD d int");
     BoundStatement bs = ps.bind(1);
     ResultSet rows = session().execute(bs);
+
     // then
-    MD5Digest idAfter = ps.getPreparedId().resultSetMetadata.id;
-    assertThat(idBefore).isNotEqualTo(idAfter);
-    assertThat(ps.getPreparedId().resultSetMetadata.variables)
-        .hasSize(4)
-        .containsVariable("d", DataType.cint());
-    assertThat(bs.preparedStatement().getPreparedId().resultSetMetadata.variables)
-        .hasSize(4)
-        .containsVariable("d", DataType.cint());
+    if (supportsUseMetadataId) {
+      MD5Digest idAfter = ps.getPreparedId().resultSetMetadata.id;
+      assertThat(idBefore).isNotEqualTo(idAfter);
+      assertThat(ps.getPreparedId().resultSetMetadata.variables)
+          .hasSize(4)
+          .containsVariable("d", DataType.cint());
+      assertThat(bs.preparedStatement().getPreparedId().resultSetMetadata.variables)
+          .hasSize(4)
+          .containsVariable("d", DataType.cint());
+    } else {
+      assertThat(idBefore).isNull(); // Scylla does not support CQL5 extensions and metadata id
+      MD5Digest idAfter = ps.getPreparedId().resultSetMetadata.id;
+      assertThat(idAfter).isNull();
+      assertThat(ps.getPreparedId().resultSetMetadata.variables)
+          .hasSize(3)
+          .doesNotContainVariable("d");
+      assertThat(bs.preparedStatement().getPreparedId().resultSetMetadata.variables)
+          .hasSize(3)
+          .doesNotContainVariable("d");
+    }
     assertThat(rows.getColumnDefinitions()).hasSize(4).containsVariable("d", DataType.cint());
   }
 
   @CassandraVersion("4.0")
+  @ScyllaVersion()
   @Test(groups = "short")
-  public void should_update_statement_id_when_metadata_changed_across_pages() throws Exception {
+  public void should_update_statement_id_when_metadata_changed_across_pages() {
     // given
+    boolean supportsUseMetadataId = isSupportsUseMetadataId();
     PreparedStatement ps = session().prepare("SELECT * FROM prepared_statement_invalidation_test");
     ResultSet rows = session().execute(ps.bind().setFetchSize(2));
     assertThat(rows.isFullyFetched()).isFalse();
     MD5Digest idBefore = ps.getPreparedId().resultSetMetadata.id;
+    if (!supportsUseMetadataId) {
+      assertThat(idBefore).isNull();
+    }
     ColumnDefinitions definitionsBefore = rows.getColumnDefinitions();
     assertThat(definitionsBefore).hasSize(3).doesNotContainVariable("d");
-    // consume the first page
+
+    // when
+    session().execute("ALTER TABLE prepared_statement_invalidation_test ADD d int");
+
+    // consume the first page only after altering table to prevent early second page prefetching
     int remaining = rows.getAvailableWithoutFetching();
     while (remaining-- > 0) {
       try {
@@ -102,24 +131,27 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
       }
     }
 
-    // when
-    session().execute("ALTER TABLE prepared_statement_invalidation_test ADD d int");
-
     // then
-    // this should trigger a background fetch of the second page, and therefore update the
-    // definitions
+    // since `prepareNextRow` (which in turn calls `fetchMoreResults`) is called for each call of
+    // `rows.one()`, new page will be already fetched at this point
     for (Row row : rows) {
       assertThat(row.isNull("d")).isTrue();
     }
     MD5Digest idAfter = ps.getPreparedId().resultSetMetadata.id;
     ColumnDefinitions definitionsAfter = rows.getColumnDefinitions();
-    assertThat(idBefore).isNotEqualTo(idAfter);
+    if (supportsUseMetadataId) {
+      assertThat(idBefore).isNotEqualTo(idAfter);
+    } else {
+      assertThat(idAfter).isNull();
+    }
     assertThat(definitionsAfter).hasSize(4).containsVariable("d", DataType.cint());
   }
 
   @CassandraVersion("4.0")
+  @ScyllaVersion()
   @Test(groups = "short")
   public void should_update_statement_id_when_metadata_changed_across_sessions() {
+    boolean supportsUseMetadataId = isSupportsUseMetadataId();
     Session session1 = cluster().connect();
     useKeyspace(session1, keyspace);
     Session session2 = cluster().connect();
@@ -131,7 +163,15 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
         session2.prepare("SELECT * FROM prepared_statement_invalidation_test WHERE a = ?");
 
     MD5Digest id1a = ps1.getPreparedId().resultSetMetadata.id;
+
     MD5Digest id2a = ps2.getPreparedId().resultSetMetadata.id;
+    if (supportsUseMetadataId) {
+      assertThat(id1a).isNotNull();
+      assertThat(id2a).isNotNull();
+    } else {
+      assertThat(id1a).isNull();
+      assertThat(id2a).isNull();
+    }
 
     ResultSet rows1 = session1.execute(ps1.bind(1));
     ResultSet rows2 = session2.execute(ps2.bind(1));
@@ -154,16 +194,27 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
 
     MD5Digest id1b = ps1.getPreparedId().resultSetMetadata.id;
     MD5Digest id2b = ps2.getPreparedId().resultSetMetadata.id;
+    if (supportsUseMetadataId) {
+      assertThat(id1a).isNotEqualTo(id1b);
+      assertThat(id2a).isNotEqualTo(id2b);
 
-    assertThat(id1a).isNotEqualTo(id1b);
-    assertThat(id2a).isNotEqualTo(id2b);
+      assertThat(ps1.getPreparedId().resultSetMetadata.variables)
+          .hasSize(4)
+          .containsVariable("d", DataType.cint());
+      assertThat(ps2.getPreparedId().resultSetMetadata.variables)
+          .hasSize(4)
+          .containsVariable("d", DataType.cint());
+    } else {
+      assertThat(id1b).isNull();
+      assertThat(id2b).isNull();
 
-    assertThat(ps1.getPreparedId().resultSetMetadata.variables)
-        .hasSize(4)
-        .containsVariable("d", DataType.cint());
-    assertThat(ps2.getPreparedId().resultSetMetadata.variables)
-        .hasSize(4)
-        .containsVariable("d", DataType.cint());
+      assertThat(ps1.getPreparedId().resultSetMetadata.variables)
+          .hasSize(3)
+          .doesNotContainVariable("d");
+      assertThat(ps2.getPreparedId().resultSetMetadata.variables)
+          .hasSize(3)
+          .doesNotContainVariable("d");
+    }
     assertThat(rows1.getColumnDefinitions()).hasSize(4).containsVariable("d", DataType.cint());
     assertThat(rows2.getColumnDefinitions()).hasSize(4).containsVariable("d", DataType.cint());
   }
@@ -182,21 +233,42 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
   }
 
   @CassandraVersion("4.0")
-  @Test(groups = "short")
+  @ScyllaVersion()
+  @Test()
   public void should_never_update_statement_id_for_conditional_updates_in_modern_protocol() {
     should_never_update_statement_id_for_conditional_updates(session());
   }
 
+  @CassandraVersion("4.0")
+  @ScyllaVersion()
+  @Test()
+  public void should_never_update_statement_for_conditional_updates_in_legacy_protocols() {
+    Cluster cluster =
+        register(
+            Cluster.builder()
+                .addContactPoints(getContactPoints())
+                .withPort(ccm().getBinaryPort())
+                .withProtocolVersion(ccm().getProtocolVersion(V4))
+                .build());
+    Session session = cluster.connect(keyspace);
+    should_never_update_statement_id_for_conditional_updates(session);
+  }
+
   private void should_never_update_statement_id_for_conditional_updates(Session session) {
     // Given
+    boolean isScylla = Objects.nonNull(ccm().getScyllaVersion());
+    boolean supportsUseMetadataId = isSupportsUseMetadataId();
     PreparedStatement ps =
         session.prepare(
             "INSERT INTO prepared_statement_invalidation_test (a, b, c) VALUES (?, ?, ?) IF NOT EXISTS");
 
     // Never store metadata in the prepared statement for conditional updates, since the result set
-    // can change
-    // depending on the outcome.
-    assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
+    // can change depending on the outcome.
+    if (isScylla) {
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).hasSize(4);
+    } else {
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
+    }
     MD5Digest idBefore = ps.getPreparedId().resultSetMetadata.id;
 
     // When
@@ -205,11 +277,21 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     // Then
     // Successful conditional update => only contains the [applied] column
     assertThat(rs.wasApplied()).isTrue();
-    assertThat(rs.getColumnDefinitions())
-        .hasSize(1)
-        .containsVariable("[applied]", DataType.cboolean());
+    if (isScylla) {
+      assertThat(rs.getColumnDefinitions())
+          .hasSize(4)
+          .containsVariable("[applied]", DataType.cboolean());
+    } else {
+      assertThat(rs.getColumnDefinitions())
+          .hasSize(1)
+          .containsVariable("[applied]", DataType.cboolean());
+    }
     // However the prepared statement shouldn't have changed
-    assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
+    if (isScylla) {
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).hasSize(4);
+    } else {
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
+    }
     assertThat(ps.getPreparedId().resultSetMetadata.id).isEqualTo(idBefore);
 
     // When
@@ -225,7 +307,11 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     assertThat(row.getInt("b")).isEqualTo(5);
     assertThat(row.getInt("c")).isEqualTo(5);
     // The prepared statement still shouldn't have changed
-    assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
+    if (isScylla) {
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).hasSize(4);
+    } else {
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
+    }
     assertThat(ps.getPreparedId().resultSetMetadata.id).isEqualTo(idBefore);
 
     // When
@@ -235,30 +321,28 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
     // Then
     // Failed conditional update => regular metadata that should also contain the new column
     assertThat(rs.wasApplied()).isFalse();
-    assertThat(rs.getColumnDefinitions()).hasSize(5);
+    if (isScylla && !supportsUseMetadataId) {
+      assertThat(rs.getColumnDefinitions()).hasSize(4);
+    } else {
+      assertThat(rs.getColumnDefinitions()).hasSize(5);
+    }
     row = rs.one();
     assertThat(row.getBool("[applied]")).isFalse();
     assertThat(row.getInt("a")).isEqualTo(5);
     assertThat(row.getInt("b")).isEqualTo(5);
     assertThat(row.getInt("c")).isEqualTo(5);
-    assertThat(row.isNull("d")).isTrue();
-    assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
-    assertThat(ps.getPreparedId().resultSetMetadata.id).isEqualTo(idBefore);
-  }
-
-  @CassandraVersion("4.0")
-  @Test(groups = "short")
-  public void should_never_update_statement_for_conditional_updates_in_legacy_protocols() {
-    // Given
-    Cluster cluster =
-        register(
-            Cluster.builder()
-                .addContactPoints(getContactPoints())
-                .withPort(ccm().getBinaryPort())
-                .withProtocolVersion(ccm().getProtocolVersion(V4))
-                .build());
-    Session session = cluster.connect(keyspace);
-    should_never_update_statement_id_for_conditional_updates(session);
+    if (!isScylla) {
+      assertThat(row.isNull("d")).isTrue();
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).isNull();
+      assertThat(ps.getPreparedId().resultSetMetadata.id).isEqualTo(idBefore);
+    } else if (supportsUseMetadataId) {
+      assertThat(row.isNull("d")).isTrue();
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).hasSize(5);
+      assertThat(ps.getPreparedId().resultSetMetadata.id).isNotEqualTo(idBefore);
+    } else {
+      assertThat(row.getColumnDefinitions()).doesNotContainVariable("d");
+      assertThat(ps.getPreparedId().resultSetMetadata.variables).hasSize(4);
+    }
   }
 
   @DataProvider(name = "resolverName")
@@ -401,5 +485,10 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
         "CREATE KEYSPACE IF NOT EXISTS cql4_loopholes_test WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }");
     session.execute("USE cql4_loopholes_test");
     return session;
+  }
+
+  private boolean isSupportsUseMetadataId() {
+    return Objects.isNull(ccm().getScyllaVersion())
+        || ccm().getScyllaVersion().compareTo(SCYLLA_METADATA_ID_SUPPORT_VERSION) > 0;
   }
 }

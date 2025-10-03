@@ -600,7 +600,7 @@ public class Host {
     /**
      * Gets invoked when the tracker is registered with a cluster, or at cluster startup if the
      * tracker was registered at initialization with {@link
-     * Cluster.Initializer#register(LatencyTracker)}.
+     * com.datastax.driver.core.Cluster.Initializer#register(LatencyTracker)}.
      *
      * @param cluster the cluster that this tracker is registered with.
      */
@@ -624,7 +624,8 @@ public class Host {
   public interface LifecycleAwareStateListener extends StateListener {
     /**
      * Gets invoked when the listener is registered with a cluster, or at cluster startup if the
-     * listener was registered at initialization with {@link Cluster#register(StateListener)}.
+     * listener was registered at initialization with {@link
+     * com.datastax.driver.core.Cluster#register(Host.StateListener)}.
      *
      * @param cluster the cluster that this listener is registered with.
      */
