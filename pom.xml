@@ -77,7 +77,7 @@
     <snappy.version>1.1.10.8</snappy.version>
     <lz4.version>1.7.1</lz4.version>
     <!-- test dependencies -->
-    <assertj.version>3.19.0</assertj.version>
+    <assertj.version>3.27.6</assertj.version>
     <commons-exec.version>1.5.0</commons-exec.version>
     <junit.version>4.13.2</junit.version>
     <logback.version>1.2.13</logback.version>
