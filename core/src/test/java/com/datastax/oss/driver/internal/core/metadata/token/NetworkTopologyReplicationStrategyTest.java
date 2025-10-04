@@ -33,6 +33,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -655,7 +656,7 @@ public class NetworkTopologyReplicationStrategyTest {
       Map<Token, Node> tokenToPrimary,
       ImmutableMap<String, String> replicationConfig) {
     AtomicInteger count = new AtomicInteger();
-    List<Token> ringSpy = spy(ring);
+    List<Token> ringSpy = spy(new ArrayList<>(ring));
     when(ringSpy.get(anyInt()))
         .thenAnswer(
             invocation -> {
