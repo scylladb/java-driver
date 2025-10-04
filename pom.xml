@@ -465,7 +465,7 @@
       <dependency>
         <groupId>org.burningwave</groupId>
         <artifactId>tools</artifactId>
-        <version>0.26.2</version>
+        <version>0.27.2</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
