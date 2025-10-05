@@ -807,7 +807,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               <docletArtifact>
                 <groupId>com.datastax.oss</groupId>
                 <artifactId>api-plumber-doclet</artifactId>
-                <version>1.0.0</version>
+                <version>2.0.0</version>
               </docletArtifact>
               <additionalJOptions>
                 <!-- API types do not leak internal types -->
