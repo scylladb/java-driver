@@ -29,7 +29,9 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.List;
 import net.jcip.annotations.Immutable;
 
 @Immutable
@@ -198,5 +200,49 @@ public abstract class DefaultGeometry implements Geometry, Serializable {
   @Override
   public String toString() {
     return asWellKnownText();
+  }
+
+  protected static void appendPosition(StringBuilder builder, double x, double y) {
+    builder
+        .append('[')
+        .append(formatCoordinate(x))
+        .append(',')
+        .append(formatCoordinate(y))
+        .append(']');
+  }
+
+  protected static void appendPosition(StringBuilder builder, Point point) {
+    appendPosition(builder, point.X(), point.Y());
+  }
+
+  protected static void appendPositions(
+      StringBuilder builder, List<Point> points, boolean closeRing) {
+    builder.append('[');
+    for (int i = 0; i < points.size(); i++) {
+      if (i > 0) {
+        builder.append(',');
+      }
+      appendPosition(builder, points.get(i));
+    }
+    if (closeRing && !points.isEmpty()) {
+      Point first = points.get(0);
+      Point last = points.get(points.size() - 1);
+      if (!haveSameCoordinates(first, last)) {
+        builder.append(',');
+        appendPosition(builder, first);
+      }
+    }
+    builder.append(']');
+  }
+
+  private static boolean haveSameCoordinates(Point first, Point second) {
+    return Double.compare(first.X(), second.X()) == 0 && Double.compare(first.Y(), second.Y()) == 0;
+  }
+
+  private static String formatCoordinate(double value) {
+    if (!Double.isFinite(value)) {
+      throw new IllegalArgumentException("Coordinate values must be finite");
+    }
+    return BigDecimal.valueOf(value).toString();
   }
 }

@@ -57,6 +57,17 @@ public class DefaultLineString extends DefaultGeometry implements LineString {
     return points;
   }
 
+  @NonNull
+  @Override
+  public String asGeoJson() {
+    int estimatedSize = Math.max(32, points.size() * 32);
+    StringBuilder builder = new StringBuilder(estimatedSize);
+    builder.append("{\"type\":\"LineString\",\"coordinates\":");
+    appendPositions(builder, points, false);
+    builder.append('}');
+    return builder.toString();
+  }
+
   /**
    * This object gets replaced by an internal proxy for serialization.
    *

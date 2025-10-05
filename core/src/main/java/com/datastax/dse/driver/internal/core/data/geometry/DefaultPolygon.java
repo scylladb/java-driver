@@ -71,6 +71,24 @@ public class DefaultPolygon extends DefaultGeometry implements Polygon {
     return interiorRings;
   }
 
+  @NonNull
+  @Override
+  public String asGeoJson() {
+    if (exteriorRing.isEmpty()) {
+      return "{\"type\":\"Polygon\",\"coordinates\":[]}";
+    }
+    int totalRings = 1 + interiorRings.size();
+    StringBuilder builder = new StringBuilder(Math.max(64, totalRings * 96));
+    builder.append("{\"type\":\"Polygon\",\"coordinates\":[");
+    appendPositions(builder, exteriorRing, true);
+    for (List<Point> ring : interiorRings) {
+      builder.append(',');
+      appendPositions(builder, ring, true);
+    }
+    builder.append("]}");
+    return builder.toString();
+  }
+
   private static OGCPolygon fromPoints(Point p1, Point p2, Point p3, Point... pn) {
     com.esri.core.geometry.Polygon polygon = new com.esri.core.geometry.Polygon();
     addPath(polygon, p1, p2, p3, pn);

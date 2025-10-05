@@ -53,6 +53,16 @@ public class DefaultPoint extends DefaultGeometry implements Point {
     return getOgcGeometry().Y();
   }
 
+  @NonNull
+  @Override
+  public String asGeoJson() {
+    StringBuilder builder = new StringBuilder(64);
+    builder.append("{\"type\":\"Point\",\"coordinates\":");
+    appendPosition(builder, X(), Y());
+    builder.append('}');
+    return builder.toString();
+  }
+
   /**
    * This object gets replaced by an internal proxy for serialization.
    *
