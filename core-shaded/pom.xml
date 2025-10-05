@@ -299,7 +299,7 @@
                 <additionalDependency>
                   <groupId>org.jctools</groupId>
                   <artifactId>jctools-core</artifactId>
-                  <version>2.1.2</version>
+                  <version>4.0.5</version>
                 </additionalDependency>
                 <additionalDependency>
                   <groupId>com.esri.geometry</groupId>
