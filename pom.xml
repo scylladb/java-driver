@@ -66,7 +66,7 @@
     -->
     <tinkerpop.version>3.5.6</tinkerpop.version>
     <!-- when changing version also update version in LICENSE_binary  -->
-    <slf4j.version>1.7.36</slf4j.version>
+    <slf4j.version>2.0.17</slf4j.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <reactive-streams.version>1.0.4</reactive-streams.version>
     <json.version>20250517</json.version>
