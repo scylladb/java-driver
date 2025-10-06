@@ -17,6 +17,7 @@ import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -128,9 +129,10 @@ public class AdvancedShardAwarenessIT {
             .withConfigLoader(loader)
             .build()) {
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
       expectedOccurences.forEach(
-          (pattern, times) -> assertMatchesExactly(pattern, times, appender.list));
-      forbiddenOccurences.forEach(pattern -> assertNoLogMatches(pattern, appender.list));
+          (pattern, times) -> assertMatchesExactly(pattern, times, logsCopy));
+      forbiddenOccurences.forEach(pattern -> assertNoLogMatches(pattern, logsCopy));
     }
   }
 
@@ -150,7 +152,8 @@ public class AdvancedShardAwarenessIT {
             .withConfigLoader(loader)
             .build()) {
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-      assertMatchesAtLeast(shardMismatchPattern, 5, appender.list);
+      List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
+      assertMatchesAtLeast(shardMismatchPattern, 5, logsCopy);
     }
   }
 
@@ -178,8 +181,9 @@ public class AdvancedShardAwarenessIT {
         CqlSession session3 = CompletableFutures.getUninterruptibly(stage3);
         CqlSession session4 = CompletableFutures.getUninterruptibly(stage4); ) {
       Uninterruptibles.sleepUninterruptibly(20, TimeUnit.SECONDS);
-      assertNoLogMatches(shardMismatchPattern, appender.list);
-      assertMatchesAtLeast(generalReconnectionPattern, 8, appender.list);
+      List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
+      assertNoLogMatches(shardMismatchPattern, logsCopy);
+      assertMatchesAtLeast(generalReconnectionPattern, 8, logsCopy);
     }
   }
 
@@ -226,11 +230,12 @@ public class AdvancedShardAwarenessIT {
                           + Pattern.quote(node2)
                           + ":19042.*Reconnection attempt complete, 66/66 channels.*"),
                   1 * sessions);
+      List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
       expectedOccurences.forEach(
-          (pattern, times) -> assertMatchesAtLeast(pattern, times, appender.list));
-      assertNoLogMatches(shardMismatchPattern, appender.list);
-      assertMatchesAtMost(reconnectionPattern1, tolerance, appender.list);
-      assertMatchesAtMost(reconnectionPattern2, tolerance, appender.list);
+          (pattern, times) -> assertMatchesAtLeast(pattern, times, logsCopy));
+      assertNoLogMatches(shardMismatchPattern, logsCopy);
+      assertMatchesAtMost(reconnectionPattern1, tolerance, logsCopy);
+      assertMatchesAtMost(reconnectionPattern2, tolerance, logsCopy);
     }
   }
 
