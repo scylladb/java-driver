@@ -14,6 +14,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
+import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
@@ -39,11 +40,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.slf4j.LoggerFactory;
 
 @ScyllaOnly(description = "Advanced shard awareness relies on ScyllaDB's shard aware port")
 @RunWith(DataProviderRunner.class)
+@Category(IsolatedTests.class)
 public class AdvancedShardAwarenessIT {
 
   @ClassRule
