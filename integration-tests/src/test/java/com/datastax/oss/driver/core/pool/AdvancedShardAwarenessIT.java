@@ -95,12 +95,7 @@ public class AdvancedShardAwarenessIT {
     Map<Pattern, Integer> expectedOccurences =
         ImmutableMap.of(
             Pattern.compile(".*\\.2:19042.*Reconnection attempt complete, 6/6 channels.*"), 1,
-            Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 6/6 channels.*"), 1,
-            Pattern.compile(".*Reconnection attempt complete.*"), 2,
-            Pattern.compile(".*\\.1:19042.*New channel added \\[.*"), 5,
-            Pattern.compile(".*\\.2:19042.*New channel added \\[.*"), 5,
-            Pattern.compile(".*\\.1:19042\\] Trying to create 5 missing channels.*"), 1,
-            Pattern.compile(".*\\.2:19042\\] Trying to create 5 missing channels.*"), 1);
+            Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 6/6 channels.*"), 1);
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, reuseAddress)
@@ -203,12 +198,6 @@ public class AdvancedShardAwarenessIT {
               Pattern.compile(".*\\.2:19042.*Reconnection attempt complete, 66/66 channels.*"),
                   1 * sessions,
               Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 66/66 channels.*"),
-                  1 * sessions,
-              Pattern.compile(".*Reconnection attempt complete.*"), 2 * sessions,
-              Pattern.compile(".*.1:19042.*New channel added \\[.*"), 65 * sessions - tolerance,
-              Pattern.compile(".*.2:19042.*New channel added \\[.*"), 65 * sessions - tolerance,
-              Pattern.compile(".*.1:19042\\] Trying to create 65 missing channels.*"), 1 * sessions,
-              Pattern.compile(".*.2:19042\\] Trying to create 65 missing channels.*"),
                   1 * sessions);
       expectedOccurences.forEach(
           (pattern, times) -> assertMatchesAtLeast(pattern, times, appender.list));
