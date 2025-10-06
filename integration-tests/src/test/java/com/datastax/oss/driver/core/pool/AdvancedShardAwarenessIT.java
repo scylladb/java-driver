@@ -55,9 +55,8 @@ public class AdvancedShardAwarenessIT {
   Level originalLevelReconnection;
   private final Pattern shardMismatchPattern =
       Pattern.compile(".*r configuration of shard aware port.*");
-  private final Pattern reconnectionPattern =
+  private final Pattern generalReconnectionPattern =
       Pattern.compile(".*Scheduling next reconnection in.*");
-  Set<Pattern> forbiddenOccurences = ImmutableSet.of(shardMismatchPattern, reconnectionPattern);
 
   @DataProvider
   public static Object[][] reuseAddressOption() {
@@ -92,10 +91,26 @@ public class AdvancedShardAwarenessIT {
   @Test
   @UseDataProvider("reuseAddressOption")
   public void should_initialize_all_channels(boolean reuseAddress) {
+    String node1 = CCM_RULE.getCcmBridge().getNodeIpAddress(1);
+    String node2 = CCM_RULE.getCcmBridge().getNodeIpAddress(2);
+    Pattern reconnectionPattern1 =
+        Pattern.compile(".*" + Pattern.quote(node1) + ".*Scheduling next reconnection in.*");
+    Pattern reconnectionPattern2 =
+        Pattern.compile(".*" + Pattern.quote(node2) + ".*Scheduling next reconnection in.*");
+    Set<Pattern> forbiddenOccurences =
+        ImmutableSet.of(shardMismatchPattern, reconnectionPattern1, reconnectionPattern2);
     Map<Pattern, Integer> expectedOccurences =
         ImmutableMap.of(
-            Pattern.compile(".*\\.2:19042.*Reconnection attempt complete, 6/6 channels.*"), 1,
-            Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 6/6 channels.*"), 1);
+            Pattern.compile(
+                    ".*"
+                        + Pattern.quote(node1)
+                        + ":19042.*Reconnection attempt complete, 6/6 channels.*"),
+                1,
+            Pattern.compile(
+                    ".*"
+                        + Pattern.quote(node2)
+                        + ":19042.*Reconnection attempt complete, 6/6 channels.*"),
+                1);
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, reuseAddress)
@@ -164,7 +179,7 @@ public class AdvancedShardAwarenessIT {
         CqlSession session4 = CompletableFutures.getUninterruptibly(stage4); ) {
       Uninterruptibles.sleepUninterruptibly(20, TimeUnit.SECONDS);
       assertNoLogMatches(shardMismatchPattern, appender.list);
-      assertMatchesAtLeast(reconnectionPattern, 8, appender.list);
+      assertMatchesAtLeast(generalReconnectionPattern, 8, appender.list);
     }
   }
 
@@ -193,16 +208,29 @@ public class AdvancedShardAwarenessIT {
         CqlSession session4 = CompletableFutures.getUninterruptibly(stage4); ) {
       Uninterruptibles.sleepUninterruptibly(8, TimeUnit.SECONDS);
       int tolerance = 2; // Sometimes socket ends up already in use
+      String node1 = CCM_RULE.getCcmBridge().getNodeIpAddress(1);
+      String node2 = CCM_RULE.getCcmBridge().getNodeIpAddress(2);
+      Pattern reconnectionPattern1 =
+          Pattern.compile(".*" + Pattern.quote(node1) + ".*Scheduling next reconnection in.*");
+      Pattern reconnectionPattern2 =
+          Pattern.compile(".*" + Pattern.quote(node2) + ".*Scheduling next reconnection in.*");
       Map<Pattern, Integer> expectedOccurences =
           ImmutableMap.of(
-              Pattern.compile(".*\\.2:19042.*Reconnection attempt complete, 66/66 channels.*"),
+              Pattern.compile(
+                      ".*"
+                          + Pattern.quote(node1)
+                          + ":19042.*Reconnection attempt complete, 66/66 channels.*"),
                   1 * sessions,
-              Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 66/66 channels.*"),
+              Pattern.compile(
+                      ".*"
+                          + Pattern.quote(node2)
+                          + ":19042.*Reconnection attempt complete, 66/66 channels.*"),
                   1 * sessions);
       expectedOccurences.forEach(
           (pattern, times) -> assertMatchesAtLeast(pattern, times, appender.list));
       assertNoLogMatches(shardMismatchPattern, appender.list);
-      assertMatchesAtMost(reconnectionPattern, tolerance, appender.list);
+      assertMatchesAtMost(reconnectionPattern1, tolerance, appender.list);
+      assertMatchesAtMost(reconnectionPattern2, tolerance, appender.list);
     }
   }
 
