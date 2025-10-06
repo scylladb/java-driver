@@ -10,28 +10,31 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
-import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
+import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.util.concurrent.Uninterruptibles;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
@@ -92,6 +95,7 @@ public class AdvancedShardAwarenessIT {
   @Test
   @UseDataProvider("reuseAddressOption")
   public void should_initialize_all_channels(boolean reuseAddress) {
+    int expectedChannelsPerNode = 6; // Divisible by smp
     String node1 = CCM_RULE.getCcmBridge().getNodeIpAddress(1);
     String node2 = CCM_RULE.getCcmBridge().getNodeIpAddress(2);
     Pattern reconnectionPattern1 =
@@ -120,15 +124,19 @@ public class AdvancedShardAwarenessIT {
             .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, 60000)
             // Due to rounding up the connections per shard this will result in 6 connections per
             // node
-            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, 4)
+            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, expectedChannelsPerNode)
             .build();
-    try (Session session =
+    try (CqlSession session =
         CqlSession.builder()
             .addContactPoint(
                 new InetSocketAddress(CCM_RULE.getCcmBridge().getNodeIpAddress(1), 19042))
             .withConfigLoader(loader)
             .build()) {
-      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      List<CqlSession> allSessions = Collections.singletonList(session);
+      Awaitility.await()
+          .atMost(5, TimeUnit.SECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
       expectedOccurences.forEach(
           (pattern, times) -> assertMatchesExactly(pattern, times, logsCopy));
@@ -138,20 +146,25 @@ public class AdvancedShardAwarenessIT {
 
   @Test
   public void should_see_mismatched_shard() {
+    int expectedChannelsPerNode = 66; // Divisible by smp
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true)
             .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, 10000)
             .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, 60000)
-            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, 64)
+            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, 66)
             .build();
-    try (Session session =
+    try (CqlSession session =
         CqlSession.builder()
             .addContactPoint(
                 new InetSocketAddress(CCM_RULE.getCcmBridge().getNodeIpAddress(1), 9042))
             .withConfigLoader(loader)
             .build()) {
-      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      List<CqlSession> allSessions = Collections.singletonList(session);
+      Awaitility.await()
+          .atMost(20, TimeUnit.SECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
       assertMatchesAtLeast(shardMismatchPattern, 5, logsCopy);
     }
@@ -160,10 +173,11 @@ public class AdvancedShardAwarenessIT {
   // There is no need to run this as a test, but it serves as a comparison
   @SuppressWarnings("unused")
   public void should_struggle_to_fill_pools() {
+    int expectedChannelsPerNode = 66; // Divisible by smp
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, false)
-            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, 64)
+            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, 66)
             .withDuration(DefaultDriverOption.RECONNECTION_BASE_DELAY, Duration.ofMillis(200))
             .withDuration(DefaultDriverOption.RECONNECTION_MAX_DELAY, Duration.ofMillis(4000))
             .build();
@@ -180,7 +194,11 @@ public class AdvancedShardAwarenessIT {
         CqlSession session2 = CompletableFutures.getUninterruptibly(stage2);
         CqlSession session3 = CompletableFutures.getUninterruptibly(stage3);
         CqlSession session4 = CompletableFutures.getUninterruptibly(stage4); ) {
-      Uninterruptibles.sleepUninterruptibly(20, TimeUnit.SECONDS);
+      List<CqlSession> allSessions = Arrays.asList(session1, session2, session3, session4);
+      Awaitility.await()
+          .atMost(20, TimeUnit.SECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
       assertNoLogMatches(shardMismatchPattern, logsCopy);
       assertMatchesAtLeast(generalReconnectionPattern, 8, logsCopy);
@@ -189,10 +207,11 @@ public class AdvancedShardAwarenessIT {
 
   @Test
   public void should_not_struggle_to_fill_pools() {
+    int expectedChannelsPerNode = 66;
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true)
-            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, 66)
+            .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, expectedChannelsPerNode)
             .withDuration(DefaultDriverOption.RECONNECTION_BASE_DELAY, Duration.ofMillis(10))
             .withDuration(DefaultDriverOption.RECONNECTION_MAX_DELAY, Duration.ofMillis(20))
             .build();
@@ -210,7 +229,11 @@ public class AdvancedShardAwarenessIT {
         CqlSession session2 = CompletableFutures.getUninterruptibly(stage2);
         CqlSession session3 = CompletableFutures.getUninterruptibly(stage3);
         CqlSession session4 = CompletableFutures.getUninterruptibly(stage4); ) {
-      Uninterruptibles.sleepUninterruptibly(8, TimeUnit.SECONDS);
+      List<CqlSession> allSessions = Arrays.asList(session1, session2, session3, session4);
+      Awaitility.await()
+          .atMost(20, TimeUnit.SECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       int tolerance = 2; // Sometimes socket ends up already in use
       String node1 = CCM_RULE.getCcmBridge().getNodeIpAddress(1);
       String node2 = CCM_RULE.getCcmBridge().getNodeIpAddress(2);
@@ -237,6 +260,27 @@ public class AdvancedShardAwarenessIT {
       assertMatchesAtMost(reconnectionPattern1, tolerance, logsCopy);
       assertMatchesAtMost(reconnectionPattern2, tolerance, logsCopy);
     }
+  }
+
+  private boolean areAllPoolsFullyInitialized(
+      List<CqlSession> sessions, int expectedChannelsPerNode) {
+    for (CqlSession session : sessions) {
+      DefaultSession defaultSession = (DefaultSession) session;
+      Map<Node, ChannelPool> pools = defaultSession.getPools();
+      if (pools == null || pools.isEmpty()) {
+        return false;
+      }
+
+      for (ChannelPool pool : pools.values()) {
+        if (pool == null) {
+          return false;
+        }
+        if (pool.size() < expectedChannelsPerNode) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private void assertNoLogMatches(Pattern pattern, List<ILoggingEvent> logs) {
