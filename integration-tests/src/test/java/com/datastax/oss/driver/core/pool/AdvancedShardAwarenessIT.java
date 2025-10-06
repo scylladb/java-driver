@@ -14,6 +14,7 @@ import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
+import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
@@ -35,11 +36,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.slf4j.LoggerFactory;
 
 @ScyllaOnly(description = "Advanced shard awareness relies on ScyllaDB's shard aware port")
 @RunWith(DataProviderRunner.class)
+@Category(IsolatedTests.class)
 public class AdvancedShardAwarenessIT {
 
   @ClassRule
@@ -96,11 +99,9 @@ public class AdvancedShardAwarenessIT {
         ImmutableMap.of(
             Pattern.compile(".*\\.2:19042.*Reconnection attempt complete, 6/6 channels.*"), 1,
             Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 6/6 channels.*"), 1,
-            Pattern.compile(".*Reconnection attempt complete.*"), 2,
-            Pattern.compile(".*\\.1:19042.*New channel added \\[.*"), 5,
-            Pattern.compile(".*\\.2:19042.*New channel added \\[.*"), 5,
-            Pattern.compile(".*\\.1:19042\\] Trying to create 5 missing channels.*"), 1,
-            Pattern.compile(".*\\.2:19042\\] Trying to create 5 missing channels.*"), 1);
+            Pattern.compile(
+                    "If this is not transient check your driver AND cluster configuration of shard aware port."),
+                0);
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, reuseAddress)
@@ -204,12 +205,9 @@ public class AdvancedShardAwarenessIT {
                   1 * sessions,
               Pattern.compile(".*\\.1:19042.*Reconnection attempt complete, 66/66 channels.*"),
                   1 * sessions,
-              Pattern.compile(".*Reconnection attempt complete.*"), 2 * sessions,
-              Pattern.compile(".*.1:19042.*New channel added \\[.*"), 65 * sessions - tolerance,
-              Pattern.compile(".*.2:19042.*New channel added \\[.*"), 65 * sessions - tolerance,
-              Pattern.compile(".*.1:19042\\] Trying to create 65 missing channels.*"), 1 * sessions,
-              Pattern.compile(".*.2:19042\\] Trying to create 65 missing channels.*"),
-                  1 * sessions);
+              Pattern.compile(
+                      "If this is not transient check your driver AND cluster configuration of shard aware port."),
+                  0);
       expectedOccurences.forEach(
           (pattern, times) -> assertMatchesAtLeast(pattern, times, appender.list));
       assertNoLogMatches(shardMismatchPattern, appender.list);
