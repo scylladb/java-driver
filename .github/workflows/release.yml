@@ -5,7 +5,7 @@ on:
     inputs:
       dryrun:
         type: boolean
-        description: 'dryrun: run without pushing SCM changes to upstream'
+        description: 'dryrun: run without publishing the package'
         default: true
 
 jobs:
@@ -47,18 +47,26 @@ jobs:
     - name: Prepare release
       env:
         GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      run: $MVNCMD release:prepare -DpushChanges=false -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+      run: make release-prepare
 
     - name: Perform release
       env:
         GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
         OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-      if: ${{ github.event.inputs.dryrun == 'false' }}
-      run: $MVNCMD release:perform -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+      if: ${{ github.event.inputs.dryrun == false }}
+      run: make release
+
+    - name: Perform dry-run release
+      env:
+        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+        OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+      if: ${{ github.event.inputs.dryrun == true }}
+      run: make release-dry-run
 
     - name: Push changes to SCM
-      if: ${{ github.event.inputs.dryrun == 'false' }}
+      if: ${{ github.event.inputs.dryrun == false }}
       run: |
         git status && git log -3
         git push origin --follow-tags -v
