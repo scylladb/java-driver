@@ -182,7 +182,7 @@ jobs:
       - name: Setup Python 3
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
   cassandra-integration-tests:
     name: Cassandra ITs
@@ -215,7 +215,7 @@ jobs:
       - name: Setup Python 3
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: Setup environment
         run: |
@@ -322,7 +322,7 @@ jobs:
       - name: Setup Python 3
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: '3.14'
 
       - name: Setup environment
         run: |
