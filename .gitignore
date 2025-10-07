@@ -10,6 +10,7 @@ docs/_build
 docs/_source
 html
 latex
+bin/
 
 .java-version
 .flattened-pom.xml

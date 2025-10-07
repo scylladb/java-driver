@@ -5,7 +5,7 @@ on:
     inputs:
       version_tag:
         type: string
-        description: ''
+        description: 'version or tag to release it again'
         required: true
 
 jobs:
@@ -15,9 +15,6 @@ jobs:
 
     permissions:
       contents: write
-
-    env:
-      MVNCMD: mvn -B -X -ntp
 
     steps:
     - name: Checkout Repository
@@ -44,20 +41,14 @@ jobs:
         git config user.name "ScyllaDB Promoter"
         git config user.email "github-promoter@scylladb.com"
 
-    - name: Clean project
-      run: $MVNCMD clean
-
-    - name: Clean release
-      run: $MVNCMD release:clean
-
     - name: Prepare release
       env:
         GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      run: $MVNCMD release:prepare -DskipTests -Darguments="-DskipTests" -DpushChanges=false -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+      run: make release-prepare
 
     - name: Perform release
       env:
         GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         OSSRH_USERNAME: ${{ secrets.OSSRH_USERNAME }}
         OSSRH_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
-      run: $MVNCMD release:perform -DscmSkip=true -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+      run: make release

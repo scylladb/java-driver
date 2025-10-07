@@ -61,19 +61,12 @@ jobs:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
 
-      - name: Install guava-shaded
-        run: mvn install -pl guava-shaded
-
       - name: Compile source and tests
-        run: mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+        run: make compile-all
 
       - name: Download test dependencies
         if: steps.java-cache.outputs.cache-hit != 'true'
-        run: mvn -B test -Dtest=TestThatDoesNotExists -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
-
-      - name: Download verify dependencies
-        if: steps.java-cache.outputs.cache-hit != 'true'
-        run: mvn -B verify -DskipTests || true
+        run: make download-all-dependencies
 
       - name: Save maven repository cache
         uses: actions/cache/save@v4
@@ -109,8 +102,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Full verify
-        run: mvn -B verify -DskipTests
-
+        run: make check
 
   unit-tests:
     name: Unit tests
@@ -138,11 +130,8 @@ jobs:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
-      - name: Install guava-shaded
-        run: mvn install -pl guava-shaded
-
       - name: Run unit tests
-        run: mvn -B test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+        run: make test-unit
 
       - name: Copy test results
         if: always()
@@ -192,7 +181,7 @@ jobs:
 
     strategy:
       matrix:
-        cassandra-version: [RELEASE-3.X, RELEASE-4.X]
+        cassandra-version: [3-LATEST, 4-LATEST]
         java-version: [8]
       fail-fast: false
 
@@ -218,19 +207,13 @@ jobs:
           python-version: '3.13'
 
       - name: Setup environment
-        run: |
-          pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
+        run: make install-cassandra-ccm
 
       - name: Get cassandra version
         id: cassandra-version
-        run: |
-          if [[ "${{ matrix.cassandra-version }}" == "RELEASE-3.X" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 cassandra3-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.cassandra-version }}" == "RELEASE-4.X" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 cassandra4-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
-          else
-            echo "Unknown cassandra version name `${{ matrix.cassandra-version }}`"
-          fi
+        env:
+          CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
+        run: make resolve-cassandra-version
 
       - name: Pull CCM image from the cache
         uses: actions/cache/restore@v4
@@ -241,11 +224,9 @@ jobs:
 
       - name: Download Cassandra (${{ steps.cassandra-version.outputs.value }}) image
         if: steps.ccm-cache.outputs.cache-hit != 'true'
-        run: |
-          rm -rf /tmp/download.ccm || true 
-          mkdir /tmp/download.ccm || true
-          ccm create ccm_1 -i 127.0.1. -n 3:0 -v "${{ steps.cassandra-version.outputs.value }}" --config-dir=/tmp/download.ccm
-          rm -rf /tmp/download.ccm
+        env:
+          CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+        run: make download-cassandra
 
       - name: Save CCM image into the cache
         if: steps.ccm-cache.outputs.cache-hit != 'true'
@@ -256,7 +237,9 @@ jobs:
 
       - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }})
         id: run-integration-tests
-        run: mvn -B -e verify -Dccm.version=${{ steps.cassandra-version.outputs.value }} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+        env:
+          CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+        run: make test-integration-cassandra
 
       - name: Copy test results
         if: steps.run-integration-tests.outcome == 'failure'
@@ -299,7 +282,7 @@ jobs:
 
     strategy:
       matrix:
-        scylla-version: [ENTERPRISE-RELEASE, ENTERPRISE-PRIOR-RELEASE, OSS-RELEASE, OSS-PRIOR-RELEASE]
+        scylla-version: [LTS-LATEST, LTS-PRIOR, LATEST]
         java-version: [8]
       fail-fast: false
 
@@ -324,30 +307,12 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Setup environment
-        run: |
-          pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
-          sudo sh -c "echo 2097152 > /proc/sys/fs/aio-max-nr"
+      - name: Install CCM
+        run: make install-scylla-ccm
 
       - name: Get scylla version
         id: scylla-version
-        run: |
-          if [[ "${{ matrix.scylla-version }}" == "ENTERPRISE-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-enterprise-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.scylla-version }}" == "ENTERPRISE-PRIOR-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 2 scylla-enterprise-stable:2 | tr -d '\"')" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.scylla-version }}" == "ENTERPRISE-RC" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-enterprise-rc | tr -d '\"')" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.scylla-version }}" == "OSS-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-oss-stable:1 | tr -d '\"')" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.scylla-version }}" == "OSS-PRIOR-RELEASE" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 2 scylla-oss-stable:2 | tr -d '\"')" >> $GITHUB_OUTPUT
-          elif [[ "${{ matrix.scylla-version }}" == "OSS-RC" ]]; then
-            echo "value=$(python3 ci/version_fetch.py --version-index 1 scylla-oss-rc | tr -d '\"')" >> $GITHUB_OUTPUT
-          else
-            echo "Unknown scylla version name `${{ matrix.scylla-version }}`"
-            exit 1
-          fi
+        run: make resolve-scylla-version
 
       - name: Pull CCM image from the cache
         uses: actions/cache/restore@v4
@@ -358,11 +323,9 @@ jobs:
 
       - name: Download Scylla (${{ steps.scylla-version.outputs.value }}) image
         if: steps.ccm-cache.outputs.cache-hit != 'true'
-        run: |
-          rm -rf /tmp/download.ccm || true 
-          mkdir /tmp/download.ccm || true
-          ccm create ccm_1 -i 127.0.1. -n 3:0 -v "release:${{ steps.scylla-version.outputs.value }}" --scylla --config-dir=/tmp/download.ccm
-          rm -rf /tmp/download.ccm
+        env:
+          SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
+        run: make download-scylla
 
       - name: Save CCM image into the cache
         uses: actions/cache/save@v4
@@ -373,7 +336,9 @@ jobs:
 
       - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
         id: run-integration-tests
-        run: mvn -B verify -Dccm.version=${{ steps.scylla-version.outputs.value }} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+        env:
+          SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
+        run: make test-integration-scylla
 
       - name: Copy test results
         if: steps.run-integration-tests.outcome == 'failure'
