@@ -27,6 +27,7 @@ setup:
 	@if [ ! -d "$(SOURCEDIR)" ]; then mkdir -p "$(SOURCEDIR)"; fi
 	cp -RL source/* $(SOURCEDIR)
 	cd $(SOURCEDIR) && find . -name README.md -execdir mv '{}' index.md ';'
+	cd $(SOURCEDIR) && find . -name README.rst -execdir mv '{}' index.rst ';'
 
 .PHONY: update
 update:
