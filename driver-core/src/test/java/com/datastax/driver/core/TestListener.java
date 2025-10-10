@@ -133,31 +133,79 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
   }
 
   private boolean scanAnnotatedElement(AnnotatedElement element) {
-    boolean foundAnnotation = false;
-    if (element.isAnnotationPresent(ScyllaSkip.class)) {
-      scyllaSkipCheck();
-      foundAnnotation = true;
+    if (CCMBridge.getGlobalScyllaVersion() != null) {
+      if (element.isAnnotationPresent(ScyllaSkip.class)) {
+        throw new SkipException("Skipping test because it is disabled for Scylla cluster.");
+      }
+
+      if (element.isAnnotationPresent(ScyllaVersion.class)) {
+        ScyllaVersion scyllaVersion = element.getAnnotation(ScyllaVersion.class);
+        scyllaVersionCheck(scyllaVersion);
+        return true;
+      }
+
+      if (element.isAnnotationPresent(ScyllaOnly.class)) {
+        return true;
+      }
+
+      if (element.isAnnotationPresent(CassandraVersion.class)) {
+        CassandraVersion cassandraVersion = element.getAnnotation(CassandraVersion.class);
+        cassandraVersionCheck(cassandraVersion);
+        return true;
+      }
+
+      if (element.isAnnotationPresent(DseVersion.class)) {
+        throw new SkipException(
+            "Skipping test because it is designed for DSE only, but running on Scylla cluster.");
+      }
+
+      return false;
+    } else if (CCMBridge.isDse()) {
+      if (element.isAnnotationPresent(ScyllaOnly.class)) {
+        throw new SkipException("Skipping test because it is enabled only for Scylla cluster.");
+      }
+
+      if (element.isAnnotationPresent(DseVersion.class)) {
+        DseVersion dseVersion = element.getAnnotation(DseVersion.class);
+        dseVersionCheck(dseVersion);
+        return true;
+      }
+
+      if (element.isAnnotationPresent(CassandraVersion.class)) {
+        CassandraVersion cassandraVersion = element.getAnnotation(CassandraVersion.class);
+        cassandraVersionCheck(cassandraVersion);
+        return true;
+      }
+
+      if (element.isAnnotationPresent(ScyllaVersion.class)) {
+        throw new SkipException(
+            "Skipping test because it is designed for Scylla only, but running on DSE cluster.");
+      }
+
+      return false;
     }
+
     if (element.isAnnotationPresent(ScyllaOnly.class)) {
-      scyllaOnlyCheck();
-      foundAnnotation = true;
+      throw new SkipException("Skipping test because it is enabled only for Scylla cluster.");
     }
+
     if (element.isAnnotationPresent(CassandraVersion.class)) {
       CassandraVersion cassandraVersion = element.getAnnotation(CassandraVersion.class);
       cassandraVersionCheck(cassandraVersion);
-      foundAnnotation = true;
+      return true;
     }
-    if (element.isAnnotationPresent(DseVersion.class)) {
-      DseVersion dseVersion = element.getAnnotation(DseVersion.class);
-      dseVersionCheck(dseVersion);
-      foundAnnotation = true;
-    }
+
     if (element.isAnnotationPresent(ScyllaVersion.class)) {
-      ScyllaVersion scyllaVersion = element.getAnnotation(ScyllaVersion.class);
-      scyllaVersionCheck(scyllaVersion);
-      foundAnnotation = true;
+      throw new SkipException(
+          "Skipping test because it is designed for Scylla only, but running on Cassandra cluster.");
     }
-    return foundAnnotation;
+
+    if (element.isAnnotationPresent(DseVersion.class)) {
+      throw new SkipException(
+          "Skipping test because it is designed for DSE only, but running on Cassandra cluster.");
+    }
+
+    return false;
   }
 
   @Override
@@ -233,18 +281,6 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
                   maxVersion, configuredVersion, annotation.description()));
         }
       }
-    }
-  }
-
-  private static void scyllaSkipCheck() {
-    if (CCMBridge.getGlobalScyllaVersion() != null) {
-      throw new SkipException("Skipping test because it is disabled for Scylla cluster.");
-    }
-  }
-
-  private static void scyllaOnlyCheck() {
-    if (CCMBridge.getGlobalScyllaVersion() == null) {
-      throw new SkipException("Skipping test because it is enabled only for Scylla cluster.");
     }
   }
 
