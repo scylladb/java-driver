@@ -15,7 +15,7 @@ on:
 
       target-tag:
         type: string
-        description: 'target-tag: tag or branch name to release. Use to to re-release failed releases'
+        description: 'target-tag: tag or branch name to release. Use to re-release tagged releases'
         default: scylla-3.x
 
 jobs:
@@ -33,12 +33,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Checkout Code One Commit Before ${{ inputs.target-tag }}
+      - name: Checkout Code One Commit Before ${{ inputs.version_tag }}
         if: inputs.target-tag != 'scylla-3.x'
-        run: |
-          git fetch --prune --unshallow || true
-          git checkout ${{ inputs.target-tag }}~1
-          git tag -d ${{ inputs.target-tag }}
+        env:
+          RELEASE_TARGET_TAG: ${{ inputs.version_tag }}
+        run: make checkout-one-commit-before
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -56,51 +55,37 @@ jobs:
           git config user.name "ScyllaDB Promoter"
           git config user.email "github-promoter@scylladb.com"
 
-      - name: Clean project
-        run: $MVNCMD clean
-
-      - name: Clean release
-        run: $MVNCMD release:clean
-
       - name: Prepare release
         env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
         run: |
-          if [[ "${{ inputs.skip-tests }}" == "true" ]]; then
-            MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
-          fi
-          export MAVEN_OPTS
-          $MVNCMD release:prepare -DpushChanges=false -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }}
+          make release-prepare
 
       - name: Perform release
+        if: inputs.dry-run == false
         env:
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}
           SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
-        run: |
-          CMD_OPTS=""
-          if [[ "${{ inputs.dry-run }}" != "true" ]]; then
-            CMD_OPTS="-Drelease.autopublish=true"
-          fi
-          if [[ "${{ inputs.skip-tests }}" == "true" ]]; then
-            MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
-          fi
-          export MAVEN_OPTS
-          $MVNCMD release:perform $CMD_OPTS -Dgpg.passphrase=${{ secrets.GPG_PASSPHRASE }} > >(tee /tmp/logs-stdout.log) 2> >(tee /tmp/logs-stderr.log)
+        run: make release
 
-      - name: Upload stdout.log
+      - name: Perform release dry-run
+        if: inputs.dry-run == true
+        env:
+          RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}
+          SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
+        run: make release-dry-run
+
+      - name: Upload release logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: maven-stdout
-          path: /tmp/logs-stdout.log
-
-      - name: Upload stderr.log
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: maven-stderr
-          path: /tmp/logs-stderr.log
+          path: /tmp/java-driver-release-logs/*.log
 
       - name: Push changes to SCM
         if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}

@@ -102,7 +102,6 @@
              regular netty-tcnative.
         <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
         -->
-        <gpg.passphrase />
         <release.autopublish>false</release.autopublish>
     </properties>
 
@@ -645,7 +644,7 @@
                         <localCheckout>true</localCheckout>
                         <pushChanges>${pushChanges}</pushChanges>
                         <mavenExecutorId>forked-path</mavenExecutorId>
-                        <arguments>-Dgpg.passphrase=${gpg.passphrase} -Drelease.autopublish=${release.autopublish}</arguments>
+                        <arguments>-Drelease.autopublish=${release.autopublish}</arguments>
                     </configuration>
                     <dependencies>
                         <dependency>
