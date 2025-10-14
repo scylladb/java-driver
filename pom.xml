@@ -25,7 +25,7 @@
 
     <groupId>com.scylladb</groupId>
     <artifactId>scylla-driver-parent</artifactId>
-    <version>3.11.5.9-SNAPSHOT</version>
+    <version>3.11.5.9</version>
     <packaging>pom</packaging>
     <name>Java Driver for Scylla and Apache Cassandra</name>
     <description>
@@ -102,7 +102,7 @@
              regular netty-tcnative.
         <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
         -->
-        <gpg.passphrase/>
+        <gpg.passphrase />
         <release.autopublish>false</release.autopublish>
     </properties>
 
@@ -1096,7 +1096,7 @@
         <connection>scm:git:https://github.com/scylladb/java-driver</connection>
         <developerConnection>scm:git:https://github.com/scylladb/java-driver</developerConnection>
         <url>https://github.com/scylladb/java-driver</url>
-        <tag>HEAD</tag>
+        <tag>3.11.5.9</tag>
     </scm>
 
     <developers>
