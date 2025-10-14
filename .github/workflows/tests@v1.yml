@@ -1,4 +1,4 @@
-name: Tests
+name: 'Tests (Driver 3.x)'
 
 on:
   push:
@@ -7,7 +7,6 @@ on:
       - "docs/**"
       - .github/workflows/docs-pages.yml
       - .github/workflows/docs-pr.yml
-      - .github/workflows/re-release.yml
       - .github/workflows/release.yml
       - "*.md"
       - "*.sh"
@@ -20,7 +19,6 @@ on:
       - "docs/**"
       - .github/workflows/docs-pages.yml
       - .github/workflows/docs-pr.yml
-      - .github/workflows/re-release.yml
       - .github/workflows/release.yml
       - "*.md"
       - "*.sh"
@@ -42,17 +40,38 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v5
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-          cache: maven
+
+      - name: Get POM hash
+        id: get-pom-hash
+        run: echo "value=${{ hashFiles('**/pom.xml') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@v4
+        id: java-cache
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
 
       - name: Compile source and tests
-        run: mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+        run: make compile-all
+
+      - name: Download test dependencies
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        run: make download-all-dependencies
+
+      - name: Save maven repository cache
+        uses: actions/cache/save@v4
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
 
   verify:
     name: Full verify
@@ -66,39 +85,54 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v5
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-          cache: maven
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Full verify
-        run: mvn -B verify -DskipTests
+        run: make check
 
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    strategy:
+      matrix:
+        java-version: [8]
+      fail-fast: false
+
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 8
         uses: actions/setup-java@v5
         with:
-          java-version: '8'
+          java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-          cache: maven
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Run unit tests
-        run: mvn -B test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+        run: make test-unit
 
       - name: Copy test results
-        if: failure()
+        if: always()
         run: |
           shopt -s globstar
           mkdir unit
@@ -106,19 +140,20 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: test-results
           path: "*/**/target/*-reports/*.xml"
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@v5
-        if: ${{ always() }}
+        if: always()
         with:
           check_name: Unit tests report
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true
+          detailed_summary: true
           updateComment: false
           skip_annotations: true
 
@@ -129,23 +164,12 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python 3
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-
-      - name: Fetch Scylla and Cassandra versions
-        id: fetch-versions
-        run: |
-          pip3 install -r ci/requirements.txt
-          echo "scylla-integration-tests-versions=$(python3 ci/version_fetch.py scylla-oss-stable:2 scylla-enterprise-stable:2 scylla-enterprise-rc)" >> $GITHUB_OUTPUT
-          echo "cassandra-integration-tests-versions=$(python3 ci/version_fetch.py cassandra3-stable:1)" >> $GITHUB_OUTPUT
-
-    outputs:
-      scylla-integration-tests-versions: ${{ steps.fetch-versions.outputs.scylla-integration-tests-versions }}
-      cassandra-integration-tests-versions: ${{ steps.fetch-versions.outputs.cassandra-integration-tests-versions }}
+          python-version: '3.13'
 
   cassandra-integration-tests:
     name: Cassandra ITs
@@ -155,78 +179,92 @@ jobs:
 
     strategy:
       matrix:
-        cassandra-version: ${{ fromJson(needs.setup-integration-tests.outputs.cassandra-integration-tests-versions) }}
+        cassandra-version: [3-LATEST]
+        java-version: [8]
       fail-fast: false
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up JDK 8
+      - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v5
         with:
-          java-version: '8'
+          java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-          cache: maven
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Setup Python 3
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-
-      - name: Setup CCM cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            /home/runner/.ccm/repository
-          key: ccm-image-cassandra-${{ matrix.cassandra-version }}
-
-      - name: Resolve scylla-ccm master SHA
-        id: ccm
-        run: |
-          SHA="$(git ls-remote https://github.com/scylladb/scylla-ccm.git refs/heads/master | cut -f1)"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Cache scylla-ccm pip
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cache/pip
-          key: scylla-ccm-pip-${{ steps.ccm.outputs.sha }}
+          python-version: '3.13'
 
       - name: Setup environment
-        run: |
-          pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
-          sudo sh -c "echo 2097152 >> /proc/sys/fs/aio-max-nr"
+        run: make install-cassandra-ccm
 
-      - name: Run integration tests on Cassandra (${{ matrix.cassandra-version }})
-        run: mvn -B verify -Pshort -Dcassandra.version=${{ matrix.cassandra-version }} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+      - name: Get cassandra version
+        id: cassandra-version
+        env:
+          CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
+        run: make resolve-cassandra-version
+
+      - name: Pull CCM image from the cache
+        uses: actions/cache/restore@v4
+        id: ccm-cache
+        with:
+          path: ~/.ccm/repository
+          key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
+
+      - name: Download Cassandra (${{ steps.cassandra-version.outputs.value }}) image
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        env:
+          CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+        run: make download-cassandra
+
+      - name: Save CCM image into the cache
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccm/repository
+          key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
+
+      - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }})
+        id: run-integration-tests
+        env:
+          CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+        run: make test-integration-cassandra
 
       - name: Copy test results
-        if: failure()
+        if: steps.run-integration-tests.outcome == 'failure'
         run: |
           shopt -s globstar
           mkdir cassandra-${{ matrix.cassandra-version }}
           cp --parents ./**/target/*-reports/*.xml cassandra-${{ matrix.cassandra-version }}/
 
       - name: Upload test results
+        if: steps.run-integration-tests.outcome == 'failure'
         uses: actions/upload-artifact@v4
-        if: failure()
         with:
-          name: test-results
+          name: test-results-${{ matrix.java-version }}-${{ matrix.cassandra-version }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ccm-logs-cassandra-${{ matrix.cassandra-version }}
-          path: /tmp/*-0/ccm*/node*/logs/*
+          name: ccm-log-cassandra-${{ matrix.java-version }}-${{ matrix.cassandra-version }}
+          path: /tmp/ccm*/ccm*/node*/logs/*
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@v5
-        if: ${{ always() }}
+        if: always()
         with:
-          check_name: Integration tests report for Cassandra ${{ matrix.cassandra-version }}
+          check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }}
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true
@@ -242,54 +280,66 @@ jobs:
 
     strategy:
       matrix:
-        scylla-version: ${{ fromJson(needs.setup-integration-tests.outputs.scylla-integration-tests-versions) }}
+        scylla-version: [LTS-LATEST, LTS-PRIOR, LATEST]
+        java-version: [8]
       fail-fast: false
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up JDK 8
+      - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@v5
         with:
-          java-version: '8'
+          java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
-          cache: maven
 
-      - name: Setup CCM cache
-        uses: actions/cache@v4
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@v4
         with:
-          path: |
-            /home/runner/.ccm/scylla-repository
-          key: ccm-image-scylla-${{ matrix.scylla-version }}
-
-      - name: Resolve scylla-ccm master SHA
-        id: ccm
-        run: |
-          SHA="$(git ls-remote https://github.com/scylladb/scylla-ccm.git refs/heads/master | cut -f1)"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Cache scylla-ccm pip
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cache/pip
-          key: scylla-ccm-pip-${{ steps.ccm.outputs.sha }}
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Setup Python 3
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.13'
 
-      - name: Setup environment
-        run: |
-          pip3 install https://github.com/scylladb/scylla-ccm/archive/master.zip
-          sudo sh -c "echo 2097152 >> /proc/sys/fs/aio-max-nr"
+      - name: Install CCM
+        run: make install-scylla-ccm
 
-      - name: Run integration tests on Scylla (${{ matrix.scylla-version }})
-        run: mvn -B verify -Pshort -Dscylla.version=${{ matrix.scylla-version }} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+      - name: Get scylla version
+        id: scylla-version
+        run: make resolve-scylla-version
+
+      - name: Pull CCM image from the cache
+        uses: actions/cache/restore@v4
+        id: ccm-cache
+        with:
+          path: ~/.ccm/scylla-repository
+          key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
+
+      - name: Download Scylla (${{ steps.scylla-version.outputs.value }}) image
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        env:
+          SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
+        run: make download-scylla
+
+      - name: Save CCM image into the cache
+        uses: actions/cache/save@v4
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.ccm/scylla-repository
+          key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
+
+      - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
+        id: run-integration-tests
+        env:
+          SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
+        run: make test-integration-scylla
 
       - name: Copy test results
-        if: failure()
+        if: steps.run-integration-tests.outcome == 'failure'
         run: |
           shopt -s globstar
           mkdir scylla-${{ matrix.scylla-version }}
@@ -297,23 +347,23 @@ jobs:
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: steps.run-integration-tests.outcome == 'failure'
         with:
-          name: test-results-${{ matrix.scylla-version }}
+          name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ccm-logs-scylla-${{ matrix.scylla-version }}
-          path: /tmp/*-0/ccm*/node*/logs/*
+          name: ccm-log-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}
+          path: /tmp/ccm*/ccm*/node*/logs/*
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@v5
-        if: ${{ always() }}
+        if: always()
         with:
-          check_name: Integration tests report for Scylla ${{ matrix.scylla-version }}
+          check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }}
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true
