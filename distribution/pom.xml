@@ -38,37 +38,22 @@
     These dependencies are only here to ensure proper build order and proper inclusion of binaries
     in the final tarball
   -->
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>java-driver-bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
   <dependencies>
     <dependency>
-      <groupId>${project.groupId}</groupId>
+      <groupId>com.scylladb</groupId>
       <artifactId>java-driver-core</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>${project.groupId}</groupId>
+      <groupId>com.scylladb</groupId>
       <artifactId>java-driver-query-builder</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>${project.groupId}</groupId>
+      <groupId>com.scylladb</groupId>
       <artifactId>java-driver-mapper-runtime</artifactId>
-      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>${project.groupId}</groupId>
+      <groupId>com.scylladb</groupId>
       <artifactId>java-driver-mapper-processor</artifactId>
-      <version>${project.version}</version>
     </dependency>
   </dependencies>
   <build>
@@ -110,18 +95,111 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <configuration>
-          <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-gpg-plugin</artifactId>
         <version>3.2.8</version>
         <configuration>
           <skip>true</skip>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <includeDependencySources>true</includeDependencySources>
+              <doctitle>Java driver for Scylla and Apache Cassandra® ${project.version} API</doctitle>
+              <windowtitle>Java driver for Scylla and Apache Cassandra(R) ${project.version} API</windowtitle>
+              <additionalDependencies>
+                <additionalDependency>
+                  <groupId>org.lz4</groupId>
+                  <artifactId>lz4-java</artifactId>
+                  <version>${lz4.version}</version>
+                </additionalDependency>
+                <additionalDependency>
+                  <groupId>org.xerial.snappy</groupId>
+                  <artifactId>snappy-java</artifactId>
+                  <version>${snappy.version}</version>
+                </additionalDependency>
+                <additionalDependency>
+                  <groupId>org.apache.tinkerpop</groupId>
+                  <artifactId>gremlin-core</artifactId>
+                  <version>${tinkerpop.version}</version>
+                </additionalDependency>
+                <additionalDependency>
+                  <groupId>org.apache.tinkerpop</groupId>
+                  <artifactId>tinkergraph-gremlin</artifactId>
+                  <version>${tinkerpop.version}</version>
+                </additionalDependency>
+              </additionalDependencies>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>assemble-binary-tarball</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <appendAssemblyId>false</appendAssemblyId>
+          <descriptors>
+            <descriptor>src/assembly/binary-tarball.xml</descriptor>
+          </descriptors>
+          <tarLongFileMode>posix</tarLongFileMode>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <id>attach-dist-as-primary</id>
+            <phase>package</phase>
+            <goals>
+              <goal>attach-artifact</goal>
+            </goals>
+            <configuration>
+              <artifacts>
+                <artifact>
+                  <file>${project.build.directory}/${project.finalName}.tar.gz</file>
+                  <type>tar.gz</type>
+                  <!-- IMPORTANT: no <classifier> -> replaces the primary artifact -->
+                </artifact>
+              </artifacts>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>net.nicoulaj.maven.plugins</groupId>
+        <artifactId>checksum-maven-plugin</artifactId>
+        <version>1.11</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>artifacts</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <attachChecksums>true</attachChecksums>
+          <algorithms>
+            <algorithm>sha256</algorithm>
+            <algorithm>sha512</algorithm>
+          </algorithms>
         </configuration>
       </plugin>
     </plugins>
@@ -130,85 +208,7 @@
     <profile>
       <id>release</id>
       <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-                <configuration>
-                  <includeDependencySources>true</includeDependencySources>
-                  <doctitle>Java driver for Scylla and Apache Cassandra® ${project.version} API</doctitle>
-                  <windowtitle>Java driver for Scylla and Apache Cassandra(R) ${project.version} API</windowtitle>
-                  <additionalDependencies>
-                    <additionalDependency>
-                      <groupId>org.lz4</groupId>
-                      <artifactId>lz4-java</artifactId>
-                      <version>${lz4.version}</version>
-                    </additionalDependency>
-                    <additionalDependency>
-                      <groupId>org.xerial.snappy</groupId>
-                      <artifactId>snappy-java</artifactId>
-                      <version>${snappy.version}</version>
-                    </additionalDependency>
-                    <additionalDependency>
-                      <groupId>org.apache.tinkerpop</groupId>
-                      <artifactId>gremlin-core</artifactId>
-                      <version>${tinkerpop.version}</version>
-                    </additionalDependency>
-                    <additionalDependency>
-                      <groupId>org.apache.tinkerpop</groupId>
-                      <artifactId>tinkergraph-gremlin</artifactId>
-                      <version>${tinkerpop.version}</version>
-                    </additionalDependency>
-                  </additionalDependencies>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <artifactId>maven-assembly-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>assemble-binary-tarball</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>single</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <appendAssemblyId>false</appendAssemblyId>
-              <descriptors>
-                <descriptor>src/assembly/binary-tarball.xml</descriptor>
-              </descriptors>
-              <tarLongFileMode>posix</tarLongFileMode>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>net.nicoulaj.maven.plugins</groupId>
-            <artifactId>checksum-maven-plugin</artifactId>
-            <version>1.11</version>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>artifacts</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <attachChecksums>true</attachChecksums>
-              <algorithms>
-                <algorithm>sha256</algorithm>
-                <algorithm>sha512</algorithm>
-              </algorithms>
-            </configuration>
-          </plugin>
-        </plugins>
+        <plugins/>
       </build>
     </profile>
   </profiles>
