@@ -98,6 +98,7 @@
     <graalapi.version>22.0.0.2</graalapi.version>
     <skipTests>false</skipTests>
     <skipUnitTests>${skipTests}</skipUnitTests>
+    <release.autopublish>false</release.autopublish>
     <pushChanges>false</pushChanges>
     <mockitoopens.argline/>
   </properties>
@@ -548,7 +549,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-release-plugin</artifactId>
-          <version>3.1.1</version>
+          <version>2.5.3</version>
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
@@ -874,15 +875,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <localCheckout>true</localCheckout>
           <pushChanges>${pushChanges}</pushChanges>
           <mavenExecutorId>forked-path</mavenExecutorId>
-          <arguments>-Dgpg.passphrase=${gpg.passphrase}</arguments>
-          <!-- Our integration tests are too long to run during a release, we run them in CI -->
-          <arguments>-DskipITs</arguments>
+          <arguments>-DskipITs -Drelease.autopublish=${release.autopublish} -Dxml-format.skip=true</arguments>
         </configuration>
         <dependencies>
           <dependency>
             <groupId>org.apache.maven.scm</groupId>
             <artifactId>maven-scm-provider-gitexe</artifactId>
-            <version>2.2.1</version>
+            <version>1.9.5</version>
           </dependency>
         </dependencies>
       </plugin>
@@ -1053,12 +1052,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </profiles>
   <distributionManagement>
     <snapshotRepository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+      <id>central</id>
+      <url>https://central.sonatype.com/repository/maven-snapshots</url>
     </snapshotRepository>
     <repository>
-      <id>ossrh</id>
-      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+      <id>central</id>
+      <url>https://central.sonatype.com/repository/maven-releases</url>
     </repository>
   </distributionManagement>
   <licenses>
