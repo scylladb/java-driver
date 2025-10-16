@@ -48,11 +48,19 @@ public interface DriverContext extends AttachmentPoint {
   @NonNull
   String getSessionName();
 
-  /** @return The driver's configuration; never {@code null}. */
+  /**
+   * Returns the driver's configuration.
+   *
+   * @return {@link DriverConfig}, never {@code null}
+   */
   @NonNull
   DriverConfig getConfig();
 
-  /** @return The driver's configuration loader; never {@code null}. */
+  /**
+   * Returns the driver's configuration loader.
+   *
+   * @return {@link DriverConfigLoader}, never {@code null}.
+   */
   @NonNull
   DriverConfigLoader getConfigLoader();
 
@@ -115,39 +123,75 @@ public interface DriverContext extends AttachmentPoint {
         : getSpeculativeExecutionPolicies().get(DriverExecutionProfile.DEFAULT_NAME);
   }
 
-  /** @return The driver's timestamp generator; never {@code null}. */
+  /**
+   * Returns the driver's timestamp generator.
+   *
+   * @return {@link TimestampGenerator} never {@code null}
+   */
   @NonNull
   TimestampGenerator getTimestampGenerator();
 
-  /** @return The driver's reconnection policy; never {@code null}. */
+  /**
+   * Returns the driver's reconnection policy.
+   *
+   * @return {@link ReconnectionPolicy} never {@code null}
+   */
   @NonNull
   ReconnectionPolicy getReconnectionPolicy();
 
-  /** @return The driver's address translator; never {@code null}. */
+  /**
+   * Returns the driver's address translator.
+   *
+   * @return {@link AddressTranslator} never {@code null}
+   */
   @NonNull
   AddressTranslator getAddressTranslator();
 
-  /** @return The authentication provider, if authentication was configured. */
+  /**
+   * Returns the authentication provider, if authentication was configured.
+   *
+   * @return optional {@link AuthProvider}
+   */
   @NonNull
   Optional<AuthProvider> getAuthProvider();
 
-  /** @return The SSL engine factory, if SSL was configured. */
+  /**
+   * Returns the SSL engine factory, if SSL was configured.
+   *
+   * @return optional {@link SslEngineFactory}
+   */
   @NonNull
   Optional<SslEngineFactory> getSslEngineFactory();
 
-  /** @return The driver's request tracker; never {@code null}. */
+  /**
+   * Returns the driver's request tracker.
+   *
+   * @return {@link RequestTracker}, never {@code null}.
+   */
   @NonNull
   RequestTracker getRequestTracker();
 
-  /** @return The driver's request throttler; never {@code null}. */
+  /**
+   * Returns the driver's request throttler.
+   *
+   * @return {@link RequestThrottler}, never {@code null}.
+   */
   @NonNull
   RequestThrottler getRequestThrottler();
 
-  /** @return The driver's node state listener; never {@code null}. */
+  /**
+   * Returns the driver's node state listener.
+   *
+   * @return {@link NodeStateListener}, never {@code null}.
+   */
   @NonNull
   NodeStateListener getNodeStateListener();
 
-  /** @return The driver's schema change listener; never {@code null}. */
+  /**
+   * Returns the driver's schema change listener.
+   *
+   * @return {@link SchemaChangeListener}, never {@code null}.
+   */
   @NonNull
   SchemaChangeListener getSchemaChangeListener();
 }

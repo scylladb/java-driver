@@ -101,7 +101,7 @@ public interface Request {
    * The table to use for tablet-aware routing. Infers the table from available ColumnDefinitions or
    * {@code null} if it is not possible.
    *
-   * @return
+   * @return {@link CqlIdentifier} of the table or {@code null} if request have no routing table
    */
   @Nullable
   default CqlIdentifier getRoutingTable() {
@@ -196,7 +196,13 @@ public interface Request {
   @Nullable
   Duration getTimeout();
 
-  /** @return The node configured on this statement, or null if none is configured. */
+  /**
+   * By default, Request is routed according to {@link
+   * com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy} But there is a way to
+   * override it and get it routed to a particular Node.
+   *
+   * @return The node configured on this statement, or null if none is configured.
+   */
   @Nullable
   Node getNode();
 }

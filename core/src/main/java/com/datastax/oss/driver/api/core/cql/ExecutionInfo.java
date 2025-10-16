@@ -50,7 +50,11 @@ import java.util.concurrent.CompletionStage;
  */
 public interface ExecutionInfo {
 
-  /** @return The {@link Request} that was executed. */
+  /**
+   * Returns the {@link Request} that was executed.
+   *
+   * @return {@link Request}, never {@code null}
+   */
   @NonNull
   default Request getRequest() {
     return getStatement();

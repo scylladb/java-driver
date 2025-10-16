@@ -623,7 +623,7 @@
           <release>8</release>
           <compilerArgs combine.children="override">
             <compilerArg>-XDcompilePolicy=simple</compilerArg>
-            <compilerArg>-Xplugin:ErrorProne -Xep:FutureReturnValueIgnored:OFF -Xep:PreferJavaTimeOverload:OFF -Xep:AnnotateFormatMethod:OFF -Xep:WildcardImport:WARN -XepExcludedPaths:.*/target/(?:generated-sources|generated-test-sources)/.*</compilerArg>
+            <compilerArg>-Xplugin:ErrorProne -Xep:FutureReturnValueIgnored:OFF -Xep:PreferJavaTimeOverload:OFF -Xep:AnnotateFormatMethod:OFF -Xep:WildcardImport:WARN -Xep:InvalidBlockTag:OFF -XepExcludedPaths:.*/target/(?:generated-sources|generated-test-sources)/.*</compilerArg>
           </compilerArgs>
           <annotationProcessorPaths>
             <path>
@@ -747,19 +747,19 @@
           <quiet>true</quiet>
           <doclint>all,-missing</doclint>
           <excludePackageNames>com.datastax.*.driver.internal*</excludePackageNames>
+          <additionalJOptions>
+            <additionalJOption>-tag</additionalJOption>
+            <additionalJOption>leaks-private-api:a:Leaks private API</additionalJOption>
+          </additionalJOptions>
           <tags>
             <tag>
               <name>apiNote</name>
               <placement>a</placement>
               <head>API note:</head>
             </tag>
-            <!--
-              For custom `leaks-private-api` tag (apparently dash separators are not handled
-              correctly)
-            -->
             <tag>
-              <name>leaks</name>
-              <placement>X</placement>
+              <name>leaks-private-api</name>
+              <placement>a</placement>
             </tag>
           </tags>
         </configuration>

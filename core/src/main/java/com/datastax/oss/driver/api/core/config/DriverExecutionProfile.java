@@ -147,9 +147,10 @@ public interface DriverExecutionProfile extends OngoingConfigOptions<DriverExecu
   }
 
   /**
-   * @return a size in bytes. This is separate from {@link #getLong(DriverOption)}, in case
-   *     implementations want to allow users to provide sizes in a more human-readable way, for
-   *     example "256 MB".
+   * This is separate from {@link #getLong(DriverOption)}, in case implementations want to allow
+   * users to provide sizes in a more human-readable way, for example "256 MB".
+   *
+   * @return a size in bytes
    */
   long getBytes(@NonNull DriverOption option);
 
@@ -157,7 +158,12 @@ public interface DriverExecutionProfile extends OngoingConfigOptions<DriverExecu
     return isDefined(option) ? getBytes(option) : defaultValue;
   }
 
-  /** @see #getBytes(DriverOption) */
+  /**
+   * Returns a list of sizes in bytes.
+   *
+   * @see #getBytes(DriverOption)
+   * @return list of sizes
+   */
   @NonNull
   List<Long> getBytesList(DriverOption option);
 
