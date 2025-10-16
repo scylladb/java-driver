@@ -622,8 +622,7 @@
         <configuration>
           <compilerId>javac-with-errorprone</compilerId>
           <forceJavacCompilerUse>true</forceJavacCompilerUse>
-          <source>1.8</source>
-          <target>1.8</target>
+          <release>8</release>
           <compilerArgs combine.children="override">
             <compilerArg>-Xep:FutureReturnValueIgnored:OFF</compilerArg>
             <compilerArg>-Xep:PreferJavaTimeOverload:OFF</compilerArg>
