@@ -3,5 +3,6 @@
   "extends": [
     "config:recommended"
   ],
-  "rebaseWhen": "never"
+  "rebaseWhen": "never",
+  "prConcurrentLimit": 2
 }
