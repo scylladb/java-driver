@@ -32,17 +32,16 @@
   </parent>
   <artifactId>java-driver-core-shaded</artifactId>
   <name>Java driver for Scylla and Apache Cassandra(R) - core with shaded deps</name>
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>java-driver-bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+  <description>Shaded distribution of the ScyllaDB Java Driver core module with relocated third-party dependencies.</description>
+  <url>https://github.com/scylladb/java-driver</url>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+      <comments>Apache License Version 2.0</comments>
+    </license>
+  </licenses>
   <dependencies>
     <!--
     Declare a dependency to the core driver itself so that all its classes get included;
@@ -297,14 +296,29 @@
               -->
               <additionalDependencies>
                 <additionalDependency>
-                  <groupId>org.jctools</groupId>
-                  <artifactId>jctools-core</artifactId>
-                  <version>4.0.5</version>
+                  <groupId>org.xerial.snappy</groupId>
+                  <artifactId>snappy-java</artifactId>
+                  <version>${snappy.version}</version>
+                </additionalDependency>
+                <additionalDependency>
+                  <groupId>org.lz4</groupId>
+                  <artifactId>lz4-java</artifactId>
+                  <version>${lz4.version}</version>
+                </additionalDependency>
+                <additionalDependency>
+                  <groupId>org.apache.tinkerpop</groupId>
+                  <artifactId>gremlin-core</artifactId>
+                  <version>${tinkerpop.version}</version>
+                </additionalDependency>
+                <additionalDependency>
+                  <groupId>org.apache.tinkerpop</groupId>
+                  <artifactId>tinkergraph-gremlin</artifactId>
+                  <version>${tinkerpop.version}</version>
                 </additionalDependency>
                 <additionalDependency>
                   <groupId>com.esri.geometry</groupId>
                   <artifactId>esri-geometry-api</artifactId>
-                  <version>2.2.4</version>
+                  <version>${esri.version}</version>
                 </additionalDependency>
               </additionalDependencies>
             </configuration>
