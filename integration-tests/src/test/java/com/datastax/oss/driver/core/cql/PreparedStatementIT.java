@@ -44,6 +44,7 @@ import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException;
 import com.datastax.oss.driver.api.core.type.DataTypes;
+import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
@@ -679,6 +680,38 @@ public class PreparedStatementIT {
     CqlSession session = sessionRule.session();
     BoundStatement boundStatement = session.prepare(queryString).bind();
     assertThat(boundStatement.getRoutingKey()).isNull();
+  }
+
+  /**
+   * Verifies driver behavior when a prepared statement is created on a node that does not support
+   * the metadata ID feature, but later executed on a node that does. In this scenario, the metadata
+   * ID is {@code null}, yet the feature flag is enabled. The test ensures that such a mixed-node
+   * situation is handled gracefully without errors.
+   */
+  @Test
+  @ScyllaOnly
+  @SuppressWarnings("ConstantConditions")
+  public void should_handle_empty_metadata_id_when_executing_statement_when_supported() {
+    // given
+    CqlSession session = sessionRule.session();
+    PreparedStatement preparedStatement =
+        session.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
+    if (hasNoScyllaMetadataIdSupport()) {
+      assertThat(preparedStatement.getResultMetadataId()).isNull();
+    } else {
+      assertThat(preparedStatement.getResultMetadataId()).isNotNull();
+      preparedStatement.setResultMetadata(null, preparedStatement.getResultSetDefinitions());
+    }
+
+    // when
+    session.execute(preparedStatement.bind(1));
+
+    // then
+    if (hasNoScyllaMetadataIdSupport()) {
+      assertThat(preparedStatement.getResultMetadataId()).isNull();
+    } else {
+      assertThat(preparedStatement.getResultMetadataId()).isNotNull();
+    }
   }
 
   private static Iterable<Row> firstPageOf(CompletionStage<AsyncResultSet> stage) {
