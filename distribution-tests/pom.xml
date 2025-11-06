@@ -32,17 +32,6 @@
   </parent>
   <artifactId>java-driver-distribution-tests</artifactId>
   <name>Scylla Java Driver - distribution tests</name>
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>java-driver-bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
   <dependencies>
     <dependency>
       <groupId>com.scylladb</groupId>
