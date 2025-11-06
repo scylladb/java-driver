@@ -224,6 +224,8 @@ class Requests {
 
   static class Execute extends Message.Request {
 
+    public static final byte[] EMPTY_BYTES = new byte[0];
+
     static final Message.Coder<Execute> coder =
         new Message.Coder<Execute>() {
           @Override
@@ -233,8 +235,11 @@ class Requests {
               ProtocolVersion version,
               ProtocolFeatureStore featureStore) {
             CBUtil.writeShortBytes(msg.statementId.bytes, dest);
-            if (ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(version, featureStore))
-              CBUtil.writeShortBytes(msg.resultMetadataId.bytes, dest);
+            if (ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(version, featureStore)) {
+              byte[] bytes =
+                  msg.resultMetadataId != null ? msg.resultMetadataId.bytes : EMPTY_BYTES;
+              CBUtil.writeShortBytes(bytes, dest);
+            }
             msg.options.encode(dest, version);
           }
 
@@ -242,8 +247,11 @@ class Requests {
           public int encodedSize(
               Execute msg, ProtocolVersion version, ProtocolFeatureStore featureStore) {
             int size = CBUtil.sizeOfShortBytes(msg.statementId.bytes);
-            if (ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(version, featureStore))
-              size += CBUtil.sizeOfShortBytes(msg.resultMetadataId.bytes);
+            if (ProtocolFeatures.PREPARED_METADATA_CHANGES.isSupportedBy(version, featureStore)) {
+              byte[] bytes =
+                  msg.resultMetadataId != null ? msg.resultMetadataId.bytes : EMPTY_BYTES;
+              size += CBUtil.sizeOfShortBytes(bytes);
+            }
             size += msg.options.encodedSize(version);
             return size;
           }
