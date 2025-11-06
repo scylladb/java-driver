@@ -104,11 +104,74 @@
   </properties>
   <dependencyManagement>
     <dependencies>
+      <!-- define version for child packages -->
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-guava-shaded</artifactId>
+        <version>${project.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-core</artifactId>
         <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-query-builder</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-test-infra</artifactId>
+        <scope>test</scope>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-mapper-processor</artifactId>
+        <scope>test</scope>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-mapper-runtime</artifactId>
+        <scope>test</scope>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-core</artifactId>
+        <scope>test</scope>
         <type>test-jar</type>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-metrics-micrometer</artifactId>
+        <scope>test</scope>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-metrics-microprofile</artifactId>
+        <scope>test</scope>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-bom</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>java-driver-core-shaded</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <!-- Regular dependencies     -->
+      <dependency>
+        <groupId>com.scylladb</groupId>
+        <artifactId>native-protocol</artifactId>
+        <version>1.5.2.0</version>
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>
@@ -484,6 +547,11 @@
           <version>3.6.1</version>
         </plugin>
         <plugin>
+          <groupId>net.nicoulaj.maven.plugins</groupId>
+          <artifactId>checksum-maven-plugin</artifactId>
+          <version>1.11</version>
+        </plugin>
+        <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.1</version>
         </plugin>
@@ -542,11 +610,6 @@
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
           <version>3.4.2</version>
-        </plugin>
-        <plugin>
-          <groupId>org.sonatype.plugins</groupId>
-          <artifactId>nexus-staging-maven-plugin</artifactId>
-          <version>1.7.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-gpg-plugin</artifactId>
@@ -627,6 +690,18 @@
       </plugins>
     </pluginManagement>
     <plugins>
+      <plugin>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
+        <version>0.8.0</version>
+        <extensions>true</extensions>
+        <configuration>
+          <publishingServerId>central</publishingServerId>
+          <excludeArtifacts>java-driver-distribution-source,java-driver-distribution-tests,java-driver-distribution,java-driver-examples,java-driver-integration-tests,java-driver-osgi-tests</excludeArtifacts>
+          <autoPublish>${release.autopublish}</autoPublish>
+          <waitUntil>validated</waitUntil>
+        </configuration>
+      </plugin>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
@@ -730,17 +805,6 @@
           <systemPropertyVariables>
             <logback.configurationFile>${project.basedir}/src/test/resources/logback-test.xml</logback.configurationFile>
           </systemPropertyVariables>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <extensions>true</extensions>
-        <configuration>
-          <serverId>ossrh</serverId>
-          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-          <autoReleaseAfterClose>true</autoReleaseAfterClose>
-          <!-- skipLocalStaging>true</skipLocalStaging -->
         </configuration>
       </plugin>
       <plugin>
