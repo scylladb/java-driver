@@ -83,7 +83,7 @@
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>native-protocol</artifactId>
-        <version>1.5.2.0</version>
+        <version>1.5.2.1</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
