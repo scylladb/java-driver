@@ -45,12 +45,6 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
 
   @Override
   public void onTestFailure(ITestResult tr) {
-    if (tr.getThrowable() instanceof SkipException) {
-      // Workaround for testng 6.13.x bug https://github.com/testng-team/testng/issues/1632
-      // When SkipException thrown from beforeInvocation marks test as FAILED
-      tr.setStatus(ITestResult.SKIP);
-      return;
-    }
     long elapsedTime = TimeUnit.NANOSECONDS.toSeconds((System.nanoTime() - start_time));
     long testTime = tr.getEndMillis() - tr.getStartMillis();
     tr.getThrowable().printStackTrace();
@@ -120,19 +114,34 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
     ITestNGMethod testNgMethod = testResult.getMethod();
     ConstructorOrMethod constructorOrMethod = testNgMethod.getConstructorOrMethod();
 
-    Class<?> clazz = testNgMethod.getInstance().getClass();
-    if (clazz != null) {
+    try {
+      Class<?> clazz = testNgMethod.getInstance().getClass();
       do {
-        if (scanAnnotatedElement(clazz)) break;
+        // Check for skip conditions and break early if version annotations are found
+        if (checkForSkipConditions(clazz)) break;
       } while (!(clazz = clazz.getSuperclass()).equals(Object.class));
-    }
-    Method method = constructorOrMethod.getMethod();
-    if (method != null) {
-      scanAnnotatedElement(method);
+      Method method = constructorOrMethod.getMethod();
+      if (method != null) {
+        checkForSkipConditions(method); // Don't need return value for methods
+      }
+    } catch (SkipException e) {
+      // Workaround for testng 6.13.x bug https://github.com/testng-team/testng/issues/1632
+      // When SkipException thrown from beforeInvocation marks test as FAILED
+      // Instead of letting TestNG handle it, we manually set the skip status
+      testResult.setStatus(ITestResult.SKIP);
+      testResult.setThrowable(e);
+      testResult.setEndMillis(System.currentTimeMillis());
+      // Don't re-throw the exception to avoid the bug
     }
   }
 
-  private boolean scanAnnotatedElement(AnnotatedElement element) {
+  /**
+   * Static method to check for skip conditions on a class or method. Throws SkipException if the
+   * element should be skipped.
+   *
+   * @return true if version-related annotations were found (to break early in class hierarchy scan)
+   */
+  public static boolean checkForSkipConditions(AnnotatedElement element) {
     if (CCMBridge.getGlobalScyllaVersion() != null) {
       if (element.isAnnotationPresent(ScyllaSkip.class)) {
         throw new SkipException("Skipping test because it is disabled for Scylla cluster.");
@@ -158,8 +167,6 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
         throw new SkipException(
             "Skipping test because it is designed for DSE only, but running on Scylla cluster.");
       }
-
-      return false;
     } else if (CCMBridge.isDse()) {
       if (element.isAnnotationPresent(ScyllaOnly.class)) {
         throw new SkipException("Skipping test because it is enabled only for Scylla cluster.");
@@ -181,31 +188,28 @@ public class TestListener extends TestListenerAdapter implements IInvokedMethodL
         throw new SkipException(
             "Skipping test because it is designed for Scylla only, but running on DSE cluster.");
       }
+    } else {
+      if (element.isAnnotationPresent(ScyllaOnly.class)) {
+        throw new SkipException("Skipping test because it is enabled only for Scylla cluster.");
+      }
 
-      return false;
+      if (element.isAnnotationPresent(CassandraVersion.class)) {
+        CassandraVersion cassandraVersion = element.getAnnotation(CassandraVersion.class);
+        cassandraVersionCheck(cassandraVersion);
+        return true;
+      }
+
+      if (element.isAnnotationPresent(ScyllaVersion.class)) {
+        throw new SkipException(
+            "Skipping test because it is designed for Scylla only, but running on Cassandra cluster.");
+      }
+
+      if (element.isAnnotationPresent(DseVersion.class)) {
+        throw new SkipException(
+            "Skipping test because it is designed for DSE only, but running on Cassandra cluster.");
+      }
     }
-
-    if (element.isAnnotationPresent(ScyllaOnly.class)) {
-      throw new SkipException("Skipping test because it is enabled only for Scylla cluster.");
-    }
-
-    if (element.isAnnotationPresent(CassandraVersion.class)) {
-      CassandraVersion cassandraVersion = element.getAnnotation(CassandraVersion.class);
-      cassandraVersionCheck(cassandraVersion);
-      return true;
-    }
-
-    if (element.isAnnotationPresent(ScyllaVersion.class)) {
-      throw new SkipException(
-          "Skipping test because it is designed for Scylla only, but running on Cassandra cluster.");
-    }
-
-    if (element.isAnnotationPresent(DseVersion.class)) {
-      throw new SkipException(
-          "Skipping test because it is designed for DSE only, but running on Cassandra cluster.");
-    }
-
-    return false;
+    return false; // No version annotations found, continue scanning
   }
 
   @Override
