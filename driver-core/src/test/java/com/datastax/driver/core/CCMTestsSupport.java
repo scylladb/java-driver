@@ -637,6 +637,10 @@ public class CCMTestsSupport {
    * @throws Exception
    */
   public void beforeTestClass(Object testInstance) throws Exception {
+    // Check for class-level skip conditions before setting up CCM cluster
+    // When SkipException is thrown from @BeforeClass, TestNG should skip the entire test class
+    TestListener.checkForSkipConditions(testInstance.getClass());
+
     testMode = determineTestMode(testInstance.getClass());
     if (testMode == PER_CLASS) {
       closer = Closer.create();
