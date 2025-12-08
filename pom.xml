@@ -75,7 +75,7 @@
     <legacy-jackson.version>1.9.12</legacy-jackson.version>
     <!-- optional dependencies -->
     <snappy.version>1.1.10.8</snappy.version>
-    <lz4.version>1.8.1</lz4.version>
+    <lz4.version>1.10.1</lz4.version>
     <!-- test dependencies -->
     <assertj.version>3.27.6</assertj.version>
     <commons-exec.version>1.5.0</commons-exec.version>
@@ -205,7 +205,7 @@
         <version>${snappy.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.lz4</groupId>
+        <groupId>at.yawk.lz4</groupId>
         <artifactId>lz4-java</artifactId>
         <version>${lz4.version}</version>
       </dependency>

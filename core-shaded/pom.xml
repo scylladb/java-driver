@@ -78,7 +78,7 @@
       <optional>true</optional>
     </dependency>
     <dependency>
-      <groupId>org.lz4</groupId>
+      <groupId>at.yawk.lz4</groupId>
       <artifactId>lz4-java</artifactId>
       <optional>true</optional>
     </dependency>
@@ -301,7 +301,7 @@
                   <version>${snappy.version}</version>
                 </additionalDependency>
                 <additionalDependency>
-                  <groupId>org.lz4</groupId>
+                  <groupId>at.yawk.lz4</groupId>
                   <artifactId>lz4-java</artifactId>
                   <version>${lz4.version}</version>
                 </additionalDependency>
