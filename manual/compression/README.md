@@ -28,9 +28,9 @@ Maven dependency:
 
 ```xml
 <dependency>
-    <groupId>org.lz4</groupId>
+    <groupId>at.yawk.lz4</groupId>
     <artifactId>lz4-java</artifactId>
-    <version>1.4.1</version>
+    <version>1.9.0</version>
 </dependency>
 ```
 
