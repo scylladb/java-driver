@@ -22,10 +22,9 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
-
     <groupId>com.scylladb</groupId>
     <artifactId>scylla-driver-parent</artifactId>
-    <version>3.11.5.11-SNAPSHOT</version>
+    <version>3.12.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Java Driver for Scylla and Apache Cassandra</name>
     <description>
@@ -44,6 +43,7 @@
         <module>driver-examples</module>
         <module>driver-tests</module>
         <module>driver-dist</module>
+        <module>driver-dist-source</module>
     </modules>
 
     <properties>
@@ -371,7 +371,7 @@
 
             <dependency>
                 <groupId>io.netty</groupId>
-                <artifactId>${netty-tcnative.artifact}</artifactId>
+                <artifactId>netty-tcnative-boringssl-static</artifactId>
                 <version>${netty-tcnative.version}</version>
                 <classifier>${os.detected.classifier}</classifier>
             </dependency>
@@ -527,6 +527,14 @@
                             <goals>
                                 <goal>jar-no-fork</goal>
                             </goals>
+                            <configuration>
+                                <includes>
+                                    <include>NOTICE.txt</include>
+                                </includes>
+                                <excludes>
+                                    <exclude>NOTICE_binary.txt</exclude>
+                                </excludes>
+                            </configuration>
                         </execution>
                     </executions>
                 </plugin>
@@ -692,6 +700,7 @@
                         </execution>
                     </executions>
                     <configuration>
+                        <comparisonVersion>3.11.2.5</comparisonVersion>
                         <comparisonVersion>3.11.2.5</comparisonVersion>
                         <ignoredDifferencesFile>../clirr-ignores.xml</ignoredDifferencesFile>
                         <excludes>
@@ -981,6 +990,14 @@
                                 <goals>
                                     <goal>jar-no-fork</goal>
                                 </goals>
+                                <configuration>
+                                    <includes>
+                                        <include>NOTICE.txt</include>
+                                    </includes>
+                                    <excludes>
+                                        <exclude>NOTICE_binary.txt</exclude>
+                                    </excludes>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -1017,9 +1034,6 @@
             <activation>
                 <jdk>[1.8,)</jdk>
             </activation>
-            <properties>
-                <javadoc.opts>-Xdoclint:none</javadoc.opts>
-            </properties>
             <build>
                 <plugins>
                     <!-- only activate for jdk8+ since requires java 8 -->
@@ -1036,6 +1050,13 @@
                             </execution>
                         </executions>
                     </plugin>
+		    <plugin>
+		      <groupId>org.apache.maven.plugins</groupId>
+		      <artifactId>maven-javadoc-plugin</artifactId>
+		      <configuration combine.self="override">
+			<doclint>none</doclint>
+		      </configuration>
+		    </plugin>
                 </plugins>
             </build>
         </profile>
@@ -1061,8 +1082,6 @@
                 </os>
             </activation>
             <properties>
-                <!-- https://netty.io/wiki/forked-tomcat-native.html netty on apple-silicon requires the boringssl variant of tc-native -->
-                <netty-tcnative.artifact>netty-tcnative-boringssl-static</netty-tcnative.artifact>
                 <!-- https://github.com/jnr/jffi/pull/116 apple-silicon requires signed jffi binaries, added in 1.3.8 (jnr-ffi 2.2.10+) -->
                 <jnr-ffi.version>2.2.10</jnr-ffi.version>
                 <snappy.version>1.1.10.1</snappy.version>

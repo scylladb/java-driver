@@ -26,7 +26,7 @@
     <parent>
         <groupId>com.scylladb</groupId>
         <artifactId>scylla-driver-parent</artifactId>
-        <version>3.11.5.11-SNAPSHOT</version>
+        <version>3.12.0.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>scylla-driver-examples</artifactId>
@@ -137,6 +137,20 @@
     </dependencies>
 
     <build>
+
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/..</directory>
+                <includes>
+                    <include>LICENSE</include>
+                    <include>NOTICE_binary.txt</include>
+                </includes>
+                <targetPath>META-INF</targetPath>
+            </resource>
+        </resources>
 
         <plugins>
 

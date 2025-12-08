@@ -1,7 +1,26 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 ## Upgrade guide
 
 The purpose of this guide is to detail changes made by successive
-versions of the Java driver.
+versions of the Java Driver.
 
 ### 3.6.0
 
@@ -52,7 +71,7 @@ versions of the Java driver.
     
 [JAVA-1752]:https://datastax-oss.atlassian.net/browse/JAVA-1752
 [JAVA-1376]:https://datastax-oss.atlassian.net/browse/JAVA-1376
-[online example]:https://github.com/datastax/java-driver/blob/3.x/driver-examples/src/main/java/com/datastax/driver/examples/retry/DowngradingRetry.java
+[online example]:https://github.com/apache/cassandra-java-driver/blob/3.x/driver-examples/src/main/java/com/datastax/driver/examples/retry/DowngradingRetry.java
 
 2.  The `TokenAwarePolicy` now has a new constructor that takes a `ReplicaOrdering` 
     argument, see [JAVA-1448]. 

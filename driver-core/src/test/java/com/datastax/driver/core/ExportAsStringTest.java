@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -28,12 +30,12 @@ import com.datastax.driver.core.schemabuilder.SchemaBuilder;
 import com.datastax.driver.core.utils.CassandraVersion;
 import com.datastax.driver.core.utils.ScyllaSkip;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.ByteStreams;
 import com.google.common.io.Closer;
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintStream;
+import java.io.InputStreamReader;
+import java.io.StringWriter;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -254,10 +256,19 @@ public class ExportAsStringTest extends CCMTestsSupport {
                   + ")")
           .isNotNull();
       closer.register(is);
-      ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      PrintStream ps = new PrintStream(baos);
-      ByteStreams.copy(is, ps);
-      return baos.toString().trim();
+
+      BufferedReader in = new BufferedReader(new InputStreamReader(is));
+      StringWriter out = new StringWriter();
+
+      String line;
+      while ((line = in.readLine()) != null) {
+
+        String trimmedLine = line.trim();
+        if (trimmedLine.startsWith("/*") || trimmedLine.startsWith("*")) continue;
+        out.write(line);
+        out.write(System.getProperty("line.separator"));
+      }
+      return out.toString().trim();
     } catch (IOException e) {
       logger.warn("Failure to read {}", resourceName, e);
       fail("Unable to read " + resourceName + " is it defined?");
