@@ -1,3 +1,22 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 ## Custom Payloads
 
 The [native protocol](../native_protocol/) version 4 introduces a new feature called [Custom Payloads][CASSANDRA-8553].
@@ -42,7 +61,7 @@ payloads sent by the driver could get lost.
 
 ### Implementation Notes
 
-Payloads in the Java driver are represented as `Map<String,ByteBuffer>` instances.
+Payloads in the Java Driver are represented as `Map<String,ByteBuffer>` instances.
 It is safe to use any `Map` implementation, including unsynchronized implementations 
 such as `java.util.HashMap`; the driver will create defensive, thread-safe copies of
 user-supplied maps. However, `ByteBuffer` instances are inherently mutable,
@@ -51,11 +70,11 @@ to the driver as it could lead to unexpected results.
 
 #### Null values
 
-Note that, for thread safety reasons, the Java driver does not permit `null` keys nor `null` values in a payload map; 
+Note that, for thread safety reasons, the Java Driver does not permit `null` keys nor `null` values in a payload map; 
 including a `null` in your payload will result in a `NullPointerException` being immediately thrown.
 
 However, the protocol specification *does* allow `null` values. If you need to include
-a `null` value in your payload map, this can be achieved with the Java driver
+a `null` value in your payload map, this can be achieved with the Java Driver
 by using the special value `Statement.NULL_PAYLOAD_VALUE`.
 
 ##### Payload length limitations
