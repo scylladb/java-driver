@@ -17,8 +17,6 @@ package com.datastax.driver.core;
 
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.google.common.base.Function;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.Maps;
 import com.google.common.net.HostAndPort;
 import com.google.common.reflect.TypeToken;
 import com.google.common.util.concurrent.AsyncFunction;
@@ -26,9 +24,6 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.Map;
 import java.util.concurrent.Executor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,13 +31,9 @@ import org.slf4j.LoggerFactory;
 /**
  * A compatibility layer to support a wide range of Guava versions.
  *
- * <p>The driver is compatible with Guava 16.0.1 or higher, but Guava 20 introduced incompatible
- * breaking changes in its API, that could in turn be breaking for legacy driver clients if we
- * simply upgraded our dependency. We don't want to increment our major version "just" for Guava (we
- * have other changes planned).
+ * <p>The driver is compatible with Guava 19.0 or higher.
  *
- * <p>Therefore we depend on Guava 19, which has both the deprecated and the new APIs, and detect
- * the actual version at runtime in order to call the relevant methods.
+ * <p>We detect the actual version at runtime in order to call the relevant methods.
  *
  * <p>This is a hack, and might not work with subsequent Guava releases; the real fix is to stop
  * exposing Guava in our public API. We'll address that in version 4 of the driver.
@@ -188,84 +179,18 @@ public abstract class GuavaCompatibility {
    * <p>The method {@code HostAndPort.getHostText} has been replaced with {@code
    * HostAndPort.getHost} starting with Guava 20.0; it has been completely removed in Guava 22.0.
    */
-  @SuppressWarnings("JavaReflectionMemberAccess")
   public String getHost(HostAndPort hostAndPort) {
-    try {
-      // Guava >= 20.0
-      return (String) HostAndPort.class.getMethod("getHost").invoke(hostAndPort);
-    } catch (Exception e) {
-      // Guava < 22.0
-      return hostAndPort.getHostText();
-    }
+    // Guava >= 20.0
+    return hostAndPort.getHost();
   }
 
   private static GuavaCompatibility selectImplementation() {
     if (isGuava_19_0_OrHigher()) {
       logger.info("Detected Guava >= 19 in the classpath, using modern compatibility layer");
       return new Version19OrHigher();
-    } else if (isGuava_16_0_1_OrHigher()) {
-      logger.info("Detected Guava < 19 in the classpath, using legacy compatibility layer");
-      return new Version18OrLower();
     } else {
       throw new DriverInternalError(
-          "Detected incompatible version of Guava in the classpath. "
-              + "You need 16.0.1 or higher.");
-    }
-  }
-
-  private static class Version18OrLower extends GuavaCompatibility {
-
-    @Override
-    public <V> ListenableFuture<V> withFallback(
-        ListenableFuture<? extends V> input, final AsyncFunction<Throwable, V> fallback) {
-      return Futures.withFallback(
-          input,
-          new com.google.common.util.concurrent.FutureFallback<V>() {
-            @Override
-            public ListenableFuture<V> create(Throwable t) throws Exception {
-              return fallback.apply(t);
-            }
-          });
-    }
-
-    @Override
-    public <V> ListenableFuture<V> withFallback(
-        ListenableFuture<? extends V> input,
-        final AsyncFunction<Throwable, V> fallback,
-        Executor executor) {
-      return Futures.withFallback(
-          input,
-          new com.google.common.util.concurrent.FutureFallback<V>() {
-            @Override
-            public ListenableFuture<V> create(Throwable t) throws Exception {
-              return fallback.apply(t);
-            }
-          },
-          executor);
-    }
-
-    @Override
-    public <I, O> ListenableFuture<O> transformAsync(
-        ListenableFuture<I> input, AsyncFunction<? super I, ? extends O> function) {
-      return Futures.transform(input, function);
-    }
-
-    @Override
-    public <I, O> ListenableFuture<O> transformAsync(
-        ListenableFuture<I> input,
-        AsyncFunction<? super I, ? extends O> function,
-        Executor executor) {
-      return Futures.transform(input, function, executor);
-    }
-
-    @Override
-    public boolean isSupertypeOf(TypeToken<?> target, TypeToken<?> argument) {
-      return target.isAssignableFrom(argument);
-    }
-
-    @Override
-    public Executor sameThreadExecutor() {
-      return MoreExecutors.sameThreadExecutor();
+          "Detected incompatible version of Guava in the classpath. " + "You need 19.0 or higher.");
     }
   }
 
@@ -317,30 +242,6 @@ public abstract class GuavaCompatibility {
         ListenableFuture.class,
         AsyncFunction.class,
         Executor.class);
-  }
-
-  private static boolean isGuava_16_0_1_OrHigher() {
-    // Cheap check for < 16.0
-    if (!methodExists(Maps.class, "asConverter", BiMap.class)) {
-      return false;
-    }
-    // More elaborate check to filter out 16.0, which has a bug in TypeToken. We need 16.0.1.
-    boolean resolved = false;
-    TypeToken<Map<String, String>> mapOfString = TypeTokens.mapOf(String.class, String.class);
-    Type type = mapOfString.getType();
-    if (type instanceof ParameterizedType) {
-      ParameterizedType pType = (ParameterizedType) type;
-      Type[] types = pType.getActualTypeArguments();
-      if (types.length == 2) {
-        TypeToken valueType = TypeToken.of(types[1]);
-        resolved = valueType.getRawType().equals(String.class);
-      }
-    }
-    if (!resolved) {
-      logger.debug(
-          "Detected Guava issue #1635 which indicates that version 16.0 is in the classpath");
-    }
-    return resolved;
   }
 
   private static boolean methodExists(

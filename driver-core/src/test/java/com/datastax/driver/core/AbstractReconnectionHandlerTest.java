@@ -263,7 +263,7 @@ public class AbstractReconnectionHandlerTest {
    */
   @Test(groups = "unit")
   public void should_yield_to_another_handler_that_just_succeeded() {
-    future.set(Futures.immediateCheckedFuture(null));
+    future.set(Futures.immediateFuture(null));
 
     handler.start();
 
