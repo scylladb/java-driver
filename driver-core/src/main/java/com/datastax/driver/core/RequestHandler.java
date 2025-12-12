@@ -44,7 +44,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
 import java.nio.ByteBuffer;
@@ -470,7 +472,7 @@ class RequestHandler {
               routingKey,
               statementKeyspace,
               statementTable);
-      GuavaCompatibility.INSTANCE.addCallback(
+      Futures.addCallback(
           connectionFuture,
           new FutureCallback<Connection>() {
             @Override
@@ -522,7 +524,8 @@ class RequestHandler {
               }
               findNextHostAndQuery();
             }
-          });
+          },
+          MoreExecutors.directExecutor());
       return true;
     }
 

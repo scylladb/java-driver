@@ -36,7 +36,9 @@ import com.datastax.driver.core.utils.MoreObjects;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -721,7 +723,7 @@ class ControlConnection implements Connection.Owner {
       connection.write(peersV2Future);
       final SettableFuture<ResultSet> peersFuture = SettableFuture.create();
       // if peers v2 query fails, query peers table instead.
-      GuavaCompatibility.INSTANCE.addCallback(
+      Futures.addCallback(
           peersV2Future,
           new FutureCallback<ResultSet>() {
 
@@ -745,7 +747,8 @@ class ControlConnection implements Connection.Owner {
                 peersFuture.setException(t);
               }
             }
-          });
+          },
+          MoreExecutors.directExecutor());
       return peersFuture;
     } else {
       DefaultResultSetFuture peersFuture =

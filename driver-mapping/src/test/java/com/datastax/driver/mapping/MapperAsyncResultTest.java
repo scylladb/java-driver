@@ -18,7 +18,6 @@ package com.datastax.driver.mapping;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.driver.core.CCMTestsSupport;
-import com.datastax.driver.core.GuavaCompatibility;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.utils.CassandraVersion;
@@ -27,6 +26,7 @@ import com.datastax.driver.mapping.annotations.Table;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import org.testng.annotations.BeforeMethod;
@@ -94,7 +94,7 @@ public class MapperAsyncResultTest extends CCMTestsSupport {
     ResultsAccumulator accumulator = new ResultsAccumulator();
     ListenableFuture<Result<User>> results = mapper.mapAsync(session().executeAsync(statement));
     ListenableFuture<Result<User>> future =
-        GuavaCompatibility.INSTANCE.transformAsync(results, accumulator);
+        Futures.transformAsync(results, accumulator, MoreExecutors.directExecutor());
     Futures.getUnchecked(future);
     assertThat(accumulator.all.size()).isEqualTo(totalCount);
   }
@@ -113,7 +113,9 @@ public class MapperAsyncResultTest extends CCMTestsSupport {
       }
       boolean wasLastPage = users.getExecutionInfo().getPagingState() == null;
       if (wasLastPage) return Futures.immediateFuture(users);
-      else return GuavaCompatibility.INSTANCE.transformAsync(users.fetchMoreResults(), this);
+      else
+        return Futures.transformAsync(
+            users.fetchMoreResults(), this, MoreExecutors.directExecutor());
     }
   }
 }
