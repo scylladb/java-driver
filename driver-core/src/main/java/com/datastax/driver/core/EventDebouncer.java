@@ -22,7 +22,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import java.util.List;
 import java.util.Queue;
@@ -248,7 +250,7 @@ abstract class EventDebouncer<T> {
     } else {
       logger.trace("{} debouncer: delivering {} events", name, toDeliver.size());
       ListenableFuture<?> delivered = callback.deliver(toDeliver);
-      GuavaCompatibility.INSTANCE.addCallback(
+      Futures.addCallback(
           delivered,
           new FutureCallback<Object>() {
             @Override
@@ -260,7 +262,8 @@ abstract class EventDebouncer<T> {
             public void onFailure(Throwable t) {
               for (SettableFuture<Void> future : futures) future.setException(t);
             }
-          });
+          },
+          MoreExecutors.directExecutor());
     }
 
     // If we didn't dequeue all events (or new ones arrived since we did), make sure we eventually

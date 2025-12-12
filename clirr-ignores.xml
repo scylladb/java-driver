@@ -447,4 +447,10 @@
         <method>*one*</method>
         <justification>False positive. Method is still present in parent interface (and was only introduced in ResultSet as a workaround for another clirr false positive)</justification>
     </difference>
+
+    <difference>
+        <differenceType>8001</differenceType> <!-- class removed -->
+        <className>com/datastax/driver/core/GuavaCompatibility</className>
+        <justification>Compatibility shim dropped now that we depend on modern Guava APIs directly.</justification>
+    </difference>
 </differences>

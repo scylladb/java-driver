@@ -21,6 +21,7 @@ import com.datastax.driver.core.utils.CassandraVersion;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import org.testng.annotations.BeforeMethod;
@@ -57,7 +58,8 @@ public class AsyncResultSetTest extends CCMTestsSupport {
     ResultsAccumulator results = new ResultsAccumulator();
 
     ListenableFuture<ResultSet> future =
-        GuavaCompatibility.INSTANCE.transformAsync(session().executeAsync(statement), results);
+        Futures.transformAsync(
+            session().executeAsync(statement), results, MoreExecutors.directExecutor());
 
     Futures.getUnchecked(future);
 
@@ -77,7 +79,8 @@ public class AsyncResultSetTest extends CCMTestsSupport {
       }
       boolean wasLastPage = rs.getExecutionInfo().getPagingState() == null;
       if (wasLastPage) return Futures.immediateFuture(rs);
-      else return GuavaCompatibility.INSTANCE.transformAsync(rs.fetchMoreResults(), this);
+      else
+        return Futures.transformAsync(rs.fetchMoreResults(), this, MoreExecutors.directExecutor());
     }
   }
 }

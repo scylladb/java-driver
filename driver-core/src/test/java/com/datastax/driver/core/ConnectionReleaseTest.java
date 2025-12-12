@@ -22,7 +22,9 @@ import static org.testng.Assert.fail;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -96,7 +98,7 @@ public class ConnectionReleaseTest extends ScassandraTestBase {
         mockFutures.add(session.executeAsync("mock query"));
 
       ListenableFuture<ResultSet> future =
-          GuavaCompatibility.INSTANCE.transformAsync(
+          Futures.transformAsync(
               session.executeAsync("select c from test1 where k=1"),
               new AsyncFunction<ResultSet, ResultSet>() {
                 @Override
@@ -108,7 +110,8 @@ public class ConnectionReleaseTest extends ScassandraTestBase {
                   // was not release.
                   return session.executeAsync("select n from test2 where c='" + c + "'");
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
 
       long waitTimeInMs = 2000;
       try {

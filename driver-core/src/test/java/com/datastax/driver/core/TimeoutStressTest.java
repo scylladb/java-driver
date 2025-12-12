@@ -21,6 +21,8 @@ import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.datastax.driver.core.utils.SocketChannelMonitor;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.channel.socket.SocketChannel;
@@ -242,7 +244,7 @@ public class TimeoutStressTest extends CCMTestsSupport {
         try {
           concurrentQueries.acquire();
           ResultSetFuture future = session.executeAsync(statement.bind("0"));
-          GuavaCompatibility.INSTANCE.addCallback(
+          Futures.addCallback(
               future,
               new FutureCallback<ResultSet>() {
 
@@ -265,7 +267,8 @@ public class TimeoutStressTest extends CCMTestsSupport {
                     // logger.error("Exception", t);
                   }
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
         } catch (Exception e) {
           logger.error("Failure while submitting query.", e);
         }

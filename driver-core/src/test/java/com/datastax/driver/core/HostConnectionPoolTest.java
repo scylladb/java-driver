@@ -57,8 +57,10 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ForwardingListeningExecutorService;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -1598,7 +1600,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
           pool.borrowConnection(
               timeoutMillis, MILLISECONDS, maxQueueSize, null, routingKey, null, null);
       requestInitialized =
-          GuavaCompatibility.INSTANCE.transform(
+          Futures.transform(
               this.connectionFuture,
               new Function<Connection, Connection.ResponseHandler>() {
                 @Override
@@ -1609,7 +1611,8 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
                   connection.dispatcher.add(thisRequest.responseHandler);
                   return responseHandler;
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
     }
 
     void simulateSuccessResponse() {
@@ -1703,7 +1706,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
     @Override
     public ListenableFuture<?> submit(Runnable task) {
       ListenableFuture<?> future = super.submit(task);
-      GuavaCompatibility.INSTANCE.addCallback(
+      Futures.addCallback(
           future,
           new FutureCallback<Object>() {
             @Override
@@ -1715,7 +1718,8 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
             public void onFailure(Throwable t) {
               semaphore.release(1);
             }
-          });
+          },
+          MoreExecutors.directExecutor());
       return future;
     }
   }

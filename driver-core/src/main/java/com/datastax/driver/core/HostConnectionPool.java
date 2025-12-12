@@ -38,6 +38,7 @@ import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
@@ -372,7 +373,7 @@ class HostConnectionPool implements Connection.Owner {
         manager.cluster.manager.configuration.getPoolingOptions().getInitializationExecutor();
     final ListenableFuture<List<Void>> allConnectionsFuture = Futures.allAsList(connectionFutures);
 
-    GuavaCompatibility.INSTANCE.addCallback(
+    Futures.addCallback(
         allConnectionsFuture,
         new FutureCallback<List<Void>>() {
           @Override
@@ -449,8 +450,9 @@ class HostConnectionPool implements Connection.Owner {
 
   private ListenableFuture<Void> handleErrors(
       ListenableFuture<Void> connectionInitFuture, Executor executor) {
-    return GuavaCompatibility.INSTANCE.withFallback(
+    return Futures.catchingAsync(
         connectionInitFuture,
+        Throwable.class,
         new AsyncFunction<Throwable, Void>() {
           @Override
           public ListenableFuture<Void> apply(Throwable t) throws Exception {
@@ -708,7 +710,7 @@ class HostConnectionPool implements Connection.Owner {
         } else {
           // Otherwise the keyspace did need to be set, tie the pendingBorrow future to the set
           // keyspace completion.
-          GuavaCompatibility.INSTANCE.addCallback(
+          Futures.addCallback(
               setKeyspaceFuture,
               new FutureCallback<Connection>() {
 
@@ -726,7 +728,8 @@ class HostConnectionPool implements Connection.Owner {
                   pendingBorrow.setException(t);
                   connection.inFlight.decrementAndGet();
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
         }
       }
     }
@@ -1033,7 +1036,7 @@ class HostConnectionPool implements Connection.Owner {
                 }
               }
             },
-            GuavaCompatibility.INSTANCE.sameThreadExecutor());
+            MoreExecutors.directExecutor());
         futures.add(future);
       }
     }
