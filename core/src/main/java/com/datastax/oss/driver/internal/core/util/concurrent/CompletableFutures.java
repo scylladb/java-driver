@@ -187,6 +187,9 @@ public class CompletableFutures {
         } catch (InterruptedException e) {
           interrupted = true;
           remainingNanos = deadline - System.nanoTime();
+          if (remainingNanos <= 0) {
+            throw new DriverExecutionException(new TimeoutException("Timed out after interrupt"));
+          }
         } catch (TimeoutException e) {
           throw new DriverExecutionException(e);
         } catch (ExecutionException e) {
