@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverExecutionException;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.base.Throwables;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +29,8 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -148,6 +151,44 @@ public class CompletableFutures {
           return stage.toCompletableFuture().get();
         } catch (InterruptedException e) {
           interrupted = true;
+        } catch (ExecutionException e) {
+          Throwable cause = e.getCause();
+          if (cause instanceof DriverException) {
+            throw ((DriverException) cause).copy();
+          }
+          Throwables.throwIfUnchecked(cause);
+          throw new DriverExecutionException(cause);
+        }
+      }
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  /**
+   * Get the result of a future uninterruptibly, with a timeout.
+   *
+   * @param stage the completion stage to wait for
+   * @param timeout the maximum time to wait
+   * @return the result value
+   * @throws DriverExecutionException if the future completed exceptionally
+   * @throws DriverExecutionException wrapping TimeoutException if the wait timed out
+   */
+  public static <T> T getUninterruptibly(CompletionStage<T> stage, Duration timeout) {
+    boolean interrupted = false;
+    try {
+      long remainingNanos = timeout.toNanos();
+      long deadline = System.nanoTime() + remainingNanos;
+      while (true) {
+        try {
+          return stage.toCompletableFuture().get(remainingNanos, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+          interrupted = true;
+          remainingNanos = deadline - System.nanoTime();
+        } catch (TimeoutException e) {
+          throw new DriverExecutionException(e);
         } catch (ExecutionException e) {
           Throwable cause = e.getCause();
           if (cause instanceof DriverException) {

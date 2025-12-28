@@ -18,12 +18,16 @@
 package com.datastax.oss.driver.internal.core.util.concurrent;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.fail;
 
+import com.datastax.oss.driver.api.core.DriverExecutionException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.Test;
 
 public class CompletableFuturesTest {
@@ -44,5 +48,30 @@ public class CompletableFuturesTest {
     } catch (ExecutionException e) {
       assertThat(e.getCause()).isEqualTo(error);
     }
+  }
+
+  @Test
+  public void should_get_uninterruptibly_with_timeout_on_completed_future() {
+    CompletableFuture<String> future = CompletableFuture.completedFuture("result");
+    String result = CompletableFutures.getUninterruptibly(future, Duration.ofSeconds(1));
+    assertThat(result).isEqualTo("result");
+  }
+
+  @Test
+  public void should_timeout_on_incomplete_future() {
+    CompletableFuture<String> future = new CompletableFuture<>();
+    assertThatThrownBy(() -> CompletableFutures.getUninterruptibly(future, Duration.ofMillis(100)))
+        .isInstanceOf(DriverExecutionException.class)
+        .hasCauseInstanceOf(TimeoutException.class);
+  }
+
+  @Test
+  public void should_propagate_exception_with_timeout() {
+    CompletableFuture<String> future = new CompletableFuture<>();
+    RuntimeException error = new RuntimeException("test error");
+    future.completeExceptionally(error);
+    assertThatThrownBy(() -> CompletableFutures.getUninterruptibly(future, Duration.ofSeconds(1)))
+        .isInstanceOf(DriverExecutionException.class)
+        .hasCause(error);
   }
 }
