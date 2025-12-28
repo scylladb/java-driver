@@ -71,7 +71,6 @@ public class CompletableFuturesTest {
     RuntimeException error = new RuntimeException("test error");
     future.completeExceptionally(error);
     assertThatThrownBy(() -> CompletableFutures.getUninterruptibly(future, Duration.ofSeconds(1)))
-        .isInstanceOf(DriverExecutionException.class)
-        .hasCause(error);
+        .isEqualTo(error);
   }
 }
