@@ -17,6 +17,8 @@ on:
 
 jobs:
   release:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     concurrency:
       group: single
