@@ -105,7 +105,7 @@ public abstract class TokenITBase {
     ProtocolVersion protocolVersion = session().getContext().getProtocolVersion();
     ByteBuffer serializedKey = TypeCodecs.INT.encodePrimitive(key, protocolVersion);
     assertThat(serializedKey).isNotNull();
-    Set<Node> replicas = tokenMap.getReplicas(KS1, serializedKey);
+    List<Node> replicas = tokenMap.getReplicasList(KS1, serializedKey);
     assertThat(replicas).hasSize(1);
     Node replica = replicas.iterator().next();
 
@@ -126,7 +126,7 @@ public abstract class TokenITBase {
           foundRange = range;
 
           // That range should be managed by the replica
-          assertThat(tokenMap.getReplicas(KS1, range)).contains(replica);
+          assertThat(tokenMap.getReplicasList(KS1, range)).contains(replica);
         }
       }
     }

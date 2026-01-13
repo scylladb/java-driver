@@ -8,7 +8,9 @@ import com.datastax.oss.driver.api.core.metadata.Tablet;
 import com.datastax.oss.driver.api.core.metadata.TabletMap;
 import com.datastax.oss.driver.shaded.guava.common.annotations.Beta;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -130,12 +132,7 @@ public class DefaultTabletMap implements TabletMap {
   @Override
   public void removeByNode(Node node) {
     for (ConcurrentSkipListSet<Tablet> tabletSet : mapping.values()) {
-      Iterator<Tablet> it = tabletSet.iterator();
-      while (it.hasNext()) {
-        if (it.next().getReplicaNodes().contains(node)) {
-          it.remove();
-        }
-      }
+      tabletSet.removeIf(tablet -> tablet.getReplicaNodesList().contains(node));
     }
   }
 
@@ -162,18 +159,18 @@ public class DefaultTabletMap implements TabletMap {
   public static class DefaultTablet implements Tablet {
     private final long firstToken;
     private final long lastToken;
-    @NonNull private final Set<Node> replicaNodes;
+    @NonNull private final ImmutableList<Node> replicaNodes;
     @NonNull private final Map<Node, Integer> replicaShards;
 
     @VisibleForTesting
     DefaultTablet(
         long firstToken,
         long lastToken,
-        @NonNull Set<Node> replicaNodes,
+        @NonNull List<Node> replicaNodes,
         @NonNull Map<Node, Integer> replicaShards) {
       this.firstToken = firstToken;
       this.lastToken = lastToken;
-      this.replicaNodes = replicaNodes;
+      this.replicaNodes = ImmutableList.copyOf(replicaNodes);
       this.replicaShards = replicaShards;
     }
 
@@ -189,7 +186,7 @@ public class DefaultTabletMap implements TabletMap {
       long firstToken = tupleValue.getLong(0);
       long lastToken = tupleValue.getLong(1);
 
-      Set<Node> replicaNodes = new HashSet<>();
+      List<Node> replicaNodes = new ArrayList<>();
       Map<Node, Integer> replicaShards = new HashMap<>();
       List<TupleValue> list = tupleValue.getList(2, TupleValue.class);
       assert list != null;
@@ -197,7 +194,9 @@ public class DefaultTabletMap implements TabletMap {
         Node node = nodes.get(tuple.getUuid(0));
         if (node != null) {
           int shard = tuple.getInt(1);
-          replicaNodes.add(node);
+          if (!replicaNodes.contains(node)) {
+            replicaNodes.add(node);
+          }
           replicaShards.put(node, shard);
         }
       }
@@ -214,8 +213,7 @@ public class DefaultTabletMap implements TabletMap {
      * @return New {@link DefaultTablet} object
      */
     public static DefaultTablet malformedTablet(long lastToken) {
-      return new DefaultTablet(
-          lastToken, lastToken, Collections.emptySet(), Collections.emptyMap());
+      return new DefaultTablet(lastToken, lastToken, ImmutableList.of(), Collections.emptyMap());
     }
 
     @Override
@@ -228,8 +226,25 @@ public class DefaultTabletMap implements TabletMap {
       return lastToken;
     }
 
+    /**
+     * Return replicas in the tablet.
+     *
+     * @return a set of replicas in the tablet
+     * @deprecated Use {@link #getReplicaNodesList()} instead.
+     */
     @Override
+    @Deprecated
     public Set<Node> getReplicaNodes() {
+      return new HashSet<>(replicaNodes);
+    }
+
+    /**
+     * Return replicas in the tablet.
+     *
+     * @return a list of replicas in the tablet
+     */
+    @Override
+    public List<Node> getReplicaNodesList() {
       return replicaNodes;
     }
 

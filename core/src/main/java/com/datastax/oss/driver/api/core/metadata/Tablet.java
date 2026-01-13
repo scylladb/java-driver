@@ -1,6 +1,7 @@
 package com.datastax.oss.driver.api.core.metadata;
 
 import com.datastax.oss.driver.shaded.guava.common.annotations.Beta;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -25,7 +26,24 @@ public interface Tablet extends Comparable<Tablet> {
    */
   public long getLastToken();
 
+  /**
+   * Returns replica nodes in the order reported by the tablets-routing-v1 payload.
+   *
+   * <p>This set is immutable
+   *
+   * @deprecated Use {@link #getReplicaNodesList()} instead.
+   */
+  @Deprecated
   public Set<Node> getReplicaNodes();
+
+  /**
+   * Returns replica nodes in the order reported by the tablets-routing-v1 payload.
+   *
+   * <p>This list is immutable.
+   *
+   * @return ordered list of replica nodes for this tablet
+   */
+  public List<Node> getReplicaNodesList();
 
   /**
    * Looks up the shard number for specific replica Node.

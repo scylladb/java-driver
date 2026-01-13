@@ -12,7 +12,7 @@ import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import java.nio.ByteBuffer;
-import java.util.Set;
+import java.util.List;
 
 /**
  * Demonstrates usage of TokenMap and NodeShardingInfo Needs a Scylla cluster to be running locally
@@ -58,12 +58,12 @@ public class TokenMapAndShardIdLookup {
 
       TokenMap tokenMap = metadata.getTokenMap().get();
 
-      Set<Node> nodes =
-          tokenMap.getReplicas(CqlIdentifier.fromCql("tokenmap_example_ks"), PARTITION_KEY);
+      List<Node> nodes =
+          tokenMap.getReplicasList(CqlIdentifier.fromCql("tokenmap_example_ks"), PARTITION_KEY);
       System.out.println("Replica set size: " + nodes.size());
 
       Token token = tokenMap.newToken(PARTITION_KEY);
-      assert nodes.size() > 0;
+      assert !nodes.isEmpty();
       Node node = nodes.iterator().next();
 
       assert node.getShardingInfo() != null;

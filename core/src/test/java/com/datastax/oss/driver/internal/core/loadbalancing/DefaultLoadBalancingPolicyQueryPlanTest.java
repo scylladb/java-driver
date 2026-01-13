@@ -35,6 +35,7 @@ import static org.mockito.Mockito.times;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.util.Optional;
@@ -95,8 +96,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node3, node5));
 
     // When
     Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
@@ -119,8 +120,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     dsePolicy.upTimes.put(node1, T1);
     dsePolicy.upTimes.put(node3, T2);
     dsePolicy.upTimes.put(node5, T3); // newest up replica
@@ -148,8 +149,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     dsePolicy.upTimes.put(node1, T2); // newest up replica
     dsePolicy.upTimes.put(node3, T1);
     given(pool3.getInFlight()).willReturn(0);
@@ -176,8 +177,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     dsePolicy.upTimes.put(node1, T2); // newest up replica
     dsePolicy.upTimes.put(node3, T1);
     given(pool1.getInFlight()).willReturn(0);
@@ -204,8 +205,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     given(pool1.getInFlight()).willReturn(100); // unhealthy
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
@@ -236,8 +237,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     given(pool1.getInFlight()).willReturn(100); // unhealthy
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
@@ -266,8 +267,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     given(pool1.getInFlight()).willReturn(0);
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(100); // unhealthy
@@ -292,8 +293,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     given(pool1.getInFlight()).willReturn(100);
     given(pool3.getInFlight()).willReturn(100);
     given(pool5.getInFlight()).willReturn(0);
@@ -318,8 +319,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     given(pool1.getInFlight()).willReturn(200);
     given(pool3.getInFlight()).willReturn(100);
 
@@ -343,8 +344,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     String localRack = "rack1";
     given(dsePolicy.getLocalRack()).willReturn(localRack);
     given(node1.getRack()).willReturn(localRack);
@@ -367,8 +368,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
     String localRack = "rack1";
     given(dsePolicy.getLocalRack()).willReturn(localRack);
     given(node3.getRack()).willReturn(localRack);

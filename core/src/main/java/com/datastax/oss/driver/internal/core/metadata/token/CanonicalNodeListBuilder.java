@@ -18,30 +18,39 @@
 package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
-import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import net.jcip.annotations.ThreadSafe;
+import net.jcip.annotations.NotThreadSafe;
 
-@ThreadSafe
-public class EverywhereReplicationStrategy implements ReplicationStrategy {
+/**
+ * A reusable set builder that guarantees that identical sets (same elements in the same order) will
+ * be represented by the same instance.
+ */
+@NotThreadSafe
+class CanonicalNodeListBuilder {
 
-  @Override
-  public Map<Token, List<Node>> computeReplicasListByToken(
-      Map<Token, Node> tokenToPrimary, List<Token> ring) {
-    ImmutableMap.Builder<Token, List<Node>> result = ImmutableMap.builder();
-    Set<Node> uniqueNodes = new LinkedHashSet<>();
-    for (Token token : ring) {
-      uniqueNodes.add(tokenToPrimary.get(token));
+  private final Map<List<Node>, List<Node>> canonicalLists = new HashMap<>();
+  private final List<Node> elements = new ArrayList<>();
+
+  void add(Node node) {
+    // This is O(n), but the cardinality is low (max possible size is the replication factor).
+    if (!elements.contains(node)) {
+      elements.add(node);
     }
-    ImmutableList<Node> allNodes = ImmutableList.copyOf(uniqueNodes);
-    for (Token token : tokenToPrimary.keySet()) {
-      result.put(token, allNodes);
-    }
-    return result.build();
+  }
+
+  int size() {
+    return elements.size();
+  }
+
+  List<Node> build() {
+    return canonicalLists.computeIfAbsent(elements, ImmutableList::copyOf);
+  }
+
+  void clear() {
+    elements.clear();
   }
 }

@@ -83,7 +83,8 @@ public class LWTLoadBalancingIT {
     int pk = 1234;
     ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(pk, ProtocolVersion.DEFAULT);
     TokenMap tokenMap = SESSION_RULE.session().getMetadata().getTokenMap().get();
-    Node owner = tokenMap.getReplicas(session.getKeyspace().get(), routingKey).iterator().next();
+    Node owner =
+        tokenMap.getReplicasList(session.getKeyspace().get(), routingKey).iterator().next();
     PreparedStatement statement =
         SESSION_RULE
             .session()
@@ -122,7 +123,8 @@ public class LWTLoadBalancingIT {
     int pk = 1234;
     ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(pk, ProtocolVersion.DEFAULT);
     TokenMap tokenMap = SESSION_RULE.session().getMetadata().getTokenMap().get();
-    Node owner = tokenMap.getReplicas(session.getKeyspace().get(), routingKey).iterator().next();
+    Node owner =
+        tokenMap.getReplicasList(session.getKeyspace().get(), routingKey).iterator().next();
     PreparedStatement statement =
         SESSION_RULE
             .session()

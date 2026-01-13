@@ -57,12 +57,12 @@ import com.datastax.oss.driver.internal.core.util.collection.LazyQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.base.Predicates;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
 import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.nio.ByteBuffer;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -263,7 +263,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     // Take a snapshot since the set is concurrent:
     Object[] currentNodes = liveNodes.dc(localDc).toArray();
 
-    Set<Node> allReplicas = getReplicas(request, session);
+    List<Node> allReplicas = getReplicas(request, session);
     int replicaCount = 0; // in currentNodes
 
     if (!allReplicas.isEmpty()) {
@@ -295,9 +295,9 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   }
 
   @NonNull
-  protected Set<Node> getReplicas(@Nullable Request request, @Nullable Session session) {
+  protected List<Node> getReplicas(@Nullable Request request, @Nullable Session session) {
     if (request == null || session == null) {
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
 
     Optional<TokenMap> maybeTokenMap = context.getMetadataManager().getMetadata().getTokenMap();
@@ -321,7 +321,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
         keyspace = session.getKeyspace().get();
       }
       if (keyspace == null) {
-        return Collections.emptySet();
+        return ImmutableList.of();
       }
 
       table = request.getRoutingTable();
@@ -329,7 +329,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
       token = request.getRoutingToken();
       key = (token == null) ? request.getRoutingKey() : null;
       if (token == null && key == null) {
-        return Collections.emptySet();
+        return ImmutableList.of();
       }
 
       partitioner = request.getPartitioner();
@@ -339,7 +339,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     } catch (Exception e) {
       // Protect against poorly-implemented Request instances
       LOG.error("Unexpected error while trying to compute query plan", e);
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
 
     if (token == null && partitioner != null) {
@@ -350,25 +350,25 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
         context.getMetadataManager().getMetadata().getKeyspace(keyspace);
     if (ksMetadata.isPresent() && ksMetadata.get().isUsingTablets() && maybeTabletMap.isPresent()) {
       if (table == null) {
-        return Collections.emptySet();
+        return ImmutableList.of();
       }
       if (token instanceof TokenLong64) {
         Tablet targetTablet =
             maybeTabletMap.get().getTablet(keyspace, table, ((TokenLong64) token).getValue());
         if (targetTablet != null) {
-          return targetTablet.getReplicaNodes();
+          return targetTablet.getReplicaNodesList();
         }
       }
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
 
     if (!maybeTokenMap.isPresent()) {
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
     TokenMap tokenMap = maybeTokenMap.get();
     return token != null
-        ? tokenMap.getReplicas(keyspace, token)
-        : tokenMap.getReplicas(keyspace, partitioner, key);
+        ? tokenMap.getReplicasList(keyspace, token)
+        : tokenMap.getReplicasList(keyspace, partitioner, key);
   }
 
   @NonNull

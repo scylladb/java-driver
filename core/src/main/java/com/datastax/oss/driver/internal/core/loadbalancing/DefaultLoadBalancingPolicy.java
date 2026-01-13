@@ -38,12 +38,12 @@ import com.datastax.oss.driver.shaded.guava.common.collect.MapMaker;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.BitSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Queue;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -138,7 +138,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     // Take a snapshot since the set is concurrent:
     Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();
 
-    Set<Node> allReplicas = getReplicas(request, session);
+    List<Node> allReplicas = getReplicas(request, session);
     int replicaCount = 0; // in currentNodes
     int localRackReplicaCount = 0; // in currentNodes
     String localRack = getLocalRack();

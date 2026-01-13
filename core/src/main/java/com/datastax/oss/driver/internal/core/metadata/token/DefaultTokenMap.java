@@ -184,21 +184,27 @@ public class DefaultTokenMap implements TokenMap {
 
   @NonNull
   @Override
-  public Set<Node> getReplicas(
+  public List<Node> getReplicasList(
       @NonNull CqlIdentifier keyspace,
       @Nullable Partitioner partitioner,
       @NonNull ByteBuffer partitionKey) {
     KeyspaceTokenMap keyspaceMap = getKeyspaceMap(keyspace);
     return (keyspaceMap == null)
-        ? Collections.emptySet()
+        ? ImmutableList.of()
         : keyspaceMap.getReplicas(partitioner, partitionKey);
   }
 
   @NonNull
   @Override
   public Set<Node> getReplicas(@NonNull CqlIdentifier keyspace, @NonNull Token token) {
+    return ImmutableSet.copyOf(getReplicasList(keyspace, token));
+  }
+
+  @NonNull
+  @Override
+  public List<Node> getReplicasList(@NonNull CqlIdentifier keyspace, @NonNull Token token) {
     KeyspaceTokenMap keyspaceMap = getKeyspaceMap(keyspace);
-    return (keyspaceMap == null) ? Collections.emptySet() : keyspaceMap.getReplicas(token);
+    return (keyspaceMap == null) ? ImmutableList.of() : keyspaceMap.getReplicas(token);
   }
 
   @NonNull
