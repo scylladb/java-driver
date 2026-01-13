@@ -23,7 +23,6 @@
  */
 package com.datastax.oss.driver.internal.core.loadbalancing;
 
-import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -45,6 +44,7 @@ import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.protocol.internal.util.Bytes;
@@ -93,10 +93,10 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
     assertRoundRobinQueryPlans();
 
     // Then
-    then(tokenMap).should(never()).getReplicas(any(CqlIdentifier.class), any(Token.class));
+    then(tokenMap).should(never()).getReplicasList(any(CqlIdentifier.class), any(Token.class));
     then(tokenMap)
         .should(never())
-        .getReplicas(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
+        .getReplicasList(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
   }
 
   @Test
@@ -110,10 +110,10 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
     // Then
     then(request).should(never()).getRoutingKey();
     then(request).should(never()).getRoutingToken();
-    then(tokenMap).should(never()).getReplicas(any(CqlIdentifier.class), any(Token.class));
+    then(tokenMap).should(never()).getReplicasList(any(CqlIdentifier.class), any(Token.class));
     then(tokenMap)
         .should(never())
-        .getReplicas(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
+        .getReplicasList(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
   }
 
   @Test
@@ -126,10 +126,10 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
 
     then(request).should(never()).getRoutingKey();
     then(request).should(never()).getRoutingToken();
-    then(tokenMap).should(never()).getReplicas(any(CqlIdentifier.class), any(Token.class));
+    then(tokenMap).should(never()).getReplicasList(any(CqlIdentifier.class), any(Token.class));
     then(tokenMap)
         .should(never())
-        .getReplicas(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
+        .getReplicasList(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
   }
 
   @Test
@@ -140,10 +140,10 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
 
     assertRoundRobinQueryPlans();
 
-    then(tokenMap).should(never()).getReplicas(any(CqlIdentifier.class), any(Token.class));
+    then(tokenMap).should(never()).getReplicasList(any(CqlIdentifier.class), any(Token.class));
     then(tokenMap)
         .should(never())
-        .getReplicas(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
+        .getReplicasList(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
   }
 
   @Test
@@ -152,10 +152,10 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
 
     assertRoundRobinQueryPlans();
 
-    then(tokenMap).should(never()).getReplicas(any(CqlIdentifier.class), any(Token.class));
+    then(tokenMap).should(never()).getReplicasList(any(CqlIdentifier.class), any(Token.class));
     then(tokenMap)
         .should(never())
-        .getReplicas(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
+        .getReplicasList(any(CqlIdentifier.class), isNull(), any(ByteBuffer.class));
   }
 
   @Test
@@ -163,11 +163,11 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
       should_use_round_robin_when_token_map_returns_no_replicas_using_request_keyspace_and_routing_key() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY)).thenReturn(Collections.emptySet());
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY)).thenReturn(Collections.emptyList());
 
     assertRoundRobinQueryPlans();
 
-    then(tokenMap).should(atLeast(1)).getReplicas(KEYSPACE, null, ROUTING_KEY);
+    then(tokenMap).should(atLeast(1)).getReplicasList(KEYSPACE, null, ROUTING_KEY);
   }
 
   @Test
@@ -178,11 +178,12 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
     given(request.getRoutingKeyspace()).willReturn(null);
     given(session.getKeyspace()).willReturn(Optional.of(KEYSPACE));
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY)).willReturn(emptySet());
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(Collections.emptyList());
     // When
     assertRoundRobinQueryPlans();
     // Then
-    then(tokenMap).should(atLeast(1)).getReplicas(KEYSPACE, null, ROUTING_KEY);
+    then(tokenMap).should(atLeast(1)).getReplicasList(KEYSPACE, null, ROUTING_KEY);
   }
 
   @Test
@@ -192,11 +193,11 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
     given(request.getKeyspace()).willReturn(null);
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingToken()).willReturn(routingToken);
-    given(tokenMap.getReplicas(KEYSPACE, routingToken)).willReturn(emptySet());
+    given(tokenMap.getReplicasList(KEYSPACE, routingToken)).willReturn(Collections.emptyList());
     // When
     assertRoundRobinQueryPlans();
     // Then
-    then(tokenMap).should(atLeast(1)).getReplicas(KEYSPACE, routingToken);
+    then(tokenMap).should(atLeast(1)).getReplicasList(KEYSPACE, routingToken);
   }
 
   @Test
@@ -230,7 +231,7 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
   public void should_prioritize_single_replica() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY)).thenReturn(ImmutableSet.of(node3));
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY)).thenReturn(ImmutableList.of(node3));
 
     // node3 always first, round-robin on the rest
     assertThat(policy.newQueryPlan(request, session))
@@ -250,8 +251,8 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
   public void should_prioritize_and_shuffle_replicas() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .thenReturn(ImmutableSet.of(node3, node5));
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node3, node5));
 
     assertThat(policy.newQueryPlan(request, session))
         .containsExactly(node3, node5, node1, node2, node4);

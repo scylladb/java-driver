@@ -7,11 +7,11 @@ import com.datastax.oss.driver.api.core.metadata.KeyspaceTableNamePair;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.Tablet;
 import com.datastax.oss.driver.api.core.metadata.TabletMap;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.junit.Test;
 import org.testng.Assert;
 
@@ -21,19 +21,20 @@ public class DefaultTabletMapTest {
   public void should_remove_overlapping_tablets() {
     TabletMap tabletMap = DefaultTabletMap.emptyMap();
     Tablet tablet1 =
-        new DefaultTabletMap.DefaultTablet(0, 1, Collections.emptySet(), Collections.emptyMap());
+        new DefaultTabletMap.DefaultTablet(0, 1, Collections.emptyList(), Collections.emptyMap());
     Tablet tablet2 =
-        new DefaultTabletMap.DefaultTablet(1, 2, Collections.emptySet(), Collections.emptyMap());
+        new DefaultTabletMap.DefaultTablet(1, 2, Collections.emptyList(), Collections.emptyMap());
     Tablet tablet3 =
-        new DefaultTabletMap.DefaultTablet(2, 3, Collections.emptySet(), Collections.emptyMap());
+        new DefaultTabletMap.DefaultTablet(2, 3, Collections.emptyList(), Collections.emptyMap());
     Tablet tablet4 =
         new DefaultTabletMap.DefaultTablet(
-            -100, 100, Collections.emptySet(), Collections.emptyMap());
+            -100, 100, Collections.emptyList(), Collections.emptyMap());
 
     Tablet tablet5 =
-        new DefaultTabletMap.DefaultTablet(-10, 10, Collections.emptySet(), Collections.emptyMap());
+        new DefaultTabletMap.DefaultTablet(
+            -10, 10, Collections.emptyList(), Collections.emptyMap());
     Tablet tablet6 =
-        new DefaultTabletMap.DefaultTablet(9, 20, Collections.emptySet(), Collections.emptyMap());
+        new DefaultTabletMap.DefaultTablet(9, 20, Collections.emptyList(), Collections.emptyMap());
 
     KeyspaceTableNamePair key1 =
         new KeyspaceTableNamePair(CqlIdentifier.fromCql("ks"), CqlIdentifier.fromCql("tab"));
@@ -75,7 +76,7 @@ public class DefaultTabletMapTest {
     TabletMap tabletMap = DefaultTabletMap.emptyMap();
     Tablet tablet1 =
         new DefaultTabletMap.DefaultTablet(
-            -123, 123, Collections.emptySet(), Collections.emptyMap());
+            -123, 123, Collections.emptyList(), Collections.emptyMap());
     tabletMap.addTablet(CqlIdentifier.fromCql("ks"), CqlIdentifier.fromCql("tab"), tablet1);
     Tablet result =
         tabletMap.getTablet(CqlIdentifier.fromCql("ks"), CqlIdentifier.fromCql("tab"), -123);
@@ -87,7 +88,7 @@ public class DefaultTabletMapTest {
     TabletMap tabletMap = DefaultTabletMap.emptyMap();
     Tablet tablet1 =
         new DefaultTabletMap.DefaultTablet(
-            -123, 456, Collections.emptySet(), Collections.emptyMap());
+            -123, 456, Collections.emptyList(), Collections.emptyMap());
     tabletMap.addTablet(CqlIdentifier.fromCql("ks"), CqlIdentifier.fromCql("tab"), tablet1);
     Tablet result =
         tabletMap.getTablet(CqlIdentifier.fromCql("ks"), CqlIdentifier.fromCql("tab"), 456);
@@ -98,9 +99,7 @@ public class DefaultTabletMapTest {
   public void should_return_correct_shard() {
     Node node1 = mock(DefaultNode.class);
     Node node2 = mock(DefaultNode.class);
-    Set<Node> replicaNodes = new HashSet<Node>();
-    replicaNodes.add(node1);
-    replicaNodes.add(node2);
+    List<Node> replicaNodes = ImmutableList.of(node1, node2);
     Map<Node, Integer> replicaShards = new HashMap<>();
     replicaShards.put(node1, 1);
     replicaShards.put(node2, 2);

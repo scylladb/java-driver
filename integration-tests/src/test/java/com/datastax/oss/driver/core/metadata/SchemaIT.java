@@ -335,7 +335,7 @@ public class SchemaIT {
       assertThat(tokenMap.getReplicas("system_views", partitionKey)).isEmpty();
       assertThat(tokenMap.getReplicas("system_virtual_schema", partitionKey)).isEmpty();
       // Check that a non-virtual keyspace is present
-      assertThat(tokenMap.getReplicas(sessionRule.keyspace(), partitionKey)).isNotEmpty();
+      assertThat(tokenMap.getReplicasList(sessionRule.keyspace(), partitionKey)).isNotEmpty();
     }
   }
 

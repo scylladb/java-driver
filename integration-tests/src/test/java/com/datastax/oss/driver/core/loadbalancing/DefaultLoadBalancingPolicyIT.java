@@ -171,7 +171,7 @@ public class DefaultLoadBalancingPolicyIT {
     ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(1, ProtocolVersion.DEFAULT);
     TokenMap tokenMap = SESSION_RULE.session().getMetadata().getTokenMap().get();
     Set<Node> localReplicas = new HashSet<>();
-    for (Node replica : tokenMap.getReplicas(keyspace, routingKey)) {
+    for (Node replica : tokenMap.getReplicasList(keyspace, routingKey)) {
       if (replica.getDatacenter().equals(LOCAL_DC)) {
         localReplicas.add(replica);
       }
@@ -215,7 +215,7 @@ public class DefaultLoadBalancingPolicyIT {
     InternalDriverContext context = (InternalDriverContext) SESSION_RULE.session().getContext();
 
     Set<Node> localReplicas = new HashSet<>();
-    for (Node replica : tokenMap.getReplicas(keyspace, routingKey)) {
+    for (Node replica : tokenMap.getReplicasList(keyspace, routingKey)) {
       if (replica.getDatacenter().equals(LOCAL_DC)) {
         localReplicas.add(replica);
         context.getEventBus().fire(TopologyEvent.forceDown(replica.getBroadcastRpcAddress().get()));

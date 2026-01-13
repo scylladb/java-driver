@@ -37,8 +37,8 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.Test;
@@ -60,7 +60,7 @@ public class BasicLoadBalancingPolicyDcFailoverTest extends BasicLoadBalancingPo
   public void should_prioritize_single_replica() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY)).thenReturn(ImmutableSet.of(node3));
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY)).thenReturn(ImmutableList.of(node3));
 
     // node3 always first, round-robin on the rest, then remote nodes
     assertThat(policy.newQueryPlan(request, session))
@@ -81,8 +81,8 @@ public class BasicLoadBalancingPolicyDcFailoverTest extends BasicLoadBalancingPo
   public void should_prioritize_and_shuffle_replicas() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .thenReturn(ImmutableSet.of(node2, node3, node5, node8));
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node2, node3, node5, node8));
 
     // node 5 and 8 being in a remote DC, they don't get a boost for being a replica
     assertThat(policy.newQueryPlan(request, session))

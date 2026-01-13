@@ -35,7 +35,6 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -95,7 +94,8 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "1", DC2, "1"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -131,7 +131,8 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "1", DC2, "1"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -167,7 +168,8 @@ public class NetworkTopologyReplicationStrategyTest {
             ImmutableMap.of(DC1, "1", DC2, "1", DC3, "1"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -208,7 +210,8 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "2", DC2, "2"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -264,7 +267,8 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "2", DC2, "2"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -332,7 +336,8 @@ public class NetworkTopologyReplicationStrategyTest {
         new NetworkTopologyReplicationStrategy(ImmutableMap.of(DC1, "3", DC2, "3"), "test");
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -371,7 +376,7 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_pick_dc_replicas_in_different_racks_first_when_nodes_own_consecutive_tokens() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(3);
+    Map<Token, List<Node>> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(3);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(16);
@@ -411,7 +416,7 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_pick_dc_replicas_in_different_racks_first_when_all_nodes_contain_all_data() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(4);
+    Map<Token, List<Node>> replicasByToken = computeWithDifferentRacksAndConsecutiveTokens(4);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(16);
@@ -441,7 +446,7 @@ public class NetworkTopologyReplicationStrategyTest {
     assertThat(replicasByToken.get(TOKEN19)).isSameAs(replicasByToken.get(TOKEN18));
   }
 
-  private Map<Token, Set<Node>> computeWithDifferentRacksAndConsecutiveTokens(
+  private Map<Token, List<Node>> computeWithDifferentRacksAndConsecutiveTokens(
       int replicationFactor) {
     List<Token> ring =
         ImmutableList.of(
@@ -480,7 +485,7 @@ public class NetworkTopologyReplicationStrategyTest {
                 DC1, Integer.toString(replicationFactor), DC2, Integer.toString(replicationFactor)),
             "test");
 
-    return strategy.computeReplicasByToken(tokenToPrimary, ring);
+    return strategy.computeReplicasListByToken(tokenToPrimary, ring);
   }
 
   /**
@@ -491,7 +496,7 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_compute_complex_layout() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeComplexLayout(2);
+    Map<Token, List<Node>> replicasByToken = computeComplexLayout(2);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(18);
@@ -524,7 +529,7 @@ public class NetworkTopologyReplicationStrategyTest {
   @Test
   public void should_compute_complex_layout_with_rf_too_high() {
     // When
-    Map<Token, Set<Node>> replicasByToken = computeComplexLayout(4);
+    Map<Token, List<Node>> replicasByToken = computeComplexLayout(4);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(18);
@@ -564,7 +569,7 @@ public class NetworkTopologyReplicationStrategyTest {
         .containsExactly(node6, node1, node5, node3, node2, node4);
   }
 
-  private Map<Token, Set<Node>> computeComplexLayout(int replicationFactor) {
+  private Map<Token, List<Node>> computeComplexLayout(int replicationFactor) {
     List<Token> ring =
         ImmutableList.of(
             TOKEN01, TOKEN02, TOKEN03, TOKEN04, TOKEN05, TOKEN06, TOKEN07, TOKEN08, TOKEN09,
@@ -602,7 +607,7 @@ public class NetworkTopologyReplicationStrategyTest {
                 DC1, Integer.toString(replicationFactor), DC2, Integer.toString(replicationFactor)),
             "test");
 
-    return strategy.computeReplicasByToken(tokenToPrimary, ring);
+    return strategy.computeReplicasListByToken(tokenToPrimary, ring);
   }
 
   /**
@@ -663,7 +668,7 @@ public class NetworkTopologyReplicationStrategyTest {
               return invocation.callRealMethod();
             });
     new NetworkTopologyReplicationStrategy(replicationConfig, "test")
-        .computeReplicasByToken(tokenToPrimary, ringSpy);
+        .computeReplicasListByToken(tokenToPrimary, ringSpy);
     return count.get();
   }
 
