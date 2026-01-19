@@ -169,6 +169,7 @@ public class CcmBridge implements AutoCloseable {
     String ccmJavaHome = System.getProperty("ccm.java.home");
     if (ccmJavaHome != null) {
       envMap.put("JAVA_HOME", ccmJavaHome);
+      envMap.put("PYTHONWARNINGS", "ignore");
     }
     ENVIRONMENT_MAP = ImmutableMap.copyOf(envMap);
   }
@@ -582,7 +583,12 @@ public class CcmBridge implements AutoCloseable {
       executor.setStreamHandler(streamHandler);
       executor.setWatchdog(watchDog);
 
-      int retValue = executor.execute(cli, ENVIRONMENT_MAP);
+      Map<String, String> env = ENVIRONMENT_MAP;
+      if (env == null) {
+        env = Collections.singletonMap("PYTHONWARNINGS", "ignore");
+      }
+
+      int retValue = executor.execute(cli, env);
       if (retValue != 0) {
         logger.error(
             "Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
