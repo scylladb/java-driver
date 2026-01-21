@@ -25,6 +25,9 @@
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
+  <properties>
+    <java.driver.version>4.19.0.5-SNAPSHOT</java.driver.version>
+  </properties>
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
@@ -32,53 +35,53 @@
   </parent>
   <artifactId>java-driver-bom</artifactId>
   <packaging>pom</packaging>
-  <name>Java driver for Scylla and Apache Cassandra(R) - Bill Of Materials</name>
+  <name>Java driver for Scylla and Apache Cassandra (R) - Bill Of Materials</name>
   <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-core</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-core-shaded</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-mapper-processor</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-mapper-runtime</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-query-builder</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-guava-shaded</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-test-infra</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-metrics-micrometer</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>java-driver-metrics-microprofile</artifactId>
-        <version>4.19.0.5-SNAPSHOT</version>
+        <version>${java.driver.version}</version>
       </dependency>
       <dependency>
         <groupId>com.scylladb</groupId>
@@ -101,7 +104,7 @@
             </goals>
             <configuration>
               <pomElements>
-                <dependencyManagement>keep</dependencyManagement>
+                <dependencyManagement>expand</dependencyManagement>
                 <ciManagement>expand</ciManagement>
                 <contributors>expand</contributors>
                 <distributionManagement>expand</distributionManagement>
