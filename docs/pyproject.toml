@@ -14,7 +14,7 @@ sphinx-sitemap = "^2.8.0"
 sphinx-autobuild = "^2025.0.0"
 Sphinx = "^8.0.0"
 sphinx-multiversion-scylla = "^0.3.4"
-wheel = "^0.45.0"
+wheel = "^0.46.0"
 sphinx-scylladb-markdown = "^0.1.2"
 
 [build-system]
