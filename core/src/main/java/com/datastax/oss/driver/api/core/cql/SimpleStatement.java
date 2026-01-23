@@ -20,6 +20,7 @@ package com.datastax.oss.driver.api.core.cql;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.internal.core.cql.DefaultSimpleStatement;
@@ -84,7 +85,8 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
         null,
         null,
         null,
-        Statement.NO_NOW_IN_SECONDS);
+        Statement.NO_NOW_IN_SECONDS,
+        RequestRoutingType.REGULAR);
   }
 
   /**
@@ -118,7 +120,8 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
         null,
         null,
         null,
-        Statement.NO_NOW_IN_SECONDS);
+        Statement.NO_NOW_IN_SECONDS,
+        RequestRoutingType.REGULAR);
   }
 
   /**
@@ -149,7 +152,8 @@ public interface SimpleStatement extends BatchableStatement<SimpleStatement> {
         null,
         null,
         null,
-        Statement.NO_NOW_IN_SECONDS);
+        Statement.NO_NOW_IN_SECONDS,
+        RequestRoutingType.REGULAR);
   }
 
   /**

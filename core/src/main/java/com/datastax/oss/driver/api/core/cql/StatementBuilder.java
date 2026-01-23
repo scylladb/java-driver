@@ -19,6 +19,7 @@ package com.datastax.oss.driver.api.core.cql;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
@@ -61,6 +62,7 @@ public abstract class StatementBuilder<
   @Nullable protected Duration timeout;
   @Nullable protected Node node;
   protected int nowInSeconds = Statement.NO_NOW_IN_SECONDS;
+  protected RequestRoutingType requestRoutingType = RequestRoutingType.REGULAR;
 
   protected StatementBuilder() {
     // nothing to do
@@ -87,6 +89,7 @@ public abstract class StatementBuilder<
     this.timeout = template.getTimeout();
     this.node = template.getNode();
     this.nowInSeconds = template.getNowInSeconds();
+    this.requestRoutingType = template.getRequestRoutingType();
   }
 
   /** @see Statement#setExecutionProfileName(String) */
@@ -279,6 +282,12 @@ public abstract class StatementBuilder<
   /** @see Statement#setNowInSeconds(int) */
   public SelfT setNowInSeconds(int nowInSeconds) {
     this.nowInSeconds = nowInSeconds;
+    return self;
+  }
+
+  /** @see Statement#setRequestRoutingType(RequestRoutingType) */
+  public SelfT setRequestRoutingType(RequestRoutingType routingType) {
+    this.requestRoutingType = routingType;
     return self;
   }
 

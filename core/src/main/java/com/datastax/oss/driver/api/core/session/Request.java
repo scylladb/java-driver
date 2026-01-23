@@ -25,7 +25,6 @@ package com.datastax.oss.driver.api.core.session;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
-import com.datastax.oss.driver.api.core.RequestRoutingMethod;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
@@ -103,7 +102,7 @@ public interface Request {
    * The table to use for tablet-aware routing. Infers the table from available ColumnDefinitions or
    * {@code null} if it is not possible.
    *
-   * @return
+   * @return The table to use for tablet-aware routing, or {@code null} if not set.
    */
   @Nullable
   default CqlIdentifier getRoutingTable() {
@@ -213,9 +212,4 @@ public interface Request {
    */
   @NonNull
   RequestRoutingType getRequestRoutingType();
-
-  @Nullable
-  default RequestRoutingMethod getRoutingMethod() {
-    return RequestRoutingMethod.REGULAR;
-  }
 }
