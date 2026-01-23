@@ -14,6 +14,8 @@ CCM_SCYLLA_VERSION ?= master
 SCYLLA_EXT_OPTS ?= --smp=2 --memory=4G
 MVNCMD ?= mvn -B -X -ntp
 
+GET_VERSION_VERSION ?= 0.4.3
+
 MAVEN_GPG_PASSPHRASE ?=
 SONATYPE_TOKEN_USERNAME ?=
 SONATYPE_TOKEN_PASSWORD ?=
@@ -46,7 +48,7 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 .prepare-get-version: .prepare-bin
 	@if [[ ! -f "$(MAKEFILE_PATH)/bin/get-version" ]]; then
 		echo "bin/get-version is not found, installing it"
-		curl -sSLo /tmp/get-version.zip https://github.com/scylladb-actions/get-version/releases/download/v0.3.0/get-version_0.3.0_linux_amd64v3.zip
+		curl -sSLo /tmp/get-version.zip https://github.com/scylladb-actions/get-version/releases/download/v$(GET_VERSION_VERSION)/get-version_$(GET_VERSION_VERSION)_linux_amd64v3.zip
 		unzip /tmp/get-version.zip get-version -d "$(MAKEFILE_PATH)/bin" >/dev/null
 	fi
 
