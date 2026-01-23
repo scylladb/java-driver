@@ -26,6 +26,7 @@ package com.datastax.oss.driver.internal.core.cql;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
@@ -69,6 +70,7 @@ public class DefaultBoundStatement implements BoundStatement {
   private final ProtocolVersion protocolVersion;
   private final Node node;
   private final int nowInSeconds;
+  private final RequestRoutingType routingType;
 
   public DefaultBoundStatement(
       PreparedStatement preparedStatement,
@@ -91,7 +93,8 @@ public class DefaultBoundStatement implements BoundStatement {
       CodecRegistry codecRegistry,
       ProtocolVersion protocolVersion,
       Node node,
-      int nowInSeconds) {
+      int nowInSeconds,
+      RequestRoutingType routingType) {
     this.preparedStatement = preparedStatement;
     this.variableDefinitions = variableDefinitions;
     this.values = values;
@@ -113,6 +116,7 @@ public class DefaultBoundStatement implements BoundStatement {
     this.protocolVersion = protocolVersion;
     this.node = node;
     this.nowInSeconds = nowInSeconds;
+    this.routingType = routingType;
   }
 
   @Override
@@ -207,7 +211,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @NonNull
@@ -251,7 +256,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -283,7 +289,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -333,7 +340,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @NonNull
@@ -360,7 +368,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         newNode,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Nullable
@@ -420,7 +429,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -452,7 +462,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @NonNull
@@ -485,7 +496,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -517,7 +529,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -549,7 +562,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -581,7 +595,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Nullable
@@ -614,7 +629,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -646,7 +662,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -678,7 +695,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Nullable
@@ -711,7 +729,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Nullable
@@ -745,7 +764,8 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        routingType);
   }
 
   @Override
@@ -777,7 +797,42 @@ public class DefaultBoundStatement implements BoundStatement {
         codecRegistry,
         protocolVersion,
         node,
-        newNowInSeconds);
+        newNowInSeconds,
+        routingType);
+  }
+
+  @NonNull
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    return routingType;
+  }
+
+  @NonNull
+  @Override
+  public BoundStatement setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
+    return new DefaultBoundStatement(
+        preparedStatement,
+        variableDefinitions,
+        values,
+        executionProfileName,
+        executionProfile,
+        routingKeyspace,
+        routingKey,
+        routingToken,
+        customPayload,
+        idempotent,
+        tracing,
+        timestamp,
+        pagingState,
+        pageSize,
+        consistencyLevel,
+        serialConsistencyLevel,
+        timeout,
+        codecRegistry,
+        protocolVersion,
+        node,
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Override
