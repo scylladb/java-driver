@@ -27,6 +27,7 @@ import static org.awaitility.Awaitility.await;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -191,7 +192,7 @@ public class LWTLoadBalancingMultiDcIT {
               .addStatement(lwt.bind(pk, i, 202));
       // Ensure LWT routing type on Cassandra where detection may be absent
       if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
-        builder = builder.setIsLWT(true);
+        builder = builder.setRequestRoutingType(RequestRoutingType.LWT);
       }
       BatchStatement batch = builder.build();
       assertThat(batch.isLWT()).isTrue();

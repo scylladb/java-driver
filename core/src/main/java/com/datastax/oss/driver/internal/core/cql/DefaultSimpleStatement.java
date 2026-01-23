@@ -65,7 +65,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
   private final Duration timeout;
   private final Node node;
   private final int nowInSeconds;
-  @NonNull private final RequestRoutingType requestRoutingType;
+  @Nullable private final RequestRoutingType requestRoutingType;
 
   /** @see SimpleStatement#builder(String) */
   public DefaultSimpleStatement(
@@ -89,7 +89,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
       Duration timeout,
       Node node,
       int nowInSeconds,
-      @NonNull RequestRoutingType requestRoutingType) {
+      @Nullable RequestRoutingType requestRoutingType) {
     if (!positionalValues.isEmpty() && !namedValues.isEmpty()) {
       throw new IllegalArgumentException("Can't have both positional and named values");
     }
@@ -773,7 +773,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
         requestRoutingType);
   }
 
-  @NonNull
+  @Nullable
   @Override
   public RequestRoutingType getRequestRoutingType() {
     return requestRoutingType;
@@ -781,7 +781,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
 
   @NonNull
   @Override
-  public SimpleStatement setRequestRoutingType(@NonNull RequestRoutingType requestRoutingType) {
+  public SimpleStatement setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
     return new DefaultSimpleStatement(
         query,
         positionalValues,
@@ -808,7 +808,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
 
   @Override
   public boolean isLWT() {
-    return false;
+    return requestRoutingType == RequestRoutingType.LWT;
   }
 
   public static Map<CqlIdentifier, Object> wrapKeys(Map<String, Object> namedValues) {

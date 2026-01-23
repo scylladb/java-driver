@@ -48,6 +48,7 @@ import com.datastax.oss.driver.internal.core.data.ValuesHelper;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.shaded.guava.common.base.Splitter;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
@@ -83,7 +84,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   private final ConsistencyLevel serialConsistencyLevelForBoundStatements;
   private final Duration timeoutForBoundStatements;
   private final Partitioner partitioner;
-  @NonNull private final RequestRoutingType requestRoutingType;
+  @Nullable private final RequestRoutingType requestRoutingType;
   private volatile boolean skipMetadata;
 
   public DefaultPreparedStatement(
@@ -111,7 +112,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
       boolean areBoundStatementsTracing,
       CodecRegistry codecRegistry,
       ProtocolVersion protocolVersion,
-      @NonNull RequestRoutingType requestRoutingType) {
+      @Nullable RequestRoutingType requestRoutingType) {
     this.id = id;
     this.partitionKeyIndices = partitionKeyIndices;
     // It's important that we keep a reference to this object, so that it only gets evicted from
@@ -192,6 +193,12 @@ public class DefaultPreparedStatement implements PreparedStatement {
     return requestRoutingType == RequestRoutingType.LWT;
   }
 
+  @Nullable
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    return requestRoutingType;
+  }
+
   @Override
   public void setResultMetadata(
       @NonNull ByteBuffer newResultMetadataId, @NonNull ColumnDefinitions newResultSetDefinitions) {
@@ -257,7 +264,8 @@ public class DefaultPreparedStatement implements PreparedStatement {
         serialConsistencyLevelForBoundStatements,
         timeoutForBoundStatements,
         codecRegistry,
-        protocolVersion);
+        protocolVersion,
+        requestRoutingType);
   }
 
   public RepreparePayload getRepreparePayload() {

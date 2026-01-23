@@ -44,6 +44,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import net.jcip.annotations.Immutable;
 
 @Immutable
@@ -70,7 +71,7 @@ public class DefaultBoundStatement implements BoundStatement {
   private final ProtocolVersion protocolVersion;
   private final Node node;
   private final int nowInSeconds;
-  @NonNull private final RequestRoutingType routingType;
+  @Nullable private final RequestRoutingType requestRoutingType;
 
   public DefaultBoundStatement(
       PreparedStatement preparedStatement,
@@ -94,7 +95,7 @@ public class DefaultBoundStatement implements BoundStatement {
       ProtocolVersion protocolVersion,
       Node node,
       int nowInSeconds,
-      @NonNull RequestRoutingType routingType) {
+      @Nullable RequestRoutingType requestRoutingType) {
     this.preparedStatement = preparedStatement;
     this.variableDefinitions = variableDefinitions;
     this.values = values;
@@ -116,7 +117,7 @@ public class DefaultBoundStatement implements BoundStatement {
     this.protocolVersion = protocolVersion;
     this.node = node;
     this.nowInSeconds = nowInSeconds;
-    this.routingType = routingType;
+    this.requestRoutingType = requestRoutingType;
   }
 
   @Override
@@ -212,7 +213,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @NonNull
@@ -257,7 +258,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -290,7 +291,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -341,7 +342,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @NonNull
@@ -369,7 +370,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         newNode,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Nullable
@@ -430,7 +431,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -463,7 +464,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @NonNull
@@ -497,7 +498,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -530,7 +531,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -563,7 +564,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -596,7 +597,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Nullable
@@ -630,7 +631,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -663,7 +664,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -696,7 +697,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Nullable
@@ -730,7 +731,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Nullable
@@ -765,7 +766,7 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   @Override
@@ -798,18 +799,20 @@ public class DefaultBoundStatement implements BoundStatement {
         protocolVersion,
         node,
         newNowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
-  @NonNull
+  @Nullable
   @Override
   public RequestRoutingType getRequestRoutingType() {
-    return routingType;
+    return Objects.nonNull(requestRoutingType)
+        ? requestRoutingType
+        : preparedStatement.getRequestRoutingType();
   }
 
   @NonNull
   @Override
-  public BoundStatement setRequestRoutingType(@NonNull RequestRoutingType requestRoutingType) {
+  public BoundStatement setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
     return new DefaultBoundStatement(
         preparedStatement,
         variableDefinitions,

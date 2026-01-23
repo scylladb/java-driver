@@ -536,7 +536,7 @@ public interface Statement<SelfT extends Statement<SelfT>> extends Request {
   @NonNull
   @CheckReturnValue
   @SuppressWarnings("unchecked")
-  default SelfT setRequestRoutingType(RequestRoutingType requestRoutingType) {
+  default SelfT setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
     return (SelfT) this;
   }
 
@@ -555,7 +555,9 @@ public interface Statement<SelfT extends Statement<SelfT>> extends Request {
    *
    * @see <a href="https://docs.scylladb.com/using-scylla/lwt/">Docs about LWT</a>
    */
-  boolean isLWT();
+  default boolean isLWT() {
+    return getRequestRoutingType() == RequestRoutingType.LWT; // treating null as non-LWT
+  }
 
   /**
    * Calculates the approximate size in bytes that the statement will have when encoded.
