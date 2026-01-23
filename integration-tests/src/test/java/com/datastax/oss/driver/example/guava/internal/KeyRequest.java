@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.example.guava.internal;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
@@ -93,5 +94,11 @@ public class KeyRequest implements Request {
   @Override
   public Node getNode() {
     return null;
+  }
+
+  @NonNull
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    return RequestRoutingType.REGULAR;
   }
 }

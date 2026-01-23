@@ -19,6 +19,7 @@ package com.datastax.dse.driver.internal.core.graph;
 
 import com.datastax.dse.driver.api.core.graph.ScriptGraphStatement;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
@@ -203,5 +204,11 @@ public class DefaultScriptGraphStatement extends GraphStatementBase<ScriptGraphS
   @Override
   public String toString() {
     return String.format("ScriptGraphStatement['%s', params: %s]", this.script, this.queryParams);
+  }
+
+  @NonNull
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    return RequestRoutingType.REGULAR;
   }
 }

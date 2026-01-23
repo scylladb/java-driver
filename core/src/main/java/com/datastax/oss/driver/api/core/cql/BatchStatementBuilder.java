@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.api.core.cql;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.internal.core.cql.DefaultBatchStatement;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterables;
@@ -152,6 +153,8 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @NonNull
   public BatchStatement build() {
     List<BatchableStatement<?>> statements = statementsBuilder.build();
+    RequestRoutingType routingType =
+        isLWT != null ? (isLWT ? RequestRoutingType.LWT : RequestRoutingType.REGULAR) : null;
     return new DefaultBatchStatement(
         batchType,
         statements,
@@ -172,7 +175,7 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        routingType);
   }
 
   public int getStatementsCount() {

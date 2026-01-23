@@ -25,6 +25,8 @@ package com.datastax.oss.driver.api.core.session;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingMethod;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -199,4 +201,21 @@ public interface Request {
   /** @return The node configured on this statement, or null if none is configured. */
   @Nullable
   Node getNode();
+
+  /**
+   * Returns the routing type for this request.
+   *
+   * <p>The value represents how the request is handled on the server side (for example, regular vs
+   * lightweight transaction). Load balancing policies use this signal to shape the execution plan
+   * (eligible coordinators and ordering).
+   *
+   * @return The routing type configured on this request
+   */
+  @NonNull
+  RequestRoutingType getRequestRoutingType();
+
+  @Nullable
+  default RequestRoutingMethod getRoutingMethod() {
+    return RequestRoutingMethod.REGULAR;
+  }
 }
