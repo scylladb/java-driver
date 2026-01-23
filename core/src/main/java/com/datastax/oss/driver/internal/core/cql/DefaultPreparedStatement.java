@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
@@ -82,7 +83,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   private final ConsistencyLevel serialConsistencyLevelForBoundStatements;
   private final Duration timeoutForBoundStatements;
   private final Partitioner partitioner;
-  private final boolean isLWT;
+  private final RequestRoutingType requestRoutingType;
   private volatile boolean skipMetadata;
 
   public DefaultPreparedStatement(
@@ -110,7 +111,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
       boolean areBoundStatementsTracing,
       CodecRegistry codecRegistry,
       ProtocolVersion protocolVersion,
-      boolean isLWT) {
+      RequestRoutingType requestRoutingType) {
     this.id = id;
     this.partitionKeyIndices = partitionKeyIndices;
     // It's important that we keep a reference to this object, so that it only gets evicted from
@@ -136,7 +137,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
 
     this.codecRegistry = codecRegistry;
     this.protocolVersion = protocolVersion;
-    this.isLWT = isLWT;
+    this.requestRoutingType = requestRoutingType;
     this.skipMetadata =
         resolveSkipMetadata(
             query, resultMetadataId, resultSetDefinitions, this.executionProfileForBoundStatements);
@@ -188,7 +189,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
 
   @Override
   public boolean isLWT() {
-    return isLWT;
+    return requestRoutingType == RequestRoutingType.LWT;
   }
 
   @Override
@@ -229,7 +230,8 @@ public class DefaultPreparedStatement implements PreparedStatement {
         codecRegistry,
         protocolVersion,
         null,
-        Statement.NO_NOW_IN_SECONDS);
+        Statement.NO_NOW_IN_SECONDS,
+        requestRoutingType);
   }
 
   @NonNull
@@ -263,8 +265,8 @@ public class DefaultPreparedStatement implements PreparedStatement {
   }
 
   private static class ResultMetadata {
-    private ByteBuffer resultMetadataId;
-    private ColumnDefinitions resultSetDefinitions;
+    private final ByteBuffer resultMetadataId;
+    private final ColumnDefinitions resultSetDefinitions;
 
     private ResultMetadata(ByteBuffer resultMetadataId, ColumnDefinitions resultSetDefinitions) {
       this.resultMetadataId = resultMetadataId;

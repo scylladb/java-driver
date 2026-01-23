@@ -185,6 +185,7 @@ public class SimpleStatementBuilder
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 }

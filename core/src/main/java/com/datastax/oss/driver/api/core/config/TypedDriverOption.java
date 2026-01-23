@@ -933,6 +933,12 @@ public class TypedDriverOption<ValueT> {
               DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS,
               GenericType.listOf(String.class));
 
+  /** The request routing method to use in the request routing load balancing policy. */
+  public static final TypedDriverOption<String> LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD =
+      new TypedDriverOption<>(
+          DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
+          GenericType.STRING);
+
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {
       ImmutableList.Builder<TypedDriverOption<?>> result = ImmutableList.builder();

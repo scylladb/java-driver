@@ -20,7 +20,6 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
-import com.datastax.oss.driver.api.core.RequestRoutingMethod;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -51,7 +50,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLongArray;
-import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -72,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * }
  * </pre>
  *
- * See {@code reference.conf} (in the manual or core driver JAR) for more details.
+ * <p>See {@code reference.conf} (in the manual or core driver JAR) for more details.
  *
  * <p><b>Local datacenter</b>: This implementation requires a local datacenter to be defined,
  * otherwise it will throw an {@link IllegalStateException}. A local datacenter can be supplied
@@ -99,6 +97,11 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy implements RequestTracker {
 
+  public enum RequestRoutingMethod {
+    REGULAR,
+    PRESERVE_REPLICA_ORDER
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancingPolicy.class);
 
   private static final long NEWLY_UP_INTERVAL_NANOS = MINUTES.toNanos(1);
@@ -108,12 +111,29 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   protected final ConcurrentMap<Node, NodeResponseRateSample> responseTimes;
   protected final Map<Node, Long> upTimes = new ConcurrentHashMap<>();
   private final boolean avoidSlowReplicas;
+  private final RequestRoutingMethod lwtRequestRoutingMethod;
 
   public DefaultLoadBalancingPolicy(@NonNull DriverContext context, @NonNull String profileName) {
     super(context, profileName);
     this.avoidSlowReplicas =
         profile.getBoolean(DefaultDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
+    this.lwtRequestRoutingMethod = getRequestRoutingMethod();
     this.responseTimes = new MapMaker().weakKeys().makeMap();
+  }
+
+  @NonNull
+  private RequestRoutingMethod getRequestRoutingMethod() {
+    String methodString =
+        profile.getString(DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD);
+    try {
+      return RequestRoutingMethod.valueOf(methodString.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOG.warn(
+          "[{}] Unknown request routing method '{}', defaulting to PRESERVE_REPLICA_ORDER",
+          logPrefix,
+          methodString);
+      return RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
+    }
   }
 
   @NonNull
@@ -133,31 +153,69 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   }
 
   @NonNull
-  @Override
-  public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
-    List<Node> replicas = getReplicas(request, session);
-    RequestRoutingType requestType =
-        Objects.nonNull(request) ? request.getRequestRoutingType() : RequestRoutingType.REGULAR;
-    boolean isLWT = requestType == RequestRoutingType.LWT;
-    Object[] currentNodes =
-        isLWT
-            ? getReplicasFromLocalDcForLwt(replicas)
-            : getLiveNodes().dc(getLocalDatacenter()).toArray();
-
-    if (Objects.nonNull(request)
-        && request.getRoutingMethod() == RequestRoutingMethod.PRESERVE_REPLICA_ORDER) {
-      return new SimpleQueryPlan(currentNodes);
+  public RequestRoutingMethod getRequestRoutingMethod(@Nullable Request request) {
+    if (request == null) {
+      return RequestRoutingMethod.REGULAR;
+    }
+    RequestRoutingType routingType = request.getRequestRoutingType();
+    if (routingType == null) {
+      return RequestRoutingMethod.REGULAR;
     }
 
+    switch (routingType) {
+      case LWT:
+        return lwtRequestRoutingMethod;
+      case REGULAR:
+        return RequestRoutingMethod.REGULAR;
+      default:
+        return RequestRoutingMethod.REGULAR;
+    }
+  }
+
+  @NonNull
+  @Override
+  public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    switch (getRequestRoutingMethod(request)) {
+      case PRESERVE_REPLICA_ORDER:
+        return newQueryPlanPreserveReplicas(request, session);
+      default:
+        return newQueryPlanRegular(request, session);
+    }
+  }
+
+  @NonNull
+  /**
+   * Builds a query plan that preserves the replica order as returned by the load balancing
+   * strategy, while pushing non-local replicas after local ones.
+   */
+  public Queue<Node> newQueryPlanPreserveReplicas(
+      @Nullable Request request, @Nullable Session session) {
+    List<Node> replicas = getReplicas(request, session);
+    String localDc = getLocalDatacenter();
+    if (localDc == null || replicas.isEmpty()) {
+      return new SimpleQueryPlan(replicas.toArray());
+    }
+
+    return new SimpleQueryPlan(moveNonLocalReplicasToTheEnd(replicas, localDc));
+  }
+
+  @NonNull
+  /**
+   * Builds a query plan that prioritizes local replicas, shuffles them for balance, and then
+   * round-robins the remaining local nodes.
+   */
+  public Queue<Node> newQueryPlanRegular(@Nullable Request request, @Nullable Session session) {
+    List<Node> replicas = getReplicas(request, session);
+    Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();
     int replicaCount = 0; // in currentNodes
     if (!replicas.isEmpty()) {
-      Pair<Integer, Integer> counts = moveReplicasToFront(requestType, currentNodes, replicas);
+      Pair<Integer, Integer> counts = moveReplicasToFront(currentNodes, replicas);
       replicaCount = counts.getLeft();
+
       int localRackReplicaCount = counts.getRight(); // in currentNodes
 
       if (replicaCount > 1) {
-        shuffleLocalRackReplicasAndReplicas(
-            requestType, currentNodes, replicaCount, localRackReplicaCount);
+        shuffleLocalRackReplicasAndReplicas(currentNodes, replicaCount, localRackReplicaCount);
 
         if (replicaCount > 2 && avoidSlowReplicas) {
           avoidSlowReplicas(Objects.requireNonNull(session), currentNodes, replicaCount);
@@ -178,36 +236,34 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     return maybeAddDcFailover(request, plan);
   }
 
-  /** For LWT requests, prefer replicas in the local DC to avoid cross-DC coordination */
-  private Object[] getReplicasFromLocalDcForLwt(List<Node> replicas) {
-    // For LWT requests, start from replicas; if a local DC is configured, prefer replicas
-    // in the local DC to avoid cross-DC coordination. Preserve original replica order.
-    String localDc = getLocalDatacenter();
-    if (localDc != null) {
-      List<Node> filtered =
-          replicas.stream()
-              .filter(n -> Objects.equals(n.getDatacenter(), localDc))
-              .collect(Collectors.toList());
-      // Fallback to all replicas if none are in the local DC
-      if (!filtered.isEmpty()) {
-        return filtered.toArray();
+  /**
+   * Returns a replica array with local-datacenter replicas first and remote replicas preserved at
+   * the end.
+   */
+  private static Object[] moveNonLocalReplicasToTheEnd(List<Node> replicas, String localDc) {
+    Object[] orderedReplicas = new Object[replicas.size()];
+    int index = 0;
+    for (Node replica : replicas) {
+      if (Objects.equals(replica.getDatacenter(), localDc)) {
+        orderedReplicas[index++] = replica;
       }
     }
-    return replicas.toArray();
+    for (Node replica : replicas) {
+      if (!Objects.equals(replica.getDatacenter(), localDc)) {
+        orderedReplicas[index++] = replica;
+      }
+    }
+    return orderedReplicas;
   }
 
   private Pair<Integer, Integer> moveReplicasToFront(
-      RequestRoutingType routingType, Object[] currentNodes, List<Node> allReplicas) {
-    // Note: local rack prioritization is intentionally ignored for LWT requests to prevent
-    // congestion when different loaders from different racks target distinct rack-local LWT
-    // leaders.
+      Object[] currentNodes, List<Node> allReplicas) {
     int replicaCount = 0, localRackReplicaCount = 0;
     for (int i = 0; i < currentNodes.length; i++) {
       Node node = (Node) currentNodes[i];
       if (allReplicas.contains(node)) {
         if (Objects.equals(node.getRack(), getLocalRack())
-            && Objects.equals(node.getDatacenter(), getLocalDatacenter())
-            && routingType != RequestRoutingType.LWT) {
+            && Objects.equals(node.getDatacenter(), getLocalDatacenter())) {
           ArrayUtils.bubbleUp(currentNodes, i, localRackReplicaCount);
           localRackReplicaCount++;
         } else {
@@ -220,15 +276,8 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   }
 
   private void shuffleLocalRackReplicasAndReplicas(
-      RequestRoutingType routingType,
-      Object[] currentNodes,
-      int replicaCount,
-      int localRackReplicaCount) {
-    // For LWT, ignore local rack prioritization to avoid rack-local leader congestion; treat
-    // all local-DC replicas uniformly.
-    if (routingType != RequestRoutingType.LWT
-        && getLocalRack() != null
-        && localRackReplicaCount > 0) {
+      Object[] currentNodes, int replicaCount, int localRackReplicaCount) {
+    if (getLocalRack() != null && localRackReplicaCount > 0) {
       // Shuffle only replicas that are in the local rack
       shuffleHead(currentNodes, localRackReplicaCount);
       // Shuffles only replicas that are not in local rack

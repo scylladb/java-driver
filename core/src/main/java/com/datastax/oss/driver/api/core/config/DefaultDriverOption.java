@@ -718,7 +718,7 @@ public enum DefaultDriverOption implements DriverOption {
 
   /**
    * CQL 4.x has a known issue where prepared statement invalidation may be bypassed on the client
-   * side. Reference: https://github.com/scylladb/scylladb/issues/20860
+   * side. Reference: <a href="https://github.com/scylladb/scylladb/issues/20860">link</a>
    *
    * <p>When this occurs, the client's metadata can become outdated, leading to various
    * deserialization errors.
@@ -1063,7 +1063,17 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value type: {@link java.util.List List}&#60;{@link String}&#62;
    */
   LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS(
-      "advanced.load-balancing-policy.dc-failover.preferred-remote-dcs");
+      "advanced.load-balancing-policy.dc-failover.preferred-remote-dcs"),
+
+  /**
+   * The default routing method to use for LWT (Lightweight Transaction) requests. REGULAR uses the
+   * standard load balancing algorithm with slow replica avoidance and shuffling.
+   * PRESERVE_REPLICA_ORDER maintains the replica order from the partitioner.
+   *
+   * <p>Value-type: string
+   */
+  LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD(
+      "advanced.load-balancing-policy.default-lwt-request-routing-method");
 
   private final String path;
 

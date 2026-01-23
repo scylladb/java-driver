@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -522,6 +523,20 @@ public interface Statement<SelfT extends Statement<SelfT>> extends Request {
   @CheckReturnValue
   @SuppressWarnings("unchecked")
   default SelfT setNowInSeconds(int nowInSeconds) {
+    return (SelfT) this;
+  }
+
+  /**
+   * Sets the request routing type to use when applying the request (for testing purposes).
+   *
+   * <p>This method's default implementation returns the statement unchanged. The only reason it
+   * exists is to preserve binary compatibility. Internally, the driver overrides it to record the
+   * new value.
+   */
+  @NonNull
+  @CheckReturnValue
+  @SuppressWarnings("unchecked")
+  default SelfT setRequestRoutingType(RequestRoutingType requestRoutingType) {
     return (SelfT) this;
   }
 

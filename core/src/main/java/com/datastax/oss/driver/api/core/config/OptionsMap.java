@@ -393,6 +393,9 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.METRICS_GENERATE_AGGREGABLE_HISTOGRAMS, true);
     map.put(
         TypedDriverOption.LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS, ImmutableList.of(""));
+    map.put(
+        TypedDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
+        "PRESERVE_REPLICA_ORDER");
   }
 
   @Immutable

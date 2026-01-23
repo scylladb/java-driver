@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -427,7 +428,9 @@ public class Conversions {
         request.areBoundStatementsTracing(),
         context.getCodecRegistry(),
         context.getProtocolVersion(),
-        lwtInfo != null && lwtInfo.isLwt(response.variablesMetadata.flags));
+        lwtInfo != null && lwtInfo.isLwt(response.variablesMetadata.flags)
+            ? RequestRoutingType.LWT
+            : RequestRoutingType.REGULAR);
   }
 
   public static ColumnDefinitions toColumnDefinitions(

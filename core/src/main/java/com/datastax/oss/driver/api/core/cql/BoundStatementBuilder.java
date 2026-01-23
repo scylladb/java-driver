@@ -204,6 +204,7 @@ public class BoundStatementBuilder extends StatementBuilder<BoundStatementBuilde
         codecRegistry,
         protocolVersion,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 }
