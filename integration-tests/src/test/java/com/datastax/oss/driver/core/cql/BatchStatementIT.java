@@ -31,6 +31,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -299,7 +300,7 @@ public class BatchStatementIT {
     builder.setSerialConsistencyLevel(ConsistencyLevel.SERIAL);
     // Enforce LWT routing only for Cassandra where prepare metadata lacks LWT flags.
     if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
-      builder.setIsLWT(true);
+      builder.setRequestRoutingType(RequestRoutingType.LWT);
     }
 
     BatchStatement batchStatement = builder.build();
@@ -327,7 +328,7 @@ public class BatchStatementIT {
     rerunBuilder.setRoutingKey(routingKeyStmt.getRoutingKey());
     // Enforce LWT routing only for Cassandra where prepare metadata lacks LWT flags.
     if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
-      rerunBuilder.setIsLWT(true);
+      rerunBuilder.setRequestRoutingType(RequestRoutingType.LWT);
     }
     BatchStatement rerunBatch = rerunBuilder.build();
     assertThat(rerunBatch.isLWT()).isEqualTo(true);

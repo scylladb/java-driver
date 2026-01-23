@@ -20,6 +20,7 @@ package com.datastax.oss.driver.api.core.cql;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.type.DataType;
@@ -67,7 +68,8 @@ public class BoundStatementBuilder extends StatementBuilder<BoundStatementBuilde
       @Nullable ConsistencyLevel serialConsistencyLevel,
       @Nullable Duration timeout,
       @NonNull CodecRegistry codecRegistry,
-      @NonNull ProtocolVersion protocolVersion) {
+      @NonNull ProtocolVersion protocolVersion,
+      @Nullable RequestRoutingType requestRoutingType) {
     this.preparedStatement = preparedStatement;
     this.variableDefinitions = variableDefinitions;
     this.values = values;
@@ -89,6 +91,7 @@ public class BoundStatementBuilder extends StatementBuilder<BoundStatementBuilde
     this.timeout = timeout;
     this.codecRegistry = codecRegistry;
     this.protocolVersion = protocolVersion;
+    this.requestRoutingType = requestRoutingType;
   }
 
   public BoundStatementBuilder(@NonNull BoundStatement template) {

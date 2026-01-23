@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -156,12 +157,10 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     if (request == null) {
       return RequestRoutingMethod.REGULAR;
     }
-    switch (request.getRequestRoutingType()) {
-      case LWT:
-        return lwtRequestRoutingMethod;
-      case REGULAR:
-      default:
-        return RequestRoutingMethod.REGULAR;
+    if (request.getRequestRoutingType() == RequestRoutingType.LWT) {
+      return lwtRequestRoutingMethod;
+    } else {
+      return RequestRoutingMethod.REGULAR;
     }
   }
 
@@ -171,6 +170,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     switch (getDefaultLWTRequestRoutingMethod(request)) {
       case PRESERVE_REPLICA_ORDER:
         return newQueryPlanPreserveReplicas(request, session);
+      case REGULAR:
       default:
         return newQueryPlanRegular(request, session);
     }
@@ -416,8 +416,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     @VisibleForTesting protected final OptionalLong newest;
 
     private NodeResponseRateSample() {
-      long now = nanoTime();
-      this.oldest = now;
+      this.oldest = nanoTime();
       this.newest = OptionalLong.empty();
     }
 

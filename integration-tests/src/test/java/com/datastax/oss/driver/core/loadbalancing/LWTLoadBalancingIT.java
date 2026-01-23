@@ -27,6 +27,7 @@ import static org.junit.Assume.assumeTrue;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
@@ -161,7 +162,7 @@ public class LWTLoadBalancingIT {
       assertThat(simpleStatement.isLWT()).isFalse();
       batch = batch.add(simpleStatement);
       batch = batch.add(statement.bind(pk, i, 123));
-      batch = batch.setIsLWT(false);
+      batch = batch.setRequestRoutingType(RequestRoutingType.REGULAR);
       assertThat(batch.isLWT()).isFalse();
       ResultSet result = session.execute(batch);
       coordinators.add(result.getExecutionInfo().getCoordinator());

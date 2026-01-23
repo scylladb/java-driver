@@ -210,6 +210,6 @@ public interface Request {
    *
    * @return The routing type configured on this request
    */
-  @NonNull
+  @Nullable
   RequestRoutingType getRequestRoutingType();
 }

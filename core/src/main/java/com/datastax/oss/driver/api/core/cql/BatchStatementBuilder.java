@@ -18,7 +18,6 @@
 package com.datastax.oss.driver.api.core.cql;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
-import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.internal.core.cql.DefaultBatchStatement;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterables;
@@ -40,7 +39,6 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @Nullable private CqlIdentifier keyspace;
   @NonNull private ImmutableList.Builder<BatchableStatement<?>> statementsBuilder;
   private int statementsCount;
-  @Nullable private Boolean isLWT = null;
 
   public BatchStatementBuilder(@NonNull BatchType batchType) {
     this.batchType = batchType;
@@ -75,19 +73,6 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @NonNull
   public BatchStatementBuilder setKeyspace(@NonNull String keyspaceName) {
     return setKeyspace(CqlIdentifier.fromCql(keyspaceName));
-  }
-
-  /**
-   * Forces driver to see this batch as LWT or non-LWT. Note that if never explicitly set or set to
-   * {@code null}, the resulting {@code DefaultBatchStatement} will decide its LWT state based on
-   * contained statements.
-   *
-   * @return this builder; never {@code null}.
-   */
-  @NonNull
-  public BatchStatementBuilder setIsLWT(Boolean newIsLWT) {
-    this.isLWT = newIsLWT;
-    return this;
   }
 
   /**
@@ -153,8 +138,6 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @NonNull
   public BatchStatement build() {
     List<BatchableStatement<?>> statements = statementsBuilder.build();
-    RequestRoutingType routingType =
-        isLWT != null ? (isLWT ? RequestRoutingType.LWT : RequestRoutingType.REGULAR) : null;
     return new DefaultBatchStatement(
         batchType,
         statements,
@@ -175,7 +158,7 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
         timeout,
         node,
         nowInSeconds,
-        routingType);
+        requestRoutingType);
   }
 
   public int getStatementsCount() {
