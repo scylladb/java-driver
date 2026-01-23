@@ -62,7 +62,7 @@ public abstract class StatementBuilder<
   @Nullable protected Duration timeout;
   @Nullable protected Node node;
   protected int nowInSeconds = Statement.NO_NOW_IN_SECONDS;
-  protected RequestRoutingType requestRoutingType = RequestRoutingType.REGULAR;
+  @NonNull protected RequestRoutingType requestRoutingType = RequestRoutingType.REGULAR;
 
   protected StatementBuilder() {
     // nothing to do
@@ -286,7 +286,7 @@ public abstract class StatementBuilder<
   }
 
   /** @see Statement#setRequestRoutingType(RequestRoutingType) */
-  public SelfT setRequestRoutingType(RequestRoutingType routingType) {
+  public SelfT setRequestRoutingType(@NonNull RequestRoutingType routingType) {
     this.requestRoutingType = routingType;
     return self;
   }

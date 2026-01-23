@@ -57,6 +57,7 @@ import com.datastax.oss.simulacron.common.stubbing.CloseType;
 import com.datastax.oss.simulacron.server.BoundNode;
 import com.datastax.oss.simulacron.server.RejectScope;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -703,7 +704,7 @@ public class NodeStateIT {
 
     @NonNull
     @Override
-    public Queue<Node> newQueryPlan(@NonNull Request request, @NonNull Session session) {
+    public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
       Object[] snapshot = liveNodes.toArray();
       Queue<Node> queryPlan = new ConcurrentLinkedQueue<>();
       int start = offset.getAndIncrement(); // Note: offset overflow won't be an issue in tests

@@ -36,7 +36,10 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.UUID;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.junit.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class DefaultLoadBalancingPolicyInitTest extends LoadBalancingPolicyTestBase {
 
   @Test

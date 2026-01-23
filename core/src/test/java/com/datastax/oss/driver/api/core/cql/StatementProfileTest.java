@@ -22,6 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.TestDataProviders;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.internal.core.cql.DefaultBoundStatement;
 import com.tngtech.java.junit.dataprovider.DataProvider;
@@ -191,6 +192,7 @@ public class StatementProfileTest {
         null,
         null,
         null,
-        Statement.NO_NOW_IN_SECONDS);
+        Statement.NO_NOW_IN_SECONDS,
+        RequestRoutingType.REGULAR);
   }
 }

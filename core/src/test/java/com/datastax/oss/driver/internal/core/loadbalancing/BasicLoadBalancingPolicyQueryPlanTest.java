@@ -38,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
@@ -80,6 +81,7 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
     when(metadataManager.getContactPoints()).thenReturn(ImmutableSet.of(node1));
     when(metadataManager.getMetadata()).thenReturn(metadata);
     when(metadata.getTokenMap()).thenAnswer(invocation -> Optional.of(this.tokenMap));
+    when(request.getRequestRoutingType()).thenReturn(RequestRoutingType.REGULAR);
 
     policy = createAndInitPolicy();
   }

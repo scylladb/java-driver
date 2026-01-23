@@ -33,6 +33,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -44,8 +45,11 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLongArray;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.junit.MockitoJUnitRunner;
 
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingPolicyQueryPlanTest {
 
   private static final long T0 = Long.MIN_VALUE;
@@ -385,6 +389,73 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Then
     assertThat(plan1).containsExactly(node5, node3, node1, node2, node4);
     assertThat(plan2).containsExactly(node5, node3, node1, node4, node2);
+  }
+
+  @Test
+  public void should_ignore_local_rack_prioritization_for_lwt_requests() {
+    // Given - LWT request with local rack configured
+    given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
+    given(request.getRoutingKey()).willReturn(ROUTING_KEY);
+    given(request.getRequestRoutingType()).willReturn(RequestRoutingType.LWT);
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
+
+    String localRack = "rack1";
+    given(dsePolicy.getLocalRack()).willReturn(localRack);
+    // Only node1 is in the local rack
+    given(node1.getRack()).willReturn(localRack);
+    given(node3.getRack()).willReturn("rack2");
+    given(node5.getRack()).willReturn("rack3");
+
+    given(pool1.getInFlight()).willReturn(0);
+    given(pool3.getInFlight()).willReturn(0);
+    given(pool5.getInFlight()).willReturn(0);
+
+    // When
+    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+
+    // Then - for LWT requests (RequestRoutingType.LWT) the policy should ignore local rack
+    // prioritization and preserve the replica order returned by the token map.
+    // The shuffle methods are still invoked for the non-replica range, so only the non-replica
+    // nodes (node2 and node4) are permuted between successive plans.
+    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(dsePolicy).should(times(2)).shuffleInRange(any(), anyInt(), anyInt());
+    assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
+    assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
+  }
+
+  @Test
+  public void should_respect_local_rack_prioritization_for_regular_requests() {
+    // Given - REGULAR request (not LWT) with local rack configured
+    given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
+    given(request.getRoutingKey()).willReturn(ROUTING_KEY);
+    given(request.getRequestRoutingType())
+        .willReturn(com.datastax.oss.driver.api.core.RequestRoutingType.REGULAR);
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .willReturn(ImmutableList.of(node1, node3, node5));
+
+    String localRack = "rack1";
+    given(dsePolicy.getLocalRack()).willReturn(localRack);
+    // node1 is in the local rack
+    given(node1.getRack()).willReturn(localRack);
+    given(node3.getRack()).willReturn("rack2");
+    given(node5.getRack()).willReturn("rack3");
+
+    given(pool1.getInFlight()).willReturn(0);
+    given(pool3.getInFlight()).willReturn(0);
+    given(pool5.getInFlight()).willReturn(0);
+
+    // When
+    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+
+    // Then - local rack replica prioritized and shuffled separately from others
+    // Verify that local rack replicas and non-local-rack replicas are shuffled separately
+    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(dsePolicy).should(times(2)).shuffleInRange(any(), anyInt(), anyInt());
+    assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
+    assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
   }
 
   @Override

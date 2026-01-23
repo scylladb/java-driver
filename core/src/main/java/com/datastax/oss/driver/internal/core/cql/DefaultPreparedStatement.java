@@ -83,7 +83,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   private final ConsistencyLevel serialConsistencyLevelForBoundStatements;
   private final Duration timeoutForBoundStatements;
   private final Partitioner partitioner;
-  private final RequestRoutingType requestRoutingType;
+  @NonNull private final RequestRoutingType requestRoutingType;
   private volatile boolean skipMetadata;
 
   public DefaultPreparedStatement(
@@ -111,7 +111,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
       boolean areBoundStatementsTracing,
       CodecRegistry codecRegistry,
       ProtocolVersion protocolVersion,
-      RequestRoutingType requestRoutingType) {
+      @NonNull RequestRoutingType requestRoutingType) {
     this.id = id;
     this.partitionKeyIndices = partitionKeyIndices;
     // It's important that we keep a reference to this object, so that it only gets evicted from

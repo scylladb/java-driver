@@ -22,6 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
 import org.junit.Test;
 
@@ -38,6 +39,7 @@ public class StatementBuilderTest {
       super(template);
     }
 
+    @NonNull
     @Override
     public SimpleStatement build() {
 
