@@ -20,7 +20,6 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
-import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -117,12 +116,12 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     super(context, profileName);
     this.avoidSlowReplicas =
         profile.getBoolean(DefaultDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
-    this.lwtRequestRoutingMethod = getRequestRoutingMethod();
+    this.lwtRequestRoutingMethod = getDefaultLWTRequestRoutingMethod();
     this.responseTimes = new MapMaker().weakKeys().makeMap();
   }
 
   @NonNull
-  private RequestRoutingMethod getRequestRoutingMethod() {
+  private RequestRoutingMethod getDefaultLWTRequestRoutingMethod() {
     String methodString =
         profile.getString(DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD);
     try {
@@ -153,20 +152,14 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   }
 
   @NonNull
-  public RequestRoutingMethod getRequestRoutingMethod(@Nullable Request request) {
+  public RequestRoutingMethod getDefaultLWTRequestRoutingMethod(@Nullable Request request) {
     if (request == null) {
       return RequestRoutingMethod.REGULAR;
     }
-    RequestRoutingType routingType = request.getRequestRoutingType();
-    if (routingType == null) {
-      return RequestRoutingMethod.REGULAR;
-    }
-
-    switch (routingType) {
+    switch (request.getRequestRoutingType()) {
       case LWT:
         return lwtRequestRoutingMethod;
       case REGULAR:
-        return RequestRoutingMethod.REGULAR;
       default:
         return RequestRoutingMethod.REGULAR;
     }
@@ -175,7 +168,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   @NonNull
   @Override
   public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
-    switch (getRequestRoutingMethod(request)) {
+    switch (getDefaultLWTRequestRoutingMethod(request)) {
       case PRESERVE_REPLICA_ORDER:
         return newQueryPlanPreserveReplicas(request, session);
       default:
@@ -183,11 +176,11 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     }
   }
 
-  @NonNull
   /**
    * Builds a query plan that preserves the replica order as returned by the load balancing
    * strategy, while pushing non-local replicas after local ones.
    */
+  @NonNull
   public Queue<Node> newQueryPlanPreserveReplicas(
       @Nullable Request request, @Nullable Session session) {
     List<Node> replicas = getReplicas(request, session);
@@ -199,11 +192,11 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     return new SimpleQueryPlan(moveNonLocalReplicasToTheEnd(replicas, localDc));
   }
 
-  @NonNull
   /**
    * Builds a query plan that prioritizes local replicas, shuffles them for balance, and then
    * round-robins the remaining local nodes.
    */
+  @NonNull
   public Queue<Node> newQueryPlanRegular(@Nullable Request request, @Nullable Session session) {
     List<Node> replicas = getReplicas(request, session);
     Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();

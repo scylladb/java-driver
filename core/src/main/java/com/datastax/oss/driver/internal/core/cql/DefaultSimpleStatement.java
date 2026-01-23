@@ -65,7 +65,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
   private final Duration timeout;
   private final Node node;
   private final int nowInSeconds;
-  private final RequestRoutingType requestRoutingType;
+  @NonNull private final RequestRoutingType requestRoutingType;
 
   /** @see SimpleStatement#builder(String) */
   public DefaultSimpleStatement(
@@ -89,7 +89,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
       Duration timeout,
       Node node,
       int nowInSeconds,
-      RequestRoutingType requestRoutingType) {
+      @NonNull RequestRoutingType requestRoutingType) {
     if (!positionalValues.isEmpty() && !namedValues.isEmpty()) {
       throw new IllegalArgumentException("Can't have both positional and named values");
     }
@@ -781,7 +781,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
 
   @NonNull
   @Override
-  public SimpleStatement setRequestRoutingType(RequestRoutingType requestRoutingType) {
+  public SimpleStatement setRequestRoutingType(@NonNull RequestRoutingType requestRoutingType) {
     return new DefaultSimpleStatement(
         query,
         positionalValues,

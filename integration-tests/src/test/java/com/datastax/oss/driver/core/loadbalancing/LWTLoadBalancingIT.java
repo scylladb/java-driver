@@ -43,6 +43,7 @@ import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -76,24 +77,26 @@ public class LWTLoadBalancingIT {
   }
 
   @Test
-  public void should_use_only_one_node_when_lwt_detected() {
+  public void should_use_replicas_when_lwt_detected() {
     assumeTrue(
         CcmBridge.isDistributionOf(BackendType.SCYLLA)); // Functionality only available in Scylla
     CqlSession session = SESSION_RULE.session();
     int pk = 1234;
     ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(pk, ProtocolVersion.DEFAULT);
     TokenMap tokenMap = SESSION_RULE.session().getMetadata().getTokenMap().get();
-    Node owner =
-        tokenMap.getReplicasList(session.getKeyspace().get(), routingKey).iterator().next();
+    List<Node> replicas = tokenMap.getReplicasList(session.getKeyspace().get(), routingKey);
     PreparedStatement statement =
         SESSION_RULE
             .session()
             .prepare("INSERT INTO foo (pk, ck, v) VALUES (?, ?, ?) IF NOT EXISTS");
     assertThat(statement.isLWT()).isTrue();
-    for (int i = 0; i < 30; i++) {
+    Set<Node> coordinators = new HashSet<>();
+    for (int i = 0; i < 100; i++) {
       ResultSet result = session.execute(statement.bind(pk, i, 123));
-      assertThat(result.getExecutionInfo().getCoordinator()).isEqualTo(owner);
+      coordinators.add(result.getExecutionInfo().getCoordinator());
     }
+    assertThat(coordinators).isSubsetOf(replicas);
+    assertThat(coordinators.size()).isGreaterThan(0).isLessThanOrEqualTo(replicas.size());
   }
 
   @Test
@@ -116,22 +119,22 @@ public class LWTLoadBalancingIT {
   }
 
   @Test
-  public void should_use_only_one_node_when_lwt_batch_detected() {
+  public void should_use_replicas_when_lwt_batch_detected() {
     assumeTrue(
         CcmBridge.isDistributionOf(BackendType.SCYLLA)); // Functionality only available in Scylla
     CqlSession session = SESSION_RULE.session();
     int pk = 1234;
     ByteBuffer routingKey = TypeCodecs.INT.encodePrimitive(pk, ProtocolVersion.DEFAULT);
     TokenMap tokenMap = SESSION_RULE.session().getMetadata().getTokenMap().get();
-    Node owner =
-        tokenMap.getReplicasList(session.getKeyspace().get(), routingKey).iterator().next();
+    List<Node> replicas = tokenMap.getReplicasList(session.getKeyspace().get(), routingKey);
     PreparedStatement statement =
         SESSION_RULE
             .session()
             .prepare("INSERT INTO foo (pk, ck, v) VALUES (?, ?, ?) IF NOT EXISTS");
     assertThat(statement.isLWT()).isTrue();
 
-    for (int i = 0; i < 30; i++) {
+    Set<Node> coordinatorsLwt = new HashSet<>();
+    for (int i = 0; i < 100; i++) {
       BatchStatement batch = BatchStatement.newInstance(BatchType.UNLOGGED);
       SimpleStatement simpleStatement =
           SimpleStatement.newInstance(
@@ -142,8 +145,10 @@ public class LWTLoadBalancingIT {
       batch = batch.add(statement.bind(pk, i, 123));
       assertThat(batch.isLWT()).isTrue();
       ResultSet result = session.execute(batch);
-      assertThat(result.getExecutionInfo().getCoordinator()).isEqualTo(owner);
+      coordinatorsLwt.add(result.getExecutionInfo().getCoordinator());
     }
+    assertThat(coordinatorsLwt).isSubsetOf(replicas);
+    assertThat(coordinatorsLwt.size()).isGreaterThan(0).isLessThanOrEqualTo(replicas.size());
 
     // Check if multiple coordinators are used when forcibly set to non-LWT
     Set<Node> coordinators = new HashSet<>();

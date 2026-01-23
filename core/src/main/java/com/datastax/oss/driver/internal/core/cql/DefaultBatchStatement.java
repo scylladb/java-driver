@@ -70,7 +70,7 @@ public class DefaultBatchStatement implements BatchStatement {
   private final Duration timeout;
   private final Node node;
   private final int nowInSeconds;
-  private final RequestRoutingType routingType;
+  @NonNull private final RequestRoutingType routingType;
 
   public DefaultBatchStatement(
       BatchType batchType,
@@ -92,7 +92,7 @@ public class DefaultBatchStatement implements BatchStatement {
       Duration timeout,
       Node node,
       int nowInSeconds,
-      RequestRoutingType routingType) {
+      @NonNull RequestRoutingType routingType) {
     for (BatchableStatement<?> statement : statements) {
       if (statement != null
           && (statement.getConsistencyLevel() != null

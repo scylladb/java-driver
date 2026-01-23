@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
@@ -294,6 +295,6 @@ public class RequestLogFormatterTest {
         false,
         context.getCodecRegistry(),
         context.getProtocolVersion(),
-        false);
+        RequestRoutingType.REGULAR);
   }
 }

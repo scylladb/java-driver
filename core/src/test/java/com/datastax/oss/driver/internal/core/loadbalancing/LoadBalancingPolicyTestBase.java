@@ -35,14 +35,11 @@ import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.LoggerFactory;
 
-@RunWith(MockitoJUnitRunner.class)
 public abstract class LoadBalancingPolicyTestBase {
 
   @Mock protected DefaultNode node1;
@@ -81,6 +78,9 @@ public abstract class LoadBalancingPolicyTestBase {
             DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_ALLOW_FOR_LOCAL_CONSISTENCY_LEVELS))
         .thenReturn(false);
     when(defaultProfile.getString(DefaultDriverOption.REQUEST_CONSISTENCY)).thenReturn("ONE");
+    when(defaultProfile.getString(
+            DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+        .thenReturn("REGULAR");
 
     when(context.getMetadataManager()).thenReturn(metadataManager);
 

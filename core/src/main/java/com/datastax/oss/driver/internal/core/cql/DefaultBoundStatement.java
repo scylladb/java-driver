@@ -70,7 +70,7 @@ public class DefaultBoundStatement implements BoundStatement {
   private final ProtocolVersion protocolVersion;
   private final Node node;
   private final int nowInSeconds;
-  private final RequestRoutingType routingType;
+  @NonNull private final RequestRoutingType routingType;
 
   public DefaultBoundStatement(
       PreparedStatement preparedStatement,
@@ -94,7 +94,7 @@ public class DefaultBoundStatement implements BoundStatement {
       ProtocolVersion protocolVersion,
       Node node,
       int nowInSeconds,
-      RequestRoutingType routingType) {
+      @NonNull RequestRoutingType routingType) {
     this.preparedStatement = preparedStatement;
     this.variableDefinitions = variableDefinitions;
     this.values = values;
@@ -809,7 +809,7 @@ public class DefaultBoundStatement implements BoundStatement {
 
   @NonNull
   @Override
-  public BoundStatement setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
+  public BoundStatement setRequestRoutingType(@NonNull RequestRoutingType requestRoutingType) {
     return new DefaultBoundStatement(
         preparedStatement,
         variableDefinitions,
