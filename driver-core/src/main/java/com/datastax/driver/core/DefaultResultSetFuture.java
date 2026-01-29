@@ -233,6 +233,7 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
                     break;
                   default:
                     logger.info("Ignoring unknown schema change result");
+                    set(rs);
                     break;
                 }
               }
