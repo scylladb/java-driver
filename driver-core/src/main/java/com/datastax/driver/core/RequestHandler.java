@@ -97,42 +97,6 @@ class RequestHandler {
   private final AtomicBoolean isDone = new AtomicBoolean();
   private final AtomicInteger executionIndex = new AtomicInteger();
 
-  private Iterator<Host> getReplicas(
-      String loggedKeyspace, Statement statement, Iterator<Host> fallback) {
-    ProtocolVersion protocolVersion = manager.cluster.manager.protocolVersion();
-    CodecRegistry codecRegistry = manager.cluster.manager.configuration.getCodecRegistry();
-    ByteBuffer partitionKey = statement.getRoutingKey(protocolVersion, codecRegistry);
-    String keyspace = statement.getKeyspace();
-    if (keyspace == null) {
-      keyspace = loggedKeyspace;
-    }
-
-    if (partitionKey == null || keyspace == null) {
-      return fallback;
-    }
-
-    Token.Factory partitioner = statement.getPartitioner();
-    String tableName = null;
-    ColumnDefinitions defs = null;
-    if (statement instanceof BoundStatement) {
-      defs = ((BoundStatement) statement).preparedStatement().getVariables();
-    } else if (statement instanceof PreparedStatement) {
-      defs = ((PreparedStatement) statement).getVariables();
-    }
-    if (defs != null && defs.size() > 0) {
-      tableName = defs.getTable(0);
-    }
-
-    final List<Host> replicas =
-        manager
-            .cluster
-            .getMetadata()
-            .getReplicasList(Metadata.quote(keyspace), tableName, partitioner, partitionKey);
-
-    // replicas are stored in the right order starting with the primary replica
-    return replicas.iterator();
-  }
-
   public RequestHandler(SessionManager manager, Callback callback, Statement statement) {
     this.id = Long.toString(System.identityHashCode(this));
     if (logger.isTraceEnabled()) logger.trace("[{}] {}", id, statement);
@@ -145,15 +109,6 @@ class RequestHandler {
     // If host is explicitly set on statement, bypass load balancing policy.
     if (statement.getHost() != null) {
       this.queryPlan = new QueryPlan(Iterators.singletonIterator(statement.getHost()));
-    } else if (statement.isLWT()) {
-      this.queryPlan =
-          new QueryPlan(
-              getReplicas(
-                  manager.poolsState.keyspace,
-                  statement,
-                  manager
-                      .loadBalancingPolicy()
-                      .newQueryPlan(manager.poolsState.keyspace, statement)));
     } else {
       this.queryPlan =
           new QueryPlan(

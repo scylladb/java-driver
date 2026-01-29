@@ -42,6 +42,7 @@ import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolOptions;
 import com.datastax.driver.core.ProtocolVersion;
+import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.QueryTracker;
 import com.datastax.driver.core.RegularStatement;
 import com.datastax.driver.core.ResultSet;
@@ -50,6 +51,7 @@ import com.datastax.driver.core.ScassandraCluster;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.SortingLoadBalancingPolicy;
+import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.TestUtils;
 import com.datastax.driver.core.TypeCodec;
 import com.google.common.collect.ImmutableMap;
@@ -64,6 +66,7 @@ import org.testng.annotations.Test;
 
 public class TokenAwarePolicyTest {
 
+  public static final String KEYSPACE = "keyspace";
   private ByteBuffer routingKey = ByteBuffer.wrap(new byte[] {1, 2, 3, 4});
 
   private RegularStatement statement = new SimpleStatement("irrelevant").setRoutingKey(routingKey);
@@ -75,6 +78,8 @@ public class TokenAwarePolicyTest {
 
   private LoadBalancingPolicy childPolicy;
   private Cluster cluster;
+  private Metadata metadata;
+  private QueryOptions queryOptions;
 
   @BeforeMethod(groups = "unit")
   public void initMocks() {
@@ -82,18 +87,22 @@ public class TokenAwarePolicyTest {
     cluster = mock(Cluster.class);
     Configuration configuration = mock(Configuration.class);
     ProtocolOptions protocolOptions = mock(ProtocolOptions.class);
-    Metadata metadata = mock(Metadata.class);
+    queryOptions = mock(QueryOptions.class);
+    when(queryOptions.getLoadBalancingLwtRequestRoutingMethod())
+        .thenReturn(QueryOptions.RequestRoutingMethod.PRESERVE_REPLICA_ORDER);
+    metadata = mock(Metadata.class);
     childPolicy = mock(LoadBalancingPolicy.class);
     when(cluster.getConfiguration()).thenReturn(configuration);
     when(configuration.getCodecRegistry()).thenReturn(codecRegistry);
     when(configuration.getProtocolOptions()).thenReturn(protocolOptions);
+    when(configuration.getQueryOptions()).thenReturn(queryOptions);
     when(protocolOptions.getProtocolVersion()).thenReturn(ProtocolVersion.DEFAULT);
     when(cluster.getMetadata()).thenReturn(metadata);
-    when(metadata.getReplicas(Metadata.quote("keyspace"), null, null, routingKey))
+    when(metadata.getReplicas(Metadata.quote(KEYSPACE), null, null, routingKey))
         .thenReturn(Sets.newLinkedHashSet(host1, host2));
-    when(metadata.getReplicasList(Metadata.quote("keyspace"), null, null, routingKey))
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
         .thenReturn(Lists.newArrayList(host1, host2));
-    when(childPolicy.newQueryPlan("keyspace", statement))
+    when(childPolicy.newQueryPlan(KEYSPACE, statement))
         .thenReturn(Sets.newLinkedHashSet(host4, host3, host2, host1).iterator());
     when(childPolicy.distance(any(Host.class))).thenReturn(HostDistance.LOCAL);
     when(host1.isUp()).thenReturn(true);
@@ -117,7 +126,7 @@ public class TokenAwarePolicyTest {
     TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
     policy.init(cluster, null);
     // when
-    Iterator<Host> queryPlan = policy.newQueryPlan("keyspace", statement);
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, statement);
     // then
     assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
   }
@@ -128,7 +137,7 @@ public class TokenAwarePolicyTest {
     TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, NEUTRAL);
     policy.init(cluster, null);
     // when
-    Iterator<Host> queryPlan = policy.newQueryPlan("keyspace", statement);
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, statement);
     // then
     assertThat(queryPlan).containsExactly(host2, host1, host4, host3);
   }
@@ -139,9 +148,289 @@ public class TokenAwarePolicyTest {
     TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, RANDOM);
     policy.init(cluster, null);
     // when
-    Iterator<Host> queryPlan = policy.newQueryPlan("keyspace", statement);
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, statement);
     // then
     assertThat(queryPlan).containsOnlyOnce(host1, host2, host3, host4).endsWith(host4, host3);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_prioritize_local_replicas_for_lwt(TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.REMOTE);
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.LOCAL);
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: local replica first, then remaining replicas only
+    assertThat(queryPlan).containsExactly(host2, host1);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_preserve_replica_order_for_lwt(TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host2, host3, host1));
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: replica order preserved and only replicas returned
+    assertThat(queryPlan).containsExactly(host2, host3, host1);
+  }
+
+  @Test(groups = "unit")
+  public void should_fallback_to_child_policy_for_lwt_when_no_replicas() {
+    // given
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList());
+    when(childPolicy.newQueryPlan(KEYSPACE, lwtStatement))
+        .thenReturn(Sets.newLinkedHashSet(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: fallback to child policy plan
+    assertThat(queryPlan).containsExactly(host4, host3, host2, host1);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_filter_down_replicas_for_lwt(TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: LWT statement with some replicas DOWN
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2, host3));
+
+    // host1 is LOCAL but DOWN
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(host1.isUp()).thenReturn(false);
+
+    // host2 is LOCAL and UP
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.LOCAL);
+    when(host2.isUp()).thenReturn(true);
+
+    // host3 is REMOTE but DOWN
+    when(childPolicy.distance(host3)).thenReturn(HostDistance.REMOTE);
+    when(host3.isUp()).thenReturn(false);
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: only UP replicas are returned (host1 and host3 are DOWN so excluded)
+    assertThat(queryPlan).containsExactly(host2);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_filter_ignored_replicas_for_lwt(TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: LWT statement with some replicas IGNORED
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2, host3));
+
+    // host1 is LOCAL and UP
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(host1.isUp()).thenReturn(true);
+
+    // host2 is IGNORED (e.g., filtered by allowlist)
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.IGNORED);
+    when(host2.isUp()).thenReturn(true);
+
+    // host3 is REMOTE and UP
+    when(childPolicy.distance(host3)).thenReturn(HostDistance.REMOTE);
+    when(host3.isUp()).thenReturn(true);
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: IGNORED replicas are excluded (host2), local first then remote
+    assertThat(queryPlan).containsExactly(host1, host3);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_filter_down_and_ignored_replicas_for_lwt(
+      TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: LWT statement with mixed replica states
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2, host3, host4));
+
+    // host1 is LOCAL and UP
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(host1.isUp()).thenReturn(true);
+
+    // host2 is LOCAL but DOWN
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.LOCAL);
+    when(host2.isUp()).thenReturn(false);
+
+    // host3 is REMOTE but IGNORED
+    when(childPolicy.distance(host3)).thenReturn(HostDistance.IGNORED);
+    when(host3.isUp()).thenReturn(true);
+
+    // host4 is REMOTE and UP
+    when(childPolicy.distance(host4)).thenReturn(HostDistance.REMOTE);
+    when(host4.isUp()).thenReturn(true);
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: only UP and non-IGNORED replicas, local first
+    assertThat(queryPlan).containsExactly(host1, host4);
+  }
+
+  /**
+   * Given an LWT statement where all replicas are either DOWN or IGNORED, ensures that the returned
+   * query plan falls back to the child policy.
+   *
+   * @param ordering the replica ordering to use in the TokenAwarePolicy
+   */
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_fallback_to_child_when_all_lwt_replicas_filtered(
+      TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: LWT statement where all replicas are DOWN or IGNORED
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2));
+
+    // host1 is DOWN
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(host1.isUp()).thenReturn(false);
+
+    // host2 is IGNORED
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.IGNORED);
+    when(host2.isUp()).thenReturn(true);
+
+    // hosts 3 & 4 are non-replicas and can be down
+    when(childPolicy.distance(host3)).thenReturn(HostDistance.REMOTE);
+    when(host3.isUp()).thenReturn(true);
+    when(childPolicy.distance(host4)).thenReturn(HostDistance.REMOTE);
+    when(host4.isUp()).thenReturn(false);
+
+    // Mock child policy to return available hosts
+    when(childPolicy.newQueryPlan(KEYSPACE, lwtStatement))
+        .thenReturn(Sets.newLinkedHashSet(host3, host4).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: fallback to child policy plan (all replicas filtered out)
+    assertThat(queryPlan).containsExactly(host3, host4);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_return_all_local_replicas_when_all_replicas_are_local(
+      TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: LWT statement where all replicas are LOCAL and UP (edge case for NPE guard)
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2, host3));
+
+    // All replicas are LOCAL and UP (no non-local replicas to collect)
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(host1.isUp()).thenReturn(true);
+
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.LOCAL);
+    when(host2.isUp()).thenReturn(true);
+
+    when(childPolicy.distance(host3)).thenReturn(HostDistance.LOCAL);
+    when(host3.isUp()).thenReturn(true);
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: should return all local replicas without NPE (nonLocalReplicas remains null)
+    assertThat(queryPlan).containsExactly(host1, host2, host3);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_allow_child_policy_to_retry_down_replicas_in_fallback(
+      TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: LWT statement where all replicas are DOWN
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(lwtStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2));
+
+    // Both replicas are DOWN
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(host1.isUp()).thenReturn(false);
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.REMOTE);
+    when(host2.isUp()).thenReturn(false);
+
+    // Child policy includes the DOWN replicas in its plan (it may have different logic)
+    when(childPolicy.newQueryPlan(KEYSPACE, lwtStatement))
+        .thenReturn(Lists.newArrayList(host1, host2, host3, host4).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, lwtStatement);
+
+    // then: fallback to child policy, which can include even the DOWN replicas
+    // (no filtering, child policy decides)
+    assertThat(queryPlan).containsExactly(host1, host2, host3, host4);
   }
 
   /**
@@ -159,7 +448,7 @@ public class TokenAwarePolicyTest {
     // given: an 8 node cluster using TokenAwarePolicy and some shuffle replica configuration with a
     // keyspace with replication factor of 3.
     ScassandraCluster sCluster =
-        ScassandraCluster.builder().withNodes(8).withSimpleKeyspace("keyspace", 3).build();
+        ScassandraCluster.builder().withNodes(8).withSimpleKeyspace(KEYSPACE, 3).build();
 
     LoadBalancingPolicy loadBalancingPolicy =
         new TokenAwarePolicy(new SortingLoadBalancingPolicy(), ordering);
@@ -184,7 +473,7 @@ public class TokenAwarePolicyTest {
 
       // then: The replicas resolved from the cluster metadata must match node 6 and its replicas.
       List<Host> replicas =
-          Lists.newArrayList(cluster.getMetadata().getReplicas("keyspace", null, routingKey));
+          Lists.newArrayList(cluster.getMetadata().getReplicas(KEYSPACE, null, routingKey));
       assertThat(replicas)
           .containsExactly(
               sCluster.host(cluster, 1, 6),
@@ -196,7 +485,7 @@ public class TokenAwarePolicyTest {
       // Actual query does not matter, only the keyspace and routing key will be used
       SimpleStatement statement = new SimpleStatement("select * from table where k=5");
       statement.setRoutingKey(routingKey);
-      statement.setKeyspace("keyspace");
+      statement.setKeyspace(KEYSPACE);
 
       List<Host> queryPlan = Lists.newArrayList(loadBalancingPolicy.newQueryPlan(null, statement));
       assertThat(queryPlan).containsOnlyElementsOf(cluster.getMetadata().getAllHosts());
@@ -227,7 +516,7 @@ public class TokenAwarePolicyTest {
   public void should_choose_proper_host_based_on_routing_key() {
     // given: A 3 node cluster using TokenAwarePolicy with a replication factor of 1.
     ScassandraCluster sCluster =
-        ScassandraCluster.builder().withNodes(3).withSimpleKeyspace("keyspace", 1).build();
+        ScassandraCluster.builder().withNodes(3).withSimpleKeyspace(KEYSPACE, 1).build();
     Cluster cluster =
         Cluster.builder()
             .addContactPoints(sCluster.address(1).getAddress())
@@ -249,7 +538,7 @@ public class TokenAwarePolicyTest {
       SimpleStatement statement =
           new SimpleStatement("select * from table where k=5")
               .setRoutingKey(routingKey)
-              .setKeyspace("keyspace");
+              .setKeyspace(KEYSPACE);
 
       QueryTracker queryTracker = new QueryTracker();
       queryTracker.query(session, 10, statement);
@@ -278,7 +567,7 @@ public class TokenAwarePolicyTest {
     ScassandraCluster sCluster =
         ScassandraCluster.builder()
             .withNodes(3, 3)
-            .withNetworkTopologyKeyspace("keyspace", ImmutableMap.of(1, 1, 2, 1))
+            .withNetworkTopologyKeyspace(KEYSPACE, ImmutableMap.of(1, 1, 2, 1))
             .build();
     @SuppressWarnings("deprecation")
     Cluster cluster =
@@ -310,7 +599,7 @@ public class TokenAwarePolicyTest {
       SimpleStatement statement =
           new SimpleStatement("select * from table where k=5")
               .setRoutingKey(routingKey)
-              .setKeyspace("keyspace");
+              .setKeyspace(KEYSPACE);
 
       QueryTracker queryTracker = new QueryTracker();
       queryTracker.query(session, 10, statement);
@@ -335,7 +624,7 @@ public class TokenAwarePolicyTest {
   public void should_use_other_nodes_when_replicas_having_token_are_down() {
     // given: A 4 node cluster using TokenAwarePolicy with a replication factor of 2.
     ScassandraCluster sCluster =
-        ScassandraCluster.builder().withNodes(4).withSimpleKeyspace("keyspace", 2).build();
+        ScassandraCluster.builder().withNodes(4).withSimpleKeyspace(KEYSPACE, 2).build();
     Cluster cluster =
         Cluster.builder()
             .addContactPoints(sCluster.address(2).getAddress())
@@ -361,7 +650,7 @@ public class TokenAwarePolicyTest {
       SimpleStatement statement =
           new SimpleStatement("select * from table where k=5")
               .setRoutingKey(routingKey)
-              .setKeyspace("keyspace");
+              .setKeyspace(KEYSPACE);
 
       QueryTracker queryTracker = new QueryTracker();
       queryTracker.query(session, 10, statement);
@@ -435,7 +724,7 @@ public class TokenAwarePolicyTest {
   public void should_use_provided_routing_key_boundstatement() {
     // given: A 4 node cluster using TokenAwarePolicy with a replication factor of 1.
     ScassandraCluster sCluster =
-        ScassandraCluster.builder().withNodes(4).withSimpleKeyspace("keyspace", 1).build();
+        ScassandraCluster.builder().withNodes(4).withSimpleKeyspace(KEYSPACE, 1).build();
     Cluster cluster =
         Cluster.builder()
             .addContactPoints(sCluster.address(2).getAddress())
@@ -449,7 +738,7 @@ public class TokenAwarePolicyTest {
     try {
       sCluster.init();
 
-      Session session = cluster.connect("keyspace");
+      Session session = cluster.connect(KEYSPACE);
 
       PreparedStatement preparedStatement =
           session.prepare("insert into tbl (k0, v) values (?, ?)");
@@ -546,6 +835,7 @@ public class TokenAwarePolicyTest {
         assertThat(rs.getExecutionInfo().getQueriedHost()).isEqualTo(host1);
         assertThat(rs.isExhausted()).isFalse();
         Row r = rs.one();
+        assertThat(rs.getExecutionInfo().getQueriedHost()).isEqualTo(host1);
         assertThat(rs.isExhausted()).isTrue();
 
         assertThat(r.getInt("i")).isEqualTo(3);

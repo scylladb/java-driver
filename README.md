@@ -17,8 +17,11 @@ The Scylla Java Driver is a fork from [DataStax Java Driver](https://github.com/
 **Features:**
 
 * Like all Scylla Drivers, the Scylla Java Driver is **Shard Aware** and contains extensions for a `tokenAwareHostPolicy`. 
-  Using this policy, the driver can select a connection to a particular shard based on the shard’s token. 
+  Using this policy, the driver can select a connection to a particular shard based on the shard's token. 
   As a result, latency is significantly reduced because there is no need to pass data between the shards.
+* **Lightweight Transaction (LWT) Optimization**: when using `TokenAwarePolicy` with prepared statements, 
+  LWT queries automatically use replica-only routing, prioritizing local datacenter replicas to minimize 
+  coordinator forwarding overhead and reduce contention during Paxos consensus phases.
 * [Sync](manual/) and [Async](manual/async/) API
 * [Simple](manual/statements/simple/), [Prepared](manual/statements/prepared/), and [Batch](manual/statements/batch/)
   statements

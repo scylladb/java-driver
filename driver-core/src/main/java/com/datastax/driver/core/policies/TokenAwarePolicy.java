@@ -31,6 +31,7 @@ import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.Token;
 import com.google.common.collect.AbstractIterator;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -50,9 +51,10 @@ import java.util.concurrent.ThreadLocalRandom;
  *   <li>the iterator returned by the {@code newQueryPlan} method will first return the {@link
  *       HostDistance#LOCAL LOCAL} replicas for the query <em>if possible</em> (i.e. if the query's
  *       {@linkplain Statement#getRoutingKey(ProtocolVersion, CodecRegistry) routing key} is not
- *       {@code null} and if the {@linkplain Metadata#getReplicas(String, ByteBuffer) set of
- *       replicas} for that partition key is not empty). If no local replica can be either found or
- *       successfully contacted, the rest of the query plan will fallback to the child policy's one.
+ *       {@code null} and if the {@linkplain Metadata#getReplicasList(String, String, Token.Factory,
+ *       ByteBuffer) set of replicas} for that partition key is not empty). If no local replica can
+ *       be either found or successfully contacted, the rest of the query plan will fall back to the
+ *       child policy's one.
  * </ul>
  *
  * The exact order in which local replicas are returned is dictated by the {@linkplain
@@ -63,6 +65,55 @@ import java.util.concurrent.ThreadLocalRandom;
  * be considered having priority. For example, if you wrap {@link DCAwareRoundRobinPolicy} with this
  * token aware policy, replicas from remote data centers may only be returned after all the hosts of
  * the local data center.
+ *
+ * <h3>Lightweight Transaction (LWT) Routing</h3>
+ *
+ * <p>For {@linkplain Statement#isLWT() lightweight transaction} queries, this policy provides
+ * specialized replica-only routing to optimize LWT performance and avoid contention. When LWT
+ * routing is enabled (the default), the query plan contains <strong>only replicas</strong> for the
+ * target partition, ordered by datacenter locality:
+ *
+ * <ul>
+ *   <li>Local replicas first: replicas for which the child policy reports {@link HostDistance#LOCAL
+ *       LOCAL} distance are returned first, in the order provided by cluster metadata (preserving
+ *       primary replica ordering from the token ring).
+ *   <li>Remote replicas second: remaining replicas (typically in remote datacenters) are appended,
+ *       but only if they are up and not ignored by the child policy.
+ *   <li>Replica-only routing when possible: under normal conditions, LWT query plans target only
+ *       replicas for the partition in order to reduce coordinator forwarding overhead and improve
+ *       performance. When replica information is unavailable, the driver falls back to the child
+ *       policy as described in the fallback behavior below, which may include non-replica hosts.
+ * </ul>
+ *
+ * <p><strong>Rack awareness</strong> is intentionally <em>not</em> applied to LWT replica ordering.
+ * All local replicas are treated equally within the local datacenter to avoid rack-based contention
+ * hotspots during Paxos consensus phases.
+ *
+ * <p><strong>Requirements for LWT replica-only routing:</strong>
+ *
+ * <ul>
+ *   <li>The statement's {@linkplain Statement#getRoutingKey(ProtocolVersion, CodecRegistry) routing
+ *       key} must be available (use {@linkplain PreparedStatement prepared statements} or manually
+ *       set the routing key).
+ *   <li>The effective keyspace must be known (set on the statement or session).
+ *   <li>Cluster metadata must contain replica information for the target partition.
+ *   <li>A child policy that correctly reports datacenter locality via {@link
+ *       LoadBalancingPolicy#distance(Host)} (e.g., {@link DCAwareRoundRobinPolicy}) must be
+ *       configured.
+ * </ul>
+ *
+ * <p><strong>Fallback behavior:</strong> If routing key, keyspace, or replica metadata is
+ * unavailable, the driver falls back to the child policy's normal query plan. In this case, the
+ * query plan may include non-replica hosts, and LWT may incur additional coordinator forwarding
+ * latency. This fallback is a pragmatic safety net to preserve availability when routing
+ * information is incomplete.
+ *
+ * <p>LWT routing can be configured via {@link
+ * QueryOptions#setLoadBalancingLwtRequestRoutingMethod(QueryOptions.RequestRoutingMethod)}. The
+ * default preserves replica order for optimal LWT performance.
+ *
+ * @see DCAwareRoundRobinPolicy
+ * @see QueryOptions.RequestRoutingMethod
  */
 public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
 
@@ -100,11 +151,188 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     NEUTRAL
   }
 
+  /**
+   * An iterator that returns local replicas first (in the order provided by the child policy), then
+   * the remaining hosts.
+   */
+  private class NeutralHostIterator extends AbstractIterator<Host> {
+
+    private final Iterator<Host> childIterator;
+    private final List<Host> replicas;
+    private List<Host> nonReplicas;
+    private Iterator<Host> nonReplicasIterator;
+
+    public NeutralHostIterator(Iterator<Host> childIterator, List<Host> replicas) {
+      this.childIterator = childIterator;
+      this.replicas = replicas;
+    }
+
+    @Override
+    protected Host computeNext() {
+
+      while (childIterator.hasNext()) {
+
+        Host host = childIterator.next();
+
+        if (host.isUp()
+            && replicas.contains(host)
+            && childPolicy.distance(host) == HostDistance.LOCAL) {
+          // UP replicas should be prioritized, retaining order from childPolicy
+          return host;
+        } else {
+          // save for later
+          if (nonReplicas == null) nonReplicas = new ArrayList<>();
+          nonReplicas.add(host);
+        }
+      }
+
+      // This should only engage if all local replicas are DOWN
+      if (nonReplicas != null) {
+
+        if (nonReplicasIterator == null) nonReplicasIterator = nonReplicas.iterator();
+
+        if (nonReplicasIterator.hasNext()) return nonReplicasIterator.next();
+      }
+
+      return endOfData();
+    }
+  }
+
+  /**
+   * An iterator that returns local replicas first (in either random or topological order, as
+   * specified at instantiation), then the remaining hosts.
+   */
+  private class RandomOrTopologicalHostIterator extends AbstractIterator<Host> {
+
+    private final Iterator<Host> replicasIterator;
+    private final String keyspace;
+    private final Statement statement;
+    private final List<Host> replicas;
+    private Iterator<Host> childIterator;
+
+    public RandomOrTopologicalHostIterator(
+        String keyspace,
+        Statement statement,
+        Iterator<Host> replicasIterator,
+        List<Host> replicas) {
+      this.replicasIterator = replicasIterator;
+      this.keyspace = keyspace;
+      this.statement = statement;
+      this.replicas = replicas;
+    }
+
+    @Override
+    protected Host computeNext() {
+      while (replicasIterator.hasNext()) {
+        Host host = replicasIterator.next();
+        if (host.isUp() && childPolicy.distance(host) == HostDistance.LOCAL) return host;
+      }
+
+      if (childIterator == null) childIterator = childPolicy.newQueryPlan(keyspace, statement);
+
+      while (childIterator.hasNext()) {
+        Host host = childIterator.next();
+        // Skip it if it was already a local replica
+        if (!replicas.contains(host) || childPolicy.distance(host) != HostDistance.LOCAL)
+          return host;
+      }
+      return endOfData();
+    }
+  }
+
+  /**
+   * An iterator that returns replicas first, with local replicas prioritized (preserving primary
+   * replica order), then remote replicas. Used for LWT queries to ensure replica-only routing and
+   * minimize coordinator forwarding overhead. DOWN and IGNORED hosts are filtered out.
+   *
+   * <p>Query plan follows a three-pass strategy:
+   *
+   * <ol>
+   *   <li><strong>Local replicas:</strong> Returns UP replicas marked as LOCAL by the child policy,
+   *       in the order provided by cluster metadata (preserving primary replica order).
+   *   <li><strong>Remote replicas:</strong> Returns UP replicas marked as REMOTE by the child
+   *       policy.
+   *   <li><strong>Child policy fallback:</strong> If no suitable replicas are available (for
+   *       example, all are DOWN or IGNORED and thus none are returned), falls back to the child
+   *       policy's query plan for the remaining hosts. The child policy's plan is used as-is and
+   *       may include hosts that were already considered by this iterator.
+   * </ol>
+   */
+  private class PreserveReplicaOrderIterator extends AbstractIterator<Host> {
+    private final Iterator<Host> replicasIterator;
+    private final String keyspace;
+    private final Statement statement;
+    private List<Host> nonLocalReplicas;
+    private Iterator<Host> nonLocalReplicasIterator;
+    private boolean hasReturnedReplicas;
+    private Iterator<Host> childIterator;
+
+    public PreserveReplicaOrderIterator(
+        String keyspace, Statement statement, Iterator<Host> replicasIterator) {
+      this.keyspace = keyspace;
+      this.statement = statement;
+      this.replicasIterator = replicasIterator;
+    }
+
+    @Override
+    protected Host computeNext() {
+      // First pass: return local replicas that are UP
+      while (replicasIterator.hasNext()) {
+        Host host = replicasIterator.next();
+        HostDistance distance = childPolicy.distance(host);
+
+        if (!host.isUp()) {
+          // Skip DOWN hosts entirely
+          continue;
+        }
+
+        switch (distance) {
+          case LOCAL:
+            hasReturnedReplicas = true;
+            return host;
+          case REMOTE:
+            // Collect remote replicas for second pass
+            if (nonLocalReplicas == null) nonLocalReplicas = new ArrayList<>();
+            nonLocalReplicas.add(host);
+            break;
+          case IGNORED: // Skip IGNORED hosts entirely
+          default: // For safety, treat any unexpected distance as IGNORED
+            break;
+        }
+      }
+
+      // Second pass: return remote replicas that are UP and not IGNORED
+      if (nonLocalReplicas != null) {
+        if (nonLocalReplicasIterator == null) {
+          nonLocalReplicasIterator = nonLocalReplicas.iterator();
+        }
+        if (nonLocalReplicasIterator.hasNext()) {
+          hasReturnedReplicas = true;
+          return nonLocalReplicasIterator.next();
+        }
+      }
+
+      // Third pass: fallback to child policy if no suitable replicas were returned
+      // This handles cases where all replicas are empty, DOWN or IGNORED
+      if (!hasReturnedReplicas) {
+        if (childIterator == null) {
+          childIterator = childPolicy.newQueryPlan(keyspace, statement);
+        }
+        if (childIterator.hasNext()) {
+          return childIterator.next();
+        }
+      }
+
+      return endOfData();
+    }
+  }
+
   private final LoadBalancingPolicy childPolicy;
   private final ReplicaOrdering replicaOrdering;
   private volatile Metadata clusterMetadata;
   private volatile ProtocolVersion protocolVersion;
   private volatile CodecRegistry codecRegistry;
+  private volatile QueryOptions.RequestRoutingMethod defaultLwtRequestRoutingMethod;
 
   /**
    * Creates a new {@code TokenAware} policy.
@@ -127,7 +355,6 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
    * @deprecated Use {@link #TokenAwarePolicy(LoadBalancingPolicy, ReplicaOrdering)} instead. This
    *     constructor will be removed in the next major release.
    */
-  @SuppressWarnings("DeprecatedIsStillUsed")
   @Deprecated
   public TokenAwarePolicy(LoadBalancingPolicy childPolicy, boolean shuffleReplicas) {
     this(childPolicy, shuffleReplicas ? ReplicaOrdering.RANDOM : ReplicaOrdering.TOPOLOGICAL);
@@ -153,6 +380,8 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     clusterMetadata = cluster.getMetadata();
     protocolVersion = cluster.getConfiguration().getProtocolOptions().getProtocolVersion();
     codecRegistry = cluster.getConfiguration().getCodecRegistry();
+    defaultLwtRequestRoutingMethod =
+        cluster.getConfiguration().getQueryOptions().getLoadBalancingLwtRequestRoutingMethod();
     childPolicy.init(cluster, hosts);
   }
 
@@ -179,7 +408,6 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
    */
   @Override
   public Iterator<Host> newQueryPlan(final String loggedKeyspace, final Statement statement) {
-
     ByteBuffer partitionKey = statement.getRoutingKey(protocolVersion, codecRegistry);
     String keyspace = statement.getKeyspace();
     if (keyspace == null) keyspace = loggedKeyspace;
@@ -201,47 +429,34 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     final List<Host> replicas =
         clusterMetadata.getReplicasList(
             Metadata.quote(keyspace), tableName, statement.getPartitioner(), partitionKey);
-    if (replicas.isEmpty()) return childPolicy.newQueryPlan(loggedKeyspace, statement);
+
+    switch (getRequestRouting(statement)) {
+      case PRESERVE_REPLICA_ORDER:
+        return newQueryPlanPreserveReplicaOrder(keyspace, statement, replicas);
+      case REGULAR:
+      default:
+        return newQueryPlanRegular(keyspace, statement, replicas);
+    }
+  }
+
+  private QueryOptions.RequestRoutingMethod getRequestRouting(Statement statement) {
+    if (!statement.isLWT() || defaultLwtRequestRoutingMethod == null) {
+      return QueryOptions.RequestRoutingMethod.REGULAR;
+    }
+    return defaultLwtRequestRoutingMethod;
+  }
+
+  private Iterator<Host> newQueryPlanRegular(
+      String keyspace, Statement statement, List<Host> replicas) {
+    if (replicas.isEmpty()) {
+      return childPolicy.newQueryPlan(keyspace, statement);
+    }
 
     if (replicaOrdering == ReplicaOrdering.NEUTRAL) {
 
       final Iterator<Host> childIterator = childPolicy.newQueryPlan(keyspace, statement);
 
-      return new AbstractIterator<Host>() {
-
-        private List<Host> nonReplicas;
-        private Iterator<Host> nonReplicasIterator;
-
-        @Override
-        protected Host computeNext() {
-
-          while (childIterator.hasNext()) {
-
-            Host host = childIterator.next();
-
-            if (host.isUp()
-                && replicas.contains(host)
-                && childPolicy.distance(host) == HostDistance.LOCAL) {
-              // UP replicas should be prioritized, retaining order from childPolicy
-              return host;
-            } else {
-              // save for later
-              if (nonReplicas == null) nonReplicas = new ArrayList<Host>();
-              nonReplicas.add(host);
-            }
-          }
-
-          // This should only engage if all local replicas are DOWN
-          if (nonReplicas != null) {
-
-            if (nonReplicasIterator == null) nonReplicasIterator = nonReplicas.iterator();
-
-            if (nonReplicasIterator.hasNext()) return nonReplicasIterator.next();
-          }
-
-          return endOfData();
-        }
-      };
+      return new NeutralHostIterator(childIterator, replicas);
 
     } else {
 
@@ -255,30 +470,13 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
         replicasIterator = replicas.iterator();
       }
 
-      return new AbstractIterator<Host>() {
-
-        private Iterator<Host> childIterator;
-
-        @Override
-        protected Host computeNext() {
-          while (replicasIterator.hasNext()) {
-            Host host = replicasIterator.next();
-            if (host.isUp() && childPolicy.distance(host) == HostDistance.LOCAL) return host;
-          }
-
-          if (childIterator == null)
-            childIterator = childPolicy.newQueryPlan(loggedKeyspace, statement);
-
-          while (childIterator.hasNext()) {
-            Host host = childIterator.next();
-            // Skip it if it was already a local replica
-            if (!replicas.contains(host) || childPolicy.distance(host) != HostDistance.LOCAL)
-              return host;
-          }
-          return endOfData();
-        }
-      };
+      return new RandomOrTopologicalHostIterator(keyspace, statement, replicasIterator, replicas);
     }
+  }
+
+  private Iterator<Host> newQueryPlanPreserveReplicaOrder(
+      String keyspace, Statement statement, List<Host> replicas) {
+    return new PreserveReplicaOrderIterator(keyspace, statement, replicas.iterator());
   }
 
   @Override
