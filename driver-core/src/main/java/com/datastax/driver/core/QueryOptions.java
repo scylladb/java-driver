@@ -50,6 +50,9 @@ public class QueryOptions {
 
   public static final int DEFAULT_REFRESH_SCHEMA_INTERVAL_MILLIS = 1000;
 
+  public static final RequestRoutingMethod DEFAULT_LOAD_BALANCING_LWT_REQUEST_ROUTING_METHOD =
+      RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
+
   private volatile ConsistencyLevel consistency = DEFAULT_CONSISTENCY_LEVEL;
   private volatile ConsistencyLevel serialConsistency = DEFAULT_SERIAL_CONSISTENCY_LEVEL;
   private volatile int fetchSize = DEFAULT_FETCH_SIZE;
@@ -78,6 +81,9 @@ public class QueryOptions {
 
   private volatile boolean addOriginalContactsToReconnectionPlan = false;
   private volatile boolean considerZeroTokenNodesValidPeers = false;
+
+  private volatile RequestRoutingMethod loadBalancingLwtRequestRoutingMethod =
+      DEFAULT_LOAD_BALANCING_LWT_REQUEST_ROUTING_METHOD;
 
   /**
    * Creates a new {@link QueryOptions} instance using the {@link #DEFAULT_CONSISTENCY_LEVEL},
@@ -221,7 +227,7 @@ public class QueryOptions {
   /**
    * Skip metadata resolve method .
    *
-   * <p>It defaults to {@link #skipCQL4MetadataResolveMethod.SMART}.
+   * <p>It defaults to {@link CQL4SkipMetadataResolveMethod#SMART}.
    *
    * @return the default idempotence for queries.
    */
@@ -574,6 +580,28 @@ public class QueryOptions {
     return this.considerZeroTokenNodesValidPeers;
   }
 
+  /**
+   * Sets the default request routing method to use for LWT queries. Default is {@link
+   * RequestRoutingMethod#PRESERVE_REPLICA_ORDER}.
+   *
+   * @param loadBalancingLwtRequestRoutingMethod the new request routing method.
+   * @return this {@code QueryOptions} instance.
+   */
+  public QueryOptions setLoadBalancingLwtRequestRoutingMethod(
+      RequestRoutingMethod loadBalancingLwtRequestRoutingMethod) {
+    this.loadBalancingLwtRequestRoutingMethod = loadBalancingLwtRequestRoutingMethod;
+    return this;
+  }
+
+  /**
+   * The default request routing method used by LWT queries.
+   *
+   * @return the default request routing method used by LWT queries.
+   */
+  public RequestRoutingMethod getLoadBalancingLwtRequestRoutingMethod() {
+    return loadBalancingLwtRequestRoutingMethod;
+  }
+
   @Override
   public boolean equals(Object that) {
     if (that == null || !(that instanceof QueryOptions)) {
@@ -594,7 +622,9 @@ public class QueryOptions {
             && this.refreshNodeIntervalMillis == other.refreshNodeIntervalMillis
             && this.refreshSchemaIntervalMillis == other.refreshSchemaIntervalMillis
             && this.reprepareOnUp == other.reprepareOnUp
-            && this.prepareOnAllHosts == other.prepareOnAllHosts)
+            && this.prepareOnAllHosts == other.prepareOnAllHosts
+            && this.loadBalancingLwtRequestRoutingMethod
+                == other.loadBalancingLwtRequestRoutingMethod)
         && this.schemaQueriesPaged == other.schemaQueriesPaged;
   }
 
@@ -614,6 +644,7 @@ public class QueryOptions {
         refreshSchemaIntervalMillis,
         reprepareOnUp,
         prepareOnAllHosts,
+        loadBalancingLwtRequestRoutingMethod,
         schemaQueriesPaged);
   }
 
@@ -625,5 +656,11 @@ public class QueryOptions {
     ENABLED,
     DISABLED,
     SMART
+  }
+
+  /** The request routing method for queries. */
+  public enum RequestRoutingMethod {
+    REGULAR,
+    PRESERVE_REPLICA_ORDER
   }
 }
