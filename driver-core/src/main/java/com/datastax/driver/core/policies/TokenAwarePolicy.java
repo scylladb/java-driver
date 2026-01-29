@@ -30,6 +30,7 @@ import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolVersion;
+import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.Token;
 import com.google.common.collect.AbstractIterator;
