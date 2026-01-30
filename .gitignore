@@ -21,6 +21,9 @@ docs/_source
 target/
 dependency-reduced-pom.xml
 
+# Personal and AI TODO list
+TODO.md
+
 # Codex - AI assistant metadata
 .codex/
 .codex-cache/
