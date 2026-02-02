@@ -28,10 +28,13 @@ import com.datastax.driver.core.Host;
 import com.datastax.driver.core.LatencyTracker;
 import com.datastax.driver.core.ScassandraTestBase;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
 import com.datastax.driver.core.exceptions.UnavailableException;
+import com.google.common.collect.Lists;
+import java.util.Iterator;
 import java.util.concurrent.CountDownLatch;
 import org.testng.annotations.Test;
 
@@ -174,6 +177,52 @@ public class LatencyAwarePolicyTest extends ScassandraTestBase {
       assertThat(stats).isNotNull();
       assertThat(stats.getMeasurementsCount()).isEqualTo(1);
       assertThat(stats.getLatencyScore()).isNotEqualTo(-1);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  @Test(groups = "short")
+  public void should_not_reorder_query_plan_for_lwt_queries() throws Exception {
+    // given
+    String query = "SELECT foo FROM bar";
+    primingClient.prime(queryBuilder().withQuery(query).build());
+
+    LatencyAwarePolicy latencyAwarePolicy =
+        LatencyAwarePolicy.builder(new RoundRobinPolicy()).withMininumMeasurements(1).build();
+
+    Cluster.Builder builder = super.createClusterBuilder();
+    builder.withLoadBalancingPolicy(latencyAwarePolicy);
+
+    Cluster cluster = builder.build();
+    try {
+      cluster.init();
+
+      // Create an LWT statement so latency-aware policy must preserve child ordering
+      Statement lwtStatement =
+          new SimpleStatement(query) {
+            @Override
+            public boolean isLWT() {
+              return true;
+            }
+          };
+
+      // Make a request to populate latency metrics
+      LatencyTrackerBarrier barrier = new LatencyTrackerBarrier(1);
+      cluster.register(barrier);
+      Session session = cluster.connect();
+      session.execute(query);
+      barrier.await();
+      latencyAwarePolicy.new Updater().run();
+
+      // when
+      Iterator<Host> plan1 = latencyAwarePolicy.newQueryPlan("ks", lwtStatement);
+      Iterator<Host> plan2 = latencyAwarePolicy.newQueryPlan("ks", lwtStatement);
+
+      // then
+      Host host = retrieveSingleHost(cluster);
+      assertThat(Lists.newArrayList(plan1)).containsExactly(host);
+      assertThat(Lists.newArrayList(plan2)).containsExactly(host);
     } finally {
       cluster.close();
     }

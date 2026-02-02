@@ -62,6 +62,11 @@ import org.slf4j.LoggerFactory;
  * they will only be tried if all other nodes failed). Note that this policy only penalizes slow
  * nodes, it does <em>not</em> globally sort the query plan by latency.
  *
+ * <p><strong>LWT statements:</strong> if {@link Statement#isLWT()} returns {@code true}, this
+ * policy does not apply latency-based reordering and returns the child policy's query plan as-is.
+ * This is to preserve LWT-specific routing assumptions (for example deterministic replica selection
+ * when using {@link TokenAwarePolicy}).
+ *
  * <p>The latency score for a given node is a based on a form of <a
  * href="http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average">exponential moving
  * average</a>. In other words, the latency score of a node is the average of its previously
@@ -145,7 +150,7 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
         if (logger.isDebugEnabled()) {
           /*
            * For users to be able to know if the policy potentially needs tuning, we need to provide
-           * some feedback on on how things evolve. For that, we use the min computation to also check
+           * some feedback on how things evolve. For that, we use the min computation to also check
            * which host will be excluded if a query is submitted now and if any host is, we log it (but
            * we try to avoid flooding too). This is probably interesting information anyway since it
            * gets an idea of which host perform badly.
@@ -253,6 +258,13 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
    */
   @Override
   public Iterator<Host> newQueryPlan(String loggedKeyspace, Statement statement) {
+    // For LWT queries, preserve the child policy's ordering.
+    // LWT routing can rely on deterministic replica ordering (e.g. by TokenAwarePolicy), and
+    // latency-based reordering can undermine those assumptions.
+    if (statement != null && statement.isLWT()) {
+      return childPolicy.newQueryPlan(loggedKeyspace, statement);
+    }
+
     final Iterator<Host> childIter = childPolicy.newQueryPlan(loggedKeyspace, statement);
     return new AbstractIterator<Host>() {
 

@@ -19,9 +19,17 @@ The Scylla Java Driver is a fork from [DataStax Java Driver](https://github.com/
 * Like all Scylla Drivers, the Scylla Java Driver is **Shard Aware** and contains extensions for a `tokenAwareHostPolicy`. 
   Using this policy, the driver can select a connection to a particular shard based on the shard's token. 
   As a result, latency is significantly reduced because there is no need to pass data between the shards.
-* **Lightweight Transaction (LWT) Optimization**: when using `TokenAwarePolicy` with prepared statements, 
-  LWT queries automatically use replica-only routing, prioritizing local datacenter replicas to minimize 
-  coordinator forwarding overhead and reduce contention during Paxos consensus phases.
+* **Lightweight Transaction (LWT) Optimization**: 
+  - When using `TokenAwarePolicy` with prepared statements, LWT queries automatically use replica-only routing, 
+    prioritizing local datacenter replicas to minimize coordinator forwarding overhead and reduce contention during 
+    Paxos consensus phases.
+  - When using `RackAwareRoundRobinPolicy`, LWT queries skip local rack prioritization and distribute evenly across 
+    all hosts in the local datacenter. This avoids creating rack-level hotspots during Paxos consensus, which can 
+    lead to increased contention and reduced throughput. The local datacenter is still prioritized over remote 
+    datacenters to maintain low latency.
+  - When using `LatencyAwarePolicy`, LWT queries bypass latency-based reordering to preserve deterministic replica 
+    selection. This ensures that LWT routing assumptions (such as consistent coordinator selection for optimal Paxos 
+    performance) are maintained throughout the policy chain.
 * [Sync](manual/) and [Async](manual/async/) API
 * [Simple](manual/statements/simple/), [Prepared](manual/statements/prepared/), and [Batch](manual/statements/batch/)
   statements
