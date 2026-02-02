@@ -86,11 +86,14 @@ public class RackAwareRoundRobinPolicyTest {
     cluster = mock(Cluster.class);
     Configuration configuration = mock(Configuration.class);
     ProtocolOptions protocolOptions = mock(ProtocolOptions.class);
+    QueryOptions queryOptions = mock(QueryOptions.class);
     Metadata metadata = mock(Metadata.class);
     childPolicy = mock(LoadBalancingPolicy.class);
     when(cluster.getConfiguration()).thenReturn(configuration);
     when(configuration.getCodecRegistry()).thenReturn(codecRegistry);
     when(configuration.getProtocolOptions()).thenReturn(protocolOptions);
+    when(configuration.getQueryOptions()).thenReturn(queryOptions);
+    when(queryOptions.getConsistencyLevel()).thenReturn(ConsistencyLevel.ONE);
     when(protocolOptions.getProtocolVersion()).thenReturn(ProtocolVersion.DEFAULT);
     when(cluster.getMetadata()).thenReturn(metadata);
     when(host1.isUp()).thenReturn(true);
@@ -1105,6 +1108,110 @@ public class RackAwareRoundRobinPolicyTest {
     queryPlan = Lists.newArrayList(policy.newQueryPlan("keyspace", noneLocalConsistencyStatement));
     Assertions.assertThat(queryPlan)
         .containsExactly(queryPlanForNonLocalConsistencyLevel2.toArray(new Host[0]));
+  }
+
+  /**
+   * Ensures that {@link RackAwareRoundRobinPolicy} skips rack prioritization for LWT queries,
+   * treating all local DC hosts equally while still prioritizing local DC over remote DC.
+   *
+   * @test_category load_balancing:rack_aware,lwt
+   */
+  @Test(groups = "unit")
+  public void should_skip_rack_prioritization_for_lwt_queries() {
+    // given: a policy with 4 local DC hosts (2 in local rack, 2 in remote rack) and 2 remote DC
+    // hosts
+    // Initialize hosts in a mixed order: remoteRack, localRack, remoteRack, localRack
+    // This ensures that when LWT skips rack prioritization, we get a different order
+    // than the rack-aware order
+    RackAwareRoundRobinPolicy policy =
+        new RackAwareRoundRobinPolicy("localDC", "localRack", 1, false, false, false);
+    policy.init(cluster, ImmutableList.of(host3, host1, host4, host2, host5, host6));
+
+    // Create a mock LWT statement
+    Statement lwtStatement = mock(Statement.class);
+    when(lwtStatement.isLWT()).thenReturn(true);
+    when(lwtStatement.getConsistencyLevel()).thenReturn(ConsistencyLevel.ONE);
+
+    // when: generating query plans for LWT queries
+    policy.index.set(0);
+    List<Host> queryPlan1 = Lists.newArrayList(policy.newQueryPlan("keyspace", lwtStatement));
+    List<Host> queryPlan2 = Lists.newArrayList(policy.newQueryPlan("keyspace", lwtStatement));
+
+    // then: all 4 local DC hosts should appear before any remote DC host (no rack prioritization)
+    Assertions.assertThat(queryPlan1.subList(0, 4)).containsOnly(host1, host2, host3, host4);
+    Assertions.assertThat(queryPlan2.subList(0, 4)).containsOnly(host1, host2, host3, host4);
+
+    // then: remote DC hosts should appear after all local DC hosts
+    Assertions.assertThat(queryPlan1.subList(4, 5)).containsOnly(host5);
+    Assertions.assertThat(queryPlan2.subList(4, 5)).containsOnly(host5);
+
+    // then: for LWT queries, order should follow insertion order (host3, host1, host4, host2)
+    // not rack-aware order (host1, host2, host3, host4)
+    Assertions.assertThat(queryPlan1).startsWith(host3);
+    Assertions.assertThat(queryPlan2).startsWith(host1);
+  }
+
+  /**
+   * Ensures that {@link RackAwareRoundRobinPolicy} preserves rack-aware routing for non-LWT
+   * queries.
+   *
+   * @test_category load_balancing:rack_aware
+   */
+  @Test(groups = "unit")
+  public void should_preserve_rack_aware_routing_for_non_lwt_queries() {
+    // given: a policy with 4 local DC hosts (2 in local rack, 2 in remote rack) and 2 remote DC
+    // hosts
+    // Initialize hosts in a mixed order to ensure rack-aware routing reorganizes them
+    RackAwareRoundRobinPolicy policy =
+        new RackAwareRoundRobinPolicy("localDC", "localRack", 1, false, false, false);
+    policy.init(cluster, ImmutableList.of(host3, host1, host4, host2, host5, host6));
+
+    // Create a normal (non-LWT) statement
+    Statement normalStatement = mock(Statement.class);
+    when(normalStatement.isLWT()).thenReturn(false);
+    when(normalStatement.getConsistencyLevel()).thenReturn(ConsistencyLevel.ONE);
+
+    // when: generating query plans for non-LWT queries
+    policy.index.set(0);
+    List<Host> queryPlan1 = Lists.newArrayList(policy.newQueryPlan("keyspace", normalStatement));
+    List<Host> queryPlan2 = Lists.newArrayList(policy.newQueryPlan("keyspace", normalStatement));
+
+    // then: local rack hosts (host1, host2) should appear first regardless of init order
+    Assertions.assertThat(queryPlan1.subList(0, 2)).containsOnly(host1, host2);
+    Assertions.assertThat(queryPlan2.subList(0, 2)).containsOnly(host1, host2);
+
+    // then: remote rack local DC hosts (host3, host4) should appear next
+    Assertions.assertThat(queryPlan1.subList(2, 4)).containsOnly(host3, host4);
+    Assertions.assertThat(queryPlan2.subList(2, 4)).containsOnly(host3, host4);
+
+    // then: remote DC hosts should appear last
+    Assertions.assertThat(queryPlan1.subList(4, 5)).containsOnly(host5);
+    Assertions.assertThat(queryPlan2.subList(4, 5)).containsOnly(host5);
+
+    // then: query plans should follow round-robin pattern within rack boundaries
+    Assertions.assertThat(queryPlan1).startsWith(host1);
+    Assertions.assertThat(queryPlan2).startsWith(host2);
+  }
+
+  /**
+   * Ensures that {@link RackAwareRoundRobinPolicy} handles null statement correctly.
+   *
+   * @test_category load_balancing:rack_aware
+   */
+  @Test(groups = "unit")
+  public void should_handle_null_statement() {
+    // given: a policy with hosts in local and remote DC
+    RackAwareRoundRobinPolicy policy =
+        new RackAwareRoundRobinPolicy("localDC", "localRack", 1, false, false, false);
+    policy.init(cluster, ImmutableList.of(host1, host2, host3, host4, host5, host6));
+
+    // when: generating query plan with null statement
+    policy.index.set(0);
+    List<Host> queryPlan = Lists.newArrayList(policy.newQueryPlan("keyspace", null));
+
+    // then: should use rack-aware routing (default behavior for non-LWT)
+    // Local rack hosts should appear first
+    Assertions.assertThat(queryPlan.subList(0, 2)).containsOnly(host1, host2);
   }
 
   @DataProvider(name = "distanceTestCases")
