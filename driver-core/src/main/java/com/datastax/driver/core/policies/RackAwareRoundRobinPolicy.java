@@ -56,6 +56,11 @@ import org.slf4j.LoggerFactory;
  * but those are always tried after the local nodes. In other words, this policy guarantees that no
  * host in a remote data center will be queried unless no host in the local data center can be
  * reached.
+ *
+ * <p>For LWT (Lightweight Transaction) queries (where {@link Statement#isLWT()} returns {@code
+ * true}), the policy skips local rack prioritization and treats all hosts in the local datacenter
+ * equally, distributing queries in round-robin fashion across the entire local DC. Remote
+ * datacenters are still only used as fallback after all local DC hosts have been tried.
  */
 public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
 
@@ -73,11 +78,11 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
   private static final String UNSET = "";
 
   private final ConcurrentMap<String, CopyOnWriteArrayList<Host>> perDcLiveHosts =
-      new ConcurrentHashMap<String, CopyOnWriteArrayList<Host>>();
-  private final CopyOnWriteArrayList<Host> liveHostsLocalRackLocalDC =
-      new CopyOnWriteArrayList<Host>();
+      new ConcurrentHashMap<>();
+  private final CopyOnWriteArrayList<Host> liveHostsAllLocalDC = new CopyOnWriteArrayList<>();
+  private final CopyOnWriteArrayList<Host> liveHostsLocalRackLocalDC = new CopyOnWriteArrayList<>();
   private final CopyOnWriteArrayList<Host> liveHostsRemoteRacksLocalDC =
-      new CopyOnWriteArrayList<Host>();
+      new CopyOnWriteArrayList<>();
   @VisibleForTesting final AtomicInteger index = new AtomicInteger();
 
   @VisibleForTesting volatile String localDc;
@@ -147,6 +152,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
       else prev.addIfAbsent(host);
 
       if (dc.equals(localDc)) {
+        liveHostsAllLocalDC.add(host);
         if (rack.equals(localRack)) {
           liveHostsLocalRackLocalDC.add(host);
         } else {
@@ -240,10 +246,17 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
   @Override
   public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
 
-    CopyOnWriteArrayList<Host> localLiveHosts = perDcLiveHosts.get(localDc);
-    // Clone for thread safety
-    final List<Host> copyLiveHostsLocalRackLocalDC = cloneList(liveHostsLocalRackLocalDC);
-    final List<Host> copyLiveHostsRemoteRacksLocalDC = cloneList(liveHostsRemoteRacksLocalDC);
+    // For LWT queries, skip rack prioritization and use all local DC hosts equally
+    final boolean isLWT = statement != null && statement.isLWT();
+
+    // For LWT queries, include all local DC hosts in the first part of the plan, not just those in
+    // the local rack
+    final List<Host> copyLiveHostsLocalRackLocalDC =
+        isLWT ? cloneList(liveHostsAllLocalDC) : cloneList(liveHostsLocalRackLocalDC);
+    // For LWT queries, skip the second part of the plan that includes hosts in remote racks of the
+    // local DC
+    final List<Host> copyLiveHostsRemoteRacksLocalDC =
+        isLWT ? Collections.emptyList() : cloneList(liveHostsRemoteRacksLocalDC);
     final int startIdx = index.getAndIncrement();
 
     return new AbstractIterator<Host>() {
@@ -288,7 +301,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
           }
 
           ConsistencyLevel cl =
-              statement.getConsistencyLevel() == null
+              statement == null || statement.getConsistencyLevel() == null
                   ? configuration.getQueryOptions().getConsistencyLevel()
                   : statement.getConsistencyLevel();
 
@@ -348,6 +361,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
     dcHosts.addIfAbsent(host);
 
     if (dc.equals(localDc)) {
+      liveHostsAllLocalDC.addIfAbsent(host);
       if (rack.equals(localRack)) {
         liveHostsLocalRackLocalDC.add(host);
       } else {
@@ -365,6 +379,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
     if (dcHosts != null) dcHosts.remove(host);
 
     if (dc.equals(localDc)) {
+      liveHostsAllLocalDC.remove(host);
       if (rack.equals(localRack)) {
         liveHostsLocalRackLocalDC.remove(host);
       } else {
