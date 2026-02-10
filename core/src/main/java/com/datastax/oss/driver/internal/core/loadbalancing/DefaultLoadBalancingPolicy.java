@@ -51,7 +51,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLongArray;
 import net.jcip.annotations.ThreadSafe;
-import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,10 +201,10 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();
     int replicaCount = 0; // in currentNodes
     if (!replicas.isEmpty()) {
-      Pair<Integer, Integer> counts = moveReplicasToFront(currentNodes, replicas);
-      replicaCount = counts.getLeft();
+      int[] counts = moveReplicasToFront(currentNodes, replicas);
+      replicaCount = counts[0];
 
-      int localRackReplicaCount = counts.getRight(); // in currentNodes
+      int localRackReplicaCount = counts[1]; // in currentNodes
 
       if (replicaCount > 1) {
         shuffleLocalRackReplicasAndReplicas(currentNodes, replicaCount, localRackReplicaCount);
@@ -249,8 +248,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     return orderedReplicas;
   }
 
-  private Pair<Integer, Integer> moveReplicasToFront(
-      Object[] currentNodes, List<Node> allReplicas) {
+  private int[] moveReplicasToFront(Object[] currentNodes, List<Node> allReplicas) {
     int replicaCount = 0, localRackReplicaCount = 0;
     for (int i = 0; i < currentNodes.length; i++) {
       Node node = (Node) currentNodes[i];
@@ -265,7 +263,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
         replicaCount++;
       }
     }
-    return Pair.of(replicaCount, localRackReplicaCount);
+    return new int[] {replicaCount, localRackReplicaCount};
   }
 
   private void shuffleLocalRackReplicasAndReplicas(
