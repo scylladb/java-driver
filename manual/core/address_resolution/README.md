@@ -118,6 +118,52 @@ datastax-java-driver.advanced.address-translator.class = com.mycompany.MyAddress
 Note: the contact points provided while creating the `CqlSession` are not translated, only addresses
 retrieved from or sent by Cassandra nodes are.
 
+### Client Routes (PrivateLink deployments)
+
+For cloud deployments using PrivateLink or similar private endpoint technologies (such as ScyllaDB Cloud), nodes are
+accessed through private DNS endpoints rather than direct IP addresses. The driver provides a client routes feature
+to handle this topology.
+
+Client routes configuration is done programmatically and is **mutually exclusive** with:
+- A custom `AddressTranslator` (if both are provided, client routes takes precedence)
+- Cloud secure connect bundles (if both are provided, the cloud bundle takes precedence)
+
+Example configuration:
+
+```java
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
+import com.datastax.oss.driver.api.core.config.ClientRoutesEndpoint;
+import java.util.UUID;
+
+// Configure endpoints with connection IDs and addresses
+ClientRoutesConfig config = ClientRoutesConfig.builder()
+    .addEndpoint(new ClientRoutesEndpoint(
+        UUID.fromString("12345678-1234-1234-1234-123456789012"),
+        "my-cluster.us-east-1.aws.scylladb.com:9042"))
+    .build();
+
+// Build session - endpoints are automatically used as seed hosts
+CqlSession session = CqlSession.builder()
+    .withClientRoutesConfig(config)
+    .withLocalDatacenter("datacenter1")
+    .build();
+```
+
+When client routes are configured:
+* The driver will use endpoint addresses as seed hosts if no explicit contact points are provided
+* Custom `AddressTranslator` configuration is not allowed (only the default `PassThroughAddressTranslator`)
+* Connection IDs map to the `system.client_routes` table entries
+
+The system table name can be customized in the [configuration](../configuration/) (primarily for testing):
+
+```
+datastax-java-driver.advanced.client-routes.table-name = "system.client_routes"
+```
+
+**Note:** As of the current version, the client routes configuration API is available, but the full handler implementation
+(DNS resolution, address translation, event handling) is still under development.
+
 ### EC2 multi-region
 
 If you deploy both Cassandra and client applications on Amazon EC2, and your cluster spans multiple regions, you'll have

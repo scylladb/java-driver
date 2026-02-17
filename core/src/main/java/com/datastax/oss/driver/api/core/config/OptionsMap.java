@@ -396,6 +396,7 @@ public class OptionsMap implements Serializable {
     map.put(
         TypedDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
         "PRESERVE_REPLICA_ORDER");
+    map.put(TypedDriverOption.CLIENT_ROUTES_TABLE_NAME, "system.client_routes");
   }
 
   @Immutable
