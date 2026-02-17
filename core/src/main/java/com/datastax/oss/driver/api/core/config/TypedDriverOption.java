@@ -939,6 +939,9 @@ public class TypedDriverOption<ValueT> {
           DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
           GenericType.STRING);
 
+  public static final TypedDriverOption<String> CLIENT_ROUTES_TABLE_NAME =
+      new TypedDriverOption<>(DefaultDriverOption.CLIENT_ROUTES_TABLE_NAME, GenericType.STRING);
+
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {
       ImmutableList.Builder<TypedDriverOption<?>> result = ImmutableList.builder();
