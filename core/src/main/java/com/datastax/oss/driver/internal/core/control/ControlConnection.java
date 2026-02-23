@@ -30,6 +30,7 @@ import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.DriverChannelOptions;
 import com.datastax.oss.driver.internal.core.channel.EventCallback;
+import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
@@ -190,6 +191,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         case ProtocolConstants.EventType.SCHEMA_CHANGE:
           processSchemaChange(event);
           break;
+        case ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE:
+          processClientRoutesChange(event);
+          break;
         default:
           LOG.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
       }
@@ -242,6 +246,34 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             });
   }
 
+  private void processClientRoutesChange(Event event) {
+    LOG.debug("[{}] Received CLIENT_ROUTES_CHANGE event: {}", logPrefix, event);
+
+    ClientRoutesHandler handler = context.getClientRoutesHandler();
+    if (handler != null) {
+      // Trigger async refresh of client routes
+      handler
+          .refresh()
+          .whenComplete(
+              (v, error) -> {
+                if (error != null) {
+                  LOG.warn(
+                      "[{}] Failed to refresh client routes after CLIENT_ROUTES_CHANGE event",
+                      logPrefix,
+                      error);
+                } else {
+                  LOG.debug("[{}] Successfully refreshed client routes", logPrefix);
+                }
+              });
+    } else {
+      // Debug level since registration is conditional - null handler during shutdown is normal
+      LOG.debug(
+          "[{}] Received CLIENT_ROUTES_CHANGE event but client routes handler is not available "
+              + "(likely during shutdown)",
+          logPrefix);
+    }
+  }
+
   private class SingleThreaded {
     private final InternalDriverContext context;
     private final DriverConfig config;
@@ -292,7 +324,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       }
       initWasCalled = true;
       try {
-        ImmutableList<String> eventTypes = buildEventTypes(listenToClusterEvents);
+        boolean listenClientRoutesEvents = context.getClientRoutesHandler() != null;
+        ImmutableList<String> eventTypes =
+            buildEventTypes(listenToClusterEvents, listenClientRoutesEvents);
         LOG.debug("[{}] Initializing with event types {}", logPrefix, eventTypes);
         channelOptions =
             DriverChannelOptions.builder()
@@ -609,13 +643,17 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     return true;
   }
 
-  private static ImmutableList<String> buildEventTypes(boolean listenClusterEvents) {
+  private static ImmutableList<String> buildEventTypes(
+      boolean listenClusterEvents, boolean listenClientRoutesEvents) {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     builder.add(ProtocolConstants.EventType.SCHEMA_CHANGE);
     if (listenClusterEvents) {
       builder
           .add(ProtocolConstants.EventType.STATUS_CHANGE)
           .add(ProtocolConstants.EventType.TOPOLOGY_CHANGE);
+    }
+    if (listenClientRoutesEvents) {
+      builder.add(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
     }
     return builder.build();
   }

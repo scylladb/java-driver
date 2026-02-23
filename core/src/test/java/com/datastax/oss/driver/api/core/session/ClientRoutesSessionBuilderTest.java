@@ -140,8 +140,10 @@ public class ClientRoutesSessionBuilderTest {
     UUID connectionId = UUID.randomUUID();
 
     InetSocketAddress addr1 = parseContactPoint("[::1]:9042", connectionId);
-    // Java expands ::1 to its canonical form
-    assertThat(addr1.getHostString()).matches("(\\[::1]|\\[0:0:0:0:0:0:0:1])");
+    // URI.getHost() preserves brackets for IPv6, so getHostString() returns [::1]
+    // Java may expand ::1 to its canonical form 0:0:0:0:0:0:0:1
+    // Pattern matches optional brackets around the IPv6 address
+    assertThat(addr1.getHostString()).matches("\\[?(::1|0:0:0:0:0:0:0:1)]?");
     assertThat(addr1.getPort()).isEqualTo(9042);
 
     InetSocketAddress addr2 = parseContactPoint("[2001:db8::1]:9042", connectionId);
@@ -160,8 +162,10 @@ public class ClientRoutesSessionBuilderTest {
 
     // Should use default port 9042
     InetSocketAddress addr1 = parseContactPoint("[::1]", connectionId);
-    // Java expands ::1 to its canonical form
-    assertThat(addr1.getHostString()).matches("(\\[::1]|\\[0:0:0:0:0:0:0:1])");
+    // Java URI.getHost() preserves brackets for IPv6, so getHostString() returns [::1]
+    // Java may expand ::1 to its canonical form 0:0:0:0:0:0:0:1
+    // Pattern matches optional brackets around the IPv6 address
+    assertThat(addr1.getHostString()).matches("\\[?(::1|0:0:0:0:0:0:0:1)]?");
     assertThat(addr1.getPort()).isEqualTo(9042);
 
     InetSocketAddress addr2 = parseContactPoint("[2001:db8::1]", connectionId);

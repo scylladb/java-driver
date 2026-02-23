@@ -976,6 +976,19 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
               programmaticContactPoints.add(new DefaultEndPoint(socketAddress));
             }
           }
+          // If no contact points could be derived from client routes, fail fast with a clear
+          // message
+          if (programmaticContactPoints.isEmpty()) {
+            LOG.error(
+                "Client routes configuration was provided, but no usable endpoints were found: "
+                    + "all endpoints have null connectionAddr and no explicit contact points are configured. "
+                    + "Please specify a connectionAddr for at least one client routes endpoint or configure "
+                    + "contact points explicitly.");
+            throw new IllegalStateException(
+                "Invalid client routes configuration: no usable endpoints. "
+                    + "At least one endpoint must define a non-null connectionAddr or explicit contact points "
+                    + "must be configured when using client routes.");
+          }
         }
       }
 

@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.api.core.config;
 
 import com.datastax.oss.driver.api.core.session.SessionBuilder;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.ArrayList;
@@ -59,6 +60,7 @@ import net.jcip.annotations.Immutable;
 @Immutable
 public class ClientRoutesConfig {
 
+  private static final String DEFAULT_TABLE_NAME = "system.client_routes";
   private static final long DEFAULT_DNS_CACHE_DURATION_MILLIS = 500L;
 
   private final List<ClientRoutesEndpoint> endpoints;
@@ -156,7 +158,7 @@ public class ClientRoutesConfig {
   /** Builder for {@link ClientRoutesConfig}. */
   public static class Builder {
     private final List<ClientRoutesEndpoint> endpoints = new ArrayList<>();
-    private String tableName;
+    private String tableName = DEFAULT_TABLE_NAME;
     private long dnsCacheDurationMillis = DEFAULT_DNS_CACHE_DURATION_MILLIS;
 
     /**
@@ -199,6 +201,7 @@ public class ClientRoutesConfig {
      * @param tableName the table name to use.
      * @return this builder.
      */
+    @VisibleForTesting
     @NonNull
     public Builder withTableName(@Nullable String tableName) {
       this.tableName = tableName;

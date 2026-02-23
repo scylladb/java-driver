@@ -232,11 +232,16 @@ public class DefaultTopologyMonitorTest {
             });
     // The rpc_address in each row should have been tried, only the last row should have been
     // converted
+    // Note: getUuid("host_id") is called once in findInPeers for comparison
     verify(peer3).getUuid("host_id");
     verify(peer3, never()).getString(anyString());
 
-    verify(peer2, times(2)).getUuid("host_id");
-    verify(peer2).getString("data_center");
+    // Note: getUuid("host_id") called twice (once in findInPeers, once in buildNodeEndPoint)
+    // getString("data_center") called twice (once in nodeInfoBuilder, once in buildNodeEndPoint)
+    // getString("rack") called twice (once in nodeInfoBuilder, once in buildNodeEndPoint)
+    verify(peer2, times(3)).getUuid("host_id");
+    verify(peer2, times(2)).getString("data_center");
+    verify(peer2, times(2)).getString("rack");
   }
 
   @Test
@@ -265,8 +270,13 @@ public class DefaultTopologyMonitorTest {
     verify(peer3).getUuid("host_id");
     verify(peer3, never()).getString(anyString());
 
-    verify(peer2, times(2)).getUuid("host_id");
-    verify(peer2).getString("data_center");
+    // Note: getUuid("host_id") called three times total (once in findInPeers, once in
+    // nodeInfoBuilder, once in buildNodeEndPoint)
+    // getString("data_center") called twice (once in nodeInfoBuilder, once in buildNodeEndPoint)
+    // getString("rack") called twice (once in nodeInfoBuilder, once in buildNodeEndPoint)
+    verify(peer2, times(3)).getUuid("host_id");
+    verify(peer2, times(2)).getString("data_center");
+    verify(peer2, times(2)).getString("rack");
   }
 
   @Test
@@ -298,8 +308,12 @@ public class DefaultTopologyMonitorTest {
     verify(peer2).getInetAddress("rpc_address");
     verify(peer2, never()).getString(anyString());
 
+    // Note: getString calls increased due to buildNodeEndPoint calling getString("data_center"),
+    // getString("rack")
+    // in addition to nodeInfoBuilder calling them
     verify(peer1).getInetAddress("rpc_address");
-    verify(peer1).getString("data_center");
+    verify(peer1, times(2)).getString("data_center");
+    verify(peer1, times(2)).getString("rack");
   }
 
   @Test
@@ -331,8 +345,12 @@ public class DefaultTopologyMonitorTest {
     verify(peer2).getInetAddress("native_address");
     verify(peer2, never()).getString(anyString());
 
+    // Note: getString calls increased due to buildNodeEndPoint calling getString("data_center"),
+    // getString("rack")
+    // in addition to nodeInfoBuilder calling them
     verify(peer1).getInetAddress("native_address");
-    verify(peer1).getString("data_center");
+    verify(peer1, times(2)).getString("data_center");
+    verify(peer1, times(2)).getString("rack");
   }
 
   @Test

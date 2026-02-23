@@ -28,6 +28,7 @@ import com.datastax.dse.protocol.internal.ProtocolV4ClientCodecsForDse;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
+import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -55,6 +56,8 @@ import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
+import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesAddressTranslator;
+import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
@@ -197,6 +200,7 @@ public class DefaultDriverContext implements InternalDriverContext {
           "loadBalancingPolicyWrapper", this::buildLoadBalancingPolicyWrapper, cycleDetector);
   private final LazyReference<ControlConnection> controlConnectionRef =
       new LazyReference<>("controlConnection", this::buildControlConnection, cycleDetector);
+  private final LazyReference<ClientRoutesHandler> clientRoutesHandlerRef;
   private final LazyReference<RequestProcessorRegistry> requestProcessorRegistryRef =
       new LazyReference<>(
           "requestProcessorRegistry", this::buildRequestProcessorRegistry, cycleDetector);
@@ -239,6 +243,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final Map<String, NodeDistanceEvaluator> nodeDistanceEvaluatorsFromBuilder;
   private final ClassLoader classLoader;
   private final InetSocketAddress cloudProxyAddress;
+  private final ClientRoutesConfig clientRoutesConfigFromBuilder;
   private final LazyReference<RequestLogFormatter> requestLogFormatterRef =
       new LazyReference<>("requestLogFormatter", this::buildRequestLogFormatter, cycleDetector);
   private final UUID startupClientId;
@@ -294,6 +299,12 @@ public class DefaultDriverContext implements InternalDriverContext {
     this.nodeDistanceEvaluatorsFromBuilder = programmaticArguments.getNodeDistanceEvaluators();
     this.classLoader = programmaticArguments.getClassLoader();
     this.cloudProxyAddress = programmaticArguments.getCloudProxyAddress();
+    this.clientRoutesConfigFromBuilder = programmaticArguments.getClientRoutesConfig();
+    this.clientRoutesHandlerRef =
+        new LazyReference<>(
+            "clientRoutesHandler",
+            () -> buildClientRoutesHandler(clientRoutesConfigFromBuilder),
+            cycleDetector);
     this.startupClientId = programmaticArguments.getStartupClientId();
     this.startupApplicationName = programmaticArguments.getStartupApplicationName();
     this.startupApplicationVersion = programmaticArguments.getStartupApplicationVersion();
@@ -405,6 +416,14 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected AddressTranslator buildAddressTranslator() {
+    // If client routes are configured, use ClientRoutesAddressTranslator
+    // We check the config directly instead of getting the handler to avoid triggering
+    // its initialization during context construction (handler may need other context components)
+    if (clientRoutesConfigFromBuilder != null) {
+      return new ClientRoutesAddressTranslator(this);
+    }
+
+    // Otherwise use the configured translator
     return Reflection.buildFromConfig(
             this,
             DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS,
@@ -416,6 +435,13 @@ public class DefaultDriverContext implements InternalDriverContext {
                     String.format(
                         "Missing address translator, check your configuration (%s)",
                         DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)));
+  }
+
+  protected ClientRoutesHandler buildClientRoutesHandler(
+      ClientRoutesConfig clientRoutesConfigFromBuilder) {
+    return (clientRoutesConfigFromBuilder != null)
+        ? new ClientRoutesHandler(this, clientRoutesConfigFromBuilder)
+        : null;
   }
 
   protected Optional<SslEngineFactory> buildSslEngineFactory(SslEngineFactory factoryFromBuilder) {
@@ -903,6 +929,12 @@ public class DefaultDriverContext implements InternalDriverContext {
   @Override
   public ControlConnection getControlConnection() {
     return controlConnectionRef.get();
+  }
+
+  @Nullable
+  @Override
+  public ClientRoutesHandler getClientRoutesHandler() {
+    return clientRoutesHandlerRef.get();
   }
 
   @NonNull
