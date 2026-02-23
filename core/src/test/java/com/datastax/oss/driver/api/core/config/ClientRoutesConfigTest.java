@@ -38,7 +38,7 @@ public class ClientRoutesConfigTest {
     assertThat(config.getEndpoints()).hasSize(1);
     assertThat(config.getEndpoints().get(0).getConnectionId()).isEqualTo(connectionId);
     assertThat(config.getEndpoints().get(0).getConnectionAddr()).isEqualTo(connectionAddr);
-    assertThat(config.getTableName()).isNull();
+    assertThat(config.getTableName()).isEqualTo("system.client_routes");
   }
 
   @Test

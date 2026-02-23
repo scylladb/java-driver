@@ -39,6 +39,7 @@ import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
+import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.LifecycleListener;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
@@ -677,6 +678,15 @@ public class DefaultSession implements CqlSession {
         } catch (Throwable t) {
           // Assume the policy had failed to initialize, and we don't need to close it => ignore
         }
+      }
+      // Add ClientRoutesHandler if configured
+      try {
+        ClientRoutesHandler handler = context.getClientRoutesHandler();
+        if (handler != null) {
+          policies.add(handler);
+        }
+      } catch (Throwable t) {
+        // ignore
       }
       try {
         context.getAuthProvider().ifPresent(policies::add);

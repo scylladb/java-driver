@@ -448,18 +448,6 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: {@link String}
    */
   ADDRESS_TRANSLATOR_CLASS("advanced.address-translator.class"),
-
-  /**
-   * The name of the system table to query for client routes information.
-   *
-   * <p>This is used when client routes are configured programmatically via {@link
-   * com.datastax.oss.driver.api.core.session.SessionBuilder#withClientRoutesConfig}. The default
-   * value is {@code system.client_routes}.
-   *
-   * <p>Value-type: {@link String}
-   */
-  CLIENT_ROUTES_TABLE_NAME("advanced.client-routes.table-name"),
-
   /**
    * The native protocol version to use.
    *

@@ -429,7 +429,24 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           broadcastRpcAddress, "broadcastRpcAddress cannot be null for a peer row");
       // Deployments that use a custom EndPoint implementation will need their own TopologyMonitor.
       // One simple approach is to extend this class and override this method.
-      return new DefaultEndPoint(context.getAddressTranslator().translate(broadcastRpcAddress));
+
+      // Pass node metadata to translator for client routes support
+      UUID hostId = row.getUuid("host_id");
+      String datacenter = row.getString("data_center");
+      String rack = row.getString("rack");
+
+      // Warn if host_id is missing and client routes are configured, as client routes require it
+      if (hostId == null && context.getClientRoutesHandler() != null) {
+        LOG.warn(
+            "[{}] host_id is null for peer {} but client routes are configured. "
+                + "This may indicate corrupted system tables or a configuration issue.",
+            logPrefix,
+            broadcastRpcAddress);
+      }
+
+      InetSocketAddress translatedAddress =
+          context.getAddressTranslator().translate(broadcastRpcAddress, hostId, datacenter, rack);
+      return new DefaultEndPoint(translatedAddress);
     } else {
       // Don't rely on system.local.rpc_address for the control node, because it mistakenly
       // reports the normal RPC address instead of the broadcast one (CASSANDRA-11181). We

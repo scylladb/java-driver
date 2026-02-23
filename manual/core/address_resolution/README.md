@@ -153,7 +153,7 @@ CqlSession session = CqlSession.builder()
 
 When client routes are configured:
 * The driver will use endpoint addresses as seed hosts if no explicit contact points are provided
-* Custom `AddressTranslator` configuration is not allowed (only the default `PassThroughAddressTranslator`)
+* Custom `AddressTranslator` configuration will be overridden by the client routes handler (a warning is logged); the default `PassThroughAddressTranslator` is used internally
 * Connection IDs map to the `system.client_routes` table entries
 
 The system table name can be customized in the [configuration](../configuration/) (primarily for testing):
