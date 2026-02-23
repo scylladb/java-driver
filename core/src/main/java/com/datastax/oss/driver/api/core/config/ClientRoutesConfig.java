@@ -44,6 +44,7 @@ import net.jcip.annotations.Immutable;
  *     .addEndpoint(new ClientRoutesEndpoint(
  *         UUID.fromString("12345678-1234-1234-1234-123456789012"),
  *         "my-privatelink.us-east-1.aws.scylladb.com:9042"))
+ *     .withDnsCacheDuration(1000L)  // Cache DNS for 1 second (default: 500ms)
  *     .build();
  *
  * CqlSession session = CqlSession.builder()
@@ -57,15 +58,23 @@ import net.jcip.annotations.Immutable;
 @Immutable
 public class ClientRoutesConfig {
 
+  private static final long DEFAULT_DNS_CACHE_DURATION_MILLIS = 500L;
+
   private final List<ClientRoutesEndpoint> endpoints;
   private final String tableName;
+  private final long dnsCacheDurationMillis;
 
-  private ClientRoutesConfig(List<ClientRoutesEndpoint> endpoints, String tableName) {
+  private ClientRoutesConfig(
+      List<ClientRoutesEndpoint> endpoints, String tableName, long dnsCacheDurationMillis) {
     if (endpoints == null || endpoints.isEmpty()) {
       throw new IllegalArgumentException("At least one endpoint must be specified");
     }
+    if (dnsCacheDurationMillis < 0) {
+      throw new IllegalArgumentException("DNS cache duration must be non-negative");
+    }
     this.endpoints = Collections.unmodifiableList(new ArrayList<>(endpoints));
     this.tableName = tableName;
+    this.dnsCacheDurationMillis = dnsCacheDurationMillis;
   }
 
   /**
@@ -89,6 +98,19 @@ public class ClientRoutesConfig {
   }
 
   /**
+   * Returns the DNS cache duration in milliseconds.
+   *
+   * <p>This controls how long resolved DNS entries are cached before being re-resolved. A shorter
+   * duration is appropriate for dynamic environments where DNS mappings change frequently, while a
+   * longer duration can reduce DNS lookup overhead in stable environments.
+   *
+   * @return the DNS cache duration in milliseconds (default: 500ms).
+   */
+  public long getDnsCacheDurationMillis() {
+    return dnsCacheDurationMillis;
+  }
+
+  /**
    * Creates a new builder for constructing a {@link ClientRoutesConfig}.
    *
    * @return a new builder instance.
@@ -107,12 +129,14 @@ public class ClientRoutesConfig {
       return false;
     }
     ClientRoutesConfig that = (ClientRoutesConfig) o;
-    return endpoints.equals(that.endpoints) && Objects.equals(tableName, that.tableName);
+    return dnsCacheDurationMillis == that.dnsCacheDurationMillis
+        && endpoints.equals(that.endpoints)
+        && Objects.equals(tableName, that.tableName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(endpoints, tableName);
+    return Objects.hash(endpoints, tableName, dnsCacheDurationMillis);
   }
 
   @Override
@@ -123,6 +147,8 @@ public class ClientRoutesConfig {
         + ", tableName='"
         + tableName
         + '\''
+        + ", dnsCacheDurationMillis="
+        + dnsCacheDurationMillis
         + '}';
   }
 
@@ -130,6 +156,7 @@ public class ClientRoutesConfig {
   public static class Builder {
     private final List<ClientRoutesEndpoint> endpoints = new ArrayList<>();
     private String tableName;
+    private long dnsCacheDurationMillis = DEFAULT_DNS_CACHE_DURATION_MILLIS;
 
     /**
      * Adds an endpoint to the configuration.
@@ -178,6 +205,29 @@ public class ClientRoutesConfig {
     }
 
     /**
+     * Sets the DNS cache duration in milliseconds.
+     *
+     * <p>This controls how long resolved DNS entries are cached before being re-resolved. A shorter
+     * duration is appropriate for dynamic environments where DNS mappings change frequently (e.g.,
+     * during rolling updates), while a longer duration can reduce DNS lookup overhead in stable
+     * environments.
+     *
+     * <p>Default: 500ms
+     *
+     * @param durationMillis the cache duration in milliseconds (must be non-negative).
+     * @return this builder.
+     * @throws IllegalArgumentException if the duration is negative.
+     */
+    @NonNull
+    public Builder withDnsCacheDuration(long durationMillis) {
+      if (durationMillis < 0) {
+        throw new IllegalArgumentException("DNS cache duration must be non-negative");
+      }
+      this.dnsCacheDurationMillis = durationMillis;
+      return this;
+    }
+
+    /**
      * Builds the {@link ClientRoutesConfig} with the configured endpoints and table name.
      *
      * @return the new configuration instance.
@@ -185,7 +235,7 @@ public class ClientRoutesConfig {
      */
     @NonNull
     public ClientRoutesConfig build() {
-      return new ClientRoutesConfig(endpoints, tableName);
+      return new ClientRoutesConfig(endpoints, tableName, dnsCacheDurationMillis);
     }
   }
 }

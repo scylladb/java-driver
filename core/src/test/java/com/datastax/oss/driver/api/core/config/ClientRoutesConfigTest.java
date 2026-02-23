@@ -120,4 +120,48 @@ public class ClientRoutesConfigTest {
     assertThat(config.getEndpoints().get(0).getConnectionId()).isEqualTo(connectionId2);
     assertThat(config.getEndpoints().get(1).getConnectionId()).isEqualTo(connectionId3);
   }
+
+  @Test
+  public void should_use_default_dns_cache_duration() {
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+            .build();
+
+    assertThat(config.getDnsCacheDurationMillis()).isEqualTo(500L);
+  }
+
+  @Test
+  public void should_build_config_with_custom_dns_cache_duration() {
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+            .withDnsCacheDuration(1000L)
+            .build();
+
+    assertThat(config.getDnsCacheDurationMillis()).isEqualTo(1000L);
+  }
+
+  @Test
+  public void should_allow_zero_dns_cache_duration() {
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+            .withDnsCacheDuration(0L)
+            .build();
+
+    assertThat(config.getDnsCacheDurationMillis()).isEqualTo(0L);
+  }
+
+  @Test
+  public void should_fail_when_dns_cache_duration_is_negative() {
+    assertThatThrownBy(
+            () ->
+                ClientRoutesConfig.builder()
+                    .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+                    .withDnsCacheDuration(-1L)
+                    .build())
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("DNS cache duration must be non-negative");
+  }
 }
