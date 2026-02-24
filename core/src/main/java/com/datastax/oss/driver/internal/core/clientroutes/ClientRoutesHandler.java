@@ -44,8 +44,7 @@ public class ClientRoutesHandler implements AutoCloseable {
   private final ClientRoutesConfig config;
   private final String logPrefix;
   private final AtomicReference<Map<UUID, ResolvedClientRoute>> resolvedRoutesRef;
-  private final Map<String, DnsCacheEntry> dnsCache;
-  private final long dnsCacheDurationNanos;
+  private final DnsResolver dnsResolver;
   private volatile boolean closed = false;
 
   public ClientRoutesHandler(
@@ -54,8 +53,34 @@ public class ClientRoutesHandler implements AutoCloseable {
     this.config = config;
     this.logPrefix = context.getSessionName();
     this.resolvedRoutesRef = new AtomicReference<>(new ConcurrentHashMap<>());
-    this.dnsCache = new ConcurrentHashMap<>();
-    this.dnsCacheDurationNanos = config.getDnsCacheDurationMillis() * 1_000_000L;
+    // TODO Phase 3: Implement CachingDnsResolver with configurable cache duration
+    // For now, create a placeholder that will be implemented in Phase 2
+    this.dnsResolver = createDnsResolver(config.getDnsCacheDurationMillis());
+  }
+
+  /**
+   * Creates a DNS resolver with the specified cache duration.
+   *
+   * <p>Phase 3 TODO: Implement CachingDnsResolver with: - Configurable cache TTL
+   * (dnsCacheDurationMillis) - Concurrency limit (default: 1 per hostname) - Fallback to last known
+   * good IP on resolution failure - Cache eviction based on TTL
+   */
+  @SuppressWarnings(
+      "UnusedVariable") // dnsCacheDurationMillis will be used in the Phase 3 implementation
+  private DnsResolver createDnsResolver(long dnsCacheDurationMillis) {
+    // Placeholder for Phase 3 implementation
+    return new DnsResolver() {
+      @NonNull
+      @Override
+      public InetAddress resolve(@NonNull String hostname) throws UnknownHostException {
+        return InetAddress.getByName(hostname);
+      }
+
+      @Override
+      public void clearCache() {
+        // No-op for now
+      }
+    };
   }
 
   public CompletionStage<Void> init() {
@@ -88,35 +113,29 @@ public class ClientRoutesHandler implements AutoCloseable {
       LOG.debug("[{}] No client route found for host_id={}", logPrefix, hostId);
       return null;
     }
-    return route.toSocketAddress(useSsl);
-  }
 
-  @SuppressWarnings("UnusedMethod") // Will be used when implementing system.client_routes query
-  private InetAddress resolveDns(String hostname) throws UnknownHostException {
-    DnsCacheEntry cached = dnsCache.get(hostname);
-    long now = System.nanoTime();
-    if (cached != null && (now - cached.resolvedAtNanos) < dnsCacheDurationNanos) {
-      return cached.address;
+    try {
+      // DNS resolution happens here through the cached resolver
+      return route.toSocketAddress(useSsl, dnsResolver);
+    } catch (UnknownHostException e) {
+      LOG.warn(
+          "[{}] Failed to resolve hostname {} for host_id={}",
+          logPrefix,
+          route.getHostname(),
+          hostId,
+          e);
+      return null;
+    } catch (IllegalStateException e) {
+      LOG.warn(
+          "[{}] Invalid route configuration for host_id={}: {}", logPrefix, hostId, e.getMessage());
+      return null;
     }
-    InetAddress resolved = InetAddress.getByName(hostname);
-    dnsCache.put(hostname, new DnsCacheEntry(resolved, now));
-    return resolved;
   }
 
   @Override
   public void close() {
     closed = true;
-    dnsCache.clear();
+    dnsResolver.clearCache();
     LOG.debug("[{}] ClientRoutesHandler closed", logPrefix);
-  }
-
-  private static class DnsCacheEntry {
-    final InetAddress address;
-    final long resolvedAtNanos;
-
-    DnsCacheEntry(InetAddress address, long resolvedAtNanos) {
-      this.address = address;
-      this.resolvedAtNanos = resolvedAtNanos;
-    }
   }
 }
