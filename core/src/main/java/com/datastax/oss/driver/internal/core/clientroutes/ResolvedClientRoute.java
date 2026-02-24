@@ -32,22 +32,19 @@ public class ResolvedClientRoute {
   private static final Logger LOG = LoggerFactory.getLogger(ResolvedClientRoute.class);
 
   private final UUID hostId;
-  private final InetAddress resolvedAddress;
-  private final int nativeTransportPort;
+  private final String hostname;
+  private final Integer nativeTransportPort;
   private final Integer nativeTransportPortSsl;
-  private final long resolvedAtNanos;
 
   public ResolvedClientRoute(
       @NonNull UUID hostId,
-      @NonNull InetAddress resolvedAddress,
-      int nativeTransportPort,
-      @Nullable Integer nativeTransportPortSsl,
-      long resolvedAtNanos) {
-    this.hostId = Objects.requireNonNull(hostId);
-    this.resolvedAddress = Objects.requireNonNull(resolvedAddress);
+      @NonNull String hostname,
+      @Nullable Integer nativeTransportPort,
+      @Nullable Integer nativeTransportPortSsl) {
+    this.hostId = Objects.requireNonNull(hostId, "hostId must not be null");
+    this.hostname = Objects.requireNonNull(hostname, "hostname must not be null");
     this.nativeTransportPort = nativeTransportPort;
     this.nativeTransportPortSsl = nativeTransportPortSsl;
-    this.resolvedAtNanos = resolvedAtNanos;
   }
 
   @NonNull
@@ -56,11 +53,12 @@ public class ResolvedClientRoute {
   }
 
   @NonNull
-  public InetAddress getResolvedAddress() {
-    return resolvedAddress;
+  public String getHostname() {
+    return hostname;
   }
 
-  public int getNativeTransportPort() {
+  @Nullable
+  public Integer getNativeTransportPort() {
     return nativeTransportPort;
   }
 
@@ -69,13 +67,27 @@ public class ResolvedClientRoute {
     return nativeTransportPortSsl;
   }
 
-  public long getResolvedAtNanos() {
-    return resolvedAtNanos;
-  }
-
+  /**
+   * Converts this route to an InetSocketAddress, resolving DNS through the provided resolver.
+   *
+   * <p>The DNS resolver handles caching, so this method can be called on every connection attempt
+   * without causing a DNS storm. DNS resolution happens at connection time, not at route discovery
+   * time, which ensures the driver uses fresh DNS entries even when system.client_routes updates
+   * happen between metadata refreshes.
+   *
+   * @param useSsl whether to use the SSL port
+   * @param dnsResolver the DNS resolver to use for hostname resolution
+   * @return an InetSocketAddress with the resolved IP and selected port
+   * @throws IllegalStateException if no port is configured for this route
+   * @throws java.net.UnknownHostException if the hostname cannot be resolved
+   */
   @NonNull
-  public InetSocketAddress toSocketAddress(boolean useSsl) {
-    int port;
+  public InetSocketAddress toSocketAddress(boolean useSsl, @NonNull DnsResolver dnsResolver)
+      throws java.net.UnknownHostException {
+    Objects.requireNonNull(dnsResolver, "dnsResolver must not be null");
+
+    // Select port based on SSL configuration
+    Integer port;
     if (useSsl) {
       if (nativeTransportPortSsl != null) {
         port = nativeTransportPortSsl;
@@ -85,7 +97,7 @@ public class ResolvedClientRoute {
             "SSL requested for host_id={} ({}:{}) but tls_port is not configured in client routes. "
                 + "Falling back to non-SSL port {}. This may indicate a configuration issue.",
             hostId,
-            resolvedAddress.getHostAddress(),
+            hostname,
             nativeTransportPort,
             nativeTransportPort);
         port = nativeTransportPort;
@@ -93,6 +105,34 @@ public class ResolvedClientRoute {
     } else {
       port = nativeTransportPort;
     }
+
+    // Validate port is configured
+    if (port == null) {
+      throw new IllegalStateException(
+          String.format(
+              "No port configured for host_id=%s, hostname=%s. "
+                  + "The system.client_routes table may be incomplete.",
+              hostId, hostname));
+    }
+
+    // Resolve DNS at connection time (resolver handles caching)
+    InetAddress resolvedAddress = dnsResolver.resolve(hostname);
+
     return new InetSocketAddress(resolvedAddress, port);
+  }
+
+  @Override
+  public String toString() {
+    return "ResolvedClientRoute{"
+        + "hostId="
+        + hostId
+        + ", hostname='"
+        + hostname
+        + '\''
+        + ", nativeTransportPort="
+        + nativeTransportPort
+        + ", nativeTransportPortSsl="
+        + nativeTransportPortSsl
+        + '}';
   }
 }
