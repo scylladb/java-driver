@@ -34,7 +34,7 @@ https://github.com/google/google-java-format for IDE plugins. The rules are not 
 
 The build will fail if the code is not formatted. To format all files from the command line, run:
  
-```
+```shell
 mvn fmt:format
 ```
 
@@ -46,7 +46,7 @@ and `while` statements, even when the body is empty or contains only a single st
 The build will fail if XML files are not formatted correctly. Run the following command before you
 commit:
 
-```java
+```shell
 mvn xml-format:xml-format
 ```
 
