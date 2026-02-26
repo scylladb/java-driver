@@ -18,18 +18,25 @@
 package com.datastax.oss.driver.internal.core.clientroutes;
 
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
+import com.datastax.oss.driver.api.core.config.ClientRoutesEndpoint;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRequestHandler;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,12 +45,15 @@ import org.slf4j.LoggerFactory;
 public class ClientRoutesHandler implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(ClientRoutesHandler.class);
 
-  @SuppressWarnings("UnusedVariable") // Will be used for querying system.client_routes
-  private final InternalDriverContext context;
+  private static final String SELECT_ROUTES_TEMPLATE =
+      "SELECT connection_id, host_id, address, port, tls_port FROM %s"
+          + " WHERE connection_id IN (%s) ALLOW FILTERING";
+
+  final InternalDriverContext context;
 
   private final ClientRoutesConfig config;
   private final String logPrefix;
-  private final AtomicReference<Map<UUID, ResolvedClientRoute>> resolvedRoutesRef;
+  final AtomicReference<Map<UUID, ResolvedClientRoute>> resolvedRoutesRef;
   private final DnsResolver dnsResolver;
   private volatile boolean closed = false;
 
@@ -53,34 +63,12 @@ public class ClientRoutesHandler implements AutoCloseable {
     this.config = config;
     this.logPrefix = context.getSessionName();
     this.resolvedRoutesRef = new AtomicReference<>(new ConcurrentHashMap<>());
-    // TODO Phase 3: Implement CachingDnsResolver with configurable cache duration
-    // For now, create a placeholder that will be implemented in Phase 2
     this.dnsResolver = createDnsResolver(config.getDnsCacheDurationMillis());
   }
 
-  /**
-   * Creates a DNS resolver with the specified cache duration.
-   *
-   * <p>Phase 3 TODO: Implement CachingDnsResolver with: - Configurable cache TTL
-   * (dnsCacheDurationMillis) - Concurrency limit (default: 1 per hostname) - Fallback to last known
-   * good IP on resolution failure - Cache eviction based on TTL
-   */
-  @SuppressWarnings(
-      "UnusedVariable") // dnsCacheDurationMillis will be used in the Phase 3 implementation
+  /** Creates a DNS resolver with the specified cache duration. */
   private DnsResolver createDnsResolver(long dnsCacheDurationMillis) {
-    // Placeholder for Phase 3 implementation
-    return new DnsResolver() {
-      @NonNull
-      @Override
-      public InetAddress resolve(@NonNull String hostname) throws UnknownHostException {
-        return InetAddress.getByName(hostname);
-      }
-
-      @Override
-      public void clearCache() {
-        // No-op for now
-      }
-    };
+    return new CachingDnsResolver(dnsCacheDurationMillis);
   }
 
   public CompletionStage<Void> init() {
@@ -88,18 +76,100 @@ public class ClientRoutesHandler implements AutoCloseable {
         "[{}] Initializing ClientRoutesHandler with {} endpoints",
         logPrefix,
         config.getEndpoints().size());
-    return queryAndResolveRoutes();
+    // Propagate failures so callers can detect unsupported servers or configuration problems.
+    return queryAndResolveRoutes(/* propagateErrors= */ true);
   }
 
   public CompletionStage<Void> refresh() {
     LOG.debug("[{}] Refreshing client routes", logPrefix);
-    return queryAndResolveRoutes();
+    // Refresh failures are non-fatal: log a warning and keep the previous route map.
+    return queryAndResolveRoutes(/* propagateErrors= */ false);
   }
 
-  private CompletionStage<Void> queryAndResolveRoutes() {
-    // TODO: Query system.client_routes table
-    // For now, return completed future
-    return CompletableFuture.completedFuture(null);
+  /**
+   * Queries the configured client-routes table and updates the in-memory route map.
+   *
+   * @param propagateErrors {@code true} to let query errors propagate to the caller (used during
+   *     {@link #init()} so session startup can detect missing tables); {@code false} to catch all
+   *     errors and log a warning (used during {@link #refresh()} where continuity matters more).
+   */
+  private CompletionStage<Void> queryAndResolveRoutes(boolean propagateErrors) {
+    DriverChannel channel = context.getControlConnection().channel();
+    if (channel == null) {
+      LOG.warn("[{}] Control connection channel is null, cannot query client routes", logPrefix);
+      return CompletableFuture.completedFuture(null);
+    }
+
+    List<ClientRoutesEndpoint> endpoints = config.getEndpoints();
+    if (endpoints.isEmpty()) {
+      LOG.warn("[{}] No endpoints configured for client routes", logPrefix);
+      return CompletableFuture.completedFuture(null);
+    }
+
+    // Build the IN clause with literal UUID values — AdminRequestHandler does not support
+    // List<UUID> as a named parameter, so we inline the values directly.
+    String connectionIdsCsv =
+        endpoints.stream()
+            .map(ep -> ep.getConnectionId().toString())
+            .collect(Collectors.joining(", "));
+    String query = String.format(SELECT_ROUTES_TEMPLATE, config.getTableName(), connectionIdsCsv);
+
+    Duration timeout =
+        context
+            .getConfig()
+            .getDefaultProfile()
+            .getDuration(DefaultDriverOption.CONTROL_CONNECTION_TIMEOUT);
+
+    try {
+      CompletionStage<Void> future =
+          AdminRequestHandler.query(channel, query, timeout, Integer.MAX_VALUE, logPrefix)
+              .start()
+              .thenAccept(
+                  adminResult -> {
+                    Map<UUID, ResolvedClientRoute> newRoutes = new ConcurrentHashMap<>();
+                    for (AdminRow row : adminResult) {
+                      if (row.isNull("host_id") || row.isNull("address") || row.isNull("port")) {
+                        LOG.warn("[{}] Skipping incomplete client_routes row: {}", logPrefix, row);
+                        continue;
+                      }
+                      UUID hostId = row.getUuid("host_id");
+                      String address = row.getString("address");
+                      Integer port = row.getInteger("port");
+                      Integer tlsPort =
+                          row.contains("tls_port") && !row.isNull("tls_port")
+                              ? row.getInteger("tls_port")
+                              : null;
+                      //noinspection DataFlowIssue
+                      newRoutes.put(
+                          hostId, new ResolvedClientRoute(hostId, address, port, tlsPort));
+                    }
+                    resolvedRoutesRef.set(newRoutes);
+                    LOG.debug(
+                        "[{}] Updated client routes: {} routes loaded",
+                        logPrefix,
+                        newRoutes.size());
+                  });
+
+      if (propagateErrors) {
+        // Let failures propagate so that init() callers (e.g. session startup) can detect
+        // missing tables or configuration problems rather than silently succeeding.
+        return future;
+      } else {
+        return future.exceptionally(
+            e -> {
+              LOG.warn("[{}] Failed to query client routes: {}", logPrefix, e.getMessage(), e);
+              return null;
+            });
+      }
+    } catch (Exception e) {
+      LOG.warn("[{}] Exception while querying client routes: {}", logPrefix, e.getMessage(), e);
+      if (propagateErrors) {
+        CompletableFuture<Void> failed = new CompletableFuture<>();
+        failed.completeExceptionally(e);
+        return failed;
+      }
+      return CompletableFuture.completedFuture(null);
+    }
   }
 
   @Nullable

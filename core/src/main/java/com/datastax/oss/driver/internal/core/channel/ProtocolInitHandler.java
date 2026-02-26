@@ -65,6 +65,7 @@ import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,10 +171,14 @@ class ProtocolInitHandler extends ConnectInitHandler {
     private Message request;
     private Authenticator authenticator;
     private ByteBuffer authResponseToken;
+    // Mutable copy of the event types to register; may be narrowed if the server rejects
+    // unsupported types (e.g. CLIENT_ROUTES_CHANGE on older ScyllaDB versions).
+    private final List<String> registerEventTypes;
 
     InitRequest(ChannelHandlerContext ctx) {
       super(ctx, timeoutMillis);
       this.step = querySupportedOptions ? Step.OPTIONS : Step.STARTUP;
+      this.registerEventTypes = new ArrayList<>(options.eventTypes);
     }
 
     @Override
@@ -200,7 +205,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
         case AUTH_RESPONSE:
           return request = new AuthResponse(authResponseToken);
         case REGISTER:
-          return request = new Register(options.eventTypes);
+          return request = new Register(registerEventTypes);
         default:
           throw new AssertionError("unhandled step: " + step);
       }
@@ -323,7 +328,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
             if (options.keyspace != null) {
               step = Step.SET_KEYSPACE;
               send();
-            } else if (!options.eventTypes.isEmpty()) {
+            } else if (!registerEventTypes.isEmpty()) {
               step = Step.REGISTER;
               send();
             } else {
@@ -331,7 +336,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
             }
           }
         } else if (step == Step.SET_KEYSPACE && response instanceof SetKeyspace) {
-          if (!options.eventTypes.isEmpty()) {
+          if (!registerEventTypes.isEmpty()) {
             step = Step.REGISTER;
             send();
           } else {
@@ -359,6 +364,33 @@ class ProtocolInitHandler extends ConnectInitHandler {
           } else if (step == Step.SET_KEYSPACE
               && error.code == ProtocolConstants.ErrorCode.INVALID) {
             fail(new InvalidKeyspaceException(error.message));
+          } else if (step == Step.REGISTER
+              && error.code == ErrorCode.PROTOCOL_ERROR
+              && error.message.contains(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE)) {
+            // The server rejected CLIENT_ROUTES_CHANGE as an unknown event type.
+            //
+            // This is expected on ScyllaDB versions older than 2025.4 (OSS) / 2025.4 (Enterprise),
+            // which do not implement the client_routes feature at the protocol level. The driver
+            // registers for this event only when ClientRoutesConfig is set, so this branch fires
+            // on any pre-2025.4 cluster that the user has (mis)configured with client routes.
+            //
+            // Behavior: strip CLIENT_ROUTES_CHANGE and retry REGISTER with the remaining event
+            // types (SCHEMA_CHANGE, STATUS_CHANGE, TOPOLOGY_CHANGE). The session connects
+            // successfully; client routes table queries may still work if the server exposes a
+            // compatible table, but live push-updates via this event will be absent.
+            LOG.warn(
+                "[{}] Server does not support {} event (requires ScyllaDB ≥ 2025.4);"
+                    + " retrying REGISTER without it — live client-route updates will be disabled",
+                logPrefix,
+                ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
+            registerEventTypes.remove(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
+            if (registerEventTypes.isEmpty()) {
+              // No event types left to register — proceed without event registration
+              setConnectSuccess();
+            } else {
+              // Retry REGISTER with the remaining event types
+              send();
+            }
           } else {
             failOnUnexpected(error);
           }

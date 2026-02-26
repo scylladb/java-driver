@@ -410,6 +410,7 @@ public class DefaultSession implements CqlSession {
       context
           .getTopologyMonitor()
           .init()
+          .thenCompose(v -> initClientRoutes())
           .thenCompose(v -> metadataManager.refreshNodes())
           .thenCompose(v -> checkProtocolVersion())
           .thenCompose(v -> initialSchemaRefresh())
@@ -431,6 +432,25 @@ public class DefaultSession implements CqlSession {
                             initFuture.completeExceptionally(error);
                           });
                 }
+              });
+    }
+
+    private CompletionStage<Void> initClientRoutes() {
+      ClientRoutesHandler handler = context.getClientRoutesHandler();
+      if (handler == null) {
+        return CompletableFuture.completedFuture(null);
+      }
+      return handler
+          .init()
+          .exceptionally(
+              e -> {
+                LOG.warn(
+                    "[{}] Failed to initialize client routes (table may not exist on this server "
+                        + "version — client-routes feature will be inactive): {}",
+                    logPrefix,
+                    e.getMessage(),
+                    e);
+                return null;
               });
     }
 

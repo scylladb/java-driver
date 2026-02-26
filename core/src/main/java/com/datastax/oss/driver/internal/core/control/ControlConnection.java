@@ -501,9 +501,23 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
 
       // Otherwise, perform a full refresh (we don't know how long we were disconnected)
       if (!isFirstConnection) {
-        context
-            .getMetadataManager()
-            .refreshNodes()
+        ClientRoutesHandler clientRoutesHandler = context.getClientRoutesHandler();
+        CompletionStage<Void> clientRoutesRefresh =
+            (clientRoutesHandler != null)
+                ? clientRoutesHandler
+                    .refresh()
+                    .exceptionally(
+                        e -> {
+                          LOG.warn(
+                              "[{}] Failed to refresh client routes after reconnection",
+                              logPrefix,
+                              e);
+                          return null;
+                        })
+                : CompletableFuture.completedFuture(null);
+
+        clientRoutesRefresh
+            .thenCompose(ignored -> context.getMetadataManager().refreshNodes())
             .whenComplete(
                 (result, error) -> {
                   if (error != null) {
@@ -629,7 +643,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     if (error instanceof AllNodesFailedException) {
       Collection<List<Throwable>> errors =
           ((AllNodesFailedException) error).getAllErrors().values();
-      if (errors.size() == 0) {
+      if (errors.isEmpty()) {
         return false;
       }
       for (List<Throwable> nodeErrors : errors) {
