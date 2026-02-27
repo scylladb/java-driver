@@ -122,14 +122,14 @@ retrieved from or sent by Cassandra nodes are.
 
 For cloud deployments using private endpoint services (such as AWS PrivateLink, Azure Private Link,
 or GCP Private Service Connect) or similar technologies (e.g., ScyllaDB Cloud), nodes are accessed
-through private DNS endpoints rather than direct IP addresses. The driver provides a client routes
-feature to handle this topology.
+through private DNS endpoints rather than direct IP addresses. The driver
+provides a built-in client routes feature that handles address translation automatically.
 
 Client routes configuration is done programmatically and is **mutually exclusive** with:
-- A custom `AddressTranslator` (if both are provided, client routes takes precedence)
-- Cloud secure connect bundles (if both are provided, the cloud bundle takes precedence)
+- A custom `AddressTranslator` (if both are provided, an `IllegalStateException` is thrown)
+- Cloud secure connect bundles (if both are provided, an `IllegalStateException` is thrown)
 
-Example configuration:
+#### Quick start
 
 ```java
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -137,33 +137,58 @@ import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.ClientRoutesEndpoint;
 import java.util.UUID;
 
-// Configure endpoints with connection IDs and addresses
 ClientRoutesConfig config = ClientRoutesConfig.builder()
     .addEndpoint(new ClientRoutesEndpoint(
         UUID.fromString("12345678-1234-1234-1234-123456789012"),
-        "my-cluster-endpoint.example.com:9042"))
+        "my-cluster-endpoint.example.com"))
     .build();
 
-// Build session - endpoints are automatically used as seed hosts
+// Contact points are seeded automatically from endpoint addresses.
 CqlSession session = CqlSession.builder()
     .withClientRoutesConfig(config)
     .withLocalDatacenter("datacenter1")
     .build();
 ```
 
-When client routes are configured:
-* The driver will use endpoint addresses as seed hosts if no explicit contact points are provided
-* Custom `AddressTranslator` configuration will be overridden by the client routes handler (a warning is logged); the default `PassThroughAddressTranslator` is used internally
-* Connection IDs map to the `system.client_routes` table entries
+#### How it works
 
-The system table name can be customized in the [configuration](../configuration/) (primarily for testing):
+1. **Startup** — after the control connection is established, the driver queries
+   `system.client_routes` (filtered to the configured `connection_id` values) and builds an
+   in-memory map of `host_id → (hostname, port, tls_port)`.
+2. **Translation** — every time the driver opens a connection to a peer node, it looks up the
+   node's `host_id` in the route map and resolves the associated DNS hostname. Contact points bypass
+   translation so the initial seed addresses are used as-is.
+3. **Event-driven updates** — the driver registers for `CLIENT_ROUTES_CHANGE` server events. When
+   one arrives, it re-queries the table and atomically swaps the route map.
+4. **Reconnect** — if the control connection is recreated the driver performs a full re-read of the
+   route table before refreshing node metadata.
 
+#### DNS caching
+
+DNS is resolved at connection time (not at route discovery time). The driver caches resolved
+addresses per hostname with a configurable TTL (default: **500 ms**):
+
+```java
+ClientRoutesConfig config = ClientRoutesConfig.builder()
+    .addEndpoint(...)
+    .withDnsCacheDuration(1_000) // milliseconds
+    .build();
 ```
-datastax-java-driver.advanced.client-routes.table-name = "system.client_routes"
-```
 
-**Note:** As of the current version, the client routes configuration API is available, but the full handler implementation
-(DNS resolution, address translation, event handling) is still under development.
+Additional properties of the DNS resolver:
+
+- **Per-hostname concurrency limit**: at most one in-flight DNS lookup per hostname; concurrent
+  callers wait and reuse the result.
+- **Last-known-good fallback**: if a DNS lookup fails, the resolver returns the last successfully
+  resolved address instead of throwing, so transient DNS hiccups do not cause connection failures.
+- **`clearCache()`**: called automatically on session close to free resources.
+
+#### Limitations
+
+- Requires ScyllaDB Enterprise ≥ 2026.1 with `system.client_routes` support
+  (scylladb/scylladb#27323). Not yet available on ScyllaDB OSS.
+- Not supported on Apache Cassandra.
+- Mutually exclusive with custom `AddressTranslator` and with cloud secure connect bundles.
 
 ### EC2 multi-region
 

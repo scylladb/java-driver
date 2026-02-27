@@ -19,6 +19,42 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.0
+
+#### PrivateLink support via client routes
+
+The driver now supports automatic address translation for ScyllaDB Cloud PrivateLink deployments
+through the new client routes feature. When enabled, the driver reads endpoint mappings from the
+`system.client_routes` system table and translates peer addresses transparently at connection time,
+with TTL-based DNS caching and automatic refresh on `CLIENT_ROUTES_CHANGE` events.
+
+Configure it programmatically on the session builder:
+
+```java
+ClientRoutesConfig config = ClientRoutesConfig.builder()
+    .addEndpoint(new ClientRoutesEndpoint(
+        UUID.fromString("<connection-id>"),
+        "my-cluster.region.provider.scylladb.com:9042"))
+    .withDnsCacheDuration(500) // optional, default 500 ms
+    .build();
+
+CqlSession session = CqlSession.builder()
+    .withClientRoutesConfig(config)
+    .withLocalDatacenter("datacenter1")
+    .build();
+```
+
+Key points:
+
+- **Contact points are seeded automatically** from the endpoint `connectionAddr` values when no
+  explicit contact points are configured.
+- **Mutually exclusive** with a custom `AddressTranslator` and with cloud secure connect bundles —
+  providing both throws `IllegalStateException` at session build time.
+- **Requires ScyllaDB Enterprise ≥ 2026.1** (scylladb/scylladb#27323). The feature is not
+  available on ScyllaDB OSS or Apache Cassandra.
+
+See [Address resolution — Client Routes](../manual/core/address_resolution/) for full details.
+
 ### 4.18.1
 
 #### Keystore reloading in DefaultSslEngineFactory

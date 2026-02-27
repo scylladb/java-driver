@@ -369,17 +369,18 @@ class ProtocolInitHandler extends ConnectInitHandler {
               && error.message.contains(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE)) {
             // The server rejected CLIENT_ROUTES_CHANGE as an unknown event type.
             //
-            // This is expected on ScyllaDB versions older than 2025.4 (OSS) / 2025.4 (Enterprise),
-            // which do not implement the client_routes feature at the protocol level. The driver
+            // This is expected on ScyllaDB versions that do not implement the client_routes feature
+            // at the protocol level (Enterprise < 2026.1; not yet available on OSS). The driver
             // registers for this event only when ClientRoutesConfig is set, so this branch fires
-            // on any pre-2025.4 cluster that the user has (mis)configured with client routes.
+            // on any pre-2026.1 Enterprise cluster that the user has (mis)configured with client
+            // routes.
             //
             // Behavior: strip CLIENT_ROUTES_CHANGE and retry REGISTER with the remaining event
             // types (SCHEMA_CHANGE, STATUS_CHANGE, TOPOLOGY_CHANGE). The session connects
             // successfully; client routes table queries may still work if the server exposes a
             // compatible table, but live push-updates via this event will be absent.
             LOG.warn(
-                "[{}] Server does not support {} event (requires ScyllaDB ≥ 2025.4);"
+                "[{}] Server does not support {} event (requires ScyllaDB Enterprise ≥ 2026.1);"
                     + " retrying REGISTER without it — live client-route updates will be disabled",
                 logPrefix,
                 ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
