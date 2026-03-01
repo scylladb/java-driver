@@ -53,7 +53,6 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
-import org.junit.experimental.categories.Category;
 import org.junit.rules.TestRule;
 
 // Do not run LWT tests in parallel because they may interfere. Tests operate on the same row.
