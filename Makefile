@@ -36,6 +36,9 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 .install-guava-shaded:
 	$(MVNCMD) install -pl guava-shaded
 
+.install-all-modules:
+	$(MVNCMD) install -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+
 .download-test-dependencies:
 	$(MVNCMD) test -Dtest=TestThatDoesNotExists -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
 
@@ -250,7 +253,7 @@ fix:
 test-unit: .install-guava-shaded
 	$(MVNCMD) test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
-test-integration-scylla: .install-guava-shaded .prepare-scylla-ccm resolve-scylla-version .prepare-environment-update-aio-max-nr
+test-integration-scylla: .install-all-modules .prepare-scylla-ccm resolve-scylla-version .prepare-environment-update-aio-max-nr
 	@if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]]; then
 		SCYLLA_VERSION_RESOLVED=`cat '${SCYLLA_VERSION_FILE}'`
 	fi
@@ -258,9 +261,9 @@ test-integration-scylla: .install-guava-shaded .prepare-scylla-ccm resolve-scyll
 		echo "ScyllaDB version ${SCYLLA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B -e verify -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
+	mvn -B -e verify -pl integration-tests -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
-test-integration-cassandra: .install-guava-shaded .prepare-scylla-ccm resolve-cassandra-version
+test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cassandra-version
 	@if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		CASSANDRA_VERSION_RESOLVED=`cat '${CASSANDRA_VERSION_FILE}'`
 	fi
@@ -268,7 +271,7 @@ test-integration-cassandra: .install-guava-shaded .prepare-scylla-ccm resolve-ca
 		echo "Cassandra version ${CASSANDRA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B -e verify -Dccm.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
+	mvn -B -e verify -pl integration-tests -Dccm.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
 check-no-compile-warnings:
 	@$(MAKE) compile-all | grep WARNING >/tmp/all-compile-warnings.log || true
