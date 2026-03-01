@@ -34,14 +34,11 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.TypedDriverOption;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
-import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.core.cql.SimpleStatementBuilder;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultProgrammaticDriverConfigLoaderBuilder;
 import java.net.InetSocketAddress;
-import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -231,30 +228,7 @@ public class MockResolverIT {
       ccmBridge.create();
       ccmBridge.start();
       session = builder.build();
-      long endTime = System.currentTimeMillis() + CLUSTER_WAIT_SECONDS * 1000;
-      while (System.currentTimeMillis() < endTime) {
-        try {
-          nodes = session.getMetadata().getNodes().values();
-          int upNodes = 0;
-          for (Node node : nodes) {
-            if (node.getUpSinceMillis() > 0) {
-              upNodes++;
-            }
-          }
-          if (upNodes == 3) {
-            break;
-          }
-          // session.refreshSchema();
-          SimpleStatement statement =
-              new SimpleStatementBuilder("select * from system.local where key='local'")
-                  .setTimeout(Duration.ofSeconds(3))
-                  .build();
-          session.executeAsync(statement);
-          Thread.sleep(3000);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
+      waitForAllNodesUp(session, 3);
       ResultSet rs = session.execute("select * from system.local where key='local'");
       assertThat(rs).isNotNull();
       Row row = rs.one();
@@ -291,29 +265,7 @@ public class MockResolverIT {
             "test.cluster.fake", ccmBridge.getNodeIpAddress(3));
         ccmBridge.create();
         ccmBridge.start();
-        long endTime = System.currentTimeMillis() + CLUSTER_WAIT_SECONDS * 1000;
-        while (System.currentTimeMillis() < endTime) {
-          try {
-            nodes = session.getMetadata().getNodes().values();
-            int upNodes = 0;
-            for (Node node : nodes) {
-              if (node.getUpSinceMillis() > 0) {
-                upNodes++;
-              }
-            }
-            if (upNodes == 3) {
-              break;
-            }
-            SimpleStatement statement =
-                new SimpleStatementBuilder("select * from system.local where key='local'")
-                    .setTimeout(Duration.ofSeconds(3))
-                    .build();
-            session.executeAsync(statement);
-            Thread.sleep(3000);
-          } catch (InterruptedException e) {
-            break;
-          }
-        }
+        waitForAllNodesUp(session, 3);
         nodes = session.getMetadata().getNodes().values();
         assertThat(nodes).hasSize(3);
         Iterator<Node> iterator = nodes.iterator();
@@ -346,30 +298,7 @@ public class MockResolverIT {
       // Now the driver should fail to reconnect since unresolved hostname is gone.
       ccmBridge.create();
       ccmBridge.start();
-      long endTime = System.currentTimeMillis() + CLUSTER_WAIT_SECONDS * 1000;
-      while (System.currentTimeMillis() < endTime) {
-        try {
-          nodes = session.getMetadata().getNodes().values();
-          int upNodes = 0;
-          for (Node node : nodes) {
-            if (node.getUpSinceMillis() > 0) {
-              upNodes++;
-            }
-          }
-          if (upNodes == 3) {
-            break;
-          }
-          // session.refreshSchema();
-          SimpleStatement statement =
-              new SimpleStatementBuilder("select * from system.local where key='local'")
-                  .setTimeout(Duration.ofSeconds(3))
-                  .build();
-          session.executeAsync(statement);
-          Thread.sleep(3000);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
+      waitForAllNodesUp(session, 3);
       session.execute("select * from system.local where key='local'");
     }
     session.close();
