@@ -38,6 +38,7 @@
     <skipParallelizableITs>${skipITs}</skipParallelizableITs>
     <skipSerialITs>${skipITs}</skipSerialITs>
     <skipIsolatedITs>${skipITs}</skipIsolatedITs>
+    <test.parallel.threads>8</test.parallel.threads>
   </properties>
   <dependencies>
     <dependency>
@@ -238,7 +239,7 @@
               <jvm>${testing.jvm}/bin/java</jvm>
               <groups>com.datastax.oss.driver.categories.ParallelizableTests</groups>
               <parallel>classes</parallel>
-              <threadCountClasses>8</threadCountClasses>
+              <threadCountClasses>${test.parallel.threads}</threadCountClasses>
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-parallelized.xml</summaryFile>
               <skipITs>${skipParallelizableITs}</skipITs>
               <argLine>${blockhound.argline}</argLine>
