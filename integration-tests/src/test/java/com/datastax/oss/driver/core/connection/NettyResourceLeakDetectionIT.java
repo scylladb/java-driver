@@ -31,13 +31,13 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
-import com.datastax.oss.driver.categories.ParallelizableTests;
+import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.shaded.guava.common.base.Strings;
 import com.datastax.oss.protocol.internal.Segment;
 import com.datastax.oss.protocol.internal.util.Bytes;
@@ -59,7 +59,7 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 import org.slf4j.LoggerFactory;
 
-@Category(ParallelizableTests.class)
+@Category(IsolatedTests.class)
 @RunWith(MockitoJUnitRunner.class)
 public class NettyResourceLeakDetectionIT {
 
@@ -67,7 +67,7 @@ public class NettyResourceLeakDetectionIT {
     ResourceLeakDetector.setLevel(Level.PARANOID);
   }
 
-  private static final CcmRule CCM_RULE = CcmRule.getInstance();
+  private static final CustomCcmRule CCM_RULE = CustomCcmRule.builder().build();
 
   private static final SessionRule<CqlSession> SESSION_RULE = SessionRule.builder(CCM_RULE).build();
 
