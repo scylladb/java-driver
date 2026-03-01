@@ -21,10 +21,14 @@ import java.util.concurrent.Semaphore;
 
 /**
  * Running multiple parallel integration tests may fail due to query timeout when trying to apply
- * several schema changes at once. Limit concurrently executed DDLs to 5.
+ * several schema changes at once. Limits concurrently executed DDLs via a configurable semaphore.
+ *
+ * <p>The permit count defaults to 5 and can be overridden with the system property {@code
+ * test.max.concurrent.ddl}.
  */
 public class SchemaChangeSynchronizer {
-  private static final Semaphore lock = new Semaphore(5);
+  private static final int MAX_CONCURRENT_DDL = Integer.getInteger("test.max.concurrent.ddl", 5);
+  private static final Semaphore lock = new Semaphore(MAX_CONCURRENT_DDL);
 
   public static void withLock(Runnable callback) {
     try {
