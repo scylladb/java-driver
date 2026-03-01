@@ -28,11 +28,11 @@ import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
-import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
-import com.datastax.oss.driver.categories.IsolatedTests;
+import com.datastax.oss.driver.categories.ParallelizableTests;
 import java.time.Duration;
 import org.junit.Assume;
 import org.junit.BeforeClass;
@@ -42,7 +42,7 @@ import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
-@Category(IsolatedTests.class)
+@Category(ParallelizableTests.class)
 public class HeapCompressionIT {
 
   static {
@@ -50,7 +50,7 @@ public class HeapCompressionIT {
     System.setProperty("io.netty.noUnsafe", "true");
   }
 
-  private static final CustomCcmRule CCM_RULE = CustomCcmRule.builder().build();
+  private static final CcmRule CCM_RULE = CcmRule.getInstance();
 
   private static final SessionRule<CqlSession> SCHEMA_SESSION_RULE =
       SessionRule.builder(CCM_RULE)
