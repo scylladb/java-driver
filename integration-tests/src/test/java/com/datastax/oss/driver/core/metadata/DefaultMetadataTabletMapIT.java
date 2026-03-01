@@ -1,5 +1,7 @@
 package com.datastax.oss.driver.core.metadata;
 
+import static org.awaitility.Awaitility.await;
+
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -28,6 +30,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -340,16 +343,15 @@ public class DefaultMetadataTabletMapIT {
   }
 
   private static boolean waitSessionLearnedTabletInfo(CqlSession session) {
-    if (isSessionLearnedTabletInfo(session)) {
-      return true;
-    }
-    // Wait till tablet update, which is async, is completed
     try {
-      Thread.sleep(200);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofMillis(50))
+          .until(() -> isSessionLearnedTabletInfo(session));
+      return true;
+    } catch (ConditionTimeoutException e) {
+      return false;
     }
-    return isSessionLearnedTabletInfo(session);
   }
 
   private static boolean checkIfRoutedProperly(CqlSession session, Statement stmt) {
