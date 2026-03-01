@@ -38,10 +38,11 @@ import com.datastax.oss.driver.api.mapper.annotations.Insert;
 import com.datastax.oss.driver.api.mapper.annotations.Mapper;
 import com.datastax.oss.driver.api.mapper.annotations.Select;
 import com.datastax.oss.driver.api.mapper.entity.saving.NullSavingStrategy;
-import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
+import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -51,9 +52,11 @@ import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.TestRule;
 
 // Do not run LWT tests in parallel because they may interfere. Tests operate on the same row.
+@Category(ParallelizableTests.class)
 @BackendRequirement(
     type = BackendType.CASSANDRA,
     minInclusive = "3.0",
@@ -61,7 +64,7 @@ import org.junit.rules.TestRule;
 @BackendRequirement(type = BackendType.SCYLLA)
 public class DeleteIT extends InventoryITBase {
 
-  private static CustomCcmRule CCM_RULE = CustomCcmRule.builder().build();
+  private static CcmRule CCM_RULE = CcmRule.getInstance();
 
   private static final SessionRule<CqlSession> SESSION_RULE = SessionRule.builder(CCM_RULE).build();
 
