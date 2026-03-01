@@ -38,7 +38,7 @@
     <skipParallelizableITs>${skipITs}</skipParallelizableITs>
     <skipSerialITs>${skipITs}</skipSerialITs>
     <skipIsolatedITs>${skipITs}</skipIsolatedITs>
-    <test.parallel.threads>8</test.parallel.threads>
+    <test.parallel.threads>16</test.parallel.threads>
   </properties>
   <dependencies>
     <dependency>
