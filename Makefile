@@ -240,7 +240,8 @@ release-dry-run: .require-release-env
 	$(MVNCMD) release:perform > >(tee /tmp/java-driver-release-logs/stdout.log) 2> >(tee /tmp/java-driver-release-logs/stderr.log)
 
 compile-all: .install-guava-shaded
-	mvn -B -T $(MAVEN_PARALLEL_THREADS) install -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	mvn -B -T $(MAVEN_PARALLEL_THREADS) install -pl '!examples' -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	mvn -B compile test-compile -pl examples -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
 check:
 	$(MVNCMD) verify -DskipTests
