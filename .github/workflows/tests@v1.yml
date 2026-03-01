@@ -181,6 +181,7 @@ jobs:
       matrix:
         cassandra-version: [3-LATEST, 4-LATEST]
         java-version: [8]
+        test-group: [parallelizable, serial, isolated]
       fail-fast: false
 
     steps:
@@ -233,38 +234,48 @@ jobs:
           path: ~/.ccm/repository
           key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
 
-      - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }})
+      - name: Determine test skip args
+        id: test-skip-args
+        run: |
+          case "${{ matrix.test-group }}" in
+            parallelizable) echo "value=-DskipSerialITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            serial)         echo "value=-DskipParallelizableITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            isolated)       echo "value=-DskipParallelizableITs=true -DskipSerialITs=true" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }}) - ${{ matrix.test-group }}
         id: run-integration-tests
         env:
           CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+          MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
         run: make test-integration-cassandra
 
       - name: Copy test results
         if: steps.run-integration-tests.outcome == 'failure'
         run: |
           shopt -s globstar
-          mkdir cassandra-${{ matrix.cassandra-version }}
-          cp --parents ./**/target/*-reports/*.xml cassandra-${{ matrix.cassandra-version }}/
+          mkdir cassandra-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
+          cp --parents ./**/target/*-reports/*.xml cassandra-${{ matrix.cassandra-version }}-${{ matrix.test-group }}/
 
       - name: Upload test results
         if: steps.run-integration-tests.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.java-version }}-${{ matrix.cassandra-version }}
+          name: test-results-${{ matrix.java-version }}-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ccm-log-cassandra-${{ matrix.java-version }}-${{ matrix.cassandra-version }}
+          name: ccm-log-cassandra-${{ matrix.java-version }}-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
           path: /tmp/ccm*/ccm*/node*/logs/*
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@v5
         if: always()
         with:
-          check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }}
+          check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }} (${{ matrix.test-group }})
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true
@@ -282,6 +293,7 @@ jobs:
       matrix:
         scylla-version: [LTS-LATEST, LTS-PRIOR, LATEST]
         java-version: [8]
+        test-group: [parallelizable, serial, isolated]
       fail-fast: false
 
     steps:
@@ -332,38 +344,48 @@ jobs:
           path: ~/.ccm/scylla-repository
           key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
 
-      - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
+      - name: Determine test skip args
+        id: test-skip-args
+        run: |
+          case "${{ matrix.test-group }}" in
+            parallelizable) echo "value=-DskipSerialITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            serial)         echo "value=-DskipParallelizableITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            isolated)       echo "value=-DskipParallelizableITs=true -DskipSerialITs=true" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }}) - ${{ matrix.test-group }}
         id: run-integration-tests
         env:
           SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
+          MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
         run: make test-integration-scylla
 
       - name: Copy test results
         if: steps.run-integration-tests.outcome == 'failure'
         run: |
           shopt -s globstar
-          mkdir scylla-${{ matrix.scylla-version }}
-          cp --parents ./**/target/*-reports/*.xml scylla-${{ matrix.scylla-version }}/
+          mkdir scylla-${{ matrix.scylla-version }}-${{ matrix.test-group }}
+          cp --parents ./**/target/*-reports/*.xml scylla-${{ matrix.scylla-version }}-${{ matrix.test-group }}/
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: steps.run-integration-tests.outcome == 'failure'
         with:
-          name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}
+          name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}-${{ matrix.test-group }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ccm-log-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}
+          name: ccm-log-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}-${{ matrix.test-group }}
           path: /tmp/ccm*/ccm*/node*/logs/*
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@v5
         if: always()
         with:
-          check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }}
+          check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }} (${{ matrix.test-group }})
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true
