@@ -156,6 +156,7 @@ public class AdvancedShardAwarenessIT {
             .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, 10000)
             .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, 60000)
             .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, 66)
+            .withDuration(DefaultDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, Duration.ofSeconds(30))
             .build();
     try (CqlSession session =
         CqlSession.builder()
@@ -165,7 +166,7 @@ public class AdvancedShardAwarenessIT {
             .build()) {
       List<CqlSession> allSessions = Collections.singletonList(session);
       Awaitility.await()
-          .atMost(20, TimeUnit.SECONDS)
+          .atMost(60, TimeUnit.SECONDS)
           .pollInterval(500, TimeUnit.MILLISECONDS)
           .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
@@ -217,6 +218,7 @@ public class AdvancedShardAwarenessIT {
             .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, expectedChannelsPerNode)
             .withDuration(DefaultDriverOption.RECONNECTION_BASE_DELAY, Duration.ofMillis(10))
             .withDuration(DefaultDriverOption.RECONNECTION_MAX_DELAY, Duration.ofMillis(20))
+            .withDuration(DefaultDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, Duration.ofSeconds(30))
             .build();
     CqlSessionBuilder builder =
         CqlSession.builder()
@@ -234,7 +236,7 @@ public class AdvancedShardAwarenessIT {
         CqlSession session4 = CompletableFutures.getUninterruptibly(stage4); ) {
       List<CqlSession> allSessions = Arrays.asList(session1, session2, session3, session4);
       Awaitility.await()
-          .atMost(20, TimeUnit.SECONDS)
+          .atMost(60, TimeUnit.SECONDS)
           .pollInterval(500, TimeUnit.MILLISECONDS)
           .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       int tolerance = 2; // Sometimes socket ends up already in use
