@@ -22,12 +22,15 @@ import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
+import com.datastax.oss.driver.categories.ParallelizableTests;
 import org.assertj.core.util.Lists;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
+import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
+@Category(ParallelizableTests.class)
 @BackendRequirement(type = BackendType.DSE, minInclusive = "5.0")
 public class PointIT extends GeometryIT<Point> {
 
