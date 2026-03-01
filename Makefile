@@ -12,6 +12,7 @@ CCM_SCYLLA_REPO ?= github.com/scylladb/scylla-ccm
 CCM_SCYLLA_VERSION ?= master
 
 SCYLLA_EXT_OPTS ?= --smp=2 --memory=4G
+MAVEN_PARALLEL_THREADS ?= 1C
 MVNCMD ?= mvn -B -X -ntp
 
 GET_VERSION_VERSION ?= 0.4.3
@@ -239,7 +240,7 @@ release-dry-run: .require-release-env
 	$(MVNCMD) release:perform > >(tee /tmp/java-driver-release-logs/stdout.log) 2> >(tee /tmp/java-driver-release-logs/stderr.log)
 
 compile-all: .install-guava-shaded
-	mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	mvn -B -T $(MAVEN_PARALLEL_THREADS) install -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
 check:
 	$(MVNCMD) verify -DskipTests
