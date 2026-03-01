@@ -25,7 +25,11 @@ import com.google.common.collect.ImmutableSet;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,8 +43,11 @@ import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.TestWatcher;
+import org.junit.runner.Description;
 import org.junit.runner.RunWith;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +71,19 @@ public class AdvancedShardAwarenessIT {
       Pattern.compile(".*r configuration of shard aware port.*");
   private final Pattern generalReconnectionPattern =
       Pattern.compile(".*Scheduling next reconnection in.*");
+
+  private static final org.slf4j.Logger LOG =
+      LoggerFactory.getLogger(AdvancedShardAwarenessIT.class);
+
+  @Rule
+  public TestWatcher logDumper =
+      new TestWatcher() {
+        @Override
+        protected void failed(Throwable e, Description description) {
+          dumpDriverLogs(description.getMethodName());
+          dumpScyllaLogs(description.getMethodName());
+        }
+      };
 
   @DataProvider
   public static Object[][] reuseAddressOption() {
@@ -357,5 +377,57 @@ public class AdvancedShardAwarenessIT {
         }
       }
     }
+  }
+
+  private void dumpDriverLogs(String testName) {
+    LOG.error("=== BEGIN DRIVER LOGS for {} ===", testName);
+    if (appender != null && appender.list != null) {
+      for (ILoggingEvent event : appender.list) {
+        LOG.error(
+            "[{}] {} {}", event.getLevel(), event.getLoggerName(), event.getFormattedMessage());
+      }
+    }
+    LOG.error(
+        "=== END DRIVER LOGS for {} ({} entries) ===",
+        testName,
+        appender != null && appender.list != null ? appender.list.size() : 0);
+  }
+
+  private void dumpScyllaLogs(String testName) {
+    Path configDir = CCM_RULE.getCcmBridge().getConfigDirectory();
+    LOG.error("=== BEGIN SCYLLA LOGS for {} (ccm dir: {}) ===", testName, configDir);
+    try (DirectoryStream<Path> clusters = Files.newDirectoryStream(configDir)) {
+      for (Path cluster : clusters) {
+        if (!Files.isDirectory(cluster)) continue;
+        try (DirectoryStream<Path> nodes = Files.newDirectoryStream(cluster, "node*")) {
+          for (Path node : nodes) {
+            Path logsDir = node.resolve("logs");
+            if (!Files.isDirectory(logsDir)) continue;
+            try (DirectoryStream<Path> logFiles = Files.newDirectoryStream(logsDir)) {
+              for (Path logFile : logFiles) {
+                if (!Files.isRegularFile(logFile)) continue;
+                LOG.error("--- {} ---", logFile);
+                try {
+                  List<String> lines = Files.readAllLines(logFile);
+                  // Print last 200 lines to avoid flooding
+                  int start = Math.max(0, lines.size() - 200);
+                  if (start > 0) {
+                    LOG.error("... ({} lines skipped, showing last 200) ...", start);
+                  }
+                  for (int i = start; i < lines.size(); i++) {
+                    LOG.error("{}", lines.get(i));
+                  }
+                } catch (IOException readEx) {
+                  LOG.error("Failed to read log file {}: {}", logFile, readEx.getMessage());
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (IOException ex) {
+      LOG.error("Failed to read CCM logs from {}: {}", configDir, ex.getMessage());
+    }
+    LOG.error("=== END SCYLLA LOGS for {} ===", testName);
   }
 }
