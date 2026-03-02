@@ -81,7 +81,7 @@ jobs:
         if: steps.java-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: ${{ steps.java-cache.outputs.cache-primary-key }}
 
       - name: Upload build targets
         uses: actions/upload-artifact@v4
