@@ -27,77 +27,126 @@ on:
       - ".gitignore"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: write
+
+env:
+  CI: true
+
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    strategy:
-      matrix:
-        java-version: [8]
-      fail-fast: false
+    env:
+      JAVA_VERSION: '8'
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
 
-      - name: Set up JDK ${{ matrix.java-version }}
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java-version }}
+          java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
-
-      - name: Get POM hash
-        id: get-pom-hash
-        run: echo "value=${{ hashFiles('**/pom.xml') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
+          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
-      - name: Compile source and tests
-        run: make compile-all
+      - name: Create settings-security.xml
+        run: echo '<settingsSecurity/>' > ~/.m2/settings-security.xml
+
+      - name: Install all modules
+        run: make install-all
+        env:
+          MAVEN_OFFLINE_FLAG: ''
 
       - name: Download test dependencies
         if: steps.java-cache.outputs.cache-hit != 'true'
         run: make download-all-dependencies
+        env:
+          MAVEN_OFFLINE_FLAG: '' # Override CI offline mode to allow fetching dependencies
 
       - name: Save maven repository cache
         uses: actions/cache/save@v4
         if: steps.java-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
+          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Upload build targets
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-targets
+          path: |
+            */target/
+            */*/target/
+          retention-days: 3
+
+      - name: Upload scylladb JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: scylladb-jars
+          path: ~/.m2/repository/com/scylladb/
+          retention-days: 3
 
   verify:
     name: Full verify
     runs-on: ubuntu-latest
+    needs: [build]
     timeout-minutes: 10
 
-    strategy:
-      matrix:
-        java-version: [8]
-      fail-fast: false
+    env:
+      JAVA_VERSION: '8'
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
 
-      - name: Set up JDK ${{ matrix.java-version }}
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java-version }}
+          java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
+        id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Verify maven cache was restored
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
+          exit 1
+
+      - name: Download build targets
+        uses: actions/download-artifact@v4
+        with:
+          name: build-targets
+
+      - name: Download scylladb JARs
+        uses: actions/download-artifact@v4
+        with:
+          name: scylladb-jars
+          path: ~/.m2/repository/com/scylladb/
+
+      - name: Touch build targets to prevent recompilation
+        run: find . -path '*/target/*' -type f -exec touch {} +
+
+      - name: Create settings-security.xml
+        run: echo '<settingsSecurity/>' > ~/.m2/settings-security.xml
 
       - name: Full verify
         run: make check
@@ -105,28 +154,51 @@ jobs:
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
+    needs: [build]
     timeout-minutes: 10
 
-    strategy:
-      matrix:
-        java-version: [8]
-      fail-fast: false
+    env:
+      JAVA_VERSION: '8'
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
 
-      - name: Set up JDK 8
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v5
         with:
-          java-version: ${{ matrix.java-version }}
+          java-version: ${{ env.JAVA_VERSION }}
           distribution: 'temurin'
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
+        id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Verify maven cache was restored
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
+          exit 1
+
+      - name: Download build targets
+        uses: actions/download-artifact@v4
+        with:
+          name: build-targets
+
+      - name: Download scylladb JARs
+        uses: actions/download-artifact@v4
+        with:
+          name: scylladb-jars
+          path: ~/.m2/repository/com/scylladb/
+
+      - name: Touch build targets to prevent recompilation
+        run: find . -path '*/target/*' -type f -exec touch {} +
+
+      - name: Create settings-security.xml
+        run: echo '<settingsSecurity/>' > ~/.m2/settings-security.xml
 
       - name: Run unit tests
         run: make test-unit
@@ -135,8 +207,8 @@ jobs:
         if: always()
         run: |
           shopt -s globstar
-          mkdir unit
-          cp --parents ./**/target/*-reports/*.xml unit/
+          mkdir -p unit
+          cp --parents ./**/target/*-reports/*.xml unit/ || true
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -157,24 +229,10 @@ jobs:
           updateComment: false
           skip_annotations: true
 
-  setup-integration-tests:
-    name: Setup ITs
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v5
-
-      - name: Setup Python 3
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-
   cassandra-integration-tests:
     name: Cassandra ITs
     runs-on: ubuntu-latest
-    needs: [setup-integration-tests]
+    needs: [build]
     timeout-minutes: 90
 
     strategy:
@@ -196,9 +254,33 @@ jobs:
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
+        id: java-cache
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Verify maven cache was restored
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
+          exit 1
+
+      - name: Download build targets
+        uses: actions/download-artifact@v4
+        with:
+          name: build-targets
+
+      - name: Download scylladb JARs
+        uses: actions/download-artifact@v4
+        with:
+          name: scylladb-jars
+          path: ~/.m2/repository/com/scylladb/
+
+      - name: Touch build targets to prevent recompilation
+        run: find . -path '*/target/*' -type f -exec touch {} +
+
+      - name: Create settings-security.xml
+        run: echo '<settingsSecurity/>' > ~/.m2/settings-security.xml
 
       - name: Setup Python 3
         uses: actions/setup-python@v6
@@ -273,7 +355,7 @@ jobs:
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@v5
-        if: always()
+        if: steps.run-integration-tests.outcome != 'skipped'
         with:
           check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }} (${{ matrix.test-group }})
           require_tests: true
@@ -286,7 +368,7 @@ jobs:
   scylla-integration-tests:
     name: Scylla ITs
     runs-on: ubuntu-latest
-    needs: [setup-integration-tests]
+    needs: [build]
     timeout-minutes: 90
 
     strategy:
@@ -308,9 +390,33 @@ jobs:
 
       - name: Restore maven repository cache
         uses: actions/cache/restore@v4
+        id: java-cache
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Verify maven cache was restored
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
+          exit 1
+
+      - name: Download build targets
+        uses: actions/download-artifact@v4
+        with:
+          name: build-targets
+
+      - name: Download scylladb JARs
+        uses: actions/download-artifact@v4
+        with:
+          name: scylladb-jars
+          path: ~/.m2/repository/com/scylladb/
+
+      - name: Touch build targets to prevent recompilation
+        run: find . -path '*/target/*' -type f -exec touch {} +
+
+      - name: Create settings-security.xml
+        run: echo '<settingsSecurity/>' > ~/.m2/settings-security.xml
 
       - name: Setup Python 3
         uses: actions/setup-python@v6
@@ -322,6 +428,8 @@ jobs:
 
       - name: Get scylla version
         id: scylla-version
+        env:
+          SCYLLA_VERSION: ${{ matrix.scylla-version }}
         run: make resolve-scylla-version
 
       - name: Pull CCM image from the cache
@@ -383,7 +491,7 @@ jobs:
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@v5
-        if: always()
+        if: steps.run-integration-tests.outcome != 'skipped'
         with:
           check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }} (${{ matrix.test-group }})
           require_tests: true
