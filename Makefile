@@ -57,7 +57,7 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 	$(MVNCMD) install -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
 .download-test-dependencies:
-	$(MVNCMD) test -Dtest=TestThatDoesNotExists -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
+	$(MVNCMD) dependency:go-offline -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
 
 .download-verify-dependencies:
 	$(MVNCMD) verify -DskipTests || true
