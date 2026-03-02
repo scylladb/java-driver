@@ -99,6 +99,7 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 
 install-cassandra-ccm:
 	@echo "Install CCM ${CCM_CASSANDRA_VERSION}"
+	pip install setuptools
 	pip install "git+https://${CCM_CASSANDRA_REPO}.git@${CCM_CASSANDRA_VERSION}"
 	mkdir ${CCM_CONFIG_DIR} 2>/dev/null || true
 	echo CASSANDRA > ${CCM_CONFIG_DIR}/ccm-type
