@@ -322,6 +322,8 @@ jobs:
 
       - name: Get scylla version
         id: scylla-version
+        env:
+          SCYLLA_VERSION: ${{ matrix.scylla-version }}
         run: make resolve-scylla-version
 
       - name: Pull CCM image from the cache

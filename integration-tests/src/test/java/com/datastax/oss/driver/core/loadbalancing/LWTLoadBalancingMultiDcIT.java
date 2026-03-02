@@ -85,7 +85,7 @@ public class LWTLoadBalancingMultiDcIT {
     // Create multi-DC keyspace and table similarly to DefaultLoadBalancingPolicyIT.
     if (CcmBridge.isDistributionOf(BackendType.SCYLLA)
         && ((CcmBridge.SCYLLA_ENTERPRISE
-                && CcmBridge.getDistributionVersion().compareTo(Version.parse("2023.1.0")) >= 0)
+                && CcmBridge.getDistributionVersion().compareTo(Version.parse("2024.2.0")) >= 0)
             || (!CcmBridge.SCYLLA_ENTERPRISE
                 && CcmBridge.getDistributionVersion().compareTo(Version.parse("6.1.0")) >= 0))) {
       session.execute(
