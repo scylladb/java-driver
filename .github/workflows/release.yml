@@ -33,10 +33,10 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
-      - name: Checkout Code One Commit Before ${{ inputs.version_tag }}
+      - name: Checkout Code One Commit Before ${{ inputs.target-tag }}
         if: inputs.target-tag != 'scylla-4.x'
         env:
-          RELEASE_TARGET_TAG: ${{ inputs.version_tag }}
+          RELEASE_TARGET_TAG: ${{ inputs.target-tag }}
         run: make checkout-one-commit-before
 
       - name: Set up Java
