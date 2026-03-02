@@ -320,6 +320,9 @@ jobs:
           path: ~/.ccm/repository
           key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
 
+      - name: Install Scylla CCM for running Cassandra
+        run: make install-scylla-ccm
+
       - name: Determine test skip args
         id: test-skip-args
         run: |
