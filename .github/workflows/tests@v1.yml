@@ -58,9 +58,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v3-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
+            v3-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Create settings-security.xml
         run: echo '<settingsSecurity/>' > ~/.m2/settings-security.xml
@@ -121,9 +121,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v3-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
+            v3-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''
@@ -175,9 +175,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v3-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
+            v3-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''
@@ -259,9 +259,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: v2-${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v3-${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            v2-${{ runner.os }}-${{ matrix.java-version }}-maven-
+            v3-${{ runner.os }}-${{ matrix.java-version }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''
@@ -397,9 +397,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: v2-${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v3-${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            v2-${{ runner.os }}-${{ matrix.java-version }}-maven-
+            v3-${{ runner.os }}-${{ matrix.java-version }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''

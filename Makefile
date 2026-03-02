@@ -56,8 +56,14 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 .install-all-modules:
 	$(MVNCMD) install -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
+# dependency:go-offline doesn't resolve surefire providers (surefire-junit4, surefire-testng)
+# because they are lazy-loaded at test runtime. We explicitly download them for offline mode.
+SUREFIRE_VERSION := $(shell grep '<surefire.version>' pom.xml | sed 's/.*<surefire.version>\(.*\)<\/surefire.version>.*/\1/')
 .download-test-dependencies:
 	$(MVNCMD) dependency:go-offline -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
+	$(MVNCMD) dependency:get -Dartifact=org.apache.maven.surefire:surefire-junit4:$(SUREFIRE_VERSION) -Dtransitive=true || true
+	$(MVNCMD) dependency:get -Dartifact=org.apache.maven.surefire:surefire-junit47:$(SUREFIRE_VERSION) -Dtransitive=true || true
+	$(MVNCMD) dependency:get -Dartifact=org.apache.maven.surefire:surefire-testng:$(SUREFIRE_VERSION) -Dtransitive=true || true
 
 .download-verify-dependencies:
 	$(MVNCMD) verify -DskipTests || true
@@ -99,7 +105,7 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 
 install-cassandra-ccm:
 	@echo "Install CCM ${CCM_CASSANDRA_VERSION}"
-	pip install "setuptools<82"
+	pip install "setuptools<81"
 	pip install "git+https://${CCM_CASSANDRA_REPO}.git@${CCM_CASSANDRA_VERSION}"
 	mkdir ${CCM_CONFIG_DIR} 2>/dev/null || true
 	echo CASSANDRA > ${CCM_CONFIG_DIR}/ccm-type
