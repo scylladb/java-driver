@@ -21,12 +21,14 @@ MAVEN_OFFLINE_FLAG ?= -o
 MAVEN_DEBUG_FLAG :=
 GUAVA_SHADED_DEP :=
 INSTALL_ALL_DEP :=
+PREPARE_CCM_DEP :=
 MAVEN_IT_PL_ARGS ?= -pl integration-tests
 else
 MAVEN_OFFLINE_FLAG ?=
 MAVEN_DEBUG_FLAG = -X
 GUAVA_SHADED_DEP := .install-guava-shaded
 INSTALL_ALL_DEP := .install-all-modules
+PREPARE_CCM_DEP = .prepare-cassandra-ccm
 MAVEN_IT_PL_ARGS ?=
 endif
 MVNCMD ?= mvn -B $(MAVEN_DEBUG_FLAG) $(MAVEN_OFFLINE_FLAG) -ntp
@@ -195,7 +197,7 @@ checkout-one-commit-before:
 		git tag -d ${RELEASE_TARGET_TAG}
 	fi
 
-download-cassandra: .prepare-cassandra-ccm resolve-cassandra-version
+download-cassandra: $(PREPARE_CCM_DEP) resolve-cassandra-version
 	@if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		CASSANDRA_VERSION_RESOLVED=$$(cat '${CASSANDRA_VERSION_FILE}')
 	fi
@@ -293,7 +295,7 @@ test-integration-scylla: $(INSTALL_ALL_DEP) .prepare-scylla-ccm resolve-scylla-v
 	fi
 	$(MVNCMD) -e verify $(MAVEN_IT_PL_ARGS) -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
-test-integration-cassandra: $(INSTALL_ALL_DEP) .prepare-cassandra-ccm resolve-cassandra-version
+test-integration-cassandra: $(INSTALL_ALL_DEP) $(PREPARE_CCM_DEP) resolve-cassandra-version
 	@if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		CASSANDRA_VERSION_RESOLVED=`cat '${CASSANDRA_VERSION_FILE}'`
 	fi
