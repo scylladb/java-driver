@@ -58,9 +58,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
+            v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Create settings-security.xml
         run: echo '<settingsSecurity/>' > ~/.m2/settings-security.xml
@@ -71,14 +71,12 @@ jobs:
           MAVEN_OFFLINE_FLAG: ''
 
       - name: Download test dependencies
-        if: steps.java-cache.outputs.cache-hit != 'true'
         run: make download-all-dependencies
         env:
           MAVEN_OFFLINE_FLAG: '' # Override CI offline mode to allow fetching dependencies
 
       - name: Save maven repository cache
         uses: actions/cache/save@v4
-        if: steps.java-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.m2/repository
           key: ${{ steps.java-cache.outputs.cache-primary-key }}
@@ -123,9 +121,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
+            v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''
@@ -177,9 +175,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
+            v2-${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''
@@ -261,9 +259,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v2-${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.java-version }}-maven-
+            v2-${{ runner.os }}-${{ matrix.java-version }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''
@@ -399,9 +397,9 @@ jobs:
         id: java-cache
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: v2-${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.java-version }}-maven-
+            v2-${{ runner.os }}-${{ matrix.java-version }}-maven-
 
       - name: Verify maven cache was restored
         if: steps.java-cache.outputs.cache-matched-key == ''

@@ -99,9 +99,8 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 
 install-cassandra-ccm:
 	@echo "Install CCM ${CCM_CASSANDRA_VERSION}"
+	pip install "setuptools<82"
 	pip install "git+https://${CCM_CASSANDRA_REPO}.git@${CCM_CASSANDRA_VERSION}"
-	pip install setuptools
-	python -c "import pkg_resources" || { echo "ERROR: pkg_resources not available after installing setuptools"; exit 1; }
 	mkdir ${CCM_CONFIG_DIR} 2>/dev/null || true
 	echo CASSANDRA > ${CCM_CONFIG_DIR}/ccm-type
 	echo ${CCM_CASSANDRA_VERSION} > ${CCM_CONFIG_DIR}/ccm-version
