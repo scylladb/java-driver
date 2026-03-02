@@ -124,9 +124,11 @@ jobs:
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Verify maven cache was restored
-        if: steps.java-cache.outputs.cache-hit != 'true'
+        if: steps.java-cache.outputs.cache-matched-key == ''
         run: |
           echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
           exit 1
@@ -176,9 +178,11 @@ jobs:
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.JAVA_VERSION }}-maven-
 
       - name: Verify maven cache was restored
-        if: steps.java-cache.outputs.cache-hit != 'true'
+        if: steps.java-cache.outputs.cache-matched-key == ''
         run: |
           echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
           exit 1
@@ -258,9 +262,11 @@ jobs:
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.java-version }}-maven-
 
       - name: Verify maven cache was restored
-        if: steps.java-cache.outputs.cache-hit != 'true'
+        if: steps.java-cache.outputs.cache-matched-key == ''
         run: |
           echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
           exit 1
@@ -394,9 +400,11 @@ jobs:
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.java-version }}-maven-
 
       - name: Verify maven cache was restored
-        if: steps.java-cache.outputs.cache-hit != 'true'
+        if: steps.java-cache.outputs.cache-matched-key == ''
         run: |
           echo "::error::Maven repository cache was not found. This can happen when the GitHub Actions cache is evicted (10 GB limit per repository). Re-run all jobs (not just failed jobs) so the build job repopulates the cache."
           exit 1
