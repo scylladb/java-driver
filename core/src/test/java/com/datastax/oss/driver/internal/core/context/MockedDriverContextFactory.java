@@ -119,6 +119,9 @@ public class MockedDriverContextFactory {
         .thenReturn("DefaultMetricsFactory");
     when(defaultProfile.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER))
         .thenReturn(localDc);
+    when(defaultProfile.getString(
+            DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+        .thenReturn("REGULAR");
     return defaultProfile;
   }
 

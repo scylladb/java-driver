@@ -42,6 +42,9 @@ public class StartupOptionsBuilderTest {
     when(defaultProfile.getString(DefaultDriverOption.PROTOCOL_COMPRESSION, "none"))
         .thenReturn(compression);
     when(defaultProfile.getName()).thenReturn(DriverExecutionProfile.DEFAULT_NAME);
+    when(defaultProfile.getString(
+            DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+        .thenReturn("REGULAR");
     return MockedDriverContextFactory.defaultDriverContext(defaultProfile);
   }
 
