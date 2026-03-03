@@ -47,7 +47,9 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.awaitility.Awaitility;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
@@ -59,7 +61,19 @@ public class MockResolverIT {
   private static final Logger LOG = LoggerFactory.getLogger(MockResolverIT.class);
 
   private static final int CLUSTER_WAIT_SECONDS =
-      60; // Maximal wait time for cluster nodes to get up
+      20; // Maximal wait time for cluster nodes to get up
+
+  private static void waitForAllNodesUp(CqlSession session, int expectedNodes) {
+    Awaitility.await()
+        .atMost(CLUSTER_WAIT_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(500, TimeUnit.MILLISECONDS)
+        .until(
+            () -> {
+              Collection<Node> nodes = session.getMetadata().getNodes().values();
+              long upCount = nodes.stream().filter(n -> n.getUpSinceMillis() > 0).count();
+              return upCount == expectedNodes;
+            });
+  }
 
   @Test
   public void should_connect_with_mocked_hostname() {
@@ -130,33 +144,7 @@ public class MockResolverIT {
       ccmBridge.create();
       ccmBridge.start();
       session = builder.build();
-      boolean allNodesUp = false;
-      int nodesUp = 0;
-      for (int i = 0; i < CLUSTER_WAIT_SECONDS; i++) {
-        try {
-          Collection<Node> nodes = session.getMetadata().getNodes().values();
-          nodesUp = 0;
-          for (Node node : nodes) {
-            if (node.getUpSinceMillis() > 0) {
-              nodesUp++;
-            }
-          }
-          if (nodesUp == numberOfNodes) {
-            allNodesUp = true;
-            break;
-          }
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
-      if (!allNodesUp) {
-        LOG.error(
-            "Driver sees only {} nodes UP instead of {} after waiting {}s",
-            nodesUp,
-            numberOfNodes,
-            CLUSTER_WAIT_SECONDS);
-      }
+      waitForAllNodesUp(session, numberOfNodes);
       ResultSet rs = session.execute("select * from system.local where key='local'");
       assertThat(rs).isNotNull();
       Row row = rs.one();
@@ -178,33 +166,7 @@ public class MockResolverIT {
         CcmBridge.builder().withNodes(numberOfNodes).withIpPrefix("127.0.1.").build()) {
       ccmBridge.create();
       ccmBridge.start();
-      boolean allNodesUp = false;
-      int nodesUp = 0;
-      for (int i = 0; i < CLUSTER_WAIT_SECONDS; i++) {
-        try {
-          Collection<Node> nodes = session.getMetadata().getNodes().values();
-          nodesUp = 0;
-          for (Node node : nodes) {
-            if (node.getUpSinceMillis() > 0) {
-              nodesUp++;
-            }
-          }
-          if (nodesUp == numberOfNodes) {
-            allNodesUp = true;
-            break;
-          }
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
-      if (!allNodesUp) {
-        LOG.error(
-            "Driver sees only {} nodes UP instead of {} after waiting {}s",
-            nodesUp,
-            numberOfNodes,
-            CLUSTER_WAIT_SECONDS);
-      }
+      waitForAllNodesUp(session, numberOfNodes);
       ResultSet rs = session.execute("select * from system.local where key='local'");
       assertThat(rs).isNotNull();
       Row row = rs.one();
