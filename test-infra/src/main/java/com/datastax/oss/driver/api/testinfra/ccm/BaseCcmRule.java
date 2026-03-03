@@ -72,7 +72,13 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
   @Override
   public Statement apply(Statement base, Description description) {
     // Scylla-specific annotations
+    // Check both method-level and class-level annotations.
+    // When used as @Rule (not @ClassRule), description.getAnnotation() only finds
+    // method-level annotations, so we also check the test class directly.
     ScyllaSkip scyllaSkip = description.getAnnotation(ScyllaSkip.class);
+    if (scyllaSkip == null && description.getTestClass() != null) {
+      scyllaSkip = description.getTestClass().getAnnotation(ScyllaSkip.class);
+    }
     if (scyllaSkip != null) {
       if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         return new Statement() {
@@ -88,6 +94,9 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     }
 
     ScyllaOnly scyllaOnly = description.getAnnotation(ScyllaOnly.class);
+    if (scyllaOnly == null && description.getTestClass() != null) {
+      scyllaOnly = description.getTestClass().getAnnotation(ScyllaOnly.class);
+    }
     if (scyllaOnly != null) {
       if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         return new Statement() {
