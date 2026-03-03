@@ -55,7 +55,6 @@ import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
-import com.datastax.oss.driver.internal.core.util.AddressParser;
 import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -63,6 +62,8 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -970,8 +971,7 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
           for (ClientRoutesEndpoint endpoint : clientRoutesConfig.getEndpoints()) {
             if (endpoint.getConnectionAddr() != null) {
               String addr = endpoint.getConnectionAddr().trim();
-              InetSocketAddress socketAddress =
-                  AddressParser.parseContactPoint(addr, endpoint.getConnectionId());
+              InetSocketAddress socketAddress = parseContactPoint(addr, endpoint.getConnectionId());
               programmaticContactPoints.add(new DefaultEndPoint(socketAddress));
             }
           }
@@ -1074,5 +1074,77 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
       Map<String, Predicate<Node>> nodeFilters,
       ClassLoader classLoader) {
     return null;
+  }
+
+  /**
+   * Parses a contact point address string into an {@link InetSocketAddress}. Supports IPv4, IPv6,
+   * and hostname formats with optional port.
+   *
+   * <p>Accepted formats:
+   *
+   * <ul>
+   *   <li>{@code hostname:port} (e.g., {@code "localhost:9042"})
+   *   <li>{@code hostname} (defaults to port 9042)
+   *   <li>{@code ipv4:port} (e.g., {@code "192.168.1.1:9042"})
+   *   <li>{@code [ipv6]:port} (e.g., {@code "[::1]:9042"})
+   *   <li>{@code [ipv6]} (defaults to port 9042)
+   * </ul>
+   *
+   * @param address the address string to parse (must not be null)
+   * @param connectionId the connection ID for error messages (may be null)
+   * @return an unresolved {@link InetSocketAddress}
+   * @throws IllegalArgumentException if the address is null, empty, or has an invalid format
+   */
+  private static InetSocketAddress parseContactPoint(String address, UUID connectionId) {
+    if (address == null) {
+      throw new IllegalArgumentException(
+          formatContactPointError(null, connectionId, "Address must not be null"));
+    }
+    if (address.isEmpty()) {
+      throw new IllegalArgumentException(
+          formatContactPointError(address, connectionId, "Address must not be empty"));
+    }
+    try {
+      String uriString = address.contains("://") ? address : "cql://" + address;
+      URI uri = new URI(uriString);
+      String host = uri.getHost();
+      int port = uri.getPort();
+      if (host == null || host.isEmpty()) {
+        throw new IllegalArgumentException(
+            formatContactPointError(
+                address,
+                connectionId,
+                "Invalid address format. Expected format: 'host:port' or '[ipv6]:port'"));
+      }
+      if (port == -1) {
+        port = 9042;
+      }
+      if (port < 1 || port > 65535) {
+        throw new IllegalArgumentException(
+            formatContactPointError(
+                address,
+                connectionId,
+                String.format("Invalid port %d. Port must be between 1 and 65535.", port)));
+      }
+      return InetSocketAddress.createUnresolved(host, port);
+    } catch (URISyntaxException e) {
+      throw new IllegalArgumentException(
+          formatContactPointError(
+              address,
+              connectionId,
+              "Invalid address format. Expected format: 'host:port' or '[ipv6]:port'. "
+                  + e.getMessage()),
+          e);
+    }
+  }
+
+  private static String formatContactPointError(String address, UUID connectionId, String message) {
+    String addressStr = (address == null) ? "null" : "'" + address + "'";
+    if (connectionId != null) {
+      return String.format(
+          "Failed to parse address %s (connection ID: %s). %s", addressStr, connectionId, message);
+    } else {
+      return String.format("Failed to parse address %s. %s", addressStr, message);
+    }
   }
 }
