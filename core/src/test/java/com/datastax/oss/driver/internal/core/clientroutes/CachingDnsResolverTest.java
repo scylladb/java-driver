@@ -22,6 +22,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
@@ -164,5 +171,70 @@ public class CachingDnsResolverTest {
 
     // Should still fall back to last-known-good after cache clear
     assertThat(resolver.resolve("host1")).isEqualTo(ADDR_1);
+  }
+
+  @Test
+  public void should_not_retain_semaphores_after_resolution() throws UnknownHostException {
+    CachingDnsResolver resolver = new CachingDnsResolver(10_000, hostname -> ADDR_1);
+
+    // Resolve a batch of distinct hostnames to ensure the semaphore map does not accumulate them.
+    int hostCount = 20;
+    for (int i = 0; i < hostCount; i++) {
+      resolver.resolve("host-" + i);
+    }
+
+    // After all resolutions complete no semaphore entries should be retained.
+    assertThat(resolver.semaphoreCount()).isZero();
+  }
+
+  @Test
+  public void should_not_retain_semaphores_after_concurrent_resolution() throws Exception {
+    int threadCount = 10;
+    CachingDnsResolver resolver =
+        new CachingDnsResolver(
+            10_000,
+            hostname -> {
+              // Simulate a short delay to increase contention on the semaphore.
+              try {
+                Thread.sleep(1);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+              return ADDR_1;
+            });
+
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService exec = Executors.newFixedThreadPool(threadCount);
+    List<Throwable> unexpectedErrors = Collections.synchronizedList(new ArrayList<>());
+    try {
+      for (int i = 0; i < threadCount; i++) {
+        final int idx = i;
+        exec.submit(
+            () -> {
+              try {
+                start.await();
+                resolver.resolve("concurrent-host-" + idx);
+              } catch (InterruptedException e) {
+                // Expected during executor shutdown; restore the interrupt flag.
+                Thread.currentThread().interrupt();
+              } catch (Throwable t) {
+                // Any other throwable (UnknownHostException, NPE, IllegalStateException, …)
+                // is unexpected and must not be silently swallowed.
+                unexpectedErrors.add(t);
+              }
+            });
+      }
+      start.countDown();
+    } finally {
+      exec.shutdown();
+      assertThat(exec.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    assertThat(unexpectedErrors)
+        .as("No unexpected exceptions should occur during concurrent resolution")
+        .isEmpty();
+
+    // All concurrent resolutions have finished; no semaphore should remain.
+    assertThat(resolver.semaphoreCount()).isZero();
   }
 }

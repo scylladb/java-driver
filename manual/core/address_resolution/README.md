@@ -181,7 +181,17 @@ Additional properties of the DNS resolver:
   callers wait and reuse the result.
 - **Last-known-good fallback**: if a DNS lookup fails, the resolver returns the last successfully
   resolved address instead of throwing, so transient DNS hiccups do not cause connection failures.
-- **`clearCache()`**: called automatically on session close to free resources.
+- **Route-map refresh** — the driver re-queries `system.client_routes` and atomically swaps the
+  in-memory route map in two situations:
+  - a `CLIENT_ROUTES_CHANGE` server event is received, or
+  - the control connection reconnects after a failure (`onSuccessfulReconnect`).
+
+  A route-map refresh does **not** flush the DNS cache. Existing cached addresses remain valid
+  until their TTL expires; new hostnames are resolved on first use.
+- **`clearCache()`** — called exactly once, when the session is closed (`CqlSession.close()`). It
+  is not called during route-map refreshes and is not intended for manual or administrative use.
+  Last-known-good entries are intentionally kept across a cache clear: should the same hostname be
+  re-resolved after a close/reopen cycle, the fallback address is still available.
 
 #### Limitations
 

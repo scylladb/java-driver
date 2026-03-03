@@ -17,12 +17,14 @@
  */
 package com.datastax.oss.driver.internal.core.clientroutes;
 
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +34,16 @@ public class CachingDnsResolver implements DnsResolver {
   private static final Logger LOG = LoggerFactory.getLogger(CachingDnsResolver.class);
 
   private final long cacheDurationNanos;
-  private final ConcurrentHashMap<String, Semaphore> semaphores = new ConcurrentHashMap<>();
+  /**
+   * Tracks one {@link Semaphore} per hostname that is currently being resolved, together with a
+   * reference count of how many threads are using it. The waiter count is incremented atomically
+   * inside {@link ConcurrentHashMap#compute} before any thread blocks, and decremented (also inside
+   * {@code compute}) after {@link Semaphore#release()}. Because {@code compute} holds the map's
+   * internal bucket lock for that key, the decrement-and-conditional-remove is one indivisible
+   * operation — closing the race that a plain {@code remove(key, value)} leaves open.
+   */
+  private final ConcurrentHashMap<String, SemaphoreEntry> semaphores = new ConcurrentHashMap<>();
+
   private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<String, InetAddress> lastKnownGood = new ConcurrentHashMap<>();
   private final ThrowingFunction<String, InetAddress> resolverFn;
@@ -55,7 +66,21 @@ public class CachingDnsResolver implements DnsResolver {
       return entry.address;
     }
 
-    Semaphore semaphore = semaphores.computeIfAbsent(hostname, h -> new Semaphore(1));
+    // Atomically get-or-create the entry and increment the waiter count in one compute() call.
+    // This ensures the count is already > 0 before any other thread can observe the entry,
+    // preventing a premature removal by a concurrently finishing thread.
+    SemaphoreEntry semEntry =
+        semaphores.compute(
+            hostname,
+            (k, existing) -> {
+              if (existing == null) {
+                existing = new SemaphoreEntry();
+              }
+              existing.waiters.incrementAndGet();
+              return existing;
+            });
+
+    Semaphore semaphore = semEntry.semaphore;
     if (!semaphore.tryAcquire()) {
       // Another thread is already resolving this hostname. Block until it finishes,
       // then re-check the cache (the other thread will have populated it).
@@ -63,31 +88,28 @@ public class CachingDnsResolver implements DnsResolver {
         semaphore.acquire();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        // Decrement the waiter count we incremented above before bailing out.
+        semaphores.compute(
+            hostname, (k, v) -> (v != null && v.waiters.decrementAndGet() == 0) ? null : v);
         throw new UnknownHostException(
             "Interrupted while waiting for DNS resolution of " + hostname);
       }
-      try {
-        // Contended path: the resolver that held the semaphore just finished — cache hit expected.
-        entry = cachedEntry(hostname);
-        if (entry != null) {
-          return entry.address;
-        }
-        // Cache still empty (e.g. the other thread failed); fall through to resolve ourselves.
-        return doResolve(hostname);
-      } finally {
-        semaphore.release();
+    }
+    try {
+      // Contended path: the resolver that held the semaphore just finished — cache hit expected.
+      entry = cachedEntry(hostname);
+      if (entry != null) {
+        return entry.address;
       }
-    } else {
-      try {
-        // Double-checked locking: a concurrent thread may have resolved while we were acquiring.
-        entry = cachedEntry(hostname);
-        if (entry != null) {
-          return entry.address;
-        }
-        return doResolve(hostname);
-      } finally {
-        semaphore.release();
-      }
+      // Cache still empty (e.g. the other thread failed); fall through to resolve ourselves.
+      return doResolve(hostname);
+    } finally {
+      semaphore.release();
+      // Atomically decrement the waiter count and remove the map entry when it reaches zero.
+      // Using compute() here is essential: it holds the bucket lock while decrementing *and*
+      // deciding whether to remove, so no other thread can slip in between the two operations.
+      semaphores.compute(
+          hostname, (k, v) -> (v != null && v.waiters.decrementAndGet() == 0) ? null : v);
     }
   }
 
@@ -123,8 +145,14 @@ public class CachingDnsResolver implements DnsResolver {
   @Override
   public void clearCache() {
     cache.clear();
-    semaphores.clear();
-    // lastKnownGood is retained for fallback
+    // Semaphore entries are self-cleaning: the waiter count reaches zero and the entry is removed
+    // atomically inside compute() at the end of every resolution. Any entry that remains here
+    // belongs to a resolution currently in flight and must not be discarded.
+    //
+    // lastKnownGood is intentionally NOT cleared here. clearCache() is only called at session
+    // close; it is never called during a route-map refresh (CLIENT_ROUTES_CHANGE events or
+    // control-connection reconnects). Retaining last-known-good means the fallback address
+    // survives a close/reopen cycle and remains available if the first re-resolution fails.
   }
 
   static class CacheEntry {
@@ -140,5 +168,25 @@ public class CachingDnsResolver implements DnsResolver {
   @FunctionalInterface
   interface ThrowingFunction<T, R> {
     R apply(T t) throws UnknownHostException;
+  }
+
+  /**
+   * Wraps a {@link Semaphore} with a reference count ({@code waiters}) that tracks how many threads
+   * are currently using this entry. The count is managed exclusively through {@link
+   * ConcurrentHashMap#compute}, which serialises increments and decrements on the same key.
+   */
+  static class SemaphoreEntry {
+    final Semaphore semaphore = new Semaphore(1);
+    final AtomicInteger waiters = new AtomicInteger(0);
+  }
+
+  /**
+   * Returns the number of hostnames that currently have an active semaphore entry (i.e. have at
+   * least one resolution in flight). Visible for testing only — callers must not depend on the
+   * internal synchronisation mechanism or the map type.
+   */
+  @VisibleForTesting
+  int semaphoreCount() {
+    return semaphores.size();
   }
 }

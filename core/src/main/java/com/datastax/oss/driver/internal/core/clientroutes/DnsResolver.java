@@ -53,9 +53,15 @@ public interface DnsResolver {
   InetAddress resolve(@NonNull String hostname) throws UnknownHostException;
 
   /**
-   * Clears all cached DNS entries.
+   * Clears all cached DNS entries, but intentionally retains last-known-good addresses so that the
+   * fallback mechanism continues to work after a cache flush.
    *
-   * <p>This is primarily useful for testing or when forcing a fresh DNS lookup is required.
+   * <p>This method is called exactly once, by {@code ClientRoutesHandler.close()}, when the session
+   * is shut down. It is <strong>not</strong> called during route-map refreshes (triggered by {@code
+   * CLIENT_ROUTES_CHANGE} events or control-connection reconnects); those refreshes re-query the
+   * routes table but let the TTL-based DNS cache expire naturally.
+   *
+   * <p>This method is not intended for manual or administrative use outside of session close.
    */
   void clearCache();
 }
