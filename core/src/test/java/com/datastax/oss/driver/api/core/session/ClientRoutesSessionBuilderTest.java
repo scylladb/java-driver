@@ -24,12 +24,11 @@ import static org.mockito.Mockito.mock;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.ClientRoutesEndpoint;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.util.UUID;
-
-import edu.umd.cs.findbugs.annotations.NonNull;
 import org.junit.Test;
 
 public class ClientRoutesSessionBuilderTest {
