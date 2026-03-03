@@ -64,6 +64,7 @@ import java.util.concurrent.CompletionStage;
 import junit.framework.TestCase;
 import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -84,9 +85,9 @@ public class PreparedStatementIT {
   private static final Version SCYLLA_METADATA_ID_SUPPORT_VERSION =
       Objects.requireNonNull(Version.parse("2025.3"));
 
-  private final CcmRule ccmRule = CcmRule.getInstance();
+  private static final CcmRule ccmRule = CcmRule.getInstance();
 
-  private final SessionRule<CqlSession> sessionRule =
+  private static final SessionRule<CqlSession> sessionRule =
       SessionRule.builder(ccmRule)
           .withConfigLoader(
               SessionUtils.configLoaderBuilder()
@@ -95,19 +96,31 @@ public class PreparedStatementIT {
                   .build())
           .build();
 
-  @Rule public TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
+  @ClassRule public static TestRule classChain = RuleChain.outerRule(ccmRule).around(sessionRule);
+
+  // CcmRule as @Rule for per-method @ScyllaOnly / @BackendRequirement annotation checking
+  @Rule public TestRule methodChain = ccmRule;
+
+  // When true, @Before will DROP+CREATE the table (needed after tests that ALTER TABLE).
+  // Starts as true so the table is created on first run.
+  private static boolean needsTableRecreate = true;
 
   @Before
   public void setupSchema() {
+    if (needsTableRecreate) {
+      executeDdl("DROP TABLE IF EXISTS prepared_statement_test");
+      executeDdl("CREATE TABLE prepared_statement_test (a int PRIMARY KEY, b int, c int)");
+      needsTableRecreate = false;
+    } else {
+      executeDdl("TRUNCATE prepared_statement_test");
+    }
     for (String query :
         ImmutableList.of(
-            "DROP TABLE IF EXISTS prepared_statement_test",
-            "CREATE TABLE prepared_statement_test (a int PRIMARY KEY, b int, c int)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (1, 1, 1)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (2, 2, 2)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (3, 3, 3)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (4, 4, 4)")) {
-      executeDdl(query);
+      sessionRule.session().execute(query);
     }
   }
 
@@ -176,6 +189,7 @@ public class PreparedStatementIT {
     }
 
     // When
+    needsTableRecreate = true;
     session.execute(
         SimpleStatement.builder("ALTER TABLE prepared_statement_test ADD d int")
             .setExecutionProfile(sessionRule.slowProfile())
@@ -239,6 +253,7 @@ public class PreparedStatementIT {
     }
 
     // When
+    needsTableRecreate = true;
     session.execute(
         SimpleStatement.builder("ALTER TABLE prepared_statement_test ADD d int")
             .setExecutionProfile(sessionRule.slowProfile())
@@ -271,71 +286,71 @@ public class PreparedStatementIT {
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
   @BackendRequirement(type = BackendType.SCYLLA)
   public void should_update_metadata_when_schema_changed_across_sessions() {
-    // Given
-    CqlSession session1 = sessionRule.session();
-    CqlSession session2 = SessionUtils.newSession(ccmRule, sessionRule.keyspace());
+    // Use fresh sessions to avoid prepare cache interference from other tests that use the
+    // same query string on the shared session.
+    try (CqlSession session1 = SessionUtils.newSession(ccmRule, sessionRule.keyspace());
+        CqlSession session2 = SessionUtils.newSession(ccmRule, sessionRule.keyspace())) {
+      // Given
+      PreparedStatement ps1 = session1.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
+      PreparedStatement ps2 = session2.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
 
-    PreparedStatement ps1 = session1.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
-    PreparedStatement ps2 = session2.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
+      ByteBuffer id1a = ps1.getResultMetadataId();
+      ByteBuffer id2a = ps2.getResultMetadataId();
+      if (hasNoScyllaMetadataIdSupport()) {
+        // Scylla does not support CQL5 extensions and metadata id
+        assertThat(id1a).isNull();
+        assertThat(id2a).isNull();
+      }
 
-    ByteBuffer id1a = ps1.getResultMetadataId();
-    ByteBuffer id2a = ps2.getResultMetadataId();
-    if (hasNoScyllaMetadataIdSupport()) {
-      // Scylla does not support CQL5 extensions and metadata id
-      assertThat(id1a).isNull();
-      assertThat(id2a).isNull();
-    }
+      ResultSet rows1 = session1.execute(ps1.bind(1));
+      ResultSet rows2 = session2.execute(ps2.bind(1));
 
-    ResultSet rows1 = session1.execute(ps1.bind(1));
-    ResultSet rows2 = session2.execute(ps2.bind(1));
+      assertThat(rows1.getColumnDefinitions()).hasSize(3);
+      assertThat(rows1.getColumnDefinitions().contains("d")).isFalse();
+      assertThat(rows2.getColumnDefinitions()).hasSize(3);
+      assertThat(rows2.getColumnDefinitions().contains("d")).isFalse();
 
-    assertThat(rows1.getColumnDefinitions()).hasSize(3);
-    assertThat(rows1.getColumnDefinitions().contains("d")).isFalse();
-    assertThat(rows2.getColumnDefinitions()).hasSize(3);
-    assertThat(rows2.getColumnDefinitions().contains("d")).isFalse();
+      // When
+      needsTableRecreate = true;
+      session1.execute("ALTER TABLE prepared_statement_test ADD d int");
 
-    // When
-    session1.execute("ALTER TABLE prepared_statement_test ADD d int");
+      rows1 = session1.execute(ps1.bind(1));
+      rows2 = session2.execute(ps2.bind(1));
 
-    rows1 = session1.execute(ps1.bind(1));
-    rows2 = session2.execute(ps2.bind(1));
+      ByteBuffer id1b = ps1.getResultMetadataId();
+      ByteBuffer id2b = ps2.getResultMetadataId();
 
-    ByteBuffer id1b = ps1.getResultMetadataId();
-    ByteBuffer id2b = ps2.getResultMetadataId();
+      // Then
+      if (hasNoScyllaMetadataIdSupport()) {
+        // Scylla does not support CQL5 extensions and metadata id
+        assertThat(id1b).isNull();
+        assertThat(id2b).isNull();
 
-    // Then
-    if (hasNoScyllaMetadataIdSupport()) {
-      // Scylla does not support CQL5 extensions and metadata id
-      assertThat(id1b).isNull();
-      assertThat(id2b).isNull();
+        assertThat(ps1.getResultSetDefinitions()).hasSize(3);
+        assertThat(ps1.getResultSetDefinitions().contains("d")).isFalse();
+        assertThat(ps2.getResultSetDefinitions()).hasSize(3);
+        assertThat(ps2.getResultSetDefinitions().contains("d")).isFalse();
 
-      assertThat(ps1.getResultSetDefinitions()).hasSize(3);
-      assertThat(ps1.getResultSetDefinitions().contains("d")).isFalse();
-      assertThat(ps2.getResultSetDefinitions()).hasSize(3);
-      assertThat(ps2.getResultSetDefinitions().contains("d")).isFalse();
+        assertThat(rows1.getColumnDefinitions()).hasSize(4);
+        assertThat(rows1.getColumnDefinitions().contains("d")).isTrue();
+        assertThat(rows2.getColumnDefinitions()).hasSize(4);
+        assertThat(rows2.getColumnDefinitions().contains("d")).isTrue();
+
+        return;
+      }
+      assertThat(Bytes.toHexString(id1b)).isNotEqualTo(Bytes.toHexString(id1a));
+      assertThat(Bytes.toHexString(id2b)).isNotEqualTo(Bytes.toHexString(id2a));
+
+      assertThat(ps1.getResultSetDefinitions()).hasSize(4);
+      assertThat(ps1.getResultSetDefinitions().contains("d")).isTrue();
+      assertThat(ps2.getResultSetDefinitions()).hasSize(4);
+      assertThat(ps2.getResultSetDefinitions().contains("d")).isTrue();
 
       assertThat(rows1.getColumnDefinitions()).hasSize(4);
       assertThat(rows1.getColumnDefinitions().contains("d")).isTrue();
       assertThat(rows2.getColumnDefinitions()).hasSize(4);
       assertThat(rows2.getColumnDefinitions().contains("d")).isTrue();
-
-      session2.close();
-      return;
     }
-    assertThat(Bytes.toHexString(id1b)).isNotEqualTo(Bytes.toHexString(id1a));
-    assertThat(Bytes.toHexString(id2b)).isNotEqualTo(Bytes.toHexString(id2a));
-
-    assertThat(ps1.getResultSetDefinitions()).hasSize(4);
-    assertThat(ps1.getResultSetDefinitions().contains("d")).isTrue();
-    assertThat(ps2.getResultSetDefinitions()).hasSize(4);
-    assertThat(ps2.getResultSetDefinitions().contains("d")).isTrue();
-
-    assertThat(rows1.getColumnDefinitions()).hasSize(4);
-    assertThat(rows1.getColumnDefinitions().contains("d")).isTrue();
-    assertThat(rows2.getColumnDefinitions()).hasSize(4);
-    assertThat(rows2.getColumnDefinitions().contains("d")).isTrue();
-
-    session2.close();
   }
 
   @Test
@@ -344,6 +359,7 @@ public class PreparedStatementIT {
   public void should_fail_to_reprepare_if_query_becomes_invalid() {
     // Given
     CqlSession session = sessionRule.session();
+    needsTableRecreate = true;
     session.execute("ALTER TABLE prepared_statement_test ADD d int");
     PreparedStatement ps =
         session.prepare("SELECT a, b, c, d FROM prepared_statement_test WHERE a = ?");
@@ -439,6 +455,7 @@ public class PreparedStatementIT {
     assertThat(Bytes.toHexString(ps.getResultMetadataId())).isEqualTo(Bytes.toHexString(idBefore));
 
     // When
+    needsTableRecreate = true;
     session.execute("ALTER TABLE prepared_statement_test ADD d int");
     rs = session.execute(ps.bind(5, 5, 5));
 
@@ -565,6 +582,7 @@ public class PreparedStatementIT {
       session.execute("USE " + sessionRule.keyspace().asCql(false));
 
       // Drop and recreate the table to invalidate the prepared statement server-side
+      needsTableRecreate = true;
       executeDdl("DROP TABLE prepared_statement_test");
       executeDdl("CREATE TABLE prepared_statement_test (a int PRIMARY KEY, b int, c int)");
 
