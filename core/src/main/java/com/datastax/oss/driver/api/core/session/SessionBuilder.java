@@ -741,11 +741,12 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   }
 
   /**
-   * Configures this session to use client routes for PrivateLink-style deployments.
+   * Configures this session to use client routes for cloud private-endpoint deployments.
    *
    * <p>Client routes enable the driver to discover and connect to nodes through a load balancer
-   * (such as AWS PrivateLink) by reading endpoint mappings from the {@code system.client_routes}
-   * table. Each endpoint is identified by a connection ID and maps to specific node addresses.
+   * (such as AWS PrivateLink, Azure Private Link, or GCP Private Service Connect) by reading
+   * endpoint mappings from the {@code system.client_routes} table. Each endpoint is identified by a
+   * connection ID and maps to specific node addresses.
    *
    * <p>This configuration is mutually exclusive with a user-provided {@link
    * com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator}. If both are specified,
@@ -759,7 +760,7 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * ClientRoutesConfig config = ClientRoutesConfig.builder()
    *     .addEndpoint(new ClientRoutesEndpoint(
    *         UUID.fromString("12345678-1234-1234-1234-123456789012"),
-   *         "my-privatelink.us-east-1.aws.scylladb.com:9042"))
+   *         "my-cluster-endpoint.example.com:9042"))
    *     .build();
    *
    * CqlSession session = CqlSession.builder()
