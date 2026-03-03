@@ -56,7 +56,8 @@ import com.datastax.oss.driver.internal.core.cql.DefaultBatchStatement;
 import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import java.util.Iterator;
 import java.util.List;
-import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -68,18 +69,21 @@ import org.junit.rules.TestRule;
 @Category(ParallelizableTests.class)
 public class BatchStatementIT {
 
-  private final CcmRule CCM_RULE = CcmRule.getInstance();
+  private static final CcmRule CCM_RULE = CcmRule.getInstance();
 
-  private final SessionRule<CqlSession> SESSION_RULE = SessionRule.builder(CCM_RULE).build();
+  private static final SessionRule<CqlSession> SESSION_RULE = SessionRule.builder(CCM_RULE).build();
 
-  @Rule public TestRule chain = RuleChain.outerRule(CCM_RULE).around(SESSION_RULE);
+  @ClassRule public static TestRule classChain = RuleChain.outerRule(CCM_RULE).around(SESSION_RULE);
+
+  // CcmRule as @Rule for per-method @BackendRequirement annotation checking
+  @Rule public TestRule methodChain = CCM_RULE;
 
   @Rule public TestName name = new TestName();
 
   private static final int batchCount = 100;
 
-  @Before
-  public void createTable() {
+  @BeforeClass
+  public static void createTable() {
     String[] schemaStatements =
         new String[] {
           "CREATE TABLE test (k0 text, k1 int, v int, PRIMARY KEY (k0, k1))",

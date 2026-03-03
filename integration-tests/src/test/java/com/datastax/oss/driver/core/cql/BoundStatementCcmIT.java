@@ -77,7 +77,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
-import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -91,11 +92,11 @@ import org.junit.runner.RunWith;
 @RunWith(DataProviderRunner.class)
 public class BoundStatementCcmIT {
 
-  private CcmRule ccmRule = CcmRule.getInstance();
+  private static final CcmRule ccmRule = CcmRule.getInstance();
 
-  private final boolean atLeastV4 = ccmRule.getHighestProtocolVersion().getCode() >= 4;
+  private static final boolean atLeastV4 = ccmRule.getHighestProtocolVersion().getCode() >= 4;
 
-  private SessionRule<CqlSession> sessionRule =
+  private static final SessionRule<CqlSession> sessionRule =
       SessionRule.builder(ccmRule)
           .withConfigLoader(
               SessionUtils.configLoaderBuilder()
@@ -103,7 +104,10 @@ public class BoundStatementCcmIT {
                   .build())
           .build();
 
-  @Rule public TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
+  @ClassRule public static TestRule classChain = RuleChain.outerRule(ccmRule).around(sessionRule);
+
+  // CcmRule as @Rule for per-method @ScyllaSkip / @BackendRequirement annotation checking
+  @Rule public TestRule methodChain = ccmRule;
 
   @Rule public TestName name = new TestName();
 
@@ -111,8 +115,8 @@ public class BoundStatementCcmIT {
 
   private static final int VALUE = 7;
 
-  @Before
-  public void setupSchema() {
+  @BeforeClass
+  public static void setupSchema() {
     // table where every column forms the primary key.
     SchemaChangeSynchronizer.withLock(
         () -> {
