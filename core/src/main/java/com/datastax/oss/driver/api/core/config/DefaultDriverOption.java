@@ -1065,6 +1065,7 @@ public enum DefaultDriverOption implements DriverOption {
   LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS(
       "advanced.load-balancing-policy.dc-failover.preferred-remote-dcs"),
 
+
   /**
    * The default routing method to use for LWT (Lightweight Transaction) requests. REGULAR uses the
    * standard load balancing algorithm with slow replica avoidance and shuffling.
@@ -1120,7 +1121,13 @@ public enum DefaultDriverOption implements DriverOption {
    *
    * <p>Value-Type: boolean
    */
-  ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES("advanced.address-translator.resolve-addresses");
+  ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES("advanced.address-translator.resolve-addresses"),
+  /**
+   * Whether or not to do a DNS reverse-lookup of provided server addresses for SAN addresses.
+   *
+   * <p>Value-type: boolean
+   */
+  SSL_ALLOW_DNS_REVERSE_LOOKUP_SAN("advanced.ssl-engine-factory.allow-dns-reverse-lookup-san");
 
   private final String path;
 
