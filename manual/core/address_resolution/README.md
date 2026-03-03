@@ -118,11 +118,12 @@ datastax-java-driver.advanced.address-translator.class = com.mycompany.MyAddress
 Note: the contact points provided while creating the `CqlSession` are not translated, only addresses
 retrieved from or sent by Cassandra nodes are.
 
-### Client Routes (PrivateLink deployments)
+### Client Routes (cloud private endpoint deployments)
 
-For cloud deployments using PrivateLink or similar private endpoint technologies (such as ScyllaDB Cloud), nodes are
-accessed through private DNS endpoints rather than direct IP addresses. The driver provides a client routes feature
-to handle this topology.
+For cloud deployments using private endpoint services (such as AWS PrivateLink, Azure Private Link,
+or GCP Private Service Connect) or similar technologies (e.g., ScyllaDB Cloud), nodes are accessed
+through private DNS endpoints rather than direct IP addresses. The driver provides a client routes
+feature to handle this topology.
 
 Client routes configuration is done programmatically and is **mutually exclusive** with:
 - A custom `AddressTranslator` (if both are provided, client routes takes precedence)
@@ -140,7 +141,7 @@ import java.util.UUID;
 ClientRoutesConfig config = ClientRoutesConfig.builder()
     .addEndpoint(new ClientRoutesEndpoint(
         UUID.fromString("12345678-1234-1234-1234-123456789012"),
-        "my-cluster.us-east-1.aws.scylladb.com:9042"))
+        "my-cluster-endpoint.example.com:9042"))
     .build();
 
 // Build session - endpoints are automatically used as seed hosts

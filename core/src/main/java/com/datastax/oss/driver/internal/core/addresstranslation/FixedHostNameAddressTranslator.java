@@ -30,8 +30,10 @@ import org.slf4j.LoggerFactory;
  * using its native transport port.
  *
  * <p>The translator can be used for scenarios when all nodes are behind some kind of proxy, and it
- * is not tailored for one concrete use case. One can use this, for example, for AWS PrivateLink as
- * all nodes would be exposed to consumer - behind one hostname pointing to AWS Endpoint.
+ * is not tailored for one concrete use case. One can use this, for example, for cloud private
+ * endpoint services (such as AWS PrivateLink, Azure Private Link, or GCP Private Service Connect)
+ * where all nodes are exposed to the consumer behind one hostname pointing to a single load
+ * balancer endpoint.
  */
 public class FixedHostNameAddressTranslator implements AddressTranslator {
 
