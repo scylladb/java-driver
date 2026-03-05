@@ -20,14 +20,13 @@ package com.datastax.oss.driver.api.core.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.UUID;
 import org.junit.Test;
 
 public class ClientRoutesConfigTest {
 
   @Test
   public void should_build_config_with_single_endpoint() {
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = "conn-id-1";
     String connectionAddr = "my-privatelink.us-east-1.aws.scylladb.com:9042";
 
     ClientRoutesConfig config =
@@ -43,8 +42,8 @@ public class ClientRoutesConfigTest {
 
   @Test
   public void should_build_config_with_multiple_endpoints() {
-    UUID connectionId1 = UUID.randomUUID();
-    UUID connectionId2 = UUID.randomUUID();
+    String connectionId1 = "conn-id-1";
+    String connectionId2 = "conn-id-2";
 
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
@@ -61,7 +60,7 @@ public class ClientRoutesConfigTest {
   public void should_build_config_with_custom_table_name() {
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
-            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+            .addEndpoint(new ClientRoutesEndpoint("conn-id-1"))
             .withTableName("custom.client_routes_test")
             .build();
 
@@ -77,7 +76,7 @@ public class ClientRoutesConfigTest {
 
   @Test
   public void should_create_endpoint_without_connection_address() {
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = "conn-id-1";
     ClientRoutesEndpoint endpoint = new ClientRoutesEndpoint(connectionId);
 
     assertThat(endpoint.getConnectionId()).isEqualTo(connectionId);
@@ -86,7 +85,7 @@ public class ClientRoutesConfigTest {
 
   @Test
   public void should_create_endpoint_with_connection_address() {
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = "conn-id-1";
     String connectionAddr = "host:9042";
     ClientRoutesEndpoint endpoint = new ClientRoutesEndpoint(connectionId, connectionAddr);
 
@@ -103,9 +102,9 @@ public class ClientRoutesConfigTest {
 
   @Test
   public void should_replace_endpoints_with_withEndpoints() {
-    UUID connectionId1 = UUID.randomUUID();
-    UUID connectionId2 = UUID.randomUUID();
-    UUID connectionId3 = UUID.randomUUID();
+    String connectionId1 = "conn-id-1";
+    String connectionId2 = "conn-id-2";
+    String connectionId3 = "conn-id-3";
 
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
@@ -124,9 +123,7 @@ public class ClientRoutesConfigTest {
   @Test
   public void should_use_default_dns_cache_duration() {
     ClientRoutesConfig config =
-        ClientRoutesConfig.builder()
-            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
-            .build();
+        ClientRoutesConfig.builder().addEndpoint(new ClientRoutesEndpoint("conn-id-1")).build();
 
     assertThat(config.getDnsCacheDurationMillis()).isEqualTo(500L);
   }
@@ -135,7 +132,7 @@ public class ClientRoutesConfigTest {
   public void should_build_config_with_custom_dns_cache_duration() {
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
-            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+            .addEndpoint(new ClientRoutesEndpoint("conn-id-1"))
             .withDnsCacheDuration(1000L)
             .build();
 
@@ -146,7 +143,7 @@ public class ClientRoutesConfigTest {
   public void should_allow_zero_dns_cache_duration() {
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
-            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+            .addEndpoint(new ClientRoutesEndpoint("conn-id-1"))
             .withDnsCacheDuration(0L)
             .build();
 
@@ -158,7 +155,7 @@ public class ClientRoutesConfigTest {
     assertThatThrownBy(
             () ->
                 ClientRoutesConfig.builder()
-                    .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID()))
+                    .addEndpoint(new ClientRoutesEndpoint("conn-id-1"))
                     .withDnsCacheDuration(-1L)
                     .build())
         .isInstanceOf(IllegalArgumentException.class)

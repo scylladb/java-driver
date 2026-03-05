@@ -106,11 +106,11 @@ public class ClientRoutesHandler implements AutoCloseable {
       return CompletableFuture.completedFuture(null);
     }
 
-    // Build the IN clause with literal UUID values — AdminRequestHandler does not support
-    // List<UUID> as a named parameter, so we inline the values directly.
+    // Build the IN clause with literal connection ID values — AdminRequestHandler does not support
+    // a named parameter list, so we inline the values directly.
     String connectionIdsCsv =
         endpoints.stream()
-            .map(ep -> ep.getConnectionId().toString())
+            .map(ClientRoutesEndpoint::getConnectionId)
             .collect(Collectors.joining(", "));
     String query = String.format(SELECT_ROUTES_TEMPLATE, config.getTableName(), connectionIdsCsv);
 

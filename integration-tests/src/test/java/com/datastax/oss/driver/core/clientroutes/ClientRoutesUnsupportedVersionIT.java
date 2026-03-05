@@ -167,7 +167,7 @@ public class ClientRoutesUnsupportedVersionIT {
           .isNull();
 
       // ── Step 2 ── session must still open (graceful degradation) ──────────────────────────────
-      UUID connectionId = UUID.randomUUID();
+      String connectionId = UUID.randomUUID().toString();
       String nodeAddr = nodeAddress();
 
       // Use the real default table name (system.client_routes) — no user-space mirror — so any

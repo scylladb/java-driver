@@ -142,7 +142,7 @@ public class ClientRoutesIT {
 
   /** Inserts one row into the test client_routes table. */
   private void insertRoute(
-      CqlSession admin, UUID connectionId, UUID hostId, String address, int port) {
+      CqlSession admin, String connectionId, UUID hostId, String address, int port) {
     admin.execute(
         "INSERT INTO "
             + TEST_TABLE
@@ -213,7 +213,7 @@ public class ClientRoutesIT {
    */
   @Test
   public void should_load_routes_from_table_on_init() {
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = UUID.randomUUID().toString();
     String nodeAddr = nodeAddress();
 
     try (CqlSession admin = openAdminSession()) {
@@ -258,7 +258,7 @@ public class ClientRoutesIT {
    */
   @Test
   public void should_refresh_routes_after_table_update() throws Exception {
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = UUID.randomUUID().toString();
     UUID hostId = UUID.randomUUID(); // synthetic — tests the query/map pipeline
     String nodeAddr = nodeAddress();
 
@@ -296,7 +296,7 @@ public class ClientRoutesIT {
   @Test
   public void should_start_session_when_table_is_empty() {
     String nodeAddr = nodeAddress();
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = UUID.randomUUID().toString();
 
     try (CqlSession admin = openAdminSession()) {
       requireSystemClientRoutesTable(admin);
@@ -325,7 +325,7 @@ public class ClientRoutesIT {
    */
   @Test
   public void should_select_tls_port_when_ssl_configured() {
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = UUID.randomUUID().toString();
     UUID hostId = UUID.randomUUID();
     String nodeAddr = nodeAddress();
 
@@ -371,7 +371,7 @@ public class ClientRoutesIT {
    */
   @Test
   public void should_refresh_routes_after_control_connection_reconnect() {
-    UUID connectionId = UUID.randomUUID();
+    String connectionId = UUID.randomUUID().toString();
     UUID hostId = UUID.randomUUID();
     String nodeAddr = nodeAddress();
 

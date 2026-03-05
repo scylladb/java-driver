@@ -38,14 +38,14 @@ import net.jcip.annotations.Immutable;
 @Immutable
 public class ClientRouteInfo {
 
-  private final UUID connectionId;
+  private final String connectionId;
   private final UUID hostId;
   private final String address;
   private final Integer nativeTransportPort;
   private final Integer nativeTransportPortSsl;
 
   public ClientRouteInfo(
-      @NonNull UUID connectionId,
+      @NonNull String connectionId,
       @NonNull UUID hostId,
       @NonNull String address,
       @Nullable Integer nativeTransportPort,
@@ -58,7 +58,7 @@ public class ClientRouteInfo {
   }
 
   @NonNull
-  public UUID getConnectionId() {
+  public String getConnectionId() {
     return connectionId;
   }
 

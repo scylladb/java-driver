@@ -20,7 +20,6 @@ package com.datastax.oss.driver.api.core.config;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Objects;
-import java.util.UUID;
 import net.jcip.annotations.Immutable;
 
 /**
@@ -32,7 +31,7 @@ import net.jcip.annotations.Immutable;
 @Immutable
 public class ClientRoutesEndpoint {
 
-  private final UUID connectionId;
+  private final String connectionId;
   private final String connectionAddr;
 
   /**
@@ -40,7 +39,7 @@ public class ClientRoutesEndpoint {
    *
    * @param connectionId the connection ID (must not be null).
    */
-  public ClientRoutesEndpoint(@NonNull UUID connectionId) {
+  public ClientRoutesEndpoint(@NonNull String connectionId) {
     this(connectionId, null);
   }
 
@@ -50,14 +49,14 @@ public class ClientRoutesEndpoint {
    * @param connectionId the connection ID (must not be null).
    * @param connectionAddr the connection address to use as a seed host (may be null).
    */
-  public ClientRoutesEndpoint(@NonNull UUID connectionId, @Nullable String connectionAddr) {
+  public ClientRoutesEndpoint(@NonNull String connectionId, @Nullable String connectionAddr) {
     this.connectionId = Objects.requireNonNull(connectionId, "connectionId must not be null");
     this.connectionAddr = connectionAddr;
   }
 
   /** Returns the connection ID for this endpoint. */
   @NonNull
-  public UUID getConnectionId() {
+  public String getConnectionId() {
     return connectionId;
   }
 
