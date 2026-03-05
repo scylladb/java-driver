@@ -47,7 +47,9 @@ public class ClientRoutesEndpoint {
    * Creates a new endpoint with the given connection ID and connection address.
    *
    * @param connectionId the connection ID (must not be null).
-   * @param connectionAddr the connection address to use as a seed host (may be null).
+   * @param connectionAddr the hostname of the seed contact point used for the initial connection
+   *     (may be null). This is a plain hostname — <em>not</em> a {@code host:port} pair; the port
+   *     is discovered from the {@code system.client_routes} table.
    */
   public ClientRoutesEndpoint(@NonNull String connectionId, @Nullable String connectionAddr) {
     this.connectionId = Objects.requireNonNull(connectionId, "connectionId must not be null");
@@ -61,10 +63,14 @@ public class ClientRoutesEndpoint {
   }
 
   /**
-   * Returns the connection address for this endpoint, or null if not specified.
+   * Returns the hostname of the seed contact point for this endpoint, or null if not specified.
    *
-   * <p>When provided and no explicit contact points are given to the session builder, this address
-   * will be used as a seed host for the initial connection.
+   * <p>This is a plain hostname — <em>not</em> a {@code host:port} pair. The port for the initial
+   * connection is discovered from the {@code system.client_routes} table after the control
+   * connection is established.
+   *
+   * <p>When provided and no explicit contact points are given to the session builder, this hostname
+   * will be used as a seed for the initial connection.
    */
   @Nullable
   public String getConnectionAddr() {

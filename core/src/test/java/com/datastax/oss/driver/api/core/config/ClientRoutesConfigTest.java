@@ -27,7 +27,7 @@ public class ClientRoutesConfigTest {
   @Test
   public void should_build_config_with_single_endpoint() {
     String connectionId = "conn-id-1";
-    String connectionAddr = "my-privatelink.us-east-1.aws.scylladb.com:9042";
+    String connectionAddr = "my-privatelink.us-east-1.aws.scylladb.com";
 
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
@@ -47,8 +47,8 @@ public class ClientRoutesConfigTest {
 
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
-            .addEndpoint(new ClientRoutesEndpoint(connectionId1, "host1:9042"))
-            .addEndpoint(new ClientRoutesEndpoint(connectionId2, "host2:9042"))
+            .addEndpoint(new ClientRoutesEndpoint(connectionId1, "host1"))
+            .addEndpoint(new ClientRoutesEndpoint(connectionId2, "host2"))
             .build();
 
     assertThat(config.getEndpoints()).hasSize(2);
@@ -86,7 +86,7 @@ public class ClientRoutesConfigTest {
   @Test
   public void should_create_endpoint_with_connection_address() {
     String connectionId = "conn-id-1";
-    String connectionAddr = "host:9042";
+    String connectionAddr = "host";
     ClientRoutesEndpoint endpoint = new ClientRoutesEndpoint(connectionId, connectionAddr);
 
     assertThat(endpoint.getConnectionId()).isEqualTo(connectionId);

@@ -1072,7 +1072,43 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: string
    */
   LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD(
-      "advanced.load-balancing-policy.default-lwt-request-routing-method");
+      "advanced.load-balancing-policy.default-lwt-request-routing-method"),
+
+  /**
+   * The list of client-routes endpoints for cloud private-endpoint (PrivateLink) deployments.
+   *
+   * <p>Each element is a HOCON object with the following fields:
+   *
+   * <ul>
+   *   <li>{@code connection-id} (string, required) – the UUID that identifies the PrivateLink
+   *       connection in the {@code system.client_routes} table.
+   *   <li>{@code connection-addr} (string, optional) – hostname of the seed contact point used for
+   *       the initial connection. This is a <em>plain hostname</em>, not a {@code host:port} pair;
+   *       the port is read from the {@code system.client_routes} table.
+   * </ul>
+   *
+   * <p>This option is read as a raw HOCON list-of-objects; it cannot be read via the flat {@link
+   * com.datastax.oss.driver.api.core.config.DriverExecutionProfile} typed getters. Parsing is
+   * performed directly from the underlying Typesafe {@code Config} object inside {@code
+   * DefaultDriverContext}.
+   *
+   * <p>Value type: list of HOCON objects
+   */
+  CLIENT_ROUTES_ENDPOINTS("advanced.client-routes.endpoints"),
+
+  /**
+   * The name of the system table to query for client-routes mappings.
+   *
+   * <p>Value type: {@link String}
+   */
+  CLIENT_ROUTES_TABLE_NAME("advanced.client-routes.table-name"),
+
+  /**
+   * How long resolved DNS entries are cached for client-routes endpoints.
+   *
+   * <p>Value-type: {@link java.time.Duration Duration}
+   */
+  CLIENT_ROUTES_DNS_CACHE_DURATION("advanced.client-routes.dns-cache-duration");
 
   private final String path;
 

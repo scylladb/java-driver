@@ -71,6 +71,12 @@ public class ClientRoutesHandler implements AutoCloseable {
     return new CachingDnsResolver(dnsCacheDurationMillis);
   }
 
+  /** Returns the {@link ClientRoutesConfig} this handler was built from. */
+  @NonNull
+  public ClientRoutesConfig getClientRoutesConfig() {
+    return config;
+  }
+
   public CompletionStage<Void> init() {
     LOG.debug(
         "[{}] Initializing ClientRoutesHandler with {} endpoints",

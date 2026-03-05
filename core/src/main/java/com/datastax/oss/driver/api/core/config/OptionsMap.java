@@ -396,6 +396,10 @@ public class OptionsMap implements Serializable {
     map.put(
         TypedDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
         "PRESERVE_REPLICA_ORDER");
+    // CLIENT_ROUTES_ENDPOINTS is intentionally omitted: it is a list-of-objects (compound HOCON
+    // values) with no sensible scalar default, analogous to how CONFIG_RELOAD_INTERVAL is omitted.
+    map.put(TypedDriverOption.CLIENT_ROUTES_TABLE_NAME, "system.client_routes");
+    map.put(TypedDriverOption.CLIENT_ROUTES_DNS_CACHE_DURATION, Duration.ofMillis(500));
   }
 
   @Immutable

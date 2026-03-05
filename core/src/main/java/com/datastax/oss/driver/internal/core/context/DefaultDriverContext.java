@@ -29,6 +29,7 @@ import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
+import com.datastax.oss.driver.api.core.config.ClientRoutesEndpoint;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -58,6 +59,7 @@ import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
 import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesAddressTranslator;
 import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
+import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
@@ -105,6 +107,9 @@ import com.datastax.oss.protocol.internal.ProtocolV3ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV5ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
 import com.datastax.oss.protocol.internal.SegmentCodec;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigList;
+import com.typesafe.config.ConfigObject;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.buffer.ByteBuf;
@@ -416,10 +421,10 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected AddressTranslator buildAddressTranslator() {
-    // If client routes are configured, use ClientRoutesAddressTranslator
-    // We check the config directly instead of getting the handler to avoid triggering
-    // its initialization during context construction (handler may need other context components)
-    if (clientRoutesConfigFromBuilder != null) {
+    // If client routes are configured (programmatic or via config file), use
+    // ClientRoutesAddressTranslator. We resolve effective config here to keep the check
+    // consistent with buildClientRoutesHandler.
+    if (clientRoutesConfigFromBuilder != null || buildClientRoutesConfigFromFile() != null) {
       return new ClientRoutesAddressTranslator(this);
     }
 
@@ -439,9 +444,120 @@ public class DefaultDriverContext implements InternalDriverContext {
 
   protected ClientRoutesHandler buildClientRoutesHandler(
       ClientRoutesConfig clientRoutesConfigFromBuilder) {
-    return (clientRoutesConfigFromBuilder != null)
-        ? new ClientRoutesHandler(this, clientRoutesConfigFromBuilder)
-        : null;
+    ClientRoutesConfig configFromFile = buildClientRoutesConfigFromFile();
+    if (configFromFile != null) {
+      if (clientRoutesConfigFromBuilder != null) {
+        LOG.warn(
+            "[{}] Both programmatic ClientRoutesConfig and '{}' were provided. "
+                + "The programmatic configuration takes precedence.",
+            getSessionName(),
+            DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath());
+        return new ClientRoutesHandler(this, clientRoutesConfigFromBuilder);
+      }
+      return new ClientRoutesHandler(this, configFromFile);
+    }
+
+    return null;
+  }
+
+  /**
+   * Reads the {@code advanced.client-routes} section from the HOCON configuration and builds a
+   * {@link ClientRoutesConfig}, or returns {@code null} if {@code endpoints} is not defined.
+   *
+   * <p>The {@code endpoints} value is a HOCON list of objects; it cannot be read through the flat
+   * {@link com.datastax.oss.driver.api.core.config.DriverExecutionProfile} typed API, so we access
+   * the underlying Typesafe {@link Config} directly via {@link TypesafeDriverConfig#getRawConfig}.
+   */
+  @Nullable
+  // Package-private to allow unit-testing without a live cluster.
+  ClientRoutesConfig buildClientRoutesConfigFromFile() {
+    DriverExecutionProfile defaultProfile = config.getDefaultProfile();
+    if (!defaultProfile.isDefined(DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS)) {
+      return null;
+    }
+
+    Config rawConfig = TypesafeDriverConfig.getRawConfig(defaultProfile);
+    if (rawConfig == null) {
+      // Non-Typesafe config backend: endpoints option is marked as defined but we cannot parse
+      // the compound-object list. Warn and skip.
+      LOG.warn(
+          "[{}] '{}' is defined but the underlying config implementation is not Typesafe-based; "
+              + "config-file client routes cannot be parsed. Use the programmatic API instead.",
+          getSessionName(),
+          DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath());
+      return null;
+    }
+
+    String endpointsPath = DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath();
+    ConfigList endpointsList;
+    try {
+      endpointsList = rawConfig.getList(endpointsPath);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Failed to read '%s' from configuration: %s. "
+                  + "Expected a list of objects, each with a required 'connection-id' field "
+                  + "and an optional 'connection-addr' field (plain hostname, no port), for example: "
+                  + "%s = [{ connection-id = \"<uuid>\", connection-addr = \"host.example.com\" }]",
+              endpointsPath, e.getMessage(), endpointsPath),
+          e);
+    }
+
+    if (endpointsList.isEmpty()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "'%s' is set but contains no entries; at least one endpoint is required. "
+                  + "Each entry must be a HOCON object with a 'connection-id' field (UUID string) "
+                  + "and an optional 'connection-addr' field (plain hostname, no port), for example: "
+                  + "%s = [{ connection-id = \"<uuid>\", connection-addr = \"host.example.com\" }]",
+              endpointsPath, endpointsPath));
+    }
+
+    ClientRoutesConfig.Builder builder = ClientRoutesConfig.builder();
+
+    for (int i = 0; i < endpointsList.size(); i++) {
+      if (!(endpointsList.get(i) instanceof ConfigObject)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "'%s[%d]' must be a HOCON object but got a %s. "
+                    + "Each entry must have a required 'connection-id' field (UUID string) "
+                    + "and an optional 'connection-addr' field (plain hostname, no port), for example: "
+                    + "{ connection-id = \"<uuid>\", connection-addr = \"host.example.com\" }. "
+                    + "Got: %s",
+                endpointsPath,
+                i,
+                endpointsList.get(i).valueType(),
+                endpointsList.get(i)));
+      }
+      Config entry = ((ConfigObject) endpointsList.get(i)).toConfig();
+
+      if (!entry.hasPath("connection-id")) {
+        throw new IllegalArgumentException(
+            String.format(
+                "'%s[%d]' is missing the required 'connection-id' field. "
+                    + "Each entry must be a HOCON object with a 'connection-id' field (UUID string) "
+                    + "and an optional 'connection-addr' field (plain hostname, no port), for example: "
+                    + "{ connection-id = \"<uuid>\", connection-addr = \"host.example.com\" }",
+                endpointsPath, i));
+      }
+      String connectionId = entry.getString("connection-id");
+      String connectionAddr =
+          entry.hasPath("connection-addr") ? entry.getString("connection-addr") : null;
+      builder.addEndpoint(new ClientRoutesEndpoint(connectionId, connectionAddr));
+    }
+
+    // Read scalar options through the standard profile API
+    if (defaultProfile.isDefined(DefaultDriverOption.CLIENT_ROUTES_TABLE_NAME)) {
+      builder.withTableName(defaultProfile.getString(DefaultDriverOption.CLIENT_ROUTES_TABLE_NAME));
+    }
+    if (defaultProfile.isDefined(DefaultDriverOption.CLIENT_ROUTES_DNS_CACHE_DURATION)) {
+      builder.withDnsCacheDuration(
+          defaultProfile
+              .getDuration(DefaultDriverOption.CLIENT_ROUTES_DNS_CACHE_DURATION)
+              .toMillis());
+    }
+
+    return builder.build();
   }
 
   protected Optional<SslEngineFactory> buildSslEngineFactory(SslEngineFactory factoryFromBuilder) {

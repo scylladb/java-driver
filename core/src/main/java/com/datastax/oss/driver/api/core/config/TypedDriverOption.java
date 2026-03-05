@@ -939,6 +939,22 @@ public class TypedDriverOption<ValueT> {
           DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
           GenericType.STRING);
 
+  /**
+   * The system table to query for client-routes endpoint mappings.
+   *
+   * <p>Note: {@link DefaultDriverOption#CLIENT_ROUTES_ENDPOINTS} intentionally has no typed
+   * equivalent here because its HOCON value is a list of compound objects (not a flat scalar type
+   * supported by the {@code DriverExecutionProfile} API); it is excluded from the {@code
+   * TypedDriverOptionTest} consistency check accordingly.
+   */
+  public static final TypedDriverOption<String> CLIENT_ROUTES_TABLE_NAME =
+      new TypedDriverOption<>(DefaultDriverOption.CLIENT_ROUTES_TABLE_NAME, GenericType.STRING);
+
+  /** How long resolved DNS entries are cached for client-routes endpoints. */
+  public static final TypedDriverOption<Duration> CLIENT_ROUTES_DNS_CACHE_DURATION =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CLIENT_ROUTES_DNS_CACHE_DURATION, GenericType.DURATION);
+
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {
       ImmutableList.Builder<TypedDriverOption<?>> result = ImmutableList.builder();

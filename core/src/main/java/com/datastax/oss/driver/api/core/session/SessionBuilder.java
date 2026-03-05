@@ -29,7 +29,6 @@ import com.datastax.oss.driver.api.core.auth.AuthProvider;
 import com.datastax.oss.driver.api.core.auth.PlainTextAuthProviderBase;
 import com.datastax.oss.driver.api.core.auth.ProgrammaticPlainTextAuthProvider;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
-import com.datastax.oss.driver.api.core.config.ClientRoutesEndpoint;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -938,27 +937,34 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
         withCloudProxyAddress(cloudConfig.getProxyAddress());
         programmaticArguments = programmaticArgumentsBuilder.build();
 
-        // Check for mutual exclusivity with client routes
-        if (clientRoutesConfig != null) {
+        // Check for mutual exclusivity with client routes (programmatic or file-based)
+        boolean fileBasedClientRoutes =
+            defaultConfig.isDefined(DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS);
+        if (clientRoutesConfig != null || fileBasedClientRoutes) {
           throw new IllegalStateException(
               "Both a secure connect bundle and client routes configuration were provided. "
                   + "They are mutually exclusive. Please use either a secure connect bundle OR client routes configuration, but not both.");
         }
       }
 
-      // Handle client routes configuration
-      if (clientRoutesConfig != null) {
-        // Check for mutual exclusivity with address translator
+      // Determine whether client routes are active (programmatic or config-file).
+      boolean fileBasedClientRoutes =
+          defaultConfig.isDefined(DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS);
+
+      // Handle client routes mutual exclusivity with a custom AddressTranslator.
+      if (clientRoutesConfig != null || fileBasedClientRoutes) {
         if (defaultConfig.isDefined(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)) {
           String translatorClass =
               defaultConfig.getString(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS);
-          // PassThroughAddressTranslator is the default, so it's compatible
+          // PassThroughAddressTranslator is the default and is compatible with client routes.
           if (!"PassThroughAddressTranslator".equals(translatorClass)
               && !"com.datastax.oss.driver.internal.core.addresstranslation.PassThroughAddressTranslator"
                   .equals(translatorClass)) {
             throw new IllegalStateException(
                 String.format(
-                    "Both client routes configuration and a custom AddressTranslator ('%s') were provided. They are mutually exclusive. Please use either client routes OR a custom AddressTranslator, but not both.",
+                    "Both client routes configuration and a custom AddressTranslator ('%s') were "
+                        + "provided. They are mutually exclusive. Please use either client routes "
+                        + "OR a custom AddressTranslator, but not both.",
                     translatorClass));
           }
         }

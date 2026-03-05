@@ -61,7 +61,7 @@ public class ClientRoutesHandlerTest {
     when(context.getSessionName()).thenReturn("test-session");
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
-            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID(), "host1:9042"))
+            .addEndpoint(new ClientRoutesEndpoint(UUID.randomUUID().toString(), "host1"))
             .build();
     handler = new TestableClientRoutesHandler(context, config);
   }
