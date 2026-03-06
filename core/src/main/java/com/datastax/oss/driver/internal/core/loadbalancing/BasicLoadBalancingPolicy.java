@@ -25,6 +25,7 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -63,6 +64,9 @@ import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -71,8 +75,10 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntUnaryOperator;
+import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,6 +119,11 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
 
+  public enum RequestRoutingMethod {
+    REGULAR,
+    PRESERVE_REPLICA_ORDER
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(BasicLoadBalancingPolicy.class);
 
   protected static final IntUnaryOperator INCREMENT = i -> (i == Integer.MAX_VALUE) ? 0 : i + 1;
@@ -127,6 +138,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   private final int maxNodesPerRemoteDc;
   private final boolean allowDcFailoverForLocalCl;
   private final ConsistencyLevel defaultConsistencyLevel;
+  private final RequestRoutingMethod lwtRequestRoutingMethod;
 
   // private because they should be set in init() and never be modified after
   private volatile DistanceReporter distanceReporter;
@@ -154,6 +166,34 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
         new LinkedHashSet<>(
             profile.getStringList(
                 DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS));
+    this.lwtRequestRoutingMethod = parseLwtRequestRoutingMethod();
+  }
+
+  @NonNull
+  private RequestRoutingMethod parseLwtRequestRoutingMethod() {
+    String methodString =
+        profile.getString(DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD);
+    try {
+      return RequestRoutingMethod.valueOf(methodString.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOG.warn(
+          "[{}] Unknown request routing method '{}', defaulting to PRESERVE_REPLICA_ORDER",
+          logPrefix,
+          methodString);
+      return RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
+    }
+  }
+
+  @NonNull
+  public RequestRoutingMethod getRequestRoutingMethod(@Nullable Request request) {
+    if (request == null) {
+      return RequestRoutingMethod.REGULAR;
+    }
+    if (request.getRequestRoutingType() == RequestRoutingType.LWT) {
+      return lwtRequestRoutingMethod;
+    } else {
+      return RequestRoutingMethod.REGULAR;
+    }
   }
 
   /**
@@ -260,6 +300,17 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   @NonNull
   @Override
   public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    switch (getRequestRoutingMethod(request)) {
+      case PRESERVE_REPLICA_ORDER:
+        return newQueryPlanPreserveReplicas(request, session);
+      case REGULAR:
+      default:
+        return newQueryPlanRegular(request, session);
+    }
+  }
+
+  @NonNull
+  protected Queue<Node> newQueryPlanRegular(@Nullable Request request, @Nullable Session session) {
     // Take a snapshot since the set is concurrent:
     Object[] currentNodes = liveNodes.dc(localDc).toArray();
 
@@ -292,6 +343,101 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
 
     QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
     return maybeAddDcFailover(request, plan);
+  }
+
+  /**
+   * Builds a query plan that preserves replica order: local replicas, remote replicas, local
+   * non-replicas (rotated), remote non-replicas (rotated).
+   */
+  @NonNull
+  protected Queue<Node> newQueryPlanPreserveReplicas(
+      @Nullable Request request, @Nullable Session session) {
+    List<Node> replicas = getReplicas(request, session);
+    String localDc = getLocalDatacenter();
+    List<Node> queryPlan = new ArrayList<>();
+
+    if (localDc == null) {
+      // No local DC: all replicas first, then rotated non-replicas
+      List<Node> allNodes = new ArrayList<>();
+      for (Object obj : getLiveNodes().dc(null).toArray()) {
+        allNodes.add((Node) obj);
+      }
+      queryPlan.addAll(replicas);
+      addRotatedNonReplicas(queryPlan, allNodes, replicas, request);
+    } else {
+      // With local DC: prioritize local, then remote
+      Map<String, List<Node>> nodesByDc = getAllNodesByDc();
+      addReplicasByDc(queryPlan, replicas, localDc);
+      addNonReplicasByDc(queryPlan, nodesByDc, replicas, localDc, request);
+    }
+
+    return new SimpleQueryPlan(queryPlan.toArray());
+  }
+
+  /** Collect all live nodes grouped by DC. */
+  private Map<String, List<Node>> getAllNodesByDc() {
+    Map<String, List<Node>> nodesByDc = new HashMap<>();
+    for (String dc : getLiveNodes().dcs()) {
+      List<Node> dcNodes = new ArrayList<>();
+      for (Object obj : getLiveNodes().dc(dc).toArray()) {
+        dcNodes.add((Node) obj);
+      }
+      nodesByDc.put(dc, dcNodes);
+    }
+    return nodesByDc;
+  }
+
+  /** Add replicas with local DC first, then remote DCs. */
+  private void addReplicasByDc(List<Node> queryPlan, List<Node> replicas, String localDc) {
+    replicas.stream()
+        .filter(r -> Objects.equals(r.getDatacenter(), localDc))
+        .forEach(queryPlan::add);
+    replicas.stream()
+        .filter(r -> !Objects.equals(r.getDatacenter(), localDc))
+        .forEach(queryPlan::add);
+  }
+
+  /** Add non-replicas with local DC first, then remote DCs (all rotated). */
+  private void addNonReplicasByDc(
+      List<Node> queryPlan,
+      Map<String, List<Node>> nodesByDc,
+      List<Node> replicas,
+      String localDc,
+      Request request) {
+    // Local DC non-replicas first
+    addRotatedNonReplicas(
+        queryPlan, nodesByDc.getOrDefault(localDc, new ArrayList<>()), replicas, request);
+    // Remote DC non-replicas
+    for (Map.Entry<String, List<Node>> entry : nodesByDc.entrySet()) {
+      if (!Objects.equals(entry.getKey(), localDc)) {
+        addRotatedNonReplicas(queryPlan, entry.getValue(), replicas, request);
+      }
+    }
+  }
+
+  /** Add non-replica nodes from given list with rotation. */
+  private void addRotatedNonReplicas(
+      List<Node> queryPlan, List<Node> nodes, List<Node> replicas, Request request) {
+    List<Node> nonReplicas =
+        nodes.stream().filter(n -> !replicas.contains(n)).collect(Collectors.toList());
+    if (!nonReplicas.isEmpty()) {
+      rotateNonReplicas(nonReplicas, request);
+      queryPlan.addAll(nonReplicas);
+    }
+  }
+
+  /** Rotates nodes based on routing key (consistent) or randomly. */
+  private void rotateNonReplicas(List<Node> nodes, @Nullable Request request) {
+    if (nodes.size() <= 1) return;
+
+    int rotationAmount =
+        (request != null && request.getRoutingKey() != null)
+            ? Math.abs(request.getRoutingKey().hashCode()) % nodes.size()
+            : randomNextInt(nodes.size());
+
+    if (rotationAmount > 0) {
+      Collections.rotate(nodes, -rotationAmount);
+    }
   }
 
   @NonNull
@@ -439,6 +585,11 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
             .toArray(QueryPlan[]::new);
 
     return new CompositeQueryPlan(queryPlans);
+  }
+
+  /** Exposed as a protected method so that it can be accessed by tests */
+  protected int randomNextInt(int bound) {
+    return ThreadLocalRandom.current().nextInt(bound);
   }
 
   /** Exposed as a protected method so that it can be accessed by tests */
