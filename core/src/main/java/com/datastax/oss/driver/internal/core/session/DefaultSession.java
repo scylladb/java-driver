@@ -39,9 +39,9 @@ import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
-import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.LifecycleListener;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager.RefreshSchemaResult;
@@ -436,7 +436,7 @@ public class DefaultSession implements CqlSession {
     }
 
     private CompletionStage<Void> initClientRoutes() {
-      ClientRoutesHandler handler = context.getClientRoutesHandler();
+      ClientRoutesTopologyMonitor handler = context.getClientRoutesHandler();
       if (handler == null) {
         return CompletableFuture.completedFuture(null);
       }
@@ -701,7 +701,7 @@ public class DefaultSession implements CqlSession {
       }
       // Add ClientRoutesHandler if configured
       try {
-        ClientRoutesHandler handler = context.getClientRoutesHandler();
+        ClientRoutesTopologyMonitor handler = context.getClientRoutesHandler();
         if (handler != null) {
           policies.add(handler);
         }

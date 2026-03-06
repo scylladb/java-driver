@@ -196,8 +196,7 @@ public class ClientRoutesConfigFromFileTest {
 
   @Test
   public void should_throw_when_endpoints_list_is_empty() {
-    DefaultDriverContext ctx =
-        contextFromHocon("advanced.client-routes.endpoints = []");
+    DefaultDriverContext ctx = contextFromHocon("advanced.client-routes.endpoints = []");
 
     assertThatThrownBy(ctx::buildClientRoutesConfigFromFile)
         .isInstanceOf(IllegalArgumentException.class)

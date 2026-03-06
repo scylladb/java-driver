@@ -24,6 +24,7 @@
 package com.datastax.oss.driver.core.clientroutes;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
@@ -38,8 +39,8 @@ import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.IsolatedTests;
-import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.AssumptionViolatedException;
@@ -64,8 +65,8 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code system.client_routes} is truly absent on the running server — if it is present, the
  *       test fails loudly to signal that the version gate in {@link ClientRoutesIT} needs updating.
  *   <li>The driver gracefully opens a session even when the table is missing (no crash on init).
- *   <li>The {@link ClientRoutesHandler} returns {@code null} for all host IDs — the feature is not
- *       accidentally activated.
+ *   <li>The {@link ClientRoutesTopologyMonitor} returns {@code null} for all host IDs — the feature
+ *       is not accidentally activated.
  * </ol>
  *
  * <p>This class is annotated with {@code @ScyllaOnly} because {@code system.client_routes} is
@@ -131,7 +132,8 @@ public class ClientRoutesUnsupportedVersionIT {
    * <ul>
    *   <li>The system table does <em>not</em> exist — confirmed via {@code system_schema.tables}.
    *   <li>A session with {@link ClientRoutesConfig} can still be opened (graceful degradation).
-   *   <li>The {@link ClientRoutesHandler} stays empty; {@code translate()} returns {@code null}.
+   *   <li>The {@link ClientRoutesTopologyMonitor} stays empty; {@code translate()} returns {@code
+   *       null}.
    * </ul>
    *
    * <p>The assertion on the absent table acts as a built-in guard against stale version gates: if
@@ -186,18 +188,21 @@ public class ClientRoutesUnsupportedVersionIT {
             .isNotNull();
 
         // ── Step 3 ── translation must return null ────────────────────────────────────────────
-        ClientRoutesHandler handler =
+        ClientRoutesTopologyMonitor handler =
             ((InternalDriverContext) session.getContext()).getClientRoutesHandler();
         assertThat(handler)
             .as("ClientRoutesHandler must be non-null whenever ClientRoutesConfig is set")
             .isNotNull();
 
         UUID anyHostId = UUID.randomUUID();
-        assertThat(handler.translate(anyHostId, false))
-            .as(
-                "ClientRoutesHandler.translate() must return null on an unsupported server — "
-                    + "the feature must NOT be silently active when system.client_routes is absent")
-            .isNull();
+        try {
+          handler.resolve(anyHostId);
+          fail(
+              "ClientRoutesTopologyMonitor.resolve() must throw on an unsupported server — "
+                  + "the feature must NOT be silently active when system.client_routes is absent");
+        } catch (IllegalStateException | java.net.UnknownHostException e) {
+          assertThat(e.getMessage()).contains("No client route found");
+        }
 
         LOG.info(
             "Confirmed: client-routes feature correctly inactive on unsupported Enterprise {}",

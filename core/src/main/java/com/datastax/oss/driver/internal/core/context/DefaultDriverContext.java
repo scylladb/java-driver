@@ -57,10 +57,9 @@ import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
-import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesAddressTranslator;
-import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
@@ -205,7 +204,7 @@ public class DefaultDriverContext implements InternalDriverContext {
           "loadBalancingPolicyWrapper", this::buildLoadBalancingPolicyWrapper, cycleDetector);
   private final LazyReference<ControlConnection> controlConnectionRef =
       new LazyReference<>("controlConnection", this::buildControlConnection, cycleDetector);
-  private final LazyReference<ClientRoutesHandler> clientRoutesHandlerRef;
+  private final LazyReference<ClientRoutesTopologyMonitor> clientRoutesHandlerRef;
   private final LazyReference<RequestProcessorRegistry> requestProcessorRegistryRef =
       new LazyReference<>(
           "requestProcessorRegistry", this::buildRequestProcessorRegistry, cycleDetector);
@@ -421,14 +420,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected AddressTranslator buildAddressTranslator() {
-    // If client routes are configured (programmatic or via config file), use
-    // ClientRoutesAddressTranslator. We resolve effective config here to keep the check
-    // consistent with buildClientRoutesHandler.
-    if (clientRoutesConfigFromBuilder != null || buildClientRoutesConfigFromFile() != null) {
-      return new ClientRoutesAddressTranslator(this);
-    }
-
-    // Otherwise use the configured translator
     return Reflection.buildFromConfig(
             this,
             DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS,
@@ -442,7 +433,7 @@ public class DefaultDriverContext implements InternalDriverContext {
                         DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)));
   }
 
-  protected ClientRoutesHandler buildClientRoutesHandler(
+  protected ClientRoutesTopologyMonitor buildClientRoutesHandler(
       ClientRoutesConfig clientRoutesConfigFromBuilder) {
     ClientRoutesConfig configFromFile = buildClientRoutesConfigFromFile();
     if (configFromFile != null) {
@@ -452,9 +443,9 @@ public class DefaultDriverContext implements InternalDriverContext {
                 + "The programmatic configuration takes precedence.",
             getSessionName(),
             DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath());
-        return new ClientRoutesHandler(this, clientRoutesConfigFromBuilder);
+        return new ClientRoutesTopologyMonitor(this, clientRoutesConfigFromBuilder);
       }
-      return new ClientRoutesHandler(this, configFromFile);
+      return new ClientRoutesTopologyMonitor(this, configFromFile);
     }
 
     return null;
@@ -524,10 +515,7 @@ public class DefaultDriverContext implements InternalDriverContext {
                     + "and an optional 'connection-addr' field (plain hostname, no port), for example: "
                     + "{ connection-id = \"<uuid>\", connection-addr = \"host.example.com\" }. "
                     + "Got: %s",
-                endpointsPath,
-                i,
-                endpointsList.get(i).valueType(),
-                endpointsList.get(i)));
+                endpointsPath, i, endpointsList.get(i).valueType(), endpointsList.get(i)));
       }
       Config entry = ((ConfigObject) endpointsList.get(i)).toConfig();
 
@@ -634,10 +622,13 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected TopologyMonitor buildTopologyMonitor() {
-    if (cloudProxyAddress == null) {
-      return new DefaultTopologyMonitor(this);
+    if (cloudProxyAddress != null) {
+      return new CloudTopologyMonitor(this, cloudProxyAddress);
     }
-    return new CloudTopologyMonitor(this, cloudProxyAddress);
+    if (clientRoutesConfigFromBuilder != null) {
+      return new ClientRoutesTopologyMonitor(this, clientRoutesConfigFromBuilder);
+    }
+    return new DefaultTopologyMonitor(this);
   }
 
   protected MetadataManager buildMetadataManager() {
@@ -1049,7 +1040,7 @@ public class DefaultDriverContext implements InternalDriverContext {
 
   @Nullable
   @Override
-  public ClientRoutesHandler getClientRoutesHandler() {
+  public ClientRoutesTopologyMonitor getClientRoutesHandler() {
     return clientRoutesHandlerRef.get();
   }
 

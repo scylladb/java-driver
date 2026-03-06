@@ -24,6 +24,7 @@
 package com.datastax.oss.driver.core.clientroutes;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -38,9 +39,10 @@ import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.IsolatedTests;
-import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -171,9 +173,9 @@ public class ClientRoutesIT {
             .build();
   }
 
-  /** Returns the {@link ClientRoutesHandler} from an open session's context. */
-  private ClientRoutesHandler handlerOf(CqlSession session) {
-    ClientRoutesHandler handler =
+  /** Returns the {@link ClientRoutesTopologyMonitor} from an open session's context. */
+  private ClientRoutesTopologyMonitor handlerOf(CqlSession session) {
+    ClientRoutesTopologyMonitor handler =
         ((InternalDriverContext) session.getContext()).getClientRoutesHandler();
     assertThat(handler)
         .as("ClientRoutesHandler must be non-null when ClientRoutesConfig is set")
@@ -205,14 +207,28 @@ public class ClientRoutesIT {
     }
   }
 
+  /**
+   * Tries to resolve a host ID and returns the result, or null if no route is found (i.e.
+   * IllegalStateException is thrown).
+   */
+  private InetSocketAddress tryResolve(ClientRoutesTopologyMonitor handler, UUID hostId) {
+    try {
+      return handler.resolve(hostId);
+    } catch (IllegalStateException e) {
+      return null;
+    } catch (UnknownHostException e) {
+      throw new RuntimeException("DNS resolution failed for host_id=" + hostId, e);
+    }
+  }
+
   // ---- tests -------------------------------------------------------------
 
   /**
-   * Verifies that {@link ClientRoutesHandler#init()} reads rows from the configured table and
-   * populates the internal route map on session startup.
+   * Verifies that {@link ClientRoutesTopologyMonitor#init()} reads rows from the configured table
+   * and populates the internal route map on session startup.
    */
   @Test
-  public void should_load_routes_from_table_on_init() {
+  public void should_load_routes_from_table_on_init() throws UnknownHostException {
     String connectionId = UUID.randomUUID().toString();
     String nodeAddr = nodeAddress();
 
@@ -241,20 +257,20 @@ public class ClientRoutesIT {
         assertThat(rs.one()).isNotNull();
 
         // Handler must have loaded the route for the known host_id
-        InetSocketAddress translated = handlerOf(session).translate(hostId, false);
+        InetSocketAddress translated = handlerOf(session).resolve(hostId);
         assertThat(translated)
             .as("Handler should have a translated address for host_id=%s", hostId)
             .isNotNull();
         assertThat(translated.getPort()).isEqualTo(9042);
 
-        LOG.info("Translated host_id={} → {}", hostId, translated);
+        LOG.info("Translated host_id={} -> {}", hostId, translated);
       }
     }
   }
 
   /**
-   * Verifies that calling {@link ClientRoutesHandler#refresh()} after inserting new rows picks up
-   * the new routes without restarting the session.
+   * Verifies that calling {@link ClientRoutesTopologyMonitor#refresh()} after inserting new rows
+   * picks up the new routes without restarting the session.
    */
   @Test
   public void should_refresh_routes_after_table_update() throws Exception {
@@ -273,16 +289,16 @@ public class ClientRoutesIT {
               .build();
 
       try (CqlSession session = openClientRoutesSession(config)) {
-        ClientRoutesHandler handler = handlerOf(session);
+        ClientRoutesTopologyMonitor handler = handlerOf(session);
 
         // No route yet
-        assertThat(handler.translate(hostId, false)).isNull();
+        assertThatThrownBy(() -> handler.resolve(hostId)).isInstanceOf(IllegalStateException.class);
 
         // Insert a new route and explicitly trigger a refresh
         insertRoute(admin, connectionId, hostId, nodeAddr, 9042);
         handler.refresh().toCompletableFuture().get(10, TimeUnit.SECONDS);
 
-        InetSocketAddress translated = handler.translate(hostId, false);
+        InetSocketAddress translated = handler.resolve(hostId);
         assertThat(translated).isNotNull();
         assertThat(translated.getPort()).isEqualTo(9042);
       }
@@ -313,18 +329,19 @@ public class ClientRoutesIT {
             session.execute("SELECT release_version FROM system.local WHERE key='local'");
         assertThat(rs.one()).isNotNull();
 
-        // No routes loaded — translate returns null for any host_id
-        assertThat(handlerOf(session).translate(UUID.randomUUID(), false)).isNull();
+        // No routes loaded — resolve throws for any host_id
+        assertThatThrownBy(() -> handlerOf(session).resolve(UUID.randomUUID()))
+            .isInstanceOf(IllegalStateException.class);
       }
     }
   }
 
   /**
-   * Verifies that a route row with a {@code tls_port} column is correctly surfaced by {@link
-   * ClientRoutesHandler#translate(UUID, boolean)} depending on the {@code useSsl} flag.
+   * Verifies that a route row with a {@code tls_port} column is correctly stored and the non-SSL
+   * port is used when SSL is not configured.
    */
   @Test
-  public void should_select_tls_port_when_ssl_configured() {
+  public void should_select_non_ssl_port_when_ssl_not_configured() throws UnknownHostException {
     String connectionId = UUID.randomUUID().toString();
     UUID hostId = UUID.randomUUID();
     String nodeAddr = nodeAddress();
@@ -352,22 +369,20 @@ public class ClientRoutesIT {
               .build();
 
       try (CqlSession session = openClientRoutesSession(config)) {
-        ClientRoutesHandler handler = handlerOf(session);
+        ClientRoutesTopologyMonitor handler = handlerOf(session);
 
-        InetSocketAddress nonSsl = handler.translate(hostId, false);
-        assertThat(nonSsl).isNotNull();
-        assertThat(nonSsl.getPort()).isEqualTo(9042);
-
-        InetSocketAddress ssl = handler.translate(hostId, true);
-        assertThat(ssl).isNotNull();
-        assertThat(ssl.getPort()).isEqualTo(9142);
+        InetSocketAddress resolved = handler.resolve(hostId);
+        assertThat(resolved).isNotNull();
+        // Non-SSL session should use the regular port
+        assertThat(resolved.getPort()).isEqualTo(9042);
       }
     }
   }
 
   /**
-   * Verifies that after a control connection force-reconnect, {@link ClientRoutesHandler#refresh()}
-   * is called automatically and picks up new rows inserted while the session was running.
+   * Verifies that after a control connection force-reconnect, {@link
+   * ClientRoutesTopologyMonitor#refresh()} is called automatically and picks up new rows inserted
+   * while the session was running.
    */
   @Test
   public void should_refresh_routes_after_control_connection_reconnect() {
@@ -386,8 +401,8 @@ public class ClientRoutesIT {
               .build();
 
       try (CqlSession session = openClientRoutesSession(config)) {
-        ClientRoutesHandler handler = handlerOf(session);
-        assertThat(handler.translate(hostId, false)).isNull();
+        ClientRoutesTopologyMonitor handler = handlerOf(session);
+        assertThat(tryResolve(handler, hostId)).isNull();
 
         // Insert a new route while the session is running
         insertRoute(admin, connectionId, hostId, nodeAddr, 9042);
@@ -396,9 +411,9 @@ public class ClientRoutesIT {
         ((InternalDriverContext) session.getContext()).getControlConnection().reconnectNow();
 
         // Routes are refreshed asynchronously; wait for the translation to become available
-        await().atMost(15, TimeUnit.SECONDS).until(() -> handler.translate(hostId, false) != null);
+        await().atMost(15, TimeUnit.SECONDS).until(() -> tryResolve(handler, hostId) != null);
 
-        assertThat(handler.translate(hostId, false))
+        assertThat(tryResolve(handler, hostId))
             .as("Route should be available after reconnect and refresh for host_id=%s", hostId)
             .isNotNull()
             .extracting(InetSocketAddress::getPort)

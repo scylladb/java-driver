@@ -25,8 +25,8 @@ import com.datastax.oss.driver.internal.core.ConsistencyLevelRegistry;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
-import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
@@ -116,7 +116,7 @@ public interface InternalDriverContext extends DriverContext {
    * com.datastax.oss.driver.api.core.config.ClientRoutesConfig} is provided to the session builder.
    */
   @Nullable
-  ClientRoutesHandler getClientRoutesHandler();
+  ClientRoutesTopologyMonitor getClientRoutesHandler();
 
   @NonNull
   RequestProcessorRegistry getRequestProcessorRegistry();

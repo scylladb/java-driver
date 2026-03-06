@@ -30,8 +30,8 @@ import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.DriverChannelOptions;
 import com.datastax.oss.driver.internal.core.channel.EventCallback;
-import com.datastax.oss.driver.internal.core.clientroutes.ClientRoutesHandler;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesChangeEvent;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
@@ -247,31 +247,12 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   }
 
   private void processClientRoutesChange(Event event) {
-    LOG.debug("[{}] Received CLIENT_ROUTES_CHANGE event: {}", logPrefix, event);
-
-    ClientRoutesHandler handler = context.getClientRoutesHandler();
-    if (handler != null) {
-      // Trigger async refresh of client routes
-      handler
-          .refresh()
-          .whenComplete(
-              (v, error) -> {
-                if (error != null) {
-                  LOG.warn(
-                      "[{}] Failed to refresh client routes after CLIENT_ROUTES_CHANGE event",
-                      logPrefix,
-                      error);
-                } else {
-                  LOG.debug("[{}] Successfully refreshed client routes", logPrefix);
-                }
-              });
-    } else {
-      // Debug level since registration is conditional - null handler during shutdown is normal
-      LOG.debug(
-          "[{}] Received CLIENT_ROUTES_CHANGE event but client routes handler is not available "
-              + "(likely during shutdown)",
-          logPrefix);
-    }
+    com.datastax.oss.protocol.internal.response.event.ClientRoutesChangeEvent crce =
+        (com.datastax.oss.protocol.internal.response.event.ClientRoutesChangeEvent) event;
+    LOG.debug("[{}] Received CLIENT_ROUTES_CHANGE event: {}", logPrefix, crce);
+    context
+        .getEventBus()
+        .fire(new ClientRoutesChangeEvent(crce.changeType, crce.connectionIds, crce.hostIds));
   }
 
   private class SingleThreaded {
@@ -501,23 +482,11 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
 
       // Otherwise, perform a full refresh (we don't know how long we were disconnected)
       if (!isFirstConnection) {
-        ClientRoutesHandler clientRoutesHandler = context.getClientRoutesHandler();
-        CompletionStage<Void> clientRoutesRefresh =
-            (clientRoutesHandler != null)
-                ? clientRoutesHandler
-                    .refresh()
-                    .exceptionally(
-                        e -> {
-                          LOG.warn(
-                              "[{}] Failed to refresh client routes after reconnection",
-                              logPrefix,
-                              e);
-                          return null;
-                        })
-                : CompletableFuture.completedFuture(null);
+        context.getEventBus().fire(ControlConnectionReconnectEvent.INSTANCE);
 
-        clientRoutesRefresh
-            .thenCompose(ignored -> context.getMetadataManager().refreshNodes())
+        context
+            .getMetadataManager()
+            .refreshNodes()
             .whenComplete(
                 (result, error) -> {
                   if (error != null) {

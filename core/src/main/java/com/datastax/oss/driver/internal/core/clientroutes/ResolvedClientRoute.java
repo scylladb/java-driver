@@ -19,17 +19,12 @@ package com.datastax.oss.driver.internal.core.clientroutes;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.UUID;
 import net.jcip.annotations.Immutable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @Immutable
 public class ResolvedClientRoute {
-  private static final Logger LOG = LoggerFactory.getLogger(ResolvedClientRoute.class);
 
   private final UUID hostId;
   private final String hostname;
@@ -65,60 +60,6 @@ public class ResolvedClientRoute {
   @Nullable
   public Integer getNativeTransportPortSsl() {
     return nativeTransportPortSsl;
-  }
-
-  /**
-   * Converts this route to an InetSocketAddress, resolving DNS through the provided resolver.
-   *
-   * <p>The DNS resolver handles caching, so this method can be called on every connection attempt
-   * without causing a DNS storm. DNS resolution happens at connection time, not at route discovery
-   * time, which ensures the driver uses fresh DNS entries even when system.client_routes updates
-   * happen between metadata refreshes.
-   *
-   * @param useSsl whether to use the SSL port
-   * @param dnsResolver the DNS resolver to use for hostname resolution
-   * @return an InetSocketAddress with the resolved IP and selected port
-   * @throws IllegalStateException if no port is configured for this route
-   * @throws java.net.UnknownHostException if the hostname cannot be resolved
-   */
-  @NonNull
-  public InetSocketAddress toSocketAddress(boolean useSsl, @NonNull DnsResolver dnsResolver)
-      throws java.net.UnknownHostException {
-    Objects.requireNonNull(dnsResolver, "dnsResolver must not be null");
-
-    // Select port based on SSL configuration
-    Integer port;
-    if (useSsl) {
-      if (nativeTransportPortSsl != null) {
-        port = nativeTransportPortSsl;
-      } else {
-        // SSL requested but not configured for this route - fall back to non-SSL port
-        LOG.warn(
-            "SSL requested for host_id={} ({}:{}) but tls_port is not configured in client routes. "
-                + "Falling back to non-SSL port {}. This may indicate a configuration issue.",
-            hostId,
-            hostname,
-            nativeTransportPort,
-            nativeTransportPort);
-        port = nativeTransportPort;
-      }
-    } else {
-      port = nativeTransportPort;
-    }
-
-    // Validate port is configured
-    if (port == null) {
-      throw new IllegalStateException(
-          String.format(
-              "No port configured for host_id=%s, hostname=%s. "
-                  + "The system.client_routes table may be incomplete.",
-              hostId, hostname));
-    }
-
-    // Resolve DNS at connection time (resolver handles caching)
-    InetAddress resolvedAddress = dnsResolver.resolve(hostname);
-
-    return new InetSocketAddress(resolvedAddress, port);
   }
 
   @Override

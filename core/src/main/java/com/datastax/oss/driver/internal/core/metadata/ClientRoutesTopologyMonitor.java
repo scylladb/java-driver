@@ -15,26 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.internal.core.clientroutes;
+package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.ClientRoutesEndpoint;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRequestHandler;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
+import com.datastax.oss.driver.internal.core.clientroutes.CachingDnsResolver;
+import com.datastax.oss.driver.internal.core.clientroutes.DnsResolver;
+import com.datastax.oss.driver.internal.core.clientroutes.ResolvedClientRoute;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.control.ControlConnectionReconnectEvent;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
@@ -42,8 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @ThreadSafe
-public class ClientRoutesHandler implements AutoCloseable {
-  private static final Logger LOG = LoggerFactory.getLogger(ClientRoutesHandler.class);
+public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
+  private static final Logger LOG = LoggerFactory.getLogger(ClientRoutesTopologyMonitor.class);
 
   private static final String SELECT_ROUTES_TEMPLATE =
       "SELECT connection_id, host_id, address, port, tls_port FROM %s"
@@ -53,22 +60,36 @@ public class ClientRoutesHandler implements AutoCloseable {
 
   private final ClientRoutesConfig config;
   private final String logPrefix;
-  final AtomicReference<Map<UUID, ResolvedClientRoute>> resolvedRoutesRef;
+  final AtomicReference<Map<UUID, ResolvedClientRoute>> resolvedRoutesCache;
   private final DnsResolver dnsResolver;
+  private final boolean useSSL;
   private volatile boolean closed = false;
 
-  public ClientRoutesHandler(
+  private volatile Object clientRoutesChangeKey;
+  private volatile Object reconnectKey;
+
+  public ClientRoutesTopologyMonitor(
       @NonNull InternalDriverContext context, @NonNull ClientRoutesConfig config) {
+    super(context);
     this.context = context;
     this.config = config;
     this.logPrefix = context.getSessionName();
-    this.resolvedRoutesRef = new AtomicReference<>(new ConcurrentHashMap<>());
-    this.dnsResolver = createDnsResolver(config.getDnsCacheDurationMillis());
+    this.resolvedRoutesCache = new AtomicReference<>(new HashMap<>());
+    this.dnsResolver = new CachingDnsResolver(config.getDnsCacheDurationMillis());
+    this.useSSL = context.getSslEngineFactory().isPresent();
   }
 
-  /** Creates a DNS resolver with the specified cache duration. */
-  private DnsResolver createDnsResolver(long dnsCacheDurationMillis) {
-    return new CachingDnsResolver(dnsCacheDurationMillis);
+  @Override
+  public CompletionStage<Void> init() {
+    this.clientRoutesChangeKey =
+        context
+            .getEventBus()
+            .register(ClientRoutesChangeEvent.class, this::onClientRoutesChangeEvent);
+    this.reconnectKey =
+        context
+            .getEventBus()
+            .register(ControlConnectionReconnectEvent.class, this::onReconnectEvent);
+    return super.init();
   }
 
   /** Returns the {@link ClientRoutesConfig} this handler was built from. */
@@ -77,28 +98,54 @@ public class ClientRoutesHandler implements AutoCloseable {
     return config;
   }
 
-  public CompletionStage<Void> init() {
-    LOG.debug(
-        "[{}] Initializing ClientRoutesHandler with {} endpoints",
-        logPrefix,
-        config.getEndpoints().size());
-    // Propagate failures so callers can detect unsupported servers or configuration problems.
-    return queryAndResolveRoutes(/* propagateErrors= */ true);
-  }
+  @NonNull
+  public InetSocketAddress resolve(@NonNull UUID hostId)
+      throws IllegalStateException, UnknownHostException {
+    if (closed) {
+      throw new IllegalStateException("Topology monitor is closed");
+    }
+    ResolvedClientRoute route = resolvedRoutesCache.get().get(hostId);
+    if (route == null) {
+      throw new IllegalStateException(
+          String.format("No client route found for host_id=%s", hostId));
+    }
 
-  public CompletionStage<Void> refresh() {
-    LOG.debug("[{}] Refreshing client routes", logPrefix);
-    // Refresh failures are non-fatal: log a warning and keep the previous route map.
-    return queryAndResolveRoutes(/* propagateErrors= */ false);
+    // Select port based on SSL configuration
+    Integer port;
+    if (useSSL) {
+      port = route.getNativeTransportPortSsl();
+      if (port == null) {
+        port = route.getNativeTransportPort();
+        LOG.warn(
+            "SSL requested for host_id={} ({}) but tls_port is not configured in client routes. "
+                + "Falling back to non-SSL port {}. This may indicate a configuration issue.",
+            hostId,
+            route.getHostname(),
+            port);
+      }
+    } else {
+      port = route.getNativeTransportPort();
+    }
+
+    if (port == null) {
+      throw new IllegalStateException(
+          String.format(
+              "No port configured for host_id=%s, hostname=%s. "
+                  + "The system.client_routes table may be incomplete.",
+              hostId, route.getHostname()));
+    }
+
+    return new InetSocketAddress(dnsResolver.resolve(route.getHostname()), port);
   }
 
   /**
-   * Queries the configured client-routes table and updates the in-memory route map.
-   *
-   * @param propagateErrors {@code true} to let query errors propagate to the caller (used during
-   *     {@link #init()} so session startup can detect missing tables); {@code false} to catch all
-   *     errors and log a warning (used during {@link #refresh()} where continuity matters more).
+   * Refreshes the client routes cache by querying the configured client routes table. Errors are
+   * logged but do not propagate, so that periodic refreshes don't interrupt driver operation.
    */
+  public CompletionStage<Void> refresh() {
+    return queryAndResolveRoutes(false);
+  }
+
   private CompletionStage<Void> queryAndResolveRoutes(boolean propagateErrors) {
     DriverChannel channel = context.getControlConnection().channel();
     if (channel == null) {
@@ -112,8 +159,6 @@ public class ClientRoutesHandler implements AutoCloseable {
       return CompletableFuture.completedFuture(null);
     }
 
-    // Build the IN clause with literal connection ID values — AdminRequestHandler does not support
-    // a named parameter list, so we inline the values directly.
     String connectionIdsCsv =
         endpoints.stream()
             .map(ClientRoutesEndpoint::getConnectionId)
@@ -132,7 +177,7 @@ public class ClientRoutesHandler implements AutoCloseable {
               .start()
               .thenAccept(
                   adminResult -> {
-                    Map<UUID, ResolvedClientRoute> newRoutes = new ConcurrentHashMap<>();
+                    Map<UUID, ResolvedClientRoute> newRoutes = new HashMap<>();
                     for (AdminRow row : adminResult) {
                       if (row.isNull("host_id") || row.isNull("address") || row.isNull("port")) {
                         LOG.warn("[{}] Skipping incomplete client_routes row: {}", logPrefix, row);
@@ -145,11 +190,10 @@ public class ClientRoutesHandler implements AutoCloseable {
                           row.contains("tls_port") && !row.isNull("tls_port")
                               ? row.getInteger("tls_port")
                               : null;
-                      //noinspection DataFlowIssue
                       newRoutes.put(
                           hostId, new ResolvedClientRoute(hostId, address, port, tlsPort));
                     }
-                    resolvedRoutesRef.set(newRoutes);
+                    resolvedRoutesCache.set(newRoutes);
                     LOG.debug(
                         "[{}] Updated client routes: {} routes loaded",
                         logPrefix,
@@ -157,8 +201,6 @@ public class ClientRoutesHandler implements AutoCloseable {
                   });
 
       if (propagateErrors) {
-        // Let failures propagate so that init() callers (e.g. session startup) can detect
-        // missing tables or configuration problems rather than silently succeeding.
         return future;
       } else {
         return future.exceptionally(
@@ -178,40 +220,52 @@ public class ClientRoutesHandler implements AutoCloseable {
     }
   }
 
-  @Nullable
-  public InetSocketAddress translate(@NonNull UUID hostId, boolean useSsl) {
+  private void onClientRoutesChangeEvent(ClientRoutesChangeEvent event) {
     if (closed) {
-      return null;
+      return;
     }
-    Map<UUID, ResolvedClientRoute> routes = resolvedRoutesRef.get();
-    ResolvedClientRoute route = routes.get(hostId);
-    if (route == null) {
-      LOG.debug("[{}] No client route found for host_id={}", logPrefix, hostId);
-      return null;
-    }
+    LOG.debug("[{}] Received {}, refreshing routes", logPrefix, event);
+    refresh();
+  }
 
-    try {
-      // DNS resolution happens here through the cached resolver
-      return route.toSocketAddress(useSsl, dnsResolver);
-    } catch (UnknownHostException e) {
-      LOG.warn(
-          "[{}] Failed to resolve hostname {} for host_id={}",
-          logPrefix,
-          route.getHostname(),
-          hostId,
-          e);
-      return null;
-    } catch (IllegalStateException e) {
-      LOG.warn(
-          "[{}] Invalid route configuration for host_id={}: {}", logPrefix, hostId, e.getMessage());
-      return null;
+  private void onReconnectEvent(@SuppressWarnings("unused") ControlConnectionReconnectEvent event) {
+    if (closed) {
+      return;
     }
+    LOG.debug("[{}] Control connection reconnected, refreshing routes", logPrefix);
+    refresh();
+  }
+
+  @NonNull
+  @Override
+  protected EndPoint buildNodeEndPoint(
+      @NonNull AdminRow row,
+      @Nullable InetSocketAddress broadcastRpcAddress,
+      @NonNull EndPoint localEndPoint) {
+    UUID hostId = Objects.requireNonNull(row.getUuid("host_id"));
+    InetAddress broadcastInetAddress = null;
+    if (broadcastRpcAddress != null) {
+      broadcastInetAddress = broadcastRpcAddress.getAddress();
+    }
+    if (broadcastInetAddress == null) {
+      broadcastInetAddress = row.getInetAddress("broadcast_address");
+    }
+    if (broadcastInetAddress == null) {
+      broadcastInetAddress = row.getInetAddress("peer");
+    }
+    return new ClientRoutesEndPoint(this, hostId, broadcastInetAddress);
   }
 
   @Override
   public void close() {
     closed = true;
+    if (clientRoutesChangeKey != null) {
+      context.getEventBus().unregister(clientRoutesChangeKey, ClientRoutesChangeEvent.class);
+    }
+    if (reconnectKey != null) {
+      context.getEventBus().unregister(reconnectKey, ControlConnectionReconnectEvent.class);
+    }
     dnsResolver.clearCache();
-    LOG.debug("[{}] ClientRoutesHandler closed", logPrefix);
+    LOG.debug("[{}] ClientRoutesTopologyMonitor closed", logPrefix);
   }
 }
