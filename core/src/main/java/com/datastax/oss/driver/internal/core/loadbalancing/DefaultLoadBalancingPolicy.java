@@ -20,7 +20,6 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
-import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -48,7 +47,6 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLongArray;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
@@ -96,11 +94,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy implements RequestTracker {
 
-  public enum RequestRoutingMethod {
-    REGULAR,
-    PRESERVE_REPLICA_ORDER
-  }
-
   private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancingPolicy.class);
 
   private static final long NEWLY_UP_INTERVAL_NANOS = MINUTES.toNanos(1);
@@ -110,29 +103,12 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   protected final ConcurrentMap<Node, NodeResponseRateSample> responseTimes;
   protected final Map<Node, Long> upTimes = new ConcurrentHashMap<>();
   private final boolean avoidSlowReplicas;
-  private final RequestRoutingMethod lwtRequestRoutingMethod;
 
   public DefaultLoadBalancingPolicy(@NonNull DriverContext context, @NonNull String profileName) {
     super(context, profileName);
     this.avoidSlowReplicas =
         profile.getBoolean(DefaultDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
-    this.lwtRequestRoutingMethod = getDefaultLWTRequestRoutingMethod();
     this.responseTimes = new MapMaker().weakKeys().makeMap();
-  }
-
-  @NonNull
-  private RequestRoutingMethod getDefaultLWTRequestRoutingMethod() {
-    String methodString =
-        profile.getString(DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD);
-    try {
-      return RequestRoutingMethod.valueOf(methodString.toUpperCase());
-    } catch (IllegalArgumentException e) {
-      LOG.warn(
-          "[{}] Unknown request routing method '{}', defaulting to PRESERVE_REPLICA_ORDER",
-          logPrefix,
-          methodString);
-      return RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
-    }
   }
 
   @NonNull
@@ -151,52 +127,13 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     return new MandatoryLocalDcHelper(context, profile, logPrefix).discoverLocalDc(nodes);
   }
 
-  @NonNull
-  public RequestRoutingMethod getDefaultLWTRequestRoutingMethod(@Nullable Request request) {
-    if (request == null) {
-      return RequestRoutingMethod.REGULAR;
-    }
-    if (request.getRequestRoutingType() == RequestRoutingType.LWT) {
-      return lwtRequestRoutingMethod;
-    } else {
-      return RequestRoutingMethod.REGULAR;
-    }
-  }
-
-  @NonNull
-  @Override
-  public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
-    switch (getDefaultLWTRequestRoutingMethod(request)) {
-      case PRESERVE_REPLICA_ORDER:
-        return newQueryPlanPreserveReplicas(request, session);
-      case REGULAR:
-      default:
-        return newQueryPlanRegular(request, session);
-    }
-  }
-
-  /**
-   * Builds a query plan that preserves the replica order as returned by the load balancing
-   * strategy, while pushing non-local replicas after local ones.
-   */
-  @NonNull
-  public Queue<Node> newQueryPlanPreserveReplicas(
-      @Nullable Request request, @Nullable Session session) {
-    List<Node> replicas = getReplicas(request, session);
-    String localDc = getLocalDatacenter();
-    if (localDc == null || replicas.isEmpty()) {
-      return new SimpleQueryPlan(replicas.toArray());
-    }
-
-    return new SimpleQueryPlan(moveNonLocalReplicasToTheEnd(replicas, localDc));
-  }
-
   /**
    * Builds a query plan that prioritizes local replicas, shuffles them for balance, and then
    * round-robins the remaining local nodes.
    */
   @NonNull
-  public Queue<Node> newQueryPlanRegular(@Nullable Request request, @Nullable Session session) {
+  @Override
+  protected Queue<Node> newQueryPlanRegular(@Nullable Request request, @Nullable Session session) {
     List<Node> replicas = getReplicas(request, session);
     Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();
     int replicaCount = 0; // in currentNodes
@@ -226,26 +163,6 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
 
     QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
     return maybeAddDcFailover(request, plan);
-  }
-
-  /**
-   * Returns a replica array with local-datacenter replicas first and remote replicas preserved at
-   * the end.
-   */
-  private static Object[] moveNonLocalReplicasToTheEnd(List<Node> replicas, String localDc) {
-    Object[] orderedReplicas = new Object[replicas.size()];
-    int index = 0;
-    for (Node replica : replicas) {
-      if (Objects.equals(replica.getDatacenter(), localDc)) {
-        orderedReplicas[index++] = replica;
-      }
-    }
-    for (Node replica : replicas) {
-      if (!Objects.equals(replica.getDatacenter(), localDc)) {
-        orderedReplicas[index++] = replica;
-      }
-    }
-    return orderedReplicas;
   }
 
   private int[] moveReplicasToFront(Object[] currentNodes, List<Node> allReplicas) {
@@ -329,7 +246,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     // - the replica in first or second position is the most recent replica marked as UP and
     // - dice roll 1d4 != 1
     else if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
-        && diceRoll1d4() != 1) {
+        && randomNextInt(4) != 1) {
 
       // Send it to the back of the replicas
       ArrayUtils.bubbleDown(
@@ -368,11 +285,6 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   /** Exposed as a protected method so that it can be accessed by tests */
   protected long nanoTime() {
     return System.nanoTime();
-  }
-
-  /** Exposed as a protected method so that it can be accessed by tests */
-  protected int diceRoll1d4() {
-    return ThreadLocalRandom.current().nextInt(4);
   }
 
   protected boolean isUnhealthy(@NonNull Node node, @NonNull Session session, long now) {

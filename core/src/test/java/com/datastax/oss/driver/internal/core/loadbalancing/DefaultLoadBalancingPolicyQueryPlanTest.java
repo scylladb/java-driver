@@ -116,7 +116,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(3)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(never()).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
+    then(dsePolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -144,7 +144,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
+    then(dsePolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -172,7 +172,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(times(2)).diceRoll1d4();
+    then(dsePolicy).should(times(2)).randomNextInt(4);
   }
 
   @Test
@@ -201,7 +201,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(times(2)).diceRoll1d4();
+    then(dsePolicy).should(times(2)).randomNextInt(4);
   }
 
   @Test
@@ -232,7 +232,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
+    then(dsePolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -263,7 +263,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
+    then(dsePolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -289,7 +289,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
+    then(dsePolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -315,7 +315,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
+    then(dsePolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -340,7 +340,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
+    then(dsePolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -475,7 +475,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
               }
 
               @Override
-              protected int diceRoll1d4() {
+              protected int randomNextInt(int bound) {
                 return diceRoll;
               }
             });

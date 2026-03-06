@@ -36,7 +36,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.session.Request;
-import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy.RequestRoutingMethod;
+import com.datastax.oss.driver.internal.core.loadbalancing.BasicLoadBalancingPolicy.RequestRoutingMethod;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
@@ -99,7 +99,7 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
     initPolicy("REGULAR");
 
     // When
-    RequestRoutingMethod method = policy.getDefaultLWTRequestRoutingMethod(null);
+    RequestRoutingMethod method = policy.getRequestRoutingMethod(null);
 
     // Then
     assertThat(method).isEqualTo(RequestRoutingMethod.REGULAR);
@@ -112,7 +112,7 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
     given(request.getRequestRoutingType()).willReturn(RequestRoutingType.REGULAR);
 
     // When
-    RequestRoutingMethod method = policy.getDefaultLWTRequestRoutingMethod(request);
+    RequestRoutingMethod method = policy.getRequestRoutingMethod(request);
 
     // Then
     assertThat(method).isEqualTo(RequestRoutingMethod.REGULAR);
@@ -125,7 +125,7 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
     given(request.getRequestRoutingType()).willReturn(RequestRoutingType.LWT);
 
     // When
-    RequestRoutingMethod method = policy.getDefaultLWTRequestRoutingMethod(request);
+    RequestRoutingMethod method = policy.getRequestRoutingMethod(request);
 
     // Then
     assertThat(method).isEqualTo(RequestRoutingMethod.REGULAR);
@@ -138,7 +138,7 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
     given(request.getRequestRoutingType()).willReturn(RequestRoutingType.LWT);
 
     // When
-    RequestRoutingMethod method = policy.getDefaultLWTRequestRoutingMethod(request);
+    RequestRoutingMethod method = policy.getRequestRoutingMethod(request);
 
     // Then
     assertThat(method).isEqualTo(RequestRoutingMethod.PRESERVE_REPLICA_ORDER);
@@ -180,10 +180,10 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
     Queue<Node> plan2 = policy.newQueryPlan(request, session);
     Queue<Node> plan3 = policy.newQueryPlan(request, session);
 
-    // Then - preserve routing maintains exact order
-    assertThat(plan1).containsExactly(node2, node1);
-    assertThat(plan2).containsExactly(node2, node1);
-    assertThat(plan3).containsExactly(node2, node1);
+    // Then - preserve routing maintains replica order, non-replicas follow
+    assertThat(plan1).containsExactly(node2, node1, node3);
+    assertThat(plan2).containsExactly(node2, node1, node3);
+    assertThat(plan3).containsExactly(node2, node1, node3);
   }
 
   @Test
@@ -228,7 +228,7 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
         .willReturn(ImmutableList.of(node1));
 
     // When
-    RequestRoutingMethod method = policy.getDefaultLWTRequestRoutingMethod(request);
+    RequestRoutingMethod method = policy.getRequestRoutingMethod(request);
 
     // Then - defaults to REGULAR for any unrecognized type
     assertThat(method).isEqualTo(RequestRoutingMethod.REGULAR);
@@ -245,9 +245,9 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
         .willReturn(ImmutableList.of(node1, node2, node3));
 
     // When - call multiple times
-    RequestRoutingMethod method1 = policy.getDefaultLWTRequestRoutingMethod(request);
-    RequestRoutingMethod method2 = policy.getDefaultLWTRequestRoutingMethod(request);
-    RequestRoutingMethod method3 = policy.getDefaultLWTRequestRoutingMethod(request);
+    RequestRoutingMethod method1 = policy.getRequestRoutingMethod(request);
+    RequestRoutingMethod method2 = policy.getRequestRoutingMethod(request);
+    RequestRoutingMethod method3 = policy.getRequestRoutingMethod(request);
 
     // Then - should always return the same method
     assertThat(method1).isEqualTo(RequestRoutingMethod.PRESERVE_REPLICA_ORDER);
