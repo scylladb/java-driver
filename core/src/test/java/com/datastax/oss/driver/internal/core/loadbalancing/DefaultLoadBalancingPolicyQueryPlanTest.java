@@ -475,7 +475,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
               }
 
               @Override
-              protected int randomNextInt(4) {
+              protected int randomNextInt(int bound) {
                 return diceRoll;
               }
             });
