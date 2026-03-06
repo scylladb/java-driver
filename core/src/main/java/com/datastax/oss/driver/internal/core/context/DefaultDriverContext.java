@@ -436,15 +436,17 @@ public class DefaultDriverContext implements InternalDriverContext {
   protected ClientRoutesTopologyMonitor buildClientRoutesHandler(
       ClientRoutesConfig clientRoutesConfigFromBuilder) {
     ClientRoutesConfig configFromFile = buildClientRoutesConfigFromFile();
-    if (configFromFile != null) {
-      if (clientRoutesConfigFromBuilder != null) {
+    if (clientRoutesConfigFromBuilder != null) {
+      if (configFromFile != null) {
         LOG.warn(
             "[{}] Both programmatic ClientRoutesConfig and '{}' were provided. "
                 + "The programmatic configuration takes precedence.",
             getSessionName(),
             DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath());
-        return new ClientRoutesTopologyMonitor(this, clientRoutesConfigFromBuilder);
       }
+      return new ClientRoutesTopologyMonitor(this, clientRoutesConfigFromBuilder);
+    }
+    if (configFromFile != null) {
       return new ClientRoutesTopologyMonitor(this, configFromFile);
     }
 
