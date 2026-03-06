@@ -310,25 +310,6 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     return maybeAddDcFailover(request, plan);
   }
 
-  /**
-   * Returns a replica array with local-datacenter replicas first and remote replicas preserved at
-   * the end.
-   */
-  private static Object[] moveNonLocalReplicasToTheEnd(List<Node> replicas, String localDc) {
-    Object[] orderedReplicas = new Object[replicas.size()];
-    int index = 0;
-    for (Node replica : replicas) {
-      if (Objects.equals(replica.getDatacenter(), localDc)) {
-        orderedReplicas[index++] = replica;
-      }
-    }
-    for (Node replica : replicas) {
-      if (!Objects.equals(replica.getDatacenter(), localDc)) {
-        orderedReplicas[index++] = replica;
-      }
-    }
-    return orderedReplicas;
-  }
 
   private int[] moveReplicasToFront(Object[] currentNodes, List<Node> allReplicas) {
     int replicaCount = 0, localRackReplicaCount = 0;
