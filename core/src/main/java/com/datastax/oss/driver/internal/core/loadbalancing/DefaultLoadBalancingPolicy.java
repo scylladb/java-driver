@@ -38,7 +38,9 @@ import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting
 import com.datastax.oss.driver.shaded.guava.common.collect.MapMaker;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,6 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,19 +179,98 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   }
 
   /**
-   * Builds a query plan that preserves the replica order as returned by the load balancing
-   * strategy, while pushing non-local replicas after local ones.
+   * Builds a query plan that preserves replica order: local replicas, remote replicas, local
+   * non-replicas (rotated), remote non-replicas (rotated).
    */
   @NonNull
   public Queue<Node> newQueryPlanPreserveReplicas(
       @Nullable Request request, @Nullable Session session) {
     List<Node> replicas = getReplicas(request, session);
     String localDc = getLocalDatacenter();
-    if (localDc == null || replicas.isEmpty()) {
-      return new SimpleQueryPlan(replicas.toArray());
+    List<Node> queryPlan = new ArrayList<>();
+
+    // Collect all nodes by DC
+    Map<String, List<Node>> nodesByDc = getAllNodesByDc();
+    List<Node> allNodes =
+        nodesByDc.values().stream().flatMap(List::stream).collect(Collectors.toList());
+
+    if (localDc == null) {
+      // No local DC: all replicas first, then rotated non-replicas
+      queryPlan.addAll(replicas);
+      addRotatedNonReplicas(queryPlan, allNodes, replicas, request);
+    } else {
+      // With local DC: prioritize local, then remote
+      addReplicasByDc(queryPlan, replicas, localDc);
+      addNonReplicasByDc(queryPlan, nodesByDc, replicas, localDc, request);
     }
 
-    return new SimpleQueryPlan(moveNonLocalReplicasToTheEnd(replicas, localDc));
+    return new SimpleQueryPlan(queryPlan.toArray());
+  }
+
+  /** Collect all live nodes grouped by DC. */
+  private Map<String, List<Node>> getAllNodesByDc() {
+    Map<String, List<Node>> nodesByDc = new java.util.HashMap<>();
+    for (String dc : getLiveNodes().dcs()) {
+      List<Node> dcNodes = new ArrayList<>();
+      for (Object obj : getLiveNodes().dc(dc).toArray()) {
+        dcNodes.add((Node) obj);
+      }
+      nodesByDc.put(dc, dcNodes);
+    }
+    return nodesByDc;
+  }
+
+  /** Add replicas with local DC first, then remote DCs. */
+  private void addReplicasByDc(List<Node> queryPlan, List<Node> replicas, String localDc) {
+    replicas.stream()
+        .filter(r -> Objects.equals(r.getDatacenter(), localDc))
+        .forEach(queryPlan::add);
+    replicas.stream()
+        .filter(r -> !Objects.equals(r.getDatacenter(), localDc))
+        .forEach(queryPlan::add);
+  }
+
+  /** Add non-replicas with local DC first, then remote DCs (all rotated). */
+  private void addNonReplicasByDc(
+      List<Node> queryPlan,
+      Map<String, List<Node>> nodesByDc,
+      List<Node> replicas,
+      String localDc,
+      Request request) {
+    // Local DC non-replicas first
+    addRotatedNonReplicas(
+        queryPlan, nodesByDc.getOrDefault(localDc, new ArrayList<>()), replicas, request);
+    // Remote DC non-replicas
+    for (Map.Entry<String, List<Node>> entry : nodesByDc.entrySet()) {
+      if (!Objects.equals(entry.getKey(), localDc)) {
+        addRotatedNonReplicas(queryPlan, entry.getValue(), replicas, request);
+      }
+    }
+  }
+
+  /** Add non-replica nodes from given list with rotation. */
+  private void addRotatedNonReplicas(
+      List<Node> queryPlan, List<Node> nodes, List<Node> replicas, Request request) {
+    List<Node> nonReplicas =
+        nodes.stream().filter(n -> !replicas.contains(n)).collect(Collectors.toList());
+    if (!nonReplicas.isEmpty()) {
+      rotateNonReplicas(nonReplicas, request);
+      queryPlan.addAll(nonReplicas);
+    }
+  }
+
+  /** Rotates nodes based on routing key (consistent) or randomly. */
+  private void rotateNonReplicas(List<Node> nodes, @Nullable Request request) {
+    if (nodes.size() <= 1) return;
+
+    int rotationAmount =
+        (request != null && request.getRoutingKey() != null)
+            ? Math.abs(request.getRoutingKey().hashCode()) % nodes.size()
+            : randomNextInt(nodes.size());
+
+    if (rotationAmount > 0) {
+      Collections.rotate(nodes, -rotationAmount);
+    }
   }
 
   /**
@@ -329,7 +411,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     // - the replica in first or second position is the most recent replica marked as UP and
     // - dice roll 1d4 != 1
     else if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
-        && diceRoll1d4() != 1) {
+        && randomNextInt(4) != 1) {
 
       // Send it to the back of the replicas
       ArrayUtils.bubbleDown(
@@ -371,8 +453,8 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   }
 
   /** Exposed as a protected method so that it can be accessed by tests */
-  protected int diceRoll1d4() {
-    return ThreadLocalRandom.current().nextInt(4);
+  protected int randomNextInt(int bound) {
+    return ThreadLocalRandom.current().nextInt(bound);
   }
 
   protected boolean isUnhealthy(@NonNull Node node, @NonNull Session session, long now) {
