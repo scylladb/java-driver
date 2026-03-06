@@ -25,6 +25,8 @@ bom/
 core-shaded/
 guava-shaded/
 
+TODO*.md
+
 # Codex
 .codex/
 .codex-cache/
