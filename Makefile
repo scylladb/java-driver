@@ -252,7 +252,7 @@ check:
 	$(MVNCMD) verify -DskipTests
 
 fix:
-	$(MVNCMD) fmt:format
+	$(MVNCMD) fmt:format xml-format:xml-format
 
 test-unit: .install-guava-shaded
 	$(MVNCMD) test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
