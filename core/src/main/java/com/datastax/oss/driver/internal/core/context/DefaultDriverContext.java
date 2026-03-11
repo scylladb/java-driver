@@ -44,6 +44,7 @@ import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
 import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.api.core.time.TimestampGenerator;
+import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
@@ -217,11 +218,12 @@ public class DefaultDriverContext implements InternalDriverContext {
       new LazyReference<>("metricIdGenerator", this::buildMetricIdGenerator, cycleDetector);
   private final LazyReference<RequestThrottler> requestThrottlerRef =
       new LazyReference<>("requestThrottler", this::buildRequestThrottler, cycleDetector);
-  private final LazyReference<Map<String, String>> startupOptionsRef =
-      new LazyReference<>("startupOptions", this::buildStartupOptions, cycleDetector);
+  private final LazyReference<StartupOptionsBuilder> startupOptionsRef =
+      new LazyReference<>("startupOptionsFactory", this::buildStartupOptionsFactory, cycleDetector);
   private final LazyReference<NodeStateListener> nodeStateListenerRef;
   private final LazyReference<SchemaChangeListener> schemaChangeListenerRef;
   private final LazyReference<RequestTracker> requestTrackerRef;
+  private final LazyReference<Optional<RequestIdGenerator>> requestIdGeneratorRef;
   private final LazyReference<Optional<AuthProvider>> authProviderRef;
   private final LazyReference<List<LifecycleListener>> lifecycleListenersRef =
       new LazyReference<>("lifecycleListeners", this::buildLifecycleListeners, cycleDetector);
@@ -283,6 +285,11 @@ public class DefaultDriverContext implements InternalDriverContext {
     this.requestTrackerRef =
         new LazyReference<>(
             "requestTracker", () -> buildRequestTracker(requestTrackerFromBuilder), cycleDetector);
+    this.requestIdGeneratorRef =
+        new LazyReference<>(
+            "requestIdGenerator",
+            () -> buildRequestIdGenerator(programmaticArguments.getRequestIdGenerator()),
+            cycleDetector);
     this.sslEngineFactoryRef =
         new LazyReference<>(
             "sslEngineFactory",
@@ -336,16 +343,15 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   /**
-   * Builds a map of options to send in a Startup message.
+   * Returns builder of options to send in a Startup message.
    *
    * @see #getStartupOptions()
    */
-  protected Map<String, String> buildStartupOptions() {
+  protected StartupOptionsBuilder buildStartupOptionsFactory() {
     return new StartupOptionsBuilder(this)
         .withClientId(startupClientId)
         .withApplicationName(startupApplicationName)
-        .withApplicationVersion(startupApplicationVersion)
-        .build();
+        .withApplicationVersion(startupApplicationVersion);
   }
 
   protected Map<String, LoadBalancingPolicy> buildLoadBalancingPolicies() {
@@ -713,6 +719,17 @@ public class DefaultDriverContext implements InternalDriverContext {
     }
   }
 
+  protected Optional<RequestIdGenerator> buildRequestIdGenerator(
+      RequestIdGenerator requestIdGenerator) {
+    return (requestIdGenerator != null)
+        ? Optional.of(requestIdGenerator)
+        : Reflection.buildFromConfig(
+            this,
+            DefaultDriverOption.REQUEST_ID_GENERATOR_CLASS,
+            RequestIdGenerator.class,
+            "com.datastax.oss.driver.internal.core.tracker");
+  }
+
   protected Optional<AuthProvider> buildAuthProvider(AuthProvider authProviderFromBuilder) {
     return (authProviderFromBuilder != null)
         ? Optional.of(authProviderFromBuilder)
@@ -977,6 +994,12 @@ public class DefaultDriverContext implements InternalDriverContext {
     return requestTrackerRef.get();
   }
 
+  @NonNull
+  @Override
+  public Optional<RequestIdGenerator> getRequestIdGenerator() {
+    return requestIdGeneratorRef.get();
+  }
+
   @Nullable
   @Override
   public String getLocalDatacenter(@NonNull String profileName) {
@@ -1017,7 +1040,8 @@ public class DefaultDriverContext implements InternalDriverContext {
   @NonNull
   @Override
   public Map<String, String> getStartupOptions() {
-    return startupOptionsRef.get();
+    // startup options are calculated dynamically and may vary per connection
+    return startupOptionsRef.get().build();
   }
 
   protected RequestLogFormatter buildRequestLogFormatter() {

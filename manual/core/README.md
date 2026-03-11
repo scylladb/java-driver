@@ -380,6 +380,7 @@ for (ColumnDefinitions.Definition definition : row.getColumnDefinitions()) {
    query_timestamps/*
    reactive/*
    reconnection/*
+   request_id/*
    request_tracker/*
    retries/*
    shaded_jar/*

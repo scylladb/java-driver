@@ -15,27 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.internal.core.config;
+package com.datastax.oss.driver.internal.core.tracker;
 
-import com.datastax.oss.driver.api.core.config.DriverOption;
+import com.datastax.oss.driver.api.core.context.DriverContext;
+import com.datastax.oss.driver.api.core.session.Request;
+import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
+import com.datastax.oss.driver.api.core.uuid.Uuids;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
-public enum MockOptions implements DriverOption {
-  INT1("int1"),
-  INT2("int2"),
-  AUTH_PROVIDER("auth_provider"),
-  SUBNET_ADDRESSES("subnet_addresses"),
-  ;
+public class UuidRequestIdGenerator implements RequestIdGenerator {
+  public UuidRequestIdGenerator(DriverContext context) {}
 
-  private final String path;
-
-  MockOptions(String path) {
-    this.path = path;
+  /** Generates a random v4 UUID. */
+  @Override
+  public String getSessionRequestId() {
+    return Uuids.random().toString();
   }
 
-  @NonNull
+  /**
+   * {session-request-id}-{random-uuid} All node requests for a session request will have the same
+   * session request id
+   */
   @Override
-  public String getPath() {
-    return path;
+  public String getNodeRequestId(@NonNull Request statement, @NonNull String parentId) {
+    return parentId + "-" + Uuids.random();
   }
 }

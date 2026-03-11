@@ -69,6 +69,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -194,6 +195,8 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     when(context.getRequestThrottler()).thenReturn(new PassThroughRequestThrottler(context));
 
     when(context.getRequestTracker()).thenReturn(new NoopRequestTracker(context));
+
+    when(context.getRequestIdGenerator()).thenReturn(Optional.empty());
   }
 
   public DefaultSession getSession() {
