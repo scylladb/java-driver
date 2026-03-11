@@ -216,6 +216,20 @@ public enum DefaultDriverOption implements DriverOption {
    */
   RETRY_POLICY_CLASS("advanced.retry-policy.class"),
 
+  // BACKOFF_RETRY_POLICY is a collection of sub-properties
+  BACKOFF_RETRY_POLICY("advanced.backoff-retry-policy"),
+
+  /**
+   * The class of the backoff retry policy.
+   *
+   * <p>Value-type: {@link String}
+   */
+  BACKOFF_RETRY_POLICY_CLASS("advanced.backoff-retry-policy.class"),
+
+  BACKOFF_RETRY_MAX_BACKOFF_MS("advanced.backoff-retry-policy.max-backoff-ms"),
+  BACKOFF_RETRY_BASE_BACKOFF_MS("advanced.backoff-retry-policy.base-backoff-ms"),
+  BACKOFF_RETRY_JITTER_RATIO("advanced.backoff-retry-policy.jitter-ratio"),
+
   // SPECULATIVE_EXECUTION_POLICY is a collection of sub-properties
   SPECULATIVE_EXECUTION_POLICY("advanced.speculative-execution-policy"),
   /**
@@ -563,7 +577,6 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: {@link java.time.Duration Duration}
    */
   METRICS_NODE_CQL_MESSAGES_INTERVAL("advanced.metrics.node.cql-messages.refresh-interval"),
-
   /**
    * Whether or not to disable the Nagle algorithm.
    *

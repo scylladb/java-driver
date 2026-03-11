@@ -47,6 +47,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.RelationMetadata;
 import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
+import com.datastax.oss.driver.api.core.retry.BackoffRetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.servererrors.AlreadyExistsException;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
@@ -607,6 +608,11 @@ public class Conversions {
   public static RetryPolicy resolveRetryPolicy(
       InternalDriverContext context, DriverExecutionProfile executionProfile) {
     return context.getRetryPolicy(executionProfile.getName());
+  }
+
+  public static BackoffRetryPolicy resolveBackoffRetryPolicy(
+      InternalDriverContext context, DriverExecutionProfile executionProfile) {
+    return context.getBackoffRetryPolicy(executionProfile.getName());
   }
 
   /**

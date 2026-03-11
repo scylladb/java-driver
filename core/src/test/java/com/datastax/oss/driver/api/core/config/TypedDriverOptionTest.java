@@ -44,6 +44,7 @@ public class TypedDriverOptionTest {
         ImmutableSet.of(
             DefaultDriverOption.LOAD_BALANCING_POLICY,
             DefaultDriverOption.RETRY_POLICY,
+            DefaultDriverOption.BACKOFF_RETRY_POLICY,
             DefaultDriverOption.SPECULATIVE_EXECUTION_POLICY);
 
     for (DriverOption option :

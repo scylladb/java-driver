@@ -56,6 +56,7 @@ import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
+import com.datastax.oss.driver.internal.core.retry.NoBackoffPolicy;
 import com.datastax.oss.driver.internal.core.servererrors.DefaultWriteTypeRegistry;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.throttling.PassThroughRequestThrottler;
@@ -135,6 +136,7 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     when(context.getLoadBalancingPolicyWrapper()).thenReturn(loadBalancingPolicyWrapper);
 
     when(context.getRetryPolicy(anyString())).thenReturn(retryPolicy);
+    when(context.getBackoffRetryPolicy(anyString())).thenReturn(new NoBackoffPolicy());
 
     // Disable speculative executions by default
     when(speculativeExecutionPolicy.nextExecution(
