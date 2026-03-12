@@ -20,6 +20,8 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     concurrency:
       group: single
       cancel-in-progress: true
@@ -41,6 +43,9 @@ jobs:
         with:
           java-version: '8'
           distribution: 'temurin'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Set up env
         run: make -C docs setupenv
