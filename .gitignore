@@ -22,7 +22,7 @@ target/
 dependency-reduced-pom.xml
 
 # Personal and AI TODO list
-TODO.md
+TODO*.md
 
 # Codex - AI assistant metadata
 .codex/
