@@ -57,6 +57,7 @@ import io.netty.channel.ChannelPipeline;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.SocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -218,6 +219,14 @@ public class ChannelFactory {
       List<ProtocolVersion> attemptedVersions,
       CompletableFuture<DriverChannel> resultFuture) {
 
+    SocketAddress resolvedAddress;
+    try {
+      resolvedAddress = endPoint.resolve();
+    } catch (Exception e) {
+      resultFuture.completeExceptionally(e);
+      return;
+    }
+
     NettyOptions nettyOptions = context.getNettyOptions();
 
     Bootstrap bootstrap =
@@ -238,7 +247,7 @@ public class ChannelFactory {
             shardId,
             endPoint);
       }
-      connectFuture = bootstrap.connect(endPoint.resolve());
+      connectFuture = bootstrap.connect(resolvedAddress);
     } else {
       int localPort =
           PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
@@ -247,9 +256,9 @@ public class ChannelFactory {
             "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
             shardId,
             endPoint);
-        connectFuture = bootstrap.connect(endPoint.resolve());
+        connectFuture = bootstrap.connect(resolvedAddress);
       } else {
-        connectFuture = bootstrap.connect(endPoint.resolve(), new InetSocketAddress(localPort));
+        connectFuture = bootstrap.connect(resolvedAddress, new InetSocketAddress(localPort));
       }
     }
 

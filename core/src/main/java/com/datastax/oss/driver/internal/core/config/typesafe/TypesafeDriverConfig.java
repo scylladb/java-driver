@@ -31,6 +31,7 @@ import com.typesafe.config.ConfigOriginFactory;
 import com.typesafe.config.ConfigValue;
 import com.typesafe.config.ConfigValueFactory;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.URL;
 import java.util.Map;
 import java.util.Optional;
@@ -163,6 +164,24 @@ public class TypesafeDriverConfig implements DriverConfig {
   @Override
   public Map<String, ? extends DriverExecutionProfile> getProfiles() {
     return profiles;
+  }
+
+  /**
+   * Returns the raw Typesafe {@link Config} backing the given profile, or {@code null} if the
+   * profile is not a Typesafe-based profile.
+   *
+   * <p>This method is public so that other internal components in different packages (e.g., {@code
+   * DefaultDriverContext}) can perform Typesafe-specific operations such as {@code getConfigList()}
+   * that are not available through the {@link DriverExecutionProfile} API. It is intentionally
+   * restricted to the {@code internal} package hierarchy and should not be considered part of the
+   * public driver API.
+   */
+  @Nullable
+  public static Config getRawConfig(@NonNull DriverExecutionProfile profile) {
+    if (profile instanceof TypesafeDriverExecutionProfile) {
+      return ((TypesafeDriverExecutionProfile) profile).getEffectiveOptions();
+    }
+    return null;
   }
 
   /**

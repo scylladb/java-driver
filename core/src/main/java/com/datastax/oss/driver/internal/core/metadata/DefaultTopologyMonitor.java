@@ -75,7 +75,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
   private static final String NATIVE_TRANSPORT_PORT = "native_transport_port";
 
   private final String logPrefix;
-  private final InternalDriverContext context;
+  protected final InternalDriverContext context;
   private final ControlConnection controlConnection;
   private final Duration timeout;
   private final boolean reconnectOnInit;
@@ -429,7 +429,10 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           broadcastRpcAddress, "broadcastRpcAddress cannot be null for a peer row");
       // Deployments that use a custom EndPoint implementation will need their own TopologyMonitor.
       // One simple approach is to extend this class and override this method.
-      return new DefaultEndPoint(context.getAddressTranslator().translate(broadcastRpcAddress));
+
+      InetSocketAddress translatedAddress =
+          context.getAddressTranslator().translate(broadcastRpcAddress);
+      return new DefaultEndPoint(translatedAddress);
     } else {
       // Don't rely on system.local.rpc_address for the control node, because it mistakenly
       // reports the normal RPC address instead of the broadcast one (CASSANDRA-11181). We
@@ -476,7 +479,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
   // Current versions of Cassandra (3.11 at the time of writing), require the same port for all
   // nodes. As a consequence, the port is not stored in system tables.
   // We save it the first time we get a control connection channel.
-  private void savePort(DriverChannel channel) {
+  protected void savePort(DriverChannel channel) {
     if (port < 0) {
       SocketAddress address = channel.getEndPoint().resolve();
       if (address instanceof InetSocketAddress) {

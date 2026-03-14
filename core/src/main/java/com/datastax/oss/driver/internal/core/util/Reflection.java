@@ -84,6 +84,36 @@ public class Reflection {
   }
 
   /**
+   * Loads a class by name, trying default packages if the name is unqualified (contains no dot).
+   *
+   * <p>If {@code className} contains a dot it is treated as fully qualified and loaded directly.
+   * Otherwise each element of {@code defaultPackages} is prepended in order until a class is found.
+   *
+   * @param classLoader the class loader to use, or null to use the driver's class loader.
+   * @param className the name of the class to load, either fully qualified or unqualified.
+   * @param defaultPackages the default packages to prepend to the class name if it's not qualified.
+   *     They will be tried in order, the first one that matches an existing class will be used.
+   * @return null if the class does not exist or could not be loaded with any of the attempted
+   *     names.
+   */
+  @Nullable
+  public static Class<?> loadClass(
+      @Nullable ClassLoader classLoader,
+      @NonNull String className,
+      @NonNull String... defaultPackages) {
+    if (className.contains(".")) {
+      return loadClass(classLoader, className);
+    }
+    for (String defaultPackage : defaultPackages) {
+      Class<?> clazz = loadClass(classLoader, defaultPackage + "." + className);
+      if (clazz != null) {
+        return clazz;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Tries to create an instance of a class, given an option defined in the driver configuration.
    *
    * <p>For example:

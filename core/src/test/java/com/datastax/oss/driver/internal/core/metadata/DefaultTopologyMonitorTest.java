@@ -50,7 +50,6 @@ import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
-import com.datastax.oss.driver.shaded.guava.common.collect.Iterators;
 import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
@@ -232,11 +231,13 @@ public class DefaultTopologyMonitorTest {
             });
     // The rpc_address in each row should have been tried, only the last row should have been
     // converted
+    // Note: getUuid("host_id") is called once in findInPeers for comparison
     verify(peer3).getUuid("host_id");
     verify(peer3, never()).getString(anyString());
 
     verify(peer2, times(2)).getUuid("host_id");
     verify(peer2).getString("data_center");
+    verify(peer2).getString("rack");
   }
 
   @Test
@@ -267,6 +268,7 @@ public class DefaultTopologyMonitorTest {
 
     verify(peer2, times(2)).getUuid("host_id");
     verify(peer2).getString("data_center");
+    verify(peer2).getString("rack");
   }
 
   @Test
@@ -300,6 +302,7 @@ public class DefaultTopologyMonitorTest {
 
     verify(peer1).getInetAddress("rpc_address");
     verify(peer1).getString("data_center");
+    verify(peer1).getString("rack");
   }
 
   @Test
@@ -333,6 +336,7 @@ public class DefaultTopologyMonitorTest {
 
     verify(peer1).getInetAddress("native_address");
     verify(peer1).getString("data_center");
+    verify(peer1).getString("rack");
   }
 
   @Test
@@ -782,9 +786,7 @@ public class DefaultTopologyMonitorTest {
   }
 
   private AdminResult mockResult(AdminRow... rows) {
-    AdminResult result = mock(AdminResult.class);
-    when(result.iterator()).thenReturn(Iterators.forArray(rows));
-    return result;
+    return AdminResultTestHelper.mockResult(rows);
   }
 
   private void assertLog(Level level, String message) {

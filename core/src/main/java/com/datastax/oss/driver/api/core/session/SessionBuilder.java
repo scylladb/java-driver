@@ -28,6 +28,7 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
 import com.datastax.oss.driver.api.core.auth.PlainTextAuthProviderBase;
 import com.datastax.oss.driver.api.core.auth.ProgrammaticPlainTextAuthProvider;
+import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -98,7 +99,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   protected Set<EndPoint> programmaticContactPoints = new HashSet<>();
   protected CqlIdentifier keyspace;
   protected Callable<InputStream> cloudConfigInputStream;
-
   protected ProgrammaticArguments.Builder programmaticArgumentsBuilder =
       ProgrammaticArguments.builder();
   private boolean programmaticSslFactory = false;
@@ -736,6 +736,42 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   }
 
   /**
+   * Configures this session to use client routes for cloud private-endpoint deployments.
+   *
+   * <p>Client routes enable the driver to discover and connect to nodes through a load balancer
+   * (such as AWS PrivateLink, Azure Private Link, or GCP Private Service Connect) by reading
+   * endpoint mappings from the {@code system.client_routes} table. Each endpoint is identified by a
+   * connection ID and maps to specific node addresses.
+   *
+   * <p>This configuration is <b>mutually exclusive</b> with a user-provided {@link
+   * com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator}. If both are specified,
+   * an {@link IllegalStateException} is thrown when the session is built.
+   *
+   * <p>Example usage:
+   *
+   * <pre>{@code
+   * ClientRoutesConfig config = ClientRoutesConfig.builder()
+   *     .addEndpoint(new ClientRouteProxy(
+   *         "12345678-1234-1234-1234-123456789012",
+   *         "my-cluster-endpoint.example.com"))
+   *     .build();
+   *
+   * CqlSession session = CqlSession.builder()
+   *     .withClientRoutesConfig(config)
+   *     .build();
+   * }</pre>
+   *
+   * @param clientRoutesConfig the client routes configuration to use, or {@code null} to disable
+   *     client routes.
+   * @see ClientRoutesConfig
+   */
+  @NonNull
+  public SelfT withClientRoutesConfig(@Nullable ClientRoutesConfig clientRoutesConfig) {
+    this.programmaticArgumentsBuilder.withClientRoutesConfig(clientRoutesConfig);
+    return self;
+  }
+
+  /**
    * A unique identifier for the created session.
    *
    * <p>It will be sent in the {@code STARTUP} protocol message, under the key {@code CLIENT_ID},
@@ -829,6 +865,7 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     CompletableFutures.propagateCancellation(wrapStage, buildStage);
     return wrapStage;
   }
+
   /**
    * Convenience method to call {@link #buildAsync()} and block on the result.
    *

@@ -33,6 +33,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
+import com.datastax.oss.driver.internal.core.metadata.AdminResultTestHelper;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterators;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.time.Duration;
@@ -77,7 +78,7 @@ public abstract class SchemaQueriesTest {
   }
 
   protected static AdminResult mockResult(AdminRow... rows) {
-    return mockResult(null, rows);
+    return AdminResultTestHelper.mockResult(rows);
   }
 
   protected static AdminResult mockResult(AdminResult next, AdminRow... rows) {

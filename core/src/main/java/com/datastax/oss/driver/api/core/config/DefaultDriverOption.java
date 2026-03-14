@@ -1073,7 +1073,31 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: string
    */
   LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD(
-      "advanced.load-balancing-policy.default-lwt-request-routing-method");
+      "advanced.load-balancing-policy.default-lwt-request-routing-method"),
+
+  /**
+   * The list of client-routes endpoints for cloud private-endpoint deployments (e.g. AWS
+   * PrivateLink, Azure Private Link, GCP Private Service Connect).
+   *
+   * <p>Each element is a HOCON object with the following fields:
+   *
+   * <ul>
+   *   <li>{@code connection-id} (string, required) – opaque string that identifies the cloud
+   *       private-endpoint connection in the {@code system.client_routes} table.
+   *   <li>{@code connection-addr} (string, optional) – DNS name or IP address that overrides the
+   *       {@code address} column from the {@code system.client_routes} table for the matching
+   *       {@code connection_id}. Must not include a port (e.g. {@code "host.example.com"} or {@code
+   *       "10.0.1.5"}).
+   * </ul>
+   *
+   * <p>This option is read as a raw HOCON list-of-objects; it cannot be read via the flat {@link
+   * com.datastax.oss.driver.api.core.config.DriverExecutionProfile} typed getters. Parsing is
+   * performed directly from the underlying Typesafe {@code Config} object inside {@code
+   * DefaultDriverContext}.
+   *
+   * <p>Value type: list of HOCON objects
+   */
+  CLIENT_ROUTES_ENDPOINTS("advanced.client-routes.endpoints");
 
   private final String path;
 

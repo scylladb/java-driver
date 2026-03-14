@@ -36,6 +36,7 @@ import com.datastax.oss.driver.api.core.auth.AuthenticationException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.connection.ConnectionInitException;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.DefaultProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
@@ -45,6 +46,7 @@ import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
+import com.datastax.oss.protocol.internal.ProtocolConstants.ErrorCode;
 import com.datastax.oss.protocol.internal.request.AuthResponse;
 import com.datastax.oss.protocol.internal.request.Options;
 import com.datastax.oss.protocol.internal.request.Query;
@@ -648,5 +650,57 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
     logger.detachAppender(appender);
     logger.setLevel(levelBefore);
+  }
+
+  @Test
+  public void should_fail_connection_when_client_routes_change_rejected() {
+    List<String> eventTypes =
+        ImmutableList.of(
+            ProtocolConstants.EventType.SCHEMA_CHANGE,
+            ProtocolConstants.EventType.STATUS_CHANGE,
+            ProtocolConstants.EventType.TOPOLOGY_CHANGE,
+            ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
+    EventCallback eventCallback = mock(EventCallback.class);
+    DriverChannelOptions driverChannelOptions =
+        DriverChannelOptions.builder().withEvents(eventTypes, eventCallback).build();
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                driverChannelOptions,
+                heartbeatHandler,
+                false));
+
+    ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
+
+    // STARTUP
+    writeInboundFrame(readOutboundFrame(), new Ready());
+    // Cluster name check
+    writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("someClusterName"));
+
+    // REGISTER attempt includes CLIENT_ROUTES_CHANGE
+    Frame registerFrame = readOutboundFrame();
+    assertThat(registerFrame.message).isInstanceOf(Register.class);
+    Register firstRegister = (Register) registerFrame.message;
+    assertThat(firstRegister.eventTypes).contains(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
+
+    // Server rejects with PROTOCOL_ERROR mentioning CLIENT_ROUTES_CHANGE
+    writeInboundFrame(
+        registerFrame,
+        new Error(
+            ErrorCode.PROTOCOL_ERROR,
+            "Unknown event type: " + ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE));
+
+    // Connection must fail with a clear error message
+    assertThat(connectFuture).isFailed();
+    assertThat(connectFuture.cause())
+        .isInstanceOf(ConnectionInitException.class)
+        .hasMessageContaining("CLIENT_ROUTES_CHANGE")
+        .hasMessageContaining("ScyllaDB Enterprise >= 2026.1");
   }
 }

@@ -28,6 +28,8 @@ import com.datastax.dse.protocol.internal.ProtocolV4ClientCodecsForDse;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
+import com.datastax.oss.driver.api.core.config.ClientRouteProxy;
+import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -52,10 +54,13 @@ import com.datastax.oss.driver.internal.core.ConsistencyLevelRegistry;
 import com.datastax.oss.driver.internal.core.DefaultConsistencyLevelRegistry;
 import com.datastax.oss.driver.internal.core.DefaultProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
+import com.datastax.oss.driver.internal.core.addresstranslation.PassThroughAddressTranslator;
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
+import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
@@ -102,6 +107,9 @@ import com.datastax.oss.protocol.internal.ProtocolV3ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV5ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
 import com.datastax.oss.protocol.internal.SegmentCodec;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigList;
+import com.typesafe.config.ConfigObject;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.buffer.ByteBuf;
@@ -140,6 +148,8 @@ public class DefaultDriverContext implements InternalDriverContext {
 
   private static final Logger LOG = LoggerFactory.getLogger(InternalDriverContext.class);
   private static final AtomicInteger SESSION_NAME_COUNTER = new AtomicInteger();
+  private static final String CLIENT_ROUTES_HOCON_EXAMPLE =
+      "{ connection-id = \"<connection-id>\", connection-addr = \"host.example.com\" }";
 
   protected final CycleDetector cycleDetector =
       new CycleDetector("Detected cycle in context initialization");
@@ -188,6 +198,8 @@ public class DefaultDriverContext implements InternalDriverContext {
       new LazyReference<>("sslHandlerFactory", this::buildSslHandlerFactory, cycleDetector);
   private final LazyReference<ChannelFactory> channelFactoryRef =
       new LazyReference<>("channelFactory", this::buildChannelFactory, cycleDetector);
+  private final LazyReference<Optional<ClientRoutesConfig>> clientRoutesConfigRef =
+      new LazyReference<>("clientRoutesConfig", this::buildClientRoutesConfig, cycleDetector);
   private final LazyReference<TopologyMonitor> topologyMonitorRef =
       new LazyReference<>("topologyMonitor", this::buildTopologyMonitor, cycleDetector);
   private final LazyReference<MetadataManager> metadataManagerRef =
@@ -239,6 +251,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final Map<String, NodeDistanceEvaluator> nodeDistanceEvaluatorsFromBuilder;
   private final ClassLoader classLoader;
   private final InetSocketAddress cloudProxyAddress;
+  private final ClientRoutesConfig clientRoutesConfigFromBuilder;
   private final LazyReference<RequestLogFormatter> requestLogFormatterRef =
       new LazyReference<>("requestLogFormatter", this::buildRequestLogFormatter, cycleDetector);
   private final UUID startupClientId;
@@ -294,6 +307,7 @@ public class DefaultDriverContext implements InternalDriverContext {
     this.nodeDistanceEvaluatorsFromBuilder = programmaticArguments.getNodeDistanceEvaluators();
     this.classLoader = programmaticArguments.getClassLoader();
     this.cloudProxyAddress = programmaticArguments.getCloudProxyAddress();
+    this.clientRoutesConfigFromBuilder = programmaticArguments.getClientRoutesConfig();
     this.startupClientId = programmaticArguments.getStartupClientId();
     this.startupApplicationName = programmaticArguments.getStartupApplicationName();
     this.startupApplicationVersion = programmaticArguments.getStartupApplicationVersion();
@@ -418,6 +432,122 @@ public class DefaultDriverContext implements InternalDriverContext {
                         DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)));
   }
 
+  /**
+   * Resolves the effective {@link ClientRoutesConfig} by merging the programmatic configuration
+   * with the HOCON file-based configuration. The programmatic configuration takes precedence; if
+   * both are present a warning is logged. The result is cached after the first call.
+   *
+   * @return {@code null} when client routes are not configured at all.
+   */
+  @Nullable
+  protected ClientRoutesConfig resolveClientRoutesConfig() {
+    return clientRoutesConfigRef.get().orElse(null);
+  }
+
+  private Optional<ClientRoutesConfig> buildClientRoutesConfig() {
+    ClientRoutesConfig configFromFile = buildClientRoutesConfigFromFile();
+    if (clientRoutesConfigFromBuilder != null) {
+      if (configFromFile != null) {
+        LOG.warn(
+            "[{}] Both programmatic ClientRoutesConfig and '{}' were provided. "
+                + "The programmatic configuration takes precedence.",
+            getSessionName(),
+            DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath());
+      }
+      return Optional.of(clientRoutesConfigFromBuilder);
+    }
+    return Optional.ofNullable(configFromFile);
+  }
+
+  /**
+   * Reads the {@code advanced.client-routes} section from the HOCON configuration and builds a
+   * {@link ClientRoutesConfig}, or returns {@code null} if {@code endpoints} is not defined.
+   *
+   * <p>The {@code endpoints} value is a HOCON list of objects; it cannot be read through the flat
+   * {@link com.datastax.oss.driver.api.core.config.DriverExecutionProfile} typed API, so we access
+   * the underlying Typesafe {@link Config} directly via {@link TypesafeDriverConfig#getRawConfig}.
+   */
+  @Nullable
+  // Package-private to allow unit-testing without a live cluster.
+  ClientRoutesConfig buildClientRoutesConfigFromFile() {
+    DriverExecutionProfile defaultProfile = config.getDefaultProfile();
+    if (!defaultProfile.isDefined(DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS)) {
+      return null;
+    }
+
+    Config rawConfig = TypesafeDriverConfig.getRawConfig(defaultProfile);
+    if (rawConfig == null) {
+      // Non-Typesafe config backend: endpoints option is marked as defined but we cannot parse
+      // the compound-object list. Warn and skip.
+      LOG.warn(
+          "[{}] '{}' is defined but the underlying config implementation is not Typesafe-based; "
+              + "config-file client routes cannot be parsed. Use the programmatic API instead.",
+          getSessionName(),
+          DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath());
+      return null;
+    }
+
+    String endpointsPath = DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS.getPath();
+    ConfigList endpointsList;
+    try {
+      endpointsList = rawConfig.getList(endpointsPath);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Failed to read '%s' from configuration: %s. "
+                  + "Expected a list of objects, each with a required 'connection-id' field "
+                  + "and an optional 'connection-addr' field (DNS name or IP address), for example: "
+                  + "%s = [%s]",
+              endpointsPath, e.getMessage(), endpointsPath, CLIENT_ROUTES_HOCON_EXAMPLE),
+          e);
+    }
+
+    if (endpointsList.isEmpty()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "'%s' is set but contains no entries; at least one endpoint is required. "
+                  + "Each entry must be a HOCON object with a 'connection-id' field (string) "
+                  + "and an optional 'connection-addr' field (DNS name or IP address), for example: "
+                  + "%s = [%s]",
+              endpointsPath, endpointsPath, CLIENT_ROUTES_HOCON_EXAMPLE));
+    }
+
+    ClientRoutesConfig.Builder builder = ClientRoutesConfig.builder();
+
+    for (int i = 0; i < endpointsList.size(); i++) {
+      if (!(endpointsList.get(i) instanceof ConfigObject)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "'%s[%d]' must be a HOCON object but got a %s. "
+                    + "Each entry must have a required 'connection-id' field (string) "
+                    + "and an optional 'connection-addr' field (DNS name or IP address), for example: "
+                    + "%s. Got: %s",
+                endpointsPath,
+                i,
+                endpointsList.get(i).valueType(),
+                CLIENT_ROUTES_HOCON_EXAMPLE,
+                endpointsList.get(i)));
+      }
+      Config entry = ((ConfigObject) endpointsList.get(i)).toConfig();
+
+      if (!entry.hasPath("connection-id")) {
+        throw new IllegalArgumentException(
+            String.format(
+                "'%s[%d]' is missing the required 'connection-id' field. "
+                    + "Each entry must be a HOCON object with a 'connection-id' field (string) "
+                    + "and an optional 'connection-addr' field (DNS name or IP address), for example: "
+                    + "%s",
+                endpointsPath, i, CLIENT_ROUTES_HOCON_EXAMPLE));
+      }
+      String connectionId = entry.getString("connection-id");
+      String connectionAddr =
+          entry.hasPath("connection-addr") ? entry.getString("connection-addr") : null;
+      builder.addEndpoint(new ClientRouteProxy(connectionId, connectionAddr));
+    }
+
+    return builder.build();
+  }
+
   protected Optional<SslEngineFactory> buildSslEngineFactory(SslEngineFactory factoryFromBuilder) {
     return (factoryFromBuilder != null)
         ? Optional.of(factoryFromBuilder)
@@ -492,10 +622,52 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected TopologyMonitor buildTopologyMonitor() {
-    if (cloudProxyAddress == null) {
-      return new DefaultTopologyMonitor(this);
+    ClientRoutesConfig clientRoutesConfig = resolveClientRoutesConfig();
+    validateClientRoutesConfiguration(clientRoutesConfig);
+
+    if (cloudProxyAddress != null) {
+      return new CloudTopologyMonitor(this, cloudProxyAddress);
     }
-    return new CloudTopologyMonitor(this, cloudProxyAddress);
+    if (clientRoutesConfig != null) {
+      return new ClientRoutesTopologyMonitor(this, clientRoutesConfig);
+    }
+    return new DefaultTopologyMonitor(this);
+  }
+
+  private void validateClientRoutesConfiguration(ClientRoutesConfig clientRoutesConfig) {
+    if (clientRoutesConfig == null) {
+      return;
+    }
+    if (cloudProxyAddress != null) {
+      throw new IllegalStateException(
+          "Both a secure connect bundle and client routes configuration were provided. "
+              + "They are mutually exclusive. Please use either a secure connect bundle OR "
+              + "client routes configuration, but not both.");
+    }
+    DriverExecutionProfile defaultProfile = getConfig().getDefaultProfile();
+    if (defaultProfile.isDefined(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)) {
+      String className = defaultProfile.getString(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS);
+      Class<?> translatorClass =
+          Reflection.loadClass(
+              getClassLoader(),
+              className,
+              "com.datastax.oss.driver.internal.core.addresstranslation");
+      if (translatorClass == null) {
+        throw new IllegalStateException(
+            String.format(
+                "Could not load AddressTranslator class '%s'. "
+                    + "Verify the class exists and is on the classpath.",
+                className));
+      }
+      if (!PassThroughAddressTranslator.class.isAssignableFrom(translatorClass)) {
+        throw new IllegalStateException(
+            String.format(
+                "Both client routes configuration and a custom AddressTranslator ('%s') were "
+                    + "provided. They are mutually exclusive. Please use either client routes "
+                    + "OR a custom AddressTranslator, but not both.",
+                translatorClass.getName()));
+      }
+    }
   }
 
   protected MetadataManager buildMetadataManager() {
