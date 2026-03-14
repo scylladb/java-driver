@@ -939,6 +939,11 @@ public class TypedDriverOption<ValueT> {
           DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
           GenericType.STRING);
 
+  // Note: DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS intentionally has no typed equivalent here
+  // because its HOCON value is a list of compound objects (not a flat scalar type supported by the
+  // DriverExecutionProfile API); it is excluded from the TypedDriverOptionTest consistency check
+  // accordingly.
+
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {
       ImmutableList.Builder<TypedDriverOption<?>> result = ImmutableList.builder();

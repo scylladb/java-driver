@@ -170,10 +170,12 @@ class ProtocolInitHandler extends ConnectInitHandler {
     private Message request;
     private Authenticator authenticator;
     private ByteBuffer authResponseToken;
+    private final List<String> registerEventTypes;
 
     InitRequest(ChannelHandlerContext ctx) {
       super(ctx, timeoutMillis);
       this.step = querySupportedOptions ? Step.OPTIONS : Step.STARTUP;
+      this.registerEventTypes = options.eventTypes;
     }
 
     @Override
@@ -200,7 +202,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
         case AUTH_RESPONSE:
           return request = new AuthResponse(authResponseToken);
         case REGISTER:
-          return request = new Register(options.eventTypes);
+          return request = new Register(registerEventTypes);
         default:
           throw new AssertionError("unhandled step: " + step);
       }
@@ -323,7 +325,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
             if (options.keyspace != null) {
               step = Step.SET_KEYSPACE;
               send();
-            } else if (!options.eventTypes.isEmpty()) {
+            } else if (!registerEventTypes.isEmpty()) {
               step = Step.REGISTER;
               send();
             } else {
@@ -331,7 +333,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
             }
           }
         } else if (step == Step.SET_KEYSPACE && response instanceof SetKeyspace) {
-          if (!options.eventTypes.isEmpty()) {
+          if (!registerEventTypes.isEmpty()) {
             step = Step.REGISTER;
             send();
           } else {
@@ -359,6 +361,17 @@ class ProtocolInitHandler extends ConnectInitHandler {
           } else if (step == Step.SET_KEYSPACE
               && error.code == ProtocolConstants.ErrorCode.INVALID) {
             fail(new InvalidKeyspaceException(error.message));
+          } else if (step == Step.REGISTER
+              && error.code == ErrorCode.PROTOCOL_ERROR
+              && error.message.contains(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE)) {
+            // The server rejected CLIENT_ROUTES_CHANGE as an unknown event type.
+            // Fail the connection so that the caller (ClientRoutesTopologyMonitor.init())
+            // gets a clear error instead of silently degrading.
+            fail(
+                "Server does not support CLIENT_ROUTES_CHANGE event "
+                    + "(requires ScyllaDB Enterprise >= 2026.1). "
+                    + "Either upgrade the server or remove the client routes configuration.",
+                null);
           } else {
             failOnUnexpected(error);
           }

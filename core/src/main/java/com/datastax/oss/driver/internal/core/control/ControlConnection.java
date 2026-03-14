@@ -31,6 +31,8 @@ import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.DriverChannelOptions;
 import com.datastax.oss.driver.internal.core.channel.EventCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesUpdateEvent;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
@@ -45,6 +47,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Event;
+import com.datastax.oss.protocol.internal.response.event.ClientRoutesChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.SchemaChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
@@ -190,6 +193,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         case ProtocolConstants.EventType.SCHEMA_CHANGE:
           processSchemaChange(event);
           break;
+        case ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE:
+          processClientRoutesChange(event);
+          break;
         default:
           LOG.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
       }
@@ -242,6 +248,14 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             });
   }
 
+  private void processClientRoutesChange(Event event) {
+    ClientRoutesChangeEvent crce = (ClientRoutesChangeEvent) event;
+    LOG.debug("[{}] Received CLIENT_ROUTES_CHANGE event: {}", logPrefix, crce);
+    context
+        .getEventBus()
+        .fire(new ClientRoutesUpdateEvent(crce.changeType, crce.connectionIds, crce.hostIds));
+  }
+
   private class SingleThreaded {
     private final InternalDriverContext context;
     private final DriverConfig config;
@@ -292,7 +306,10 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       }
       initWasCalled = true;
       try {
-        ImmutableList<String> eventTypes = buildEventTypes(listenToClusterEvents);
+        boolean listenClientRoutesEvents =
+            context.getTopologyMonitor() instanceof ClientRoutesTopologyMonitor;
+        ImmutableList<String> eventTypes =
+            buildEventTypes(listenToClusterEvents, listenClientRoutesEvents);
         LOG.debug("[{}] Initializing with event types {}", logPrefix, eventTypes);
         channelOptions =
             DriverChannelOptions.builder()
@@ -467,42 +484,61 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
 
       // Otherwise, perform a full refresh (we don't know how long we were disconnected)
       if (!isFirstConnection) {
-        context
-            .getMetadataManager()
-            .refreshNodes()
-            .whenComplete(
-                (result, error) -> {
-                  if (error != null) {
-                    LOG.debug("[{}] Error while refreshing node list", logPrefix, error);
-                  } else {
-                    try {
-                      // A failed node list refresh at startup is not fatal, so this might be the
-                      // first successful refresh; make sure the LBP gets initialized (this is a
-                      // no-op if it was initialized already).
-                      context.getLoadBalancingPolicyWrapper().init();
-                      context
-                          .getMetadataManager()
-                          .refreshSchema(null, false, true)
-                          .whenComplete(
-                              (metadata, schemaError) -> {
-                                if (schemaError != null) {
-                                  Loggers.warnWithException(
-                                      LOG,
-                                      "[{}] Unexpected error while refreshing schema after a "
-                                          + "successful reconnection, keeping previous version",
-                                      logPrefix,
-                                      schemaError);
-                                }
-                              });
-                    } catch (Throwable t) {
-                      Loggers.warnWithException(
-                          LOG,
-                          "[{}] Unexpected error on control connection reconnect",
-                          logPrefix,
-                          t);
-                    }
-                  }
-                });
+        // If client routes are active, wait for the routes refresh to complete before refreshing
+        // nodes, so that buildNodeEndPoint sees up-to-date route data.
+        CompletionStage<Void> routesReady;
+        if (context.getTopologyMonitor() instanceof ClientRoutesTopologyMonitor) {
+          routesReady = ((ClientRoutesTopologyMonitor) context.getTopologyMonitor()).refresh();
+        } else {
+          routesReady = CompletableFuture.completedFuture(null);
+        }
+
+        routesReady.whenComplete(
+            (routesResult, routesError) -> {
+              if (routesError != null) {
+                LOG.debug(
+                    "[{}] Error while refreshing client routes on reconnect",
+                    logPrefix,
+                    routesError);
+              }
+              context
+                  .getMetadataManager()
+                  .refreshNodes()
+                  .whenComplete(
+                      (result, error) -> {
+                        if (error != null) {
+                          LOG.debug("[{}] Error while refreshing node list", logPrefix, error);
+                        } else {
+                          try {
+                            // A failed node list refresh at startup is not fatal, so this might
+                            // be the first successful refresh; make sure the LBP gets initialized
+                            // (this is a no-op if it was initialized already).
+                            context.getLoadBalancingPolicyWrapper().init();
+                            context
+                                .getMetadataManager()
+                                .refreshSchema(null, false, true)
+                                .whenComplete(
+                                    (metadata, schemaError) -> {
+                                      if (schemaError != null) {
+                                        Loggers.warnWithException(
+                                            LOG,
+                                            "[{}] Unexpected error while refreshing schema after"
+                                                + " a successful reconnection, keeping previous"
+                                                + " version",
+                                            logPrefix,
+                                            schemaError);
+                                      }
+                                    });
+                          } catch (Throwable t) {
+                            Loggers.warnWithException(
+                                LOG,
+                                "[{}] Unexpected error on control connection reconnect",
+                                logPrefix,
+                                t);
+                          }
+                        }
+                      });
+            });
       }
     }
 
@@ -595,7 +631,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     if (error instanceof AllNodesFailedException) {
       Collection<List<Throwable>> errors =
           ((AllNodesFailedException) error).getAllErrors().values();
-      if (errors.size() == 0) {
+      if (errors.isEmpty()) {
         return false;
       }
       for (List<Throwable> nodeErrors : errors) {
@@ -609,13 +645,17 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     return true;
   }
 
-  private static ImmutableList<String> buildEventTypes(boolean listenClusterEvents) {
+  private static ImmutableList<String> buildEventTypes(
+      boolean listenClusterEvents, boolean listenClientRoutesEvents) {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     builder.add(ProtocolConstants.EventType.SCHEMA_CHANGE);
     if (listenClusterEvents) {
       builder
           .add(ProtocolConstants.EventType.STATUS_CHANGE)
           .add(ProtocolConstants.EventType.TOPOLOGY_CHANGE);
+    }
+    if (listenClientRoutesEvents) {
+      builder.add(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
     }
     return builder.build();
   }

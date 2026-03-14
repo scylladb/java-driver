@@ -630,6 +630,15 @@ public class CcmBridge implements AutoCloseable {
     return f;
   }
 
+  /** Returns the total number of nodes across all data centers. */
+  public int getNodeCount() {
+    int total = 0;
+    for (int n : nodes) {
+      total += n;
+    }
+    return total;
+  }
+
   public String getNodeIpAddress(int nodeId) {
     return ipPrefix + nodeId;
   }
