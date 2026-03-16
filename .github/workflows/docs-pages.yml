@@ -20,8 +20,6 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     concurrency:
       group: single
       cancel-in-progress: true
