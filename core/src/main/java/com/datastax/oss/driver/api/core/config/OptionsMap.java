@@ -399,6 +399,7 @@ public class OptionsMap implements Serializable {
     // CLIENT_ROUTES_ENDPOINTS is intentionally omitted: it is a list-of-objects (compound HOCON
     // values) with no sensible scalar default, analogous to how CONFIG_RELOAD_INTERVAL is omitted.
     map.put(TypedDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, 9042);
+    map.put(TypedDriverOption.CLIENT_ROUTES_PROXY_PROTOCOL, false);
   }
 
   @Immutable

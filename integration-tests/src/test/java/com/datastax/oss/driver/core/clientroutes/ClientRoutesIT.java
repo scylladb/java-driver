@@ -821,6 +821,59 @@ public class ClientRoutesIT {
   }
 
   @Test
+  public void should_use_shard_awareness_through_pp2_nlb() throws Exception {
+    // Verify server supports client_routes
+    try (CqlSession admin = openAdminSession()) {
+      requireSystemClientRoutesTable(admin);
+    }
+    try (CcmBridge ccm = CcmBridge.builder().withNodes(1).build()) {
+      ccm.create();
+      ccm.start();
+
+      // Create PP2-enabled NLB
+      NlbSimulator nlb =
+          new NlbSimulator(ccm, NLB_ADDRESS, NLB_BASE_PORT, /* proxyProtocol= */ true);
+      try {
+        nlb.addNode(1);
+        Map<Integer, UUID> hostIds = collectHostIds(ccm, 1);
+        postClientRoutes(ccm, hostIds, nlb);
+        waitForRoutesVisibleOnAllNodes(ccm, hostIds.keySet(), hostIds.size());
+
+        ClientRoutesConfig config =
+            ClientRoutesConfig.builder()
+                .addEndpoint(new ClientRouteProxy(CONNECTION_ID, NLB_ADDRESS))
+                .withProxyProtocol(true)
+                .build();
+
+        try (CqlSession session = openNlbSession(config, nlb)) {
+          assertQueryWorks(session);
+
+          // With PP2, the NLB forwards the driver's original source port to ScyllaDB.
+          // The driver binds shard-specific local ports (advanced shard awareness, on by default),
+          // so ScyllaDB can route each connection to the correct shard. Verify the pool works
+          // correctly by running queries and waiting for the full pool to be established.
+          Node node = session.getMetadata().getNodes().values().iterator().next();
+          int shardCount =
+              node.getShardingInfo() != null ? node.getShardingInfo().getShardsCount() : 1;
+
+          // Wait for full shard-aware pool to be established (one connection per shard)
+          await()
+              .atMost(30, TimeUnit.SECONDS)
+              .pollInterval(1, TimeUnit.SECONDS)
+              .until(() -> node.getOpenConnections() >= shardCount);
+
+          // Run queries to verify shard-aware routing works end-to-end through the PP2 NLB
+          for (int i = 0; i < 20; i++) {
+            assertQueryWorks(session);
+          }
+        }
+      } finally {
+        nlb.close();
+      }
+    }
+  }
+
+  @Test
   public void should_work_with_mixed_proxy_and_direct_nodes() throws Exception {
     try (CqlSession admin = openAdminSession()) {
       requireSystemClientRoutesTable(admin);
