@@ -84,9 +84,13 @@ public final class ClientRoutesConfig {
   private final List<ClientRouteProxy> endpoints;
   private final String tableName;
   private final int nativeTransportPort;
+  private final boolean proxyProtocol;
 
   private ClientRoutesConfig(
-      List<ClientRouteProxy> endpoints, String tableName, int nativeTransportPort) {
+      List<ClientRouteProxy> endpoints,
+      String tableName,
+      int nativeTransportPort,
+      boolean proxyProtocol) {
     if (endpoints == null || endpoints.isEmpty()) {
       throw new IllegalArgumentException("At least one endpoint must be specified");
     }
@@ -99,6 +103,7 @@ public final class ClientRoutesConfig {
     this.endpoints = Collections.unmodifiableList(new ArrayList<>(endpoints));
     this.tableName = tableName;
     this.nativeTransportPort = nativeTransportPort;
+    this.proxyProtocol = proxyProtocol;
   }
 
   /**
@@ -134,6 +139,21 @@ public final class ClientRoutesConfig {
   }
 
   /**
+   * Returns whether Proxy Protocol v2 is in use between the NLB and ScyllaDB nodes.
+   *
+   * <p>When {@code true}, the driver assumes the NLB prepends a PP2 binary header to each
+   * connection it opens to ScyllaDB. The header carries the original client IP and source port,
+   * which ScyllaDB uses for shard-aware routing. This restores shard-awareness end-to-end through
+   * the NLB. Requires both the NLB and ScyllaDB to be configured for Proxy Protocol v2, and {@code
+   * advanced-shard-awareness.enabled} must be {@code true} (the default).
+   *
+   * @return {@code true} if Proxy Protocol v2 is enabled.
+   */
+  public boolean isProxyProtocol() {
+    return proxyProtocol;
+  }
+
+  /**
    * Creates a new builder for constructing a {@link ClientRoutesConfig}.
    *
    * @return a new builder instance.
@@ -154,12 +174,13 @@ public final class ClientRoutesConfig {
     ClientRoutesConfig that = (ClientRoutesConfig) o;
     return endpoints.equals(that.endpoints)
         && tableName.equals(that.tableName)
-        && nativeTransportPort == that.nativeTransportPort;
+        && nativeTransportPort == that.nativeTransportPort
+        && proxyProtocol == that.proxyProtocol;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(endpoints, tableName, nativeTransportPort);
+    return Objects.hash(endpoints, tableName, nativeTransportPort, proxyProtocol);
   }
 
   @Override
@@ -172,6 +193,8 @@ public final class ClientRoutesConfig {
         + '\''
         + ", nativeTransportPort="
         + nativeTransportPort
+        + ", proxyProtocol="
+        + proxyProtocol
         + '}';
   }
 
@@ -181,6 +204,7 @@ public final class ClientRoutesConfig {
     private final Set<String> seenConnectionIds = new HashSet<>();
     private String tableName = DEFAULT_TABLE_NAME;
     private int nativeTransportPort = DEFAULT_NATIVE_TRANSPORT_PORT;
+    private boolean proxyProtocol = false;
 
     /**
      * Adds an endpoint to the configuration.
@@ -254,6 +278,26 @@ public final class ClientRoutesConfig {
     }
 
     /**
+     * Sets whether Proxy Protocol v2 (PP2) is in use between the NLB and ScyllaDB nodes.
+     *
+     * <p>When {@code true}, the driver assumes the NLB prepends a PP2 binary header to each
+     * connection it opens to ScyllaDB. The header carries the original client source IP and port,
+     * which ScyllaDB uses to route the connection to the correct shard. This restores
+     * shard-awareness end-to-end through the NLB.
+     *
+     * <p>Requires: (1) the NLB configured with PP2, (2) ScyllaDB configured to accept PP2, (3)
+     * {@code advanced-shard-awareness.enabled = true} (the default).
+     *
+     * @param proxyProtocol {@code true} to enable PP2 mode.
+     * @return this builder.
+     */
+    @NonNull
+    public Builder withProxyProtocol(boolean proxyProtocol) {
+      this.proxyProtocol = proxyProtocol;
+      return this;
+    }
+
+    /**
      * Builds the {@link ClientRoutesConfig} with the configured endpoints and table name.
      *
      * @return the new configuration instance.
@@ -261,7 +305,7 @@ public final class ClientRoutesConfig {
      */
     @NonNull
     public ClientRoutesConfig build() {
-      return new ClientRoutesConfig(endpoints, tableName, nativeTransportPort);
+      return new ClientRoutesConfig(endpoints, tableName, nativeTransportPort, proxyProtocol);
     }
   }
 }

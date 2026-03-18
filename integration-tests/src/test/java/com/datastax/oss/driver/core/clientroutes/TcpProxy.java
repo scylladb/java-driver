@@ -46,6 +46,7 @@ public class TcpProxy implements Closeable {
 
   private final ServerSocket serverSocket;
   private final InetSocketAddress target;
+  private final boolean proxyProtocol;
   private final AtomicBoolean closed = new AtomicBoolean(false);
   private final CopyOnWriteArrayList<Socket> activeSockets = new CopyOnWriteArrayList<>();
   private final CopyOnWriteArrayList<Thread> pipeThreads = new CopyOnWriteArrayList<>();
@@ -59,7 +60,23 @@ public class TcpProxy implements Closeable {
    * @param target the remote address to forward connections to
    */
   public TcpProxy(String bindAddress, int listenPort, InetSocketAddress target) throws IOException {
+    this(bindAddress, listenPort, target, false);
+  }
+
+  /**
+   * Creates and starts a TCP proxy with optional Proxy Protocol v2 support.
+   *
+   * @param bindAddress the local address to bind on
+   * @param listenPort the local port to listen on (0 for any available port)
+   * @param target the remote address to forward connections to
+   * @param proxyProtocol when {@code true}, a PP2 binary header is prepended to each forwarded
+   *     connection carrying the original client IP and source port
+   */
+  public TcpProxy(
+      String bindAddress, int listenPort, InetSocketAddress target, boolean proxyProtocol)
+      throws IOException {
     this.target = target;
+    this.proxyProtocol = proxyProtocol;
     this.serverSocket = new ServerSocket();
     this.serverSocket.setReuseAddress(true);
     this.serverSocket.bind(new InetSocketAddress(bindAddress, listenPort));
@@ -67,7 +84,11 @@ public class TcpProxy implements Closeable {
         new Thread(this::acceptLoop, "tcp-proxy-accept-" + serverSocket.getLocalPort());
     this.acceptThread.setDaemon(true);
     this.acceptThread.start();
-    LOG.debug("TcpProxy listening on {} -> {}", serverSocket.getLocalPort(), target);
+    LOG.debug(
+        "TcpProxy listening on {} -> {} (proxyProtocol={})",
+        serverSocket.getLocalPort(),
+        target,
+        proxyProtocol);
   }
 
   /** Returns the local port this proxy is listening on. */
@@ -97,6 +118,19 @@ public class TcpProxy implements Closeable {
           continue;
         }
 
+        if (proxyProtocol) {
+          try {
+            sendPp2Header(remote.getOutputStream(), client);
+          } catch (IOException e) {
+            closeQuietly(client);
+            closeQuietly(remote);
+            if (!closed.get()) {
+              LOG.warn("TcpProxy failed to write PP2 header", e);
+            }
+            continue;
+          }
+        }
+
         Thread c2r =
             new Thread(
                 () -> pipe(client, remote),
@@ -121,6 +155,64 @@ public class TcpProxy implements Closeable {
         }
       }
     }
+  }
+
+  /**
+   * Writes a Proxy Protocol v2 (PP2) binary header to {@code out} encoding the original client
+   * source address and port. ScyllaDB reads this header to determine the client's original source
+   * port and uses it for shard-aware routing.
+   *
+   * <p>PP2 TCP4 header format (28 bytes total):
+   *
+   * <ul>
+   *   <li>12 bytes: fixed signature
+   *   <li>1 byte: version (0x2) | command PROXY (0x1) = 0x21
+   *   <li>1 byte: family AF_INET (0x1) | protocol STREAM (0x1) = 0x11
+   *   <li>2 bytes: address block length = 12 (big-endian)
+   *   <li>4 bytes: source IPv4 (client's address)
+   *   <li>4 bytes: destination IPv4 (this proxy's local address)
+   *   <li>2 bytes: source port (client's port, big-endian)
+   *   <li>2 bytes: destination port (this proxy's local port, big-endian)
+   * </ul>
+   */
+  private void sendPp2Header(OutputStream out, Socket client) throws IOException {
+    byte[] src = client.getInetAddress().getAddress(); // client source IP (4 bytes)
+    byte[] dst = serverSocket.getInetAddress().getAddress(); // NLB bind address (4 bytes)
+    int srcPort = client.getPort(); // client source port carries shard hint
+    int dstPort = serverSocket.getLocalPort(); // NLB listening port
+
+    byte[] header = new byte[28];
+    // PP2 signature
+    header[0] = 0x0D;
+    header[1] = 0x0A;
+    header[2] = 0x0D;
+    header[3] = 0x0A;
+    header[4] = 0x00;
+    header[5] = 0x0D;
+    header[6] = 0x0A;
+    header[7] = 0x51;
+    header[8] = 0x55;
+    header[9] = 0x49;
+    header[10] = 0x54;
+    header[11] = 0x0A;
+    header[12] = 0x21; // version 2, PROXY command
+    header[13] = 0x11; // AF_INET, STREAM
+    header[14] = 0x00;
+    header[15] = 12; // address block length = 12
+    System.arraycopy(src, 0, header, 16, 4);
+    System.arraycopy(dst, 0, header, 20, 4);
+    header[24] = (byte) (srcPort >> 8);
+    header[25] = (byte) (srcPort & 0xFF);
+    header[26] = (byte) (dstPort >> 8);
+    header[27] = (byte) (dstPort & 0xFF);
+    out.write(header);
+    out.flush();
+    LOG.debug(
+        "PP2 header sent: src={}:{} dst={}:{}",
+        client.getInetAddress().getHostAddress(),
+        srcPort,
+        serverSocket.getInetAddress().getHostAddress(),
+        dstPort);
   }
 
   private void pipe(Socket from, Socket to) {
