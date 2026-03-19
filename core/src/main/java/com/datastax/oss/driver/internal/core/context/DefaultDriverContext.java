@@ -514,9 +514,9 @@ public class DefaultDriverContext implements InternalDriverContext {
 
     ClientRoutesConfig.Builder builder = ClientRoutesConfig.builder();
 
-    if (defaultProfile.isDefined(DefaultDriverOption.CLIENT_ROUTES_PROXY_PROTOCOL)) {
-      builder.withProxyProtocol(
-          defaultProfile.getBoolean(DefaultDriverOption.CLIENT_ROUTES_PROXY_PROTOCOL));
+    if (defaultProfile.isDefined(DefaultDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED)) {
+      builder.withShardAwareness(
+          defaultProfile.getBoolean(DefaultDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED));
     }
 
     for (int i = 0; i < endpointsList.size(); i++) {
@@ -654,29 +654,6 @@ public class DefaultDriverContext implements InternalDriverContext {
               + "They are mutually exclusive. Please use either a secure connect bundle OR "
               + "client routes configuration, but not both.");
     }
-    if (clientRoutesConfig.isProxyProtocol()) {
-      boolean shardAwarenessEnabled =
-          getConfig()
-              .getDefaultProfile()
-              .getBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED);
-      if (!shardAwarenessEnabled) {
-        // proxyProtocol=true signals that the NLB will forward the driver's original source port
-        // to ScyllaDB via a PP2 header, enabling shard-aware connection routing through the proxy.
-        // However, this only has effect when advanced shard awareness is also enabled — that is the
-        // mechanism that binds a shard-specific local port in the first place. With shard awareness
-        // disabled the driver uses a random local port, so PP2 forwards a port that carries no
-        // shard intent. The setting is therefore ignored. If shard-aware routing through the NLB
-        // is desired, enable advanced-shard-awareness (it is on by default).
-        LOG.warn(
-            "[{}] ClientRoutesConfig has proxyProtocol=true but {} is false. "
-                + "Proxy Protocol v2 has no effect without advanced shard awareness — "
-                + "the proxyProtocol flag will be ignored. To enable shard-aware routing "
-                + "through the NLB, set advanced-shard-awareness.enabled=true (the default).",
-            getSessionName(),
-            DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED.getPath());
-      }
-    }
-
     DriverExecutionProfile defaultProfile = getConfig().getDefaultProfile();
     if (defaultProfile.isDefined(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)) {
       String className = defaultProfile.getString(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS);

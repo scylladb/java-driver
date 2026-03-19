@@ -949,10 +949,10 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DefaultDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, GenericType.INTEGER);
 
-  /** Whether Proxy Protocol v2 is in use between the NLB and ScyllaDB nodes. */
-  public static final TypedDriverOption<Boolean> CLIENT_ROUTES_PROXY_PROTOCOL =
+  /** Whether shard awareness is enabled for client-routes deployments. */
+  public static final TypedDriverOption<Boolean> CLIENT_ROUTES_SHARD_AWARENESS_ENABLED =
       new TypedDriverOption<>(
-          DefaultDriverOption.CLIENT_ROUTES_PROXY_PROTOCOL, GenericType.BOOLEAN);
+          DefaultDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, GenericType.BOOLEAN);
 
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {

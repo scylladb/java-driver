@@ -1110,17 +1110,16 @@ public enum DefaultDriverOption implements DriverOption {
   CLIENT_ROUTES_NATIVE_TRANSPORT_PORT("advanced.client-routes.native-transport-port"),
 
   /**
-   * Whether Proxy Protocol v2 (PP2) is in use between the NLB and ScyllaDB nodes.
+   * Whether NLB shard awareness is enabled for client-routes deployments.
    *
-   * <p>When {@code true}, the driver assumes the NLB prepends a PP2 binary header to each
-   * connection it opens to ScyllaDB. The header carries the original client source IP and port,
-   * enabling shard-aware routing through the NLB. Requires: (1) NLB configured with PP2, (2)
-   * ScyllaDB configured to accept PP2, (3) {@code advanced-shard-awareness.enabled = true} (the
+   * <p>When {@code true}, the driver assumes the NLB is configured to forward the driver's original
+   * source port to ScyllaDB (e.g. via Proxy Protocol v2), enabling shard-aware connection routing
+   * end-to-end through the NLB. Requires {@code advanced-shard-awareness.enabled = true} (the
    * default).
    *
    * <p>Value type: boolean
    */
-  CLIENT_ROUTES_PROXY_PROTOCOL("advanced.client-routes.proxy-protocol");
+  CLIENT_ROUTES_SHARD_AWARENESS_ENABLED("advanced.client-routes.shard-awarness-enabled");
 
   private final String path;
 

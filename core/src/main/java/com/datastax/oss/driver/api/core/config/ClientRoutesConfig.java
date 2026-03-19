@@ -84,13 +84,13 @@ public final class ClientRoutesConfig {
   private final List<ClientRouteProxy> endpoints;
   private final String tableName;
   private final int nativeTransportPort;
-  private final boolean proxyProtocol;
+  private final boolean shardAwarenessEnabled;
 
   private ClientRoutesConfig(
       List<ClientRouteProxy> endpoints,
       String tableName,
       int nativeTransportPort,
-      boolean proxyProtocol) {
+      boolean shardAwarenessEnabled) {
     if (endpoints == null || endpoints.isEmpty()) {
       throw new IllegalArgumentException("At least one endpoint must be specified");
     }
@@ -103,7 +103,7 @@ public final class ClientRoutesConfig {
     this.endpoints = Collections.unmodifiableList(new ArrayList<>(endpoints));
     this.tableName = tableName;
     this.nativeTransportPort = nativeTransportPort;
-    this.proxyProtocol = proxyProtocol;
+    this.shardAwarenessEnabled = shardAwarenessEnabled;
   }
 
   /**
@@ -139,18 +139,17 @@ public final class ClientRoutesConfig {
   }
 
   /**
-   * Returns whether Proxy Protocol v2 is in use between the NLB and ScyllaDB nodes.
+   * Returns whether shard awareness is enabled.
    *
-   * <p>When {@code true}, the driver assumes the NLB prepends a PP2 binary header to each
-   * connection it opens to ScyllaDB. The header carries the original client IP and source port,
-   * which ScyllaDB uses for shard-aware routing. This restores shard-awareness end-to-end through
-   * the NLB. Requires both the NLB and ScyllaDB to be configured for Proxy Protocol v2, and {@code
-   * advanced-shard-awareness.enabled} must be {@code true} (the default).
+   * <p>When {@code true}, the driver assumes the load balancer is configured to forward the
+   * driver's original source port to ScyllaDB (e.g. via Proxy Protocol v2), enabling shard-aware
+   * connection routing end-to-end through the load balancer. Requires {@code
+   * advanced-shard-awareness.enabled} to be {@code true} (the default).
    *
-   * @return {@code true} if Proxy Protocol v2 is enabled.
+   * @return {@code true} if shard awareness is enabled.
    */
-  public boolean isProxyProtocol() {
-    return proxyProtocol;
+  public boolean isShardAwarenessEnabled() {
+    return shardAwarenessEnabled;
   }
 
   /**
@@ -175,12 +174,12 @@ public final class ClientRoutesConfig {
     return endpoints.equals(that.endpoints)
         && tableName.equals(that.tableName)
         && nativeTransportPort == that.nativeTransportPort
-        && proxyProtocol == that.proxyProtocol;
+        && shardAwarenessEnabled == that.shardAwarenessEnabled;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(endpoints, tableName, nativeTransportPort, proxyProtocol);
+    return Objects.hash(endpoints, tableName, nativeTransportPort, shardAwarenessEnabled);
   }
 
   @Override
@@ -193,8 +192,8 @@ public final class ClientRoutesConfig {
         + '\''
         + ", nativeTransportPort="
         + nativeTransportPort
-        + ", proxyProtocol="
-        + proxyProtocol
+        + ", shardAwareness="
+        + shardAwarenessEnabled
         + '}';
   }
 
@@ -204,7 +203,7 @@ public final class ClientRoutesConfig {
     private final Set<String> seenConnectionIds = new HashSet<>();
     private String tableName = DEFAULT_TABLE_NAME;
     private int nativeTransportPort = DEFAULT_NATIVE_TRANSPORT_PORT;
-    private boolean proxyProtocol = false;
+    private boolean shardAwareness = false;
 
     /**
      * Adds an endpoint to the configuration.
@@ -278,22 +277,20 @@ public final class ClientRoutesConfig {
     }
 
     /**
-     * Sets whether Proxy Protocol v2 (PP2) is in use between the NLB and ScyllaDB nodes.
+     * Sets whether shard awareness is enabled.
      *
-     * <p>When {@code true}, the driver assumes the NLB prepends a PP2 binary header to each
-     * connection it opens to ScyllaDB. The header carries the original client source IP and port,
-     * which ScyllaDB uses to route the connection to the correct shard. This restores
-     * shard-awareness end-to-end through the NLB.
+     * <p>When {@code true}, the driver assumes the load balancer is configured to forward the
+     * driver's original source port to ScyllaDB (e.g. via Proxy Protocol v2), enabling shard-aware
+     * connection routing end-to-end through the load balancer.
      *
-     * <p>Requires: (1) the NLB configured with PP2, (2) ScyllaDB configured to accept PP2, (3)
-     * {@code advanced-shard-awareness.enabled = true} (the default).
+     * <p>Requires {@code advanced-shard-awareness.enabled = true} (the default).
      *
-     * @param proxyProtocol {@code true} to enable PP2 mode.
+     * @param shardAwareness {@code true} to enable shard awareness.
      * @return this builder.
      */
     @NonNull
-    public Builder withProxyProtocol(boolean proxyProtocol) {
-      this.proxyProtocol = proxyProtocol;
+    public Builder withShardAwareness(boolean shardAwareness) {
+      this.shardAwareness = shardAwareness;
       return this;
     }
 
@@ -305,7 +302,7 @@ public final class ClientRoutesConfig {
      */
     @NonNull
     public ClientRoutesConfig build() {
-      return new ClientRoutesConfig(endpoints, tableName, nativeTransportPort, proxyProtocol);
+      return new ClientRoutesConfig(endpoints, tableName, nativeTransportPort, shardAwareness);
     }
   }
 }
