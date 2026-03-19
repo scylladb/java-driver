@@ -109,8 +109,10 @@ public class DcInferringLoadBalancingPolicyInitTest extends LoadBalancingPolicyT
     // Then
     assertThat(t)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(
-            "No local DC was provided, but the contact points are from different DCs: node1=dc1, node2=dc2");
+        .hasMessageContaining("The local DC could not be inferred")
+        .hasMessageContaining("nodes are in different DCs")
+        .hasMessageContaining("node1=dc1")
+        .hasMessageContaining("node2=dc2");
   }
 
   @Test
@@ -134,8 +136,7 @@ public class DcInferringLoadBalancingPolicyInitTest extends LoadBalancingPolicyT
     // Then
     assertThat(t)
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(
-            "The local DC could not be inferred from contact points, please set it explicitly");
+        .hasMessageContaining("The local DC could not be inferred, please set it explicitly");
   }
 
   @Test

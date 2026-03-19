@@ -29,6 +29,8 @@ import com.datastax.oss.driver.api.core.metadata.Tablet;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.core.type.TupleType;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
+import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
@@ -337,12 +339,23 @@ public class MetadataManager implements AsyncAutoCloseable {
     }
 
     private Void refreshNodes(Iterable<NodeInfo> nodeInfos) {
+      boolean isFirst = !didFirstNodeListRefresh;
       MetadataRefresh refresh =
-          didFirstNodeListRefresh
-              ? new FullNodeListRefresh(nodeInfos)
-              : new InitialNodeListRefresh(nodeInfos, contactPoints);
+          isFirst ? new InitialNodeListRefresh(nodeInfos) : new FullNodeListRefresh(nodeInfos);
       didFirstNodeListRefresh = true;
-      return apply(refresh);
+      apply(refresh);
+      if (isFirst) {
+        // The control connection opened its channel on the contact point DefaultNode, which is
+        // now discarded. Re-fire channelOpened on the new metadata node so that
+        // NodeStateManager counts the control connection and transitions the node to UP.
+        DriverChannel channel = controlConnection.channel();
+        if (channel != null) {
+          metadata
+              .findNode(channel.getEndPoint())
+              .ifPresent(node -> context.getEventBus().fire(ChannelEvent.channelOpened(node)));
+        }
+      }
+      return null;
     }
 
     private void addNode(InetSocketAddress address, NodeInfo info) {

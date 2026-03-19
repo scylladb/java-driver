@@ -26,7 +26,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -83,8 +82,6 @@ import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -111,8 +108,6 @@ public class NodeStateIT {
           .build();
 
   @Rule public TestRule chain = RuleChain.outerRule(simulacron).around(sessionRule);
-
-  private @Captor ArgumentCaptor<DefaultNode> nodeCaptor;
 
   private InternalDriverContext driverContext;
   private ConfigurableIgnoresPolicy defaultLoadBalancingPolicy;
@@ -184,10 +179,12 @@ public class NodeStateIT {
                 .findNode(simulacronRegularNode.inetSocketAddress())
                 .orElseThrow(AssertionError::new);
 
-    // SessionRule uses all nodes as contact points, so we only get onUp notifications for them (no
-    // onAdd)
+    // All discovered nodes fire onAdd during initial node list refresh, then the control node
+    // transitions to UP when the control connection's channel event is re-fired on the metadata
+    // node
+    inOrder.verify(nodeStateListener, timeout(500)).onAdd(metadataControlNode);
+    inOrder.verify(nodeStateListener, timeout(500)).onAdd(metadataRegularNode);
     inOrder.verify(nodeStateListener, timeout(500)).onUp(metadataControlNode);
-    inOrder.verify(nodeStateListener, timeout(500)).onUp(metadataRegularNode);
   }
 
   @After
@@ -552,16 +549,11 @@ public class NodeStateIT {
       Node localMetadataNode1 = metadata.findNode(endPoint1).orElseThrow(AssertionError::new);
       Node localMetadataNode2 = metadata.findNode(endPoint2).orElseThrow(AssertionError::new);
 
-      // The order of the calls is not deterministic because contact points are shuffled, but it
-      // does not matter here since Mockito.verify does not enforce order.
-      verify(localNodeStateListener, timeout(500)).onRemove(nodeCaptor.capture());
-      assertThat(nodeCaptor.getValue().getEndPoint()).isEqualTo(wrongContactPoint);
-      verify(localNodeStateListener, timeout(500)).onUp(localMetadataNode1);
+      // Contact points are not preserved in metadata, so no onRemove for the wrong contact point.
+      // All discovered nodes fire onAdd, then the control node transitions to UP.
+      verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode1);
       verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode2);
-
-      // Note: there might be an additional onDown for wrongContactPoint if it was hit first at
-      // init. This is hard to test since the node was removed later, so we simply don't call
-      // verifyNoMoreInteractions.
+      verify(localNodeStateListener, timeout(500)).onUp(localMetadataNode1);
     }
   }
 
@@ -601,17 +593,21 @@ public class NodeStateIT {
           Node localMetadataNode1 = metadata.findNode(address1).orElseThrow(AssertionError::new);
           Node localMetadataNode2 = metadata.findNode(address2).orElseThrow(AssertionError::new);
           if (localMetadataNode2.getState() == NodeState.DOWN) {
-            // Stopped node was tried first and marked down, that's our target scenario
-            verify(localNodeStateListener, timeout(500)).onDown(localMetadataNode2);
+            // Stopped node was tried first and marked down, that's our target scenario.
+            // All nodes fire onAdd first, then the control node goes UP, and the stopped
+            // node goes DOWN when a connection attempt fails.
+            verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode1);
+            verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode2);
             verify(localNodeStateListener, timeout(500)).onUp(localMetadataNode1);
+            verify(localNodeStateListener, timeout(500)).onDown(localMetadataNode2);
             verify(localNodeStateListener, timeout(500)).onSessionReady(localSession);
-            verifyNoMoreInteractions(localNodeStateListener);
             return;
           } else {
-            // Stopped node was not tried
-            assertThat(localMetadataNode2).isUnknown();
+            // Stopped node was not tried as contact point — it may still be UNKNOWN or
+            // transition to DOWN asynchronously as the pool attempts to connect.
+            verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode1);
+            verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode2);
             verify(localNodeStateListener, timeout(500)).onUp(localMetadataNode1);
-            verifyNoMoreInteractions(localNodeStateListener);
           }
         }
         reset(localNodeStateListener);

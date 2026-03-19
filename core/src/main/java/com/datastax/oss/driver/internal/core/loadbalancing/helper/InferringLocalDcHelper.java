@@ -21,9 +21,10 @@ import static com.datastax.oss.driver.internal.core.time.Clock.LOG;
 
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.HashSet;
 import java.util.Map;
@@ -36,9 +37,8 @@ import net.jcip.annotations.ThreadSafe;
  * An implementation of {@link LocalDcHelper} that fetches the user-supplied datacenter, if any,
  * from the programmatic configuration API, or else, from the driver configuration. If no local
  * datacenter is explicitly defined, this implementation infers the local datacenter from the
- * contact points: if all contact points share the same datacenter, that datacenter is returned. If
- * the contact points are from different datacenters, or if no contact points reported any
- * datacenter, an {@link IllegalStateException} is thrown.
+ * control node (the node the control connection is connected to). If the control node's datacenter
+ * is not available, an {@link IllegalStateException} is thrown.
  */
 @ThreadSafe
 public class InferringLocalDcHelper extends OptionalLocalDcHelper {
@@ -58,31 +58,45 @@ public class InferringLocalDcHelper extends OptionalLocalDcHelper {
     if (optionalLocalDc.isPresent()) {
       return optionalLocalDc;
     }
+    // Infer from the control node — its datacenter is the local DC.
+    DriverChannel controlChannel =
+        context.getControlConnection() != null ? context.getControlConnection().channel() : null;
+    if (controlChannel != null) {
+      EndPoint controlEndPoint = controlChannel.getEndPoint();
+      for (Node node : nodes.values()) {
+        if (node.getEndPoint().equals(controlEndPoint)) {
+          String datacenter = node.getDatacenter();
+          if (datacenter != null) {
+            LOG.info("[{}] Inferred local DC from control node: {}", logPrefix, datacenter);
+            return Optional.of(datacenter);
+          }
+          break;
+        }
+      }
+    }
+    // Fallback: if all nodes share the same DC, use it.
     Set<String> datacenters = new HashSet<>();
-    Set<DefaultNode> contactPoints = context.getMetadataManager().getContactPoints();
-    for (Node node : contactPoints) {
+    for (Node node : nodes.values()) {
       String datacenter = node.getDatacenter();
       if (datacenter != null) {
         datacenters.add(datacenter);
       }
     }
     if (datacenters.size() == 1) {
-      String localDc = datacenters.iterator().next();
-      LOG.info("[{}] Inferred local DC from contact points: {}", logPrefix, localDc);
-      return Optional.of(localDc);
+      return Optional.of(datacenters.iterator().next());
     }
-    if (datacenters.isEmpty()) {
+    if (datacenters.size() > 1) {
       throw new IllegalStateException(
-          "The local DC could not be inferred from contact points, please set it explicitly (see "
-              + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
-              + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter)");
+          String.format(
+              "The local DC could not be inferred (nodes are in different DCs: %s), "
+                  + "please set it explicitly (see "
+                  + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
+                  + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter)",
+              formatNodesAndDcs(nodes.values())));
     }
     throw new IllegalStateException(
-        String.format(
-            "No local DC was provided, but the contact points are from different DCs: %s; "
-                + "please set the local DC explicitly (see "
-                + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
-                + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter)",
-            formatNodesAndDcs(contactPoints)));
+        "The local DC could not be inferred, please set it explicitly (see "
+            + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
+            + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter)");
   }
 }

@@ -153,9 +153,6 @@ public class MetadataManagerTest {
     assertThatStage(refreshNodesFuture).isSuccess();
     assertThat(metadataManager.refreshes).hasSize(1);
     InitialNodeListRefresh refresh = (InitialNodeListRefresh) metadataManager.refreshes.get(0);
-    assertThat(refresh.contactPoints)
-        .extracting(Node::getEndPoint)
-        .containsOnly(MetadataManager.DEFAULT_CONTACT_POINT);
     assertThat(refresh.nodeInfos).containsExactlyInAnyOrder(info1, info2);
   }
 

@@ -545,7 +545,11 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     private void onChannelClosed(DriverChannel channel, Node node) {
       assert adminExecutor.inEventLoop();
       if (!closeWasCalled) {
-        context.getEventBus().fire(ChannelEvent.channelClosed(node));
+        // Look up the current metadata node by endpoint, since the original contact point node
+        // may have been replaced by a new DefaultNode during InitialNodeListRefresh.
+        Node metadataNode =
+            context.getMetadataManager().getMetadata().findNode(channel.getEndPoint()).orElse(node);
+        context.getEventBus().fire(ChannelEvent.channelClosed(metadataNode));
         // If this channel is the current control channel, we must start a
         // reconnection attempt to get a new control channel.
         if (channel == ControlConnection.this.channel) {

@@ -39,8 +39,7 @@ public class DcInferringLoadBalancingPolicyDistanceTest
             IllegalStateException.class,
             ise ->
                 assertThat(ise)
-                    .hasMessageContaining(
-                        "No local DC was provided, but the contact points are from different DCs")
+                    .hasMessageContaining("The local DC could not be inferred")
                     .hasMessageContaining("node1=null")
                     .hasMessageContaining("node2=dc1")
                     .hasMessageContaining("node3=dc2"));
