@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenFactory;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenFactoryRegistry;
@@ -64,6 +65,17 @@ class InitialNodeListRefresh extends NodesRefresh {
     assert oldMetadata == DefaultMetadata.EMPTY;
     TokenFactory tokenFactory = null;
 
+    // After ControlConnection.connect() queries system.local, the control channel's endpoint is
+    // upgraded from DefaultEndPoint to ClientRoutesEndPoint. This lets us identify the control
+    // node by endpoint equality, so we can match it to its contact point.
+    EndPoint controlChannelEndPoint = null;
+    if (context.getControlConnection() != null) {
+      DriverChannel controlChannel = context.getControlConnection().channel();
+      if (controlChannel != null) {
+        controlChannelEndPoint = controlChannel.getEndPoint();
+      }
+    }
+
     Map<UUID, DefaultNode> newNodes = new HashMap<>();
     // Contact point nodes don't have host ID as well as other info yet, so we fill them with node
     // info found on first match by endpoint
@@ -82,6 +94,15 @@ class InitialNodeListRefresh extends NodesRefresh {
       } else {
         EndPoint endPoint = nodeInfo.getEndPoint();
         DefaultNode contactPointNode = findContactPointNode(endPoint);
+        // Fallback for ClientRoutes: the contact point has DefaultEndPoint (discovery proxy)
+        // while the NodeInfo has ClientRoutesEndPoint. If this NodeInfo's endpoint matches the
+        // control channel's (upgraded) endpoint, it's the control node — match it to the first
+        // available contact point.
+        if (contactPointNode == null
+            && controlChannelEndPoint != null
+            && endPoint.equals(controlChannelEndPoint)) {
+          contactPointNode = firstUnmatchedContactPoint(matchedContactPoints);
+        }
         DefaultNode node;
         if (contactPointNode == null || matchedContactPoints.contains(endPoint)) {
           node = new DefaultNode(endPoint, context);
@@ -119,6 +140,15 @@ class InitialNodeListRefresh extends NodesRefresh {
   private DefaultNode findContactPointNode(EndPoint endPoint) {
     for (DefaultNode node : contactPoints) {
       if (node.getEndPoint().equals(endPoint)) {
+        return node;
+      }
+    }
+    return null;
+  }
+
+  private DefaultNode firstUnmatchedContactPoint(Set<EndPoint> matchedContactPoints) {
+    for (DefaultNode node : contactPoints) {
+      if (!matchedContactPoints.contains(node.getEndPoint())) {
         return node;
       }
     }

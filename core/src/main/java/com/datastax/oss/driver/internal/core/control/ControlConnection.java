@@ -463,7 +463,26 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                                   adminExecutor
                                       .submit(() -> onChannelClosed(channel, node))
                                       .addListener(UncaughtExceptions::log));
-                      onSuccess.run();
+                      resolveChannelNodeInfo(channel)
+                          .whenCompleteAsync(
+                              (ignored, fetchError) -> {
+                                if (fetchError != null) {
+                                  LOG.debug(
+                                      "[{}] Failed to fetch control node host_id from {}, "
+                                          + "trying next node",
+                                      logPrefix,
+                                      node,
+                                      fetchError);
+                                  channel.forceClose();
+                                  List<Entry<Node, Throwable>> newErrors =
+                                      (errors == null) ? new ArrayList<>() : errors;
+                                  newErrors.add(new SimpleEntry<>(node, fetchError));
+                                  connect(nodes, newErrors, onSuccess, onFailure);
+                                } else {
+                                  onSuccess.run();
+                                }
+                              },
+                              adminExecutor);
                     }
                   } catch (Exception e) {
                     Loggers.warnWithException(
@@ -475,6 +494,25 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                 },
                 adminExecutor);
       }
+    }
+
+    /**
+     * Resolves the identity of the node at the other end of the channel via the topology monitor,
+     * then updates the channel's endpoint. This allows {@link InitialNodeListRefresh} to identify
+     * the control node by endpoint equality when matching contact points (e.g., when a
+     * DefaultEndPoint contact point connects to a node that uses ClientRoutesEndPoint).
+     */
+    private CompletionStage<Void> resolveChannelNodeInfo(DriverChannel channel) {
+      return context
+          .getTopologyMonitor()
+          .getChannelNodeInfo(channel)
+          .thenAccept(
+              endPoint -> {
+                if (!endPoint.equals(channel.getEndPoint())) {
+                  channel.setEndPoint(endPoint);
+                  LOG.debug("[{}] Control channel endpoint upgraded to {}", logPrefix, endPoint);
+                }
+              });
     }
 
     private void onSuccessfulReconnect() {

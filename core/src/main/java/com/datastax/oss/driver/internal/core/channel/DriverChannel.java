@@ -69,7 +69,7 @@ public class DriverChannel {
   @SuppressWarnings("RedundantStringConstructorCall")
   static final Object FORCEFUL_CLOSE_MESSAGE = new String("FORCEFUL_CLOSE_MESSAGE");
 
-  private final EndPoint endPoint;
+  private volatile EndPoint endPoint;
   private final Channel channel;
   private final InFlightHandler inFlightHandler;
   private final WriteCoalescer writeCoalescer;
@@ -248,6 +248,11 @@ public class DriverChannel {
   /** The endpoint that was used to establish the connection. */
   public EndPoint getEndPoint() {
     return endPoint;
+  }
+
+  /** Updates the endpoint, e.g. after resolving the node's identity from system.local. */
+  public void setEndPoint(EndPoint endPoint) {
+    this.endPoint = endPoint;
   }
 
   public SocketAddress localAddress() {

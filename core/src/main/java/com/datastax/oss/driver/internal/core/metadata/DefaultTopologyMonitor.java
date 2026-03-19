@@ -165,6 +165,22 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
   }
 
   @Override
+  public CompletionStage<EndPoint> getChannelNodeInfo(DriverChannel channel) {
+    if (closeFuture.isDone()) {
+      return CompletableFutures.failedFuture(new IllegalStateException("closed"));
+    }
+    EndPoint localEndPoint = channel.getEndPoint();
+    return query(channel, "SELECT * FROM system.local WHERE key='local'")
+        .thenApply(
+            result -> {
+              AdminRow localRow = result.iterator().next();
+              InetSocketAddress broadcastRpcAddress =
+                  getBroadcastRpcAddress(localRow, localEndPoint);
+              return buildNodeEndPoint(localRow, broadcastRpcAddress, localEndPoint);
+            });
+  }
+
+  @Override
   public CompletionStage<Iterable<NodeInfo>> refreshNodeList() {
     if (closeFuture.isDone()) {
       return CompletableFutures.failedFuture(new IllegalStateException("closed"));

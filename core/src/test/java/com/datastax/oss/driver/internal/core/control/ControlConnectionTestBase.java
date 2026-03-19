@@ -41,6 +41,7 @@ import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
+import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
 import io.netty.channel.Channel;
 import io.netty.channel.DefaultChannelPromise;
@@ -136,6 +137,15 @@ abstract class ControlConnectionTestBase {
     when(config.getDefaultProfile()).thenReturn(defaultProfile);
     when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
         .thenReturn(false);
+
+    TopologyMonitor topologyMonitor = mock(TopologyMonitor.class);
+    when(topologyMonitor.getChannelNodeInfo(any(DriverChannel.class)))
+        .thenAnswer(
+            invocation -> {
+              DriverChannel ch = invocation.getArgument(0);
+              return CompletableFuture.completedFuture(ch.getEndPoint());
+            });
+    when(context.getTopologyMonitor()).thenReturn(topologyMonitor);
 
     controlConnection = new ControlConnection(context);
   }

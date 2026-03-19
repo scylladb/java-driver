@@ -165,6 +165,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     // buildNodeEndPoint (called during the subsequent refreshNodes) can use ClientRoutesEndPoint.
     // If the server does not support CLIENT_ROUTES_CHANGE, the control connection will fail with
     // a ConnectionInitException and the error propagates naturally.
+    // Note: the control node's host_id is resolved by ControlConnection.connect() (via
+    // fetchControlNodeHostId) so that InitialNodeListRefresh can match the contact point.
     return super.init()
         .thenCompose(ignored -> queryClientRoutesAndCache(null, null))
         .whenComplete(

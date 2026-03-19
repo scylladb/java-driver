@@ -482,7 +482,6 @@ public class ClientRoutesTopologyMonitorTest {
             .build();
     TestableClientRoutesTopologyMonitor h =
         new TestableClientRoutesTopologyMonitor(context, config) {
-          volatile boolean initDone = false;
           volatile boolean firstPostInitDone = false;
 
           @Override
@@ -492,12 +491,13 @@ public class ClientRoutesTopologyMonitorTest {
               @NonNull String queryString,
               @NonNull Duration timeout) {
             capturedQueries.add(queryString);
-            if (!initDone) {
-              initDone = true;
+            if (queryString.contains("system.client_routes") && !firstPostInitDone) {
+              // First client_routes query is during init — return immediately
+              firstPostInitDone = true;
               return CompletableFuture.completedFuture(emptyResult);
             }
-            if (!firstPostInitDone) {
-              firstPostInitDone = true;
+            if (queryString.contains("system.client_routes")) {
+              // Second client_routes query — block on delayedFuture
               return delayedFuture;
             }
             return CompletableFuture.completedFuture(emptyResult);
