@@ -38,6 +38,7 @@ import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.schema.parsing.SchemaParserFactory;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaQueriesFactory;
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
+import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import io.netty.channel.DefaultEventLoopGroup;
@@ -311,6 +312,97 @@ public class MetadataManagerTest {
     // Then
     waitForPendingAdminTasks(() -> result.toCompletableFuture().isDone());
     assertThatStage(result).isFailed(t -> assertThat(t).isEqualTo(expectedException));
+  }
+
+  @Test
+  public void refreshSchema_should_recover_after_newInstance_failure() {
+    // Given
+    IllegalStateException expectedException = new IllegalStateException("Error we're testing");
+    when(schemaQueriesFactory.newInstance()).thenThrow(expectedException);
+    when(topologyMonitor.refreshNodeList())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(mock(NodeInfo.class))));
+    when(topologyMonitor.checkSchemaAgreement())
+        .thenReturn(CompletableFuture.completedFuture(Boolean.TRUE));
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    metadataManager.refreshNodes();
+    waitForPendingAdminTasks(() -> metadataManager.refreshes.size() == 1);
+
+    // First refresh fails
+    CompletionStage<MetadataManager.RefreshSchemaResult> result1 =
+        metadataManager.refreshSchema("foo", true, true);
+    waitForPendingAdminTasks(() -> result1.toCompletableFuture().isDone());
+    assertThatStage(result1).isFailed(t -> assertThat(t).isEqualTo(expectedException));
+
+    // When - second refresh should not be stuck (uses same throwing mock)
+    CompletionStage<MetadataManager.RefreshSchemaResult> result2 =
+        metadataManager.refreshSchema("bar", true, true);
+
+    // Then - should complete (not hang forever), proving currentSchemaRefresh was cleared
+    waitForPendingAdminTasks(() -> result2.toCompletableFuture().isDone());
+    assertThatStage(result2).isFailed(t -> assertThat(t).isEqualTo(expectedException));
+  }
+
+  @Test
+  public void refreshSchema_should_recover_after_agreement_error() {
+    // Given
+    RuntimeException agreementException = new RuntimeException("Agreement check failed");
+    when(topologyMonitor.refreshNodeList())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(mock(NodeInfo.class))));
+    when(topologyMonitor.checkSchemaAgreement())
+        .thenReturn(CompletableFutures.failedFuture(agreementException));
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    metadataManager.refreshNodes();
+    waitForPendingAdminTasks(() -> metadataManager.refreshes.size() == 1);
+
+    // First refresh fails due to agreement error
+    CompletionStage<MetadataManager.RefreshSchemaResult> result1 =
+        metadataManager.refreshSchema("foo", true, true);
+    waitForPendingAdminTasks(() -> result1.toCompletableFuture().isDone());
+    assertThatStage(result1).isFailed();
+
+    // When - second refresh should not be stuck (uses same failing mock)
+    CompletionStage<MetadataManager.RefreshSchemaResult> result2 =
+        metadataManager.refreshSchema("bar", true, true);
+
+    // Then - should complete (not hang forever), proving currentSchemaRefresh was cleared
+    waitForPendingAdminTasks(() -> result2.toCompletableFuture().isDone());
+    assertThatStage(result2).isFailed();
+  }
+
+  @Test
+  public void refreshSchema_should_drain_queued_refresh_after_newInstance_failure() {
+    // Given
+    IllegalStateException expectedException = new IllegalStateException("Error we're testing");
+    when(schemaQueriesFactory.newInstance()).thenThrow(expectedException);
+    when(topologyMonitor.refreshNodeList())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(mock(NodeInfo.class))));
+    // Use a future we control to introduce a delay in schema agreement check
+    CompletableFuture<Boolean> agreementFuture = new CompletableFuture<>();
+    when(topologyMonitor.checkSchemaAgreement()).thenReturn(agreementFuture);
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    metadataManager.refreshNodes();
+    waitForPendingAdminTasks(() -> metadataManager.refreshes.size() == 1);
+
+    // Start first refresh (it will block on agreement check)
+    CompletionStage<MetadataManager.RefreshSchemaResult> result1 =
+        metadataManager.refreshSchema("foo", true, true);
+
+    // Queue a second refresh while the first is in progress
+    CompletionStage<MetadataManager.RefreshSchemaResult> result2 =
+        metadataManager.refreshSchema("bar", true, true);
+
+    // Now complete the agreement check - first refresh will fail at newInstance(),
+    // and onSchemaRefreshComplete should drain the queued second refresh
+    agreementFuture.complete(true);
+
+    // Then both requests should complete (not hang forever)
+    waitForPendingAdminTasks(
+        () -> result1.toCompletableFuture().isDone() && result2.toCompletableFuture().isDone());
+    assertThatStage(result1).isFailed(t -> assertThat(t).isEqualTo(expectedException));
+    assertThatStage(result2).isFailed(t -> assertThat(t).isEqualTo(expectedException));
   }
 
   private static class TestMetadataManager extends MetadataManager {
