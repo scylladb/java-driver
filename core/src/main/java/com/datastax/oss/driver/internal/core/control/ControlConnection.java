@@ -455,15 +455,34 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                             previousChannel);
                         previousChannel.forceClose();
                       }
-                      context.getEventBus().fire(ChannelEvent.channelOpened(node));
-                      channel
-                          .closeFuture()
-                          .addListener(
-                              f ->
-                                  adminExecutor
-                                      .submit(() -> onChannelClosed(channel, node))
-                                      .addListener(UncaughtExceptions::log));
-                      onSuccess.run();
+                      resolveChannelNodeInfo(channel)
+                          .whenCompleteAsync(
+                              (ignored, fetchError) -> {
+                                if (fetchError != null) {
+                                  LOG.debug(
+                                      "[{}] Failed to resolve control node endpoint from {}, "
+                                          + "trying next node",
+                                      logPrefix,
+                                      node,
+                                      fetchError);
+                                  channel.forceClose();
+                                  List<Entry<Node, Throwable>> newErrors =
+                                      (errors == null) ? new ArrayList<>() : errors;
+                                  newErrors.add(new SimpleEntry<>(node, fetchError));
+                                  connect(nodes, newErrors, onSuccess, onFailure);
+                                } else {
+                                  context.getEventBus().fire(ChannelEvent.channelOpened(node));
+                                  channel
+                                      .closeFuture()
+                                      .addListener(
+                                          f ->
+                                              adminExecutor
+                                                  .submit(() -> onChannelClosed(channel, node))
+                                                  .addListener(UncaughtExceptions::log));
+                                  onSuccess.run();
+                                }
+                              },
+                              adminExecutor);
                     }
                   } catch (Exception e) {
                     Loggers.warnWithException(
@@ -475,6 +494,23 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                 },
                 adminExecutor);
       }
+    }
+
+    /**
+     * Resolves the identity of the node at the other end of the channel via the topology monitor,
+     * then updates the channel's endpoint.
+     */
+    private CompletionStage<Void> resolveChannelNodeInfo(DriverChannel channel) {
+      return context
+          .getTopologyMonitor()
+          .getChannelEndpoint(channel)
+          .thenAccept(
+              endPoint -> {
+                if (!endPoint.equals(channel.getEndPoint())) {
+                  channel.setEndPoint(endPoint);
+                  LOG.debug("[{}] Control channel endpoint upgraded to {}", logPrefix, endPoint);
+                }
+              });
     }
 
     private void onSuccessfulReconnect() {

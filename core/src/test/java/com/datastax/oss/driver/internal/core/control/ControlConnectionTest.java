@@ -22,10 +22,12 @@ import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
@@ -33,6 +35,7 @@ import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.MockChannelFactoryHelper;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
+import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -518,6 +521,41 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     // no event because the control connection never "owned" the channel
     verify(eventBus, never()).fire(ChannelEvent.channelOpened(node2));
     verify(eventBus, never()).fire(ChannelEvent.channelClosed(node2));
+
+    factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_try_next_node_if_resolve_endpoint_fails() {
+    // Given
+    DriverChannel channel1 = newMockDriverChannel(1);
+    DriverChannel channel2 = newMockDriverChannel(2);
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory)
+            .success(node1, channel1)
+            .success(node2, channel2)
+            .build();
+
+    // Make resolveChannelNodeInfo fail for channel1
+    TopologyMonitor topologyMonitor = context.getTopologyMonitor();
+    CompletableFuture<EndPoint> failedFuture = new CompletableFuture<>();
+    failedFuture.completeExceptionally(new RuntimeException("mock resolve failure"));
+    when(topologyMonitor.getChannelEndpoint(channel1)).thenReturn(failedFuture);
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    factoryHelper.waitForCall(node1);
+    factoryHelper.waitForCall(node2);
+
+    // Then
+    assertThatStage(initFuture)
+        .isSuccess(v -> assertThat(controlConnection.channel()).isEqualTo(channel2));
+    // channel1's resolve failed, so channelOpened should NOT have been fired for node1
+    verify(eventBus, VERIFY_TIMEOUT).fire(ChannelEvent.channelOpened(node2));
+    verify(eventBus, never()).fire(ChannelEvent.channelOpened(node1));
+    // channel1 should be force-closed (called once by resolve failure handler,
+    // and once more when channel2 succeeds and closes the previousChannel)
+    verify(channel1, timeout(500).atLeastOnce()).forceClose();
 
     factoryHelper.verifyNoMoreCalls();
   }
