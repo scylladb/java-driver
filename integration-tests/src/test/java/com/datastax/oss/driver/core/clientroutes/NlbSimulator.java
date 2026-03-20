@@ -112,20 +112,16 @@ public class NlbSimulator implements Closeable {
     String nodeIp = ccmBridge.getNodeIpAddress(nodeId);
     InetSocketAddress nodeAddr = new InetSocketAddress(nodeIp, 9042);
 
-    // Create per-node proxy first, before updating state
     int nodePort = getNodePort(nodeId);
     TcpProxy proxy = new TcpProxy(bindAddress, nodePort, nodeAddr);
 
-    // Update state and rebuild discovery proxy; if rebuild fails, close the new proxy
     activeNodes.add(nodeId);
     nodeProxies.put(nodeId, proxy);
-    try {
-      rebuildDiscoveryProxy();
-    } catch (IOException e) {
-      activeNodes.remove(Integer.valueOf(nodeId));
-      nodeProxies.remove(nodeId);
-      proxy.close();
-      throw e;
+
+    if (discoveryProxy == null) {
+      discoveryProxy = buildDiscoveryProxy(nodeAddr);
+    } else {
+      discoveryProxy.addTarget(nodeAddr);
     }
 
     LOG.info("NLB: added node{} ({}:{}) -> proxy port {}", nodeId, nodeIp, 9042, nodePort);
@@ -139,37 +135,20 @@ public class NlbSimulator implements Closeable {
     }
     activeNodes.remove(Integer.valueOf(nodeId));
 
-    // Rebuild discovery proxy with updated node list
-    rebuildDiscoveryProxy();
+    if (discoveryProxy != null) {
+      String nodeIp = ccmBridge.getNodeIpAddress(nodeId);
+      discoveryProxy.removeTarget(new InetSocketAddress(nodeIp, 9042));
+    }
 
     LOG.info("NLB: removed node{}", nodeId);
   }
 
-  private void rebuildDiscoveryProxy() throws IOException {
-    RoundRobinProxy oldProxy = discoveryProxy;
-
-    if (activeNodes.isEmpty()) {
-      discoveryProxy = null;
-      if (oldProxy != null) {
-        oldProxy.close();
-      }
-      return;
-    }
-
-    // Build target list from active nodes
+  private RoundRobinProxy buildDiscoveryProxy(InetSocketAddress firstTarget) throws IOException {
     List<InetSocketAddress> targets = new ArrayList<>();
-    for (int nodeId : activeNodes) {
-      String nodeIp = ccmBridge.getNodeIpAddress(nodeId);
-      targets.add(new InetSocketAddress(nodeIp, 9042));
-    }
-
-    // Create new proxy before closing old one to avoid inconsistent state on failure
-    discoveryProxy = new RoundRobinProxy(bindAddress, basePort, targets);
-    if (oldProxy != null) {
-      oldProxy.close();
-    }
-    LOG.info(
-        "NLB: discovery proxy on port {} -> {} nodes: {}", basePort, targets.size(), activeNodes);
+    targets.add(firstTarget);
+    RoundRobinProxy proxy = new RoundRobinProxy(bindAddress, basePort, targets);
+    LOG.info("NLB: discovery proxy on port {} -> {}", basePort, firstTarget);
+    return proxy;
   }
 
   @Override

@@ -47,7 +47,7 @@ public class RoundRobinProxy implements Closeable {
   private static final int BUFFER_SIZE = 8192;
 
   private final ServerSocket serverSocket;
-  private final List<InetSocketAddress> targets;
+  private final CopyOnWriteArrayList<InetSocketAddress> targets;
   private final AtomicInteger counter = new AtomicInteger(0);
   private final AtomicBoolean closed = new AtomicBoolean(false);
   private final CopyOnWriteArrayList<Socket> activeSockets = new CopyOnWriteArrayList<>();
@@ -59,7 +59,7 @@ public class RoundRobinProxy implements Closeable {
     if (targets.isEmpty()) {
       throw new IllegalArgumentException("At least one target required");
     }
-    this.targets = targets;
+    this.targets = new CopyOnWriteArrayList<>(targets);
     this.serverSocket = new ServerSocket();
     this.serverSocket.setReuseAddress(true);
     this.serverSocket.bind(new InetSocketAddress(bindAddress, listenPort));
@@ -73,6 +73,18 @@ public class RoundRobinProxy implements Closeable {
 
   public int getLocalPort() {
     return serverSocket.getLocalPort();
+  }
+
+  /** Adds a target to the round-robin pool. */
+  public void addTarget(InetSocketAddress target) {
+    targets.add(target);
+    LOG.debug("RoundRobinProxy on port {} added target: {}", serverSocket.getLocalPort(), target);
+  }
+
+  /** Removes a target from the round-robin pool. */
+  public void removeTarget(InetSocketAddress target) {
+    targets.remove(target);
+    LOG.debug("RoundRobinProxy on port {} removed target: {}", serverSocket.getLocalPort(), target);
   }
 
   private void acceptLoop() {
