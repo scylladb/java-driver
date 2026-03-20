@@ -64,6 +64,16 @@ public final class ClientRoutesConfig {
   private static final String DEFAULT_TABLE_NAME = "system.client_routes";
 
   /**
+   * Default native transport port used by Scylla/Cassandra nodes. This is used as the fallback port
+   * for {@code broadcastRpcAddress} when the system tables do not include port information (e.g.
+   * older Scylla versions without {@code system.peers_v2}). The {@code broadcastRpcAddress} is how
+   * the driver matches TOPOLOGY_CHANGE events (node added/removed) to nodes in its metadata — it is
+   * NOT used for opening connections. Connections go through {@code ClientRoutesEndPoint} which
+   * resolves via the NLB proxy addresses in the routes cache.
+   */
+  public static final int DEFAULT_NATIVE_TRANSPORT_PORT = 9042;
+
+  /**
    * Pattern for valid unquoted CQL table names: must start with a letter or underscore, followed by
    * letters, digits, or underscores. Optionally qualified with a keyspace prefix using the same
    * rules. Quoted identifiers (e.g. {@code "My-Table"}) are not supported.
@@ -73,8 +83,10 @@ public final class ClientRoutesConfig {
 
   private final List<ClientRouteProxy> endpoints;
   private final String tableName;
+  private final int nativeTransportPort;
 
-  private ClientRoutesConfig(List<ClientRouteProxy> endpoints, String tableName) {
+  private ClientRoutesConfig(
+      List<ClientRouteProxy> endpoints, String tableName, int nativeTransportPort) {
     if (endpoints == null || endpoints.isEmpty()) {
       throw new IllegalArgumentException("At least one endpoint must be specified");
     }
@@ -86,6 +98,7 @@ public final class ClientRoutesConfig {
     }
     this.endpoints = Collections.unmodifiableList(new ArrayList<>(endpoints));
     this.tableName = tableName;
+    this.nativeTransportPort = nativeTransportPort;
   }
 
   /**
@@ -109,6 +122,18 @@ public final class ClientRoutesConfig {
   }
 
   /**
+   * Returns the native transport port of the cluster nodes. This port is used as the fallback for
+   * building {@code broadcastRpcAddress} when system tables lack port columns. The {@code
+   * broadcastRpcAddress} is used only to match TOPOLOGY_CHANGE events to metadata nodes — it is NOT
+   * used to open connections (those go through the NLB proxy endpoints from the routes cache).
+   *
+   * @return the native transport port (defaults to {@value #DEFAULT_NATIVE_TRANSPORT_PORT}).
+   */
+  public int getNativeTransportPort() {
+    return nativeTransportPort;
+  }
+
+  /**
    * Creates a new builder for constructing a {@link ClientRoutesConfig}.
    *
    * @return a new builder instance.
@@ -127,12 +152,14 @@ public final class ClientRoutesConfig {
       return false;
     }
     ClientRoutesConfig that = (ClientRoutesConfig) o;
-    return endpoints.equals(that.endpoints) && tableName.equals(that.tableName);
+    return endpoints.equals(that.endpoints)
+        && tableName.equals(that.tableName)
+        && nativeTransportPort == that.nativeTransportPort;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(endpoints, tableName);
+    return Objects.hash(endpoints, tableName, nativeTransportPort);
   }
 
   @Override
@@ -143,6 +170,8 @@ public final class ClientRoutesConfig {
         + ", tableName='"
         + tableName
         + '\''
+        + ", nativeTransportPort="
+        + nativeTransportPort
         + '}';
   }
 
@@ -151,6 +180,7 @@ public final class ClientRoutesConfig {
     private final List<ClientRouteProxy> endpoints = new ArrayList<>();
     private final Set<String> seenConnectionIds = new HashSet<>();
     private String tableName = DEFAULT_TABLE_NAME;
+    private int nativeTransportPort = DEFAULT_NATIVE_TRANSPORT_PORT;
 
     /**
      * Adds an endpoint to the configuration.
@@ -209,6 +239,21 @@ public final class ClientRoutesConfig {
     }
 
     /**
+     * Sets the native transport port of the cluster nodes. This is used as the fallback port for
+     * {@code broadcastRpcAddress} when system tables do not include port information. Only needed
+     * for clusters using a non-standard native transport port. Defaults to {@value
+     * #DEFAULT_NATIVE_TRANSPORT_PORT}.
+     *
+     * @param port the native transport port.
+     * @return this builder.
+     */
+    @NonNull
+    public Builder withNativeTransportPort(int port) {
+      this.nativeTransportPort = port;
+      return this;
+    }
+
+    /**
      * Builds the {@link ClientRoutesConfig} with the configured endpoints and table name.
      *
      * @return the new configuration instance.
@@ -216,7 +261,7 @@ public final class ClientRoutesConfig {
      */
     @NonNull
     public ClientRoutesConfig build() {
-      return new ClientRoutesConfig(endpoints, tableName);
+      return new ClientRoutesConfig(endpoints, tableName, nativeTransportPort);
     }
   }
 }

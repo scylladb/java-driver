@@ -944,6 +944,11 @@ public class TypedDriverOption<ValueT> {
   // DriverExecutionProfile API); it is excluded from the TypedDriverOptionTest consistency check
   // accordingly.
 
+  /** The native transport port of the cluster nodes, used for broadcastRpcAddress fallback. */
+  public static final TypedDriverOption<Integer> CLIENT_ROUTES_NATIVE_TRANSPORT_PORT =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, GenericType.INTEGER);
+
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {
       ImmutableList.Builder<TypedDriverOption<?>> result = ImmutableList.builder();
