@@ -1161,38 +1161,18 @@ public class ClientRoutesTopologyMonitorTest {
   // ---- savePort() --------------------------------------------------------
 
   @Test
-  public void savePort_should_use_route_port_when_routes_available() {
-    UUID id1 = UUID.randomUUID();
-    UUID id2 = UUID.randomUUID();
-    handler.setRoutes(
-        ImmutableMap.of(
-            id1, new ClientRouteRecord(id1, "127.0.0.1", 19042),
-            id2, new ClientRouteRecord(id2, "127.0.0.2", 19042)));
-
+  public void savePort_should_use_native_transport_port_from_config() {
     DriverChannel channel = Mockito.mock(DriverChannel.class);
     handler.savePort(channel);
 
-    assertThat(handler.port).isEqualTo(19042);
-  }
-
-  @Test
-  public void savePort_should_fall_through_to_super_when_routes_empty() {
-    // routes cache is empty by default
-    DriverChannel channel = Mockito.mock(DriverChannel.class);
-    EndPoint ep = Mockito.mock(EndPoint.class);
-    when(ep.resolve()).thenReturn(new InetSocketAddress("127.0.0.1", 9042));
-    when(channel.getEndPoint()).thenReturn(ep);
-
-    handler.savePort(channel);
-
+    // Should use the default native transport port from ClientRoutesConfig (9042),
+    // NOT the NLB proxy port from the routes cache or the channel endpoint.
     assertThat(handler.port).isEqualTo(9042);
   }
 
   @Test
   public void savePort_should_skip_when_port_already_set() {
     handler.port = 12345;
-    UUID id = UUID.randomUUID();
-    handler.setRoutes(ImmutableMap.of(id, new ClientRouteRecord(id, "127.0.0.1", 19042)));
 
     DriverChannel channel = Mockito.mock(DriverChannel.class);
     handler.savePort(channel);

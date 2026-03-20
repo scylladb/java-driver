@@ -1097,7 +1097,17 @@ public enum DefaultDriverOption implements DriverOption {
    *
    * <p>Value type: list of HOCON objects
    */
-  CLIENT_ROUTES_ENDPOINTS("advanced.client-routes.endpoints");
+  CLIENT_ROUTES_ENDPOINTS("advanced.client-routes.endpoints"),
+
+  /**
+   * The native transport port of the cluster nodes.
+   *
+   * <p>Used as the fallback port for {@code broadcastRpcAddress} when system tables lack port
+   * columns. Only needed for clusters using a non-standard native transport port. Defaults to 9042.
+   *
+   * <p>Value type: {@link Integer}
+   */
+  CLIENT_ROUTES_NATIVE_TRANSPORT_PORT("advanced.client-routes.native-transport-port");
 
   private final String path;
 

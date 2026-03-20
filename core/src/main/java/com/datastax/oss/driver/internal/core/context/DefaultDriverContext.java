@@ -545,6 +545,11 @@ public class DefaultDriverContext implements InternalDriverContext {
       builder.addEndpoint(new ClientRouteProxy(connectionId, connectionAddr));
     }
 
+    if (defaultProfile.isDefined(DefaultDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT)) {
+      builder.withNativeTransportPort(
+          defaultProfile.getInt(DefaultDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT));
+    }
+
     return builder.build();
   }
 

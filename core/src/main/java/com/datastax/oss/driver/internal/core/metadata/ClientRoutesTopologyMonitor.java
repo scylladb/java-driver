@@ -130,6 +130,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       @NonNull InternalDriverContext context, @NonNull ClientRoutesConfig config) {
     super(context);
     this.config = config;
+    this.port = config.getNativeTransportPort();
     this.configuredConnectionIds =
         Collections.unmodifiableList(
             config.getEndpoints().stream()
@@ -438,36 +439,15 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   }
 
   /**
-   * Overrides the default port discovery to use the port from the client routes cache instead of
-   * the control connection channel. When connecting through an NLB proxy, the channel port is the
-   * proxy port, not the real server port. The {@code system.client_routes} table has the correct
-   * port.
-   *
-   * <p>All nodes in a Scylla/Cassandra cluster use the same native transport port, so any route's
-   * port is correct. We use the minimum host_id for deterministic selection.
+   * No-op: the port is set in the constructor from {@link ClientRoutesConfig#getNativeTransportPort
+   * ()}. The default implementation would save the control channel's endpoint port, which is the
+   * NLB proxy port — not the real native transport port. Using the proxy port would cause {@link
+   * #getBroadcastRpcAddress} to build incorrect {@code broadcastRpcAddress} values, preventing
+   * {@code Metadata.findNode()} from matching TOPOLOGY_CHANGE events (which carry the real native
+   * transport port).
    */
   @Override
-  protected void savePort(DriverChannel channel) {
-    if (port < 0) {
-      Map<UUID, ClientRouteRecord> routes = resolvedRoutesCache.get();
-      if (!routes.isEmpty()) {
-        // Pick the route with the smallest host_id for deterministic behavior.
-        UUID minId = null;
-        ClientRouteRecord chosen = null;
-        for (Map.Entry<UUID, ClientRouteRecord> entry : routes.entrySet()) {
-          if (minId == null || entry.getKey().compareTo(minId) < 0) {
-            minId = entry.getKey();
-            chosen = entry.getValue();
-          }
-        }
-        if (chosen != null && chosen.getPort() > 0) {
-          port = chosen.getPort();
-          return;
-        }
-      }
-    }
-    super.savePort(channel);
-  }
+  protected void savePort(DriverChannel channel) {}
 
   @NonNull
   @Override
