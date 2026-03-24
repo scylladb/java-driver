@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.filter;
-import static org.junit.Assume.assumeTrue;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.verify;
 
@@ -29,11 +28,10 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.HostNameEndPoint;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.Set;
 import org.junit.After;
@@ -100,19 +98,22 @@ public class ContactPointsTest {
   }
 
   @Test
-  public void should_parse_host_and_port_and_resolve_all_a_records() throws UnknownHostException {
-    int localhostARecordsCount = InetAddress.getAllByName("localhost").length;
-    assumeTrue(
-        "This test assumes that localhost resolves to multiple A-records",
-        localhostARecordsCount >= 2);
-
+  public void should_create_hostname_endpoint_for_hostname_contact_point() {
     Set<EndPoint> endPoints =
         ContactPoints.merge(Collections.emptySet(), ImmutableList.of("localhost:9042"), true);
 
-    assertThat(endPoints).hasSize(localhostARecordsCount);
-    assertLog(
-        Level.INFO,
-        "Contact point localhost:9042 resolves to multiple addresses, will use them all");
+    assertThat(endPoints).hasSize(1);
+    assertThat(endPoints.iterator().next()).isInstanceOf(HostNameEndPoint.class);
+    assertThat(endPoints).containsExactly(new HostNameEndPoint("localhost", 9042));
+  }
+
+  @Test
+  public void should_create_default_endpoint_for_ip_contact_point() {
+    Set<EndPoint> endPoints =
+        ContactPoints.merge(Collections.emptySet(), ImmutableList.of("127.0.0.1:9042"), true);
+
+    assertThat(endPoints).hasSize(1);
+    assertThat(endPoints.iterator().next()).isInstanceOf(DefaultEndPoint.class);
   }
 
   @Test

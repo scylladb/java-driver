@@ -19,8 +19,10 @@ package com.datastax.oss.driver.internal.core;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.HostNameEndPoint;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
+import com.datastax.oss.driver.shaded.guava.common.net.InetAddresses;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -41,18 +43,17 @@ public class ContactPoints {
 
     Set<EndPoint> result = Sets.newHashSet(programmaticContactPoints);
     for (String spec : configContactPoints) {
-      for (InetSocketAddress address : extract(spec, resolve)) {
-        DefaultEndPoint endPoint = new DefaultEndPoint(address);
+      for (EndPoint endPoint : extract(spec, resolve)) {
         boolean wasNew = result.add(endPoint);
         if (!wasNew) {
-          LOG.warn("Duplicate contact point {}", address);
+          LOG.warn("Duplicate contact point {}", endPoint);
         }
       }
     }
     return ImmutableSet.copyOf(result);
   }
 
-  private static Set<InetSocketAddress> extract(String spec, boolean resolve) {
+  private static Set<EndPoint> extract(String spec, boolean resolve) {
     int separator = spec.lastIndexOf(':');
     if (separator < 0) {
       LOG.warn("Ignoring invalid contact point {} (expecting host:port)", spec);
@@ -69,8 +70,9 @@ public class ContactPoints {
       return Collections.emptySet();
     }
     if (!resolve) {
-      return ImmutableSet.of(InetSocketAddress.createUnresolved(host, port));
-    } else {
+      return ImmutableSet.of(new DefaultEndPoint(InetSocketAddress.createUnresolved(host, port)));
+    } else if (InetAddresses.isInetAddress(host)) {
+      // IP literal: resolve once at startup and cache in DefaultEndPoint
       try {
         InetAddress[] inetAddresses = InetAddress.getAllByName(host);
         if (inetAddresses.length > 1) {
@@ -79,11 +81,22 @@ public class ContactPoints {
               spec,
               Arrays.deepToString(inetAddresses));
         }
-        Set<InetSocketAddress> result = new HashSet<>();
+        Set<EndPoint> result = new HashSet<>();
         for (InetAddress inetAddress : inetAddresses) {
-          result.add(new InetSocketAddress(inetAddress, port));
+          result.add(new DefaultEndPoint(new InetSocketAddress(inetAddress, port)));
         }
         return result;
+      } catch (UnknownHostException e) {
+        LOG.warn("Ignoring invalid contact point {} (unknown host {})", spec, host);
+        return Collections.emptySet();
+      }
+    } else {
+      // Hostname: validate it resolves now, but use HostNameEndPoint so DNS is re-queried on each
+      // reconnect attempt. This allows the driver to pick up a new IP after a node replacement
+      // updates the DNS entry (e.g. in cloud deployments).
+      try {
+        InetAddress.getAllByName(host);
+        return ImmutableSet.of(new HostNameEndPoint(host, port));
       } catch (UnknownHostException e) {
         LOG.warn("Ignoring invalid contact point {} (unknown host {})", spec, host);
         return Collections.emptySet();
