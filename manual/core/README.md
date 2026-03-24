@@ -125,6 +125,28 @@ datastax-java-driver {
 For more details about the local datacenter, refer to the [load balancing
 policy](load_balancing/#local-only) section.
 
+When a contact point is specified as a hostname (rather than an IP literal), the driver re-resolves
+it via DNS on every connection attempt. This allows the driver to automatically pick up a new IP
+address after a node replacement updates the DNS entry, without requiring a restart. However, the
+JVM maintains its own DNS cache: by default (when no security manager is installed) successful
+lookups are cached for 30 seconds, so there may be a lag before the updated IP is used.
+
+To reduce the lag, lower the JVM security property `networkaddress.cache.ttl` in
+`$JAVA_HOME/conf/security/java.security` or programmatically before building the session:
+
+```java
+java.security.Security.setProperty("networkaddress.cache.ttl", "5");
+```
+
+The effective recovery time after a node replacement is
+`max(networkaddress.cache.ttl, reconnection backoff)`, so there is no benefit to setting the TTL
+lower than your reconnection base delay. Setting it to `0` disables the JVM DNS cache entirely,
+causing a live DNS query on every connection attempt — this minimises lag but increases DNS load
+and makes reconnection sensitive to transient DNS failures.
+
+See also the `advanced.resolve-contact-points` option in the
+[configuration reference](configuration/reference/) for further details.
+
 ##### Keyspace
 
 By default, a session isn't tied to any specific keyspace. You'll need to prefix table names in your
