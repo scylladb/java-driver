@@ -39,3 +39,8 @@ claude.log
 claude_history.json
 claude_config.json
 CLAUDE.md
+
+# GitHub AI tool configurations (per-user, not shared)
+.github/agents/
+.github/prompts/
+.github/copilot-instructions.md
