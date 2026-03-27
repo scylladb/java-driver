@@ -75,16 +75,24 @@ public class DefaultNode implements Node, Serializable {
   private volatile ShardingInfo shardingInfo;
 
   public DefaultNode(EndPoint endPoint, InternalDriverContext context) {
+    this(endPoint, context, true);
+  }
+
+  private DefaultNode(EndPoint endPoint, InternalDriverContext context, boolean metrics) {
     this.endPoint = endPoint;
     this.state = NodeState.UNKNOWN;
     this.distance = NodeDistance.IGNORED;
     this.rawTokens = Collections.emptySet();
     this.extras = Collections.emptyMap();
-    // We leak a reference to a partially constructed object (this), but in practice this won't be a
-    // problem because the node updater only needs the connect address to initialize.
-    this.metricUpdater = context.getMetricsFactory().newNodeUpdater(this);
+    this.metricUpdater =
+        metrics ? context.getMetricsFactory().newNodeUpdater(this) : NoopNodeMetricUpdater.INSTANCE;
     this.upSinceMillis = -1;
     this.shardingInfo = null;
+  }
+
+  /** Creates a contact point node without registering metrics. */
+  public static DefaultNode newContactPoint(EndPoint endPoint, InternalDriverContext context) {
+    return new DefaultNode(endPoint, context, false);
   }
 
   @NonNull

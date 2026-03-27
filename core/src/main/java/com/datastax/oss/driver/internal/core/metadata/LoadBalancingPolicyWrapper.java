@@ -175,7 +175,7 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
       Set<DefaultNode> originalNodes = context.getMetadataManager().getContactPoints();
       List<Node> nodes = new ArrayList<>();
       for (DefaultNode node : originalNodes) {
-        nodes.add(new DefaultNode(node.getEndPoint(), context));
+        nodes.add(DefaultNode.newContactPoint(node.getEndPoint(), context));
       }
       Collections.shuffle(nodes);
       return new ConcurrentLinkedQueue<>(nodes);
