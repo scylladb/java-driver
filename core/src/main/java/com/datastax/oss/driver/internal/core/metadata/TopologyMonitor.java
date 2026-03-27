@@ -130,4 +130,15 @@ public interface TopologyMonitor extends AsyncAutoCloseable {
    * take a while to replicate across nodes.
    */
   CompletionStage<Boolean> checkSchemaAgreement();
+
+  /**
+   * Resets any cached column name sets learned from previous system table query responses.
+   *
+   * <p>Called by the control connection on reconnect so that the next topology refresh re-learns
+   * the available columns via {@code SELECT *} instead of reusing a potentially stale projection.
+   *
+   * <p>The default implementation is a no-op; implementations that cache column names (such as
+   * {@link DefaultTopologyMonitor}) should override this method.
+   */
+  default void resetColumnCaches() {}
 }
