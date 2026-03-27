@@ -31,6 +31,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -97,8 +98,14 @@ public class RoundRobinProxy implements Closeable {
         }
         activeSockets.add(client);
 
+        List<InetSocketAddress> snapshot = new ArrayList<>(targets);
+        if (snapshot.isEmpty()) {
+          closeQuietly(client);
+          LOG.warn("RoundRobinProxy has no targets, rejecting connection");
+          continue;
+        }
         InetSocketAddress target =
-            targets.get(Math.floorMod(counter.getAndIncrement(), targets.size()));
+            snapshot.get(Math.floorMod(counter.getAndIncrement(), snapshot.size()));
         Socket remote = new Socket();
         activeSockets.add(remote);
         try {

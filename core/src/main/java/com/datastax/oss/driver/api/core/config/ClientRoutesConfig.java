@@ -272,6 +272,10 @@ public final class ClientRoutesConfig {
      */
     @NonNull
     public Builder withNativeTransportPort(int port) {
+      if (port <= 0 || port > 65535) {
+        throw new IllegalArgumentException(
+            "Native transport port must be between 1 and 65535, got " + port);
+      }
       this.nativeTransportPort = port;
       return this;
     }
