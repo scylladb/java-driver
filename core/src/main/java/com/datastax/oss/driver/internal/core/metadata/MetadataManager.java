@@ -150,10 +150,10 @@ public class MetadataManager implements AsyncAutoCloseable {
       LOG.info(
           "[{}] No contact points provided, defaulting to {}", logPrefix, DEFAULT_CONTACT_POINT);
       this.wasImplicitContactPoint = true;
-      contactPointsBuilder.add(new DefaultNode(DEFAULT_CONTACT_POINT, context));
+      contactPointsBuilder.add(DefaultNode.newContactPoint(DEFAULT_CONTACT_POINT, context));
     } else {
       for (EndPoint endPoint : providedContactPoints) {
-        contactPointsBuilder.add(new DefaultNode(endPoint, context));
+        contactPointsBuilder.add(DefaultNode.newContactPoint(endPoint, context));
       }
     }
     this.contactPoints = contactPointsBuilder.build();
