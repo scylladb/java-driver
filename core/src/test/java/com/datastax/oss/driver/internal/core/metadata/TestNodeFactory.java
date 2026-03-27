@@ -39,6 +39,13 @@ public class TestNodeFactory {
     return node;
   }
 
+  public static DefaultNode newNode(NodeInfo nodeInfo, InternalDriverContext context) {
+    DefaultNode node = new DefaultNode(nodeInfo.getEndPoint(), context);
+    node.hostId = nodeInfo.getHostId();
+    nodeInfo.getBroadcastRpcAddress().ifPresent(addr -> node.broadcastRpcAddress = addr);
+    return node;
+  }
+
   public static DefaultNode newContactPoint(int lastIpByte, InternalDriverContext context) {
     DefaultEndPoint endPoint = newEndPoint(lastIpByte);
     return DefaultNode.newContactPoint(endPoint, context);

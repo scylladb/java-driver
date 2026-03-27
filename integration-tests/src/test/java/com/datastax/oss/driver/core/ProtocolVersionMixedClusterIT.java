@@ -77,7 +77,7 @@ public class ProtocolVersionMixedClusterIT {
           .containsExactly(
               // Initial connection with protocol v4
               "SELECT cluster_name FROM system.local WHERE key='local'",
-              // An extra query done by TopologyMonitor.getChannelEndpoint to resolve control
+              // An extra query done by TopologyMonitor.getChannelNodeInfo to resolve control
               // connection channel endpoint
               "SELECT * FROM system.local WHERE key='local'",
               "SELECT * FROM system.local WHERE key='local'",
@@ -108,7 +108,7 @@ public class ProtocolVersionMixedClusterIT {
           .containsExactly(
               // Initial connection with protocol v4
               "SELECT cluster_name FROM system.local WHERE key='local'",
-              // An extra query done by TopologyMonitor.getChannelEndpoint to resolve control
+              // An extra query done by TopologyMonitor.getChannelNodeInfo to resolve control
               // connection channel endpoint
               "SELECT * FROM system.local WHERE key='local'",
               "SELECT * FROM system.local WHERE key='local'",
@@ -162,7 +162,7 @@ public class ProtocolVersionMixedClusterIT {
           .containsExactly(
               // Initial connection with protocol v4
               "SELECT cluster_name FROM system.local WHERE key='local'",
-              // An extra query done by TopologyMonitor.getChannelEndpoint to resolve control
+              // An extra query done by TopologyMonitor.getChannelNodeInfo to resolve control
               // connection channel endpoint
               "SELECT * FROM system.local WHERE key='local'",
               "SELECT * FROM system.local WHERE key='local'",

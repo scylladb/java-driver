@@ -17,27 +17,24 @@
  */
 package com.datastax.oss.driver.internal.core.metadata;
 
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenFactory;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenFactoryRegistry;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The first node list refresh: contact points are not in the metadata yet, we need to copy them
- * over.
+ * The first node list refresh: creates new nodes from the discovered node list, reusing any node
+ * already in metadata (e.g. the control node registered by the control connection) so that
+ * connection state is preserved.
  */
 @ThreadSafe
 class InitialNodeListRefresh extends NodesRefresh {
@@ -45,11 +42,9 @@ class InitialNodeListRefresh extends NodesRefresh {
   private static final Logger LOG = LoggerFactory.getLogger(InitialNodeListRefresh.class);
 
   @VisibleForTesting final Iterable<NodeInfo> nodeInfos;
-  @VisibleForTesting final Set<DefaultNode> contactPoints;
 
-  InitialNodeListRefresh(Iterable<NodeInfo> nodeInfos, Set<DefaultNode> contactPoints) {
+  InitialNodeListRefresh(Iterable<NodeInfo> nodeInfos) {
     this.nodeInfos = nodeInfos;
-    this.contactPoints = contactPoints;
   }
 
   @Override
@@ -59,16 +54,15 @@ class InitialNodeListRefresh extends NodesRefresh {
     String logPrefix = context.getSessionName();
     TokenFactoryRegistry tokenFactoryRegistry = context.getTokenFactoryRegistry();
 
-    // Since this is the first refresh, and we've stored contact points separately until now, the
-    // metadata is empty.
-    assert oldMetadata == DefaultMetadata.EMPTY;
     TokenFactory tokenFactory = null;
 
+    Map<UUID, DefaultNode> existingByHostId = new HashMap<>();
+    for (Node n : oldMetadata.getNodes().values()) {
+      existingByHostId.put(n.getHostId(), (DefaultNode) n);
+    }
+
     Map<UUID, DefaultNode> newNodes = new HashMap<>();
-    // Contact point nodes don't have host ID as well as other info yet, so we fill them with node
-    // info found on first match by endpoint
-    Set<EndPoint> matchedContactPoints = new HashSet<>();
-    List<DefaultNode> addedNodes = new ArrayList<>();
+    ImmutableList.Builder<Object> eventsBuilder = ImmutableList.builder();
 
     for (NodeInfo nodeInfo : nodeInfos) {
       UUID hostId = nodeInfo.getHostId();
@@ -80,17 +74,15 @@ class InitialNodeListRefresh extends NodesRefresh {
             hostId,
             newNodes.get(hostId));
       } else {
-        EndPoint endPoint = nodeInfo.getEndPoint();
-        DefaultNode contactPointNode = findContactPointNode(endPoint);
         DefaultNode node;
-        if (contactPointNode == null || matchedContactPoints.contains(endPoint)) {
-          node = new DefaultNode(endPoint, context);
-          addedNodes.add(node);
-          LOG.debug("[{}] Adding new node {}", logPrefix, node);
+        DefaultNode existing = existingByHostId.get(hostId);
+        if (existing != null) {
+          node = existing;
+          LOG.debug("[{}] Reusing existing node {}", logPrefix, node);
         } else {
-          matchedContactPoints.add(contactPointNode.getEndPoint());
-          node = contactPointNode;
-          LOG.debug("[{}] Copying contact point {}", logPrefix, node);
+          node = new DefaultNode(nodeInfo.getEndPoint(), context);
+          LOG.debug("[{}] Adding new node {}", logPrefix, node);
+          eventsBuilder.add(NodeStateEvent.added(node));
         }
         if (tokenMapEnabled && tokenFactory == null && nodeInfo.getPartitioner() != null) {
           tokenFactory = tokenFactoryRegistry.tokenFactoryFor(nodeInfo.getPartitioner());
@@ -100,13 +92,13 @@ class InitialNodeListRefresh extends NodesRefresh {
       }
     }
 
-    ImmutableList.Builder<Object> eventsBuilder = ImmutableList.builder();
-    for (DefaultNode addedNode : addedNodes) {
-      eventsBuilder.add(NodeStateEvent.added(addedNode));
-    }
-    for (DefaultNode contactPoint : contactPoints) {
-      if (!matchedContactPoints.contains(contactPoint.getEndPoint())) {
-        eventsBuilder.add(NodeStateEvent.removed(contactPoint));
+    for (Map.Entry<UUID, DefaultNode> entry : existingByHostId.entrySet()) {
+      if (!newNodes.containsKey(entry.getKey())) {
+        LOG.warn(
+            "[{}] Pre-registered node {} was not found in the node list refresh",
+            logPrefix,
+            entry.getValue());
+        eventsBuilder.add(NodeStateEvent.removed(entry.getValue()));
       }
     }
 
@@ -114,14 +106,5 @@ class InitialNodeListRefresh extends NodesRefresh {
         oldMetadata.withNodes(
             ImmutableMap.copyOf(newNodes), tokenMapEnabled, true, tokenFactory, context),
         eventsBuilder.build());
-  }
-
-  private DefaultNode findContactPointNode(EndPoint endPoint) {
-    for (DefaultNode node : contactPoints) {
-      if (node.getEndPoint().equals(endPoint)) {
-        return node;
-      }
-    }
-    return null;
   }
 }

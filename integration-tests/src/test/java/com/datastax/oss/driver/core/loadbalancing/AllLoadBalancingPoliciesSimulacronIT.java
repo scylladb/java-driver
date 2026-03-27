@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
+import com.datastax.oss.driver.api.core.config.ProgrammaticDriverConfigLoaderBuilder;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
@@ -403,18 +404,22 @@ public class AllLoadBalancingPoliciesSimulacronIT {
       boolean allowLocalCl,
       boolean tokenAware,
       Predicate<Node> nodeFilter) {
-    DriverConfigLoader loader =
+    ProgrammaticDriverConfigLoaderBuilder builder =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.METADATA_SCHEMA_ENABLED, tokenAware)
             .withString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, lbp)
-            .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, dc)
             .withInt(
                 DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_MAX_NODES_PER_REMOTE_DC,
                 maxRemoteNodes)
             .withBoolean(
                 DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_ALLOW_FOR_LOCAL_CONSISTENCY_LEVELS,
-                allowLocalCl)
-            .build();
+                allowLocalCl);
+    if (dc != null) {
+      builder.withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, dc);
+    } else {
+      builder.without(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER);
+    }
+    DriverConfigLoader loader = builder.build();
     return SessionUtils.newSession(SIMULACRON_RULE, null, null, null, nodeFilter, loader);
   }
 

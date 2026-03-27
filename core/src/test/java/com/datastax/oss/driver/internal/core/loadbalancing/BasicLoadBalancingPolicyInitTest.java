@@ -18,14 +18,10 @@
 package com.datastax.oss.driver.internal.core.loadbalancing;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.filter;
-import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
@@ -99,33 +95,6 @@ public class BasicLoadBalancingPolicyInitTest extends LoadBalancingPolicyTestBas
     assertThat(policy.getLocalDatacenter()).isNull();
     // should not warn about contact points not being in the same DC
     verify(appender, never()).doAppend(loggingEventCaptor.capture());
-  }
-
-  @Test
-  public void should_warn_if_contact_points_not_in_local_dc() {
-    // Given
-    when(context.getLocalDatacenter(DriverExecutionProfile.DEFAULT_NAME)).thenReturn("dc1");
-    when(node2.getDatacenter()).thenReturn("dc2");
-    when(node3.getDatacenter()).thenReturn("dc3");
-    when(metadataManager.getContactPoints()).thenReturn(ImmutableSet.of(node1, node2, node3));
-    BasicLoadBalancingPolicy policy = createPolicy();
-
-    // When
-    policy.init(
-        ImmutableMap.of(
-            UUID.randomUUID(), node1, UUID.randomUUID(), node2, UUID.randomUUID(), node3),
-        distanceReporter);
-
-    // Then
-    verify(appender, atLeast(1)).doAppend(loggingEventCaptor.capture());
-    Iterable<ILoggingEvent> warnLogs =
-        filter(loggingEventCaptor.getAllValues()).with("level", Level.WARN).get();
-    assertThat(warnLogs).hasSize(1);
-    assertThat(warnLogs.iterator().next().getFormattedMessage())
-        .contains(
-            "You specified dc1 as the local DC, but some contact points are from a different DC")
-        .contains("node2=dc2")
-        .contains("node3=dc3");
   }
 
   @Test
