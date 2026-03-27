@@ -1161,12 +1161,11 @@ public class ClientRoutesTopologyMonitorTest {
   // ---- savePort() --------------------------------------------------------
 
   @Test
-  public void savePort_should_use_native_transport_port_from_config() {
+  public void port_should_be_set_from_config_in_constructor() {
     DriverChannel channel = Mockito.mock(DriverChannel.class);
     handler.savePort(channel);
 
-    // Should use the default native transport port from ClientRoutesConfig (9042),
-    // NOT the NLB proxy port from the routes cache or the channel endpoint.
+    // Port is set from ClientRoutesConfig in the constructor (default 9042), savePort is a no-op.
     assertThat(handler.port).isEqualTo(9042);
   }
 

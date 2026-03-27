@@ -96,11 +96,12 @@ public class DefaultNode implements Node, Serializable {
   public void setEndPoint(@NonNull EndPoint newEndPoint, @NonNull InternalDriverContext context) {
     if (!newEndPoint.equals(endPoint)) {
       endPoint = newEndPoint;
-
-      // The endpoint is also used to build metric names, so make sure they get updated
+      // metricUpdater is transient, so it can be null on deserialized nodes.
       NodeMetricUpdater previousMetricUpdater = metricUpdater;
-      if (!(previousMetricUpdater instanceof NoopNodeMetricUpdater)) {
+      if (previousMetricUpdater != null
+          && !(previousMetricUpdater instanceof NoopNodeMetricUpdater)) {
         metricUpdater = context.getMetricsFactory().newNodeUpdater(this);
+        previousMetricUpdater.clearMetrics();
       }
     }
   }

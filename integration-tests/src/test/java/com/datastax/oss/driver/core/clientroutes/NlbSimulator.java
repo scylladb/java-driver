@@ -138,6 +138,10 @@ public class NlbSimulator implements Closeable {
     if (discoveryProxy != null) {
       String nodeIp = ccmBridge.getNodeIpAddress(nodeId);
       discoveryProxy.removeTarget(new InetSocketAddress(nodeIp, 9042));
+      if (activeNodes.isEmpty()) {
+        discoveryProxy.close();
+        discoveryProxy = null;
+      }
     }
 
     LOG.info("NLB: removed node{}", nodeId);
