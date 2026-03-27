@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterators;
+import java.util.List;
 
 /** Test utility for constructing {@link AdminResult} mocks without network access. */
 public class AdminResultTestHelper {
@@ -34,6 +35,17 @@ public class AdminResultTestHelper {
   public static AdminResult mockResult(AdminRow... rows) {
     AdminResult result = mock(AdminResult.class);
     when(result.iterator()).thenAnswer(invocation -> Iterators.forArray(rows));
+    return result;
+  }
+
+  /**
+   * Returns a mock {@link AdminResult} whose iterator yields the given rows and whose {@link
+   * AdminResult#getColumnNames()} returns the given column names. Use this in warm-cache tests that
+   * need the monitor to learn a specific projected column set from the response.
+   */
+  public static AdminResult mockResultWithColumns(List<String> columnNames, AdminRow... rows) {
+    AdminResult result = mockResult(rows);
+    when(result.getColumnNames()).thenReturn(columnNames);
     return result;
   }
 

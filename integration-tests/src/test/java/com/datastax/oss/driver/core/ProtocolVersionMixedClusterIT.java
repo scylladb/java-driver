@@ -49,6 +49,20 @@ import org.junit.experimental.categories.Category;
 @Category(ParallelizableTests.class)
 public class ProtocolVersionMixedClusterIT {
 
+  /**
+   * The projected system.local query issued on the second call once the column cache has been
+   * warmed by {@code getChannelNodeInfo()}. The column list is the intersection of Simulacron's
+   * {@code PeerMetadataHandler#buildSystemLocalRowsMetadata} column order and {@code
+   * DefaultTopologyMonitor#LOCAL_COLUMNS_OF_INTEREST}: columns the server returns but the driver
+   * never reads (e.g. {@code key}, {@code bootstrapped}, {@code cluster_name}, {@code cql_version})
+   * are excluded.
+   */
+  private static final String PROJECTED_LOCAL_QUERY =
+      "SELECT rpc_address, rpc_port, broadcast_address, broadcast_port,"
+          + " data_center, listen_address, listen_port, partitioner,"
+          + " rack, release_version, tokens, host_id, schema_version"
+          + " FROM system.local WHERE key='local'";
+
   @Test
   public void should_downgrade_if_peer_does_not_support_negotiated_version() {
     DriverConfigLoader loader =
@@ -78,9 +92,10 @@ public class ProtocolVersionMixedClusterIT {
               // Initial connection with protocol v4
               "SELECT cluster_name FROM system.local WHERE key='local'",
               // An extra query done by TopologyMonitor.getChannelNodeInfo to resolve control
-              // connection channel endpoint
+              // connection channel endpoint; warms localColumns cache
               "SELECT * FROM system.local WHERE key='local'",
-              "SELECT * FROM system.local WHERE key='local'",
+              // refreshNodeList uses cached column projection on second system.local call
+              PROJECTED_LOCAL_QUERY,
               "SELECT * FROM system.peers_v2",
               "SELECT * FROM system.peers");
     }
@@ -109,9 +124,10 @@ public class ProtocolVersionMixedClusterIT {
               // Initial connection with protocol v4
               "SELECT cluster_name FROM system.local WHERE key='local'",
               // An extra query done by TopologyMonitor.getChannelNodeInfo to resolve control
-              // connection channel endpoint
+              // connection channel endpoint; warms localColumns cache
               "SELECT * FROM system.local WHERE key='local'",
-              "SELECT * FROM system.local WHERE key='local'",
+              // refreshNodeList uses cached column projection on second system.local call
+              PROJECTED_LOCAL_QUERY,
               "SELECT * FROM system.peers_v2",
               "SELECT * FROM system.peers");
     }
@@ -163,9 +179,10 @@ public class ProtocolVersionMixedClusterIT {
               // Initial connection with protocol v4
               "SELECT cluster_name FROM system.local WHERE key='local'",
               // An extra query done by TopologyMonitor.getChannelNodeInfo to resolve control
-              // connection channel endpoint
+              // connection channel endpoint; warms localColumns cache
               "SELECT * FROM system.local WHERE key='local'",
-              "SELECT * FROM system.local WHERE key='local'",
+              // refreshNodeList uses cached column projection on second system.local call
+              PROJECTED_LOCAL_QUERY,
               "SELECT * FROM system.peers_v2",
               "SELECT * FROM system.peers");
 

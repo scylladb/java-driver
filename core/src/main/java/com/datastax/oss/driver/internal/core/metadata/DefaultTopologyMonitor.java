@@ -32,6 +32,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterators;
@@ -74,6 +75,121 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
   private static final String NATIVE_PORT = "native_port";
   private static final String NATIVE_TRANSPORT_PORT = "native_transport_port";
 
+  /**
+   * The columns we actually read from {@code system.local}. Used to intersect with the full column
+   * list returned by the first {@code SELECT *} response, so that subsequent projected queries only
+   * fetch columns the driver uses.
+   *
+   * <p>Includes DSE-specific columns; absent columns are silently ignored by the intersection step.
+   */
+  @VisibleForTesting
+  static final ImmutableSet<String> LOCAL_COLUMNS_OF_INTEREST =
+      ImmutableSet.of(
+          // Topology / addressing
+          "broadcast_address",
+          "broadcast_port",
+          "listen_address",
+          "listen_port",
+          "rpc_address",
+          "rpc_port",
+          "native_address",
+          "native_transport_address",
+          "native_transport_port",
+          "native_transport_port_ssl",
+          // Node metadata
+          "data_center",
+          "rack",
+          "release_version",
+          "tokens",
+          "partitioner",
+          "host_id",
+          "schema_version",
+          // DSE-specific
+          "dse_version",
+          "graph",
+          "workload",
+          "workloads",
+          "server_id",
+          "storage_port",
+          "storage_port_ssl",
+          "jmx_port");
+
+  /**
+   * The columns we actually read from {@code system.peers}. Mirrors {@link
+   * #LOCAL_COLUMNS_OF_INTEREST} but replaces {@code listen_address}/{@code listen_port} with the
+   * {@code peer} column used as a broadcast-address fallback and peer-row identifier.
+   */
+  @VisibleForTesting
+  static final ImmutableSet<String> PEERS_COLUMNS_OF_INTEREST =
+      ImmutableSet.of(
+          // Peer identifier / broadcast address fallback
+          "peer",
+          // Topology / addressing
+          "broadcast_address",
+          "broadcast_port",
+          "rpc_address",
+          "rpc_port",
+          "native_address",
+          "native_transport_address",
+          "native_transport_port",
+          "native_transport_port_ssl",
+          // Node metadata
+          "data_center",
+          "rack",
+          "release_version",
+          "tokens",
+          "partitioner",
+          "host_id",
+          "schema_version",
+          // DSE-specific
+          "dse_version",
+          "graph",
+          "workload",
+          "workloads",
+          "server_id",
+          "storage_port",
+          "storage_port_ssl",
+          "jmx_port");
+
+  /**
+   * The columns we actually read from {@code system.peers_v2} (Cassandra ≥ 4.0). Replaces {@code
+   * rpc_address} with {@code native_address}/{@code native_port} as the primary RPC endpoint
+   * columns, and adds {@code peer_port}.
+   */
+  @VisibleForTesting
+  static final ImmutableSet<String> PEERS_V2_COLUMNS_OF_INTEREST =
+      ImmutableSet.of(
+          // Peer identifier
+          "peer",
+          "peer_port",
+          // Primary RPC endpoint (peers_v2-specific)
+          "native_address",
+          "native_port",
+          // Topology / addressing
+          "broadcast_address",
+          "broadcast_port",
+          "rpc_address",
+          "native_transport_address",
+          "native_transport_port",
+          "native_transport_port_ssl",
+          // Node metadata
+          "data_center",
+          "rack",
+          "release_version",
+          "tokens",
+          "partitioner",
+          "host_id",
+          "schema_version",
+          // DSE-specific
+          "dse_version",
+          "graph",
+          "workload",
+          "workloads",
+          "server_id",
+          "storage_port",
+          "storage_port_ssl",
+          "jmx_port");
+
   private final String logPrefix;
   protected final InternalDriverContext context;
   private final ControlConnection controlConnection;
@@ -83,6 +199,14 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
 
   @VisibleForTesting volatile boolean isSchemaV2;
   @VisibleForTesting volatile int port = -1;
+
+  // Column name caches: null means "not yet learned — use SELECT *".
+  // Populated on the first successful response as the intersection of the server's column list
+  // and the *_COLUMNS_OF_INTEREST set, so subsequent queries project only columns the driver reads.
+  // Reset to null on reconnect.
+  private volatile List<String> localColumns = null;
+  private volatile List<String> peersColumns = null;
+  private volatile List<String> peersV2Columns = null;
 
   public DefaultTopologyMonitor(InternalDriverContext context) {
     this.logPrefix = context.getSessionName();
@@ -95,6 +219,63 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     // Set this to true initially, after the first refreshNodes is called this will either stay true
     // or be set to false;
     this.isSchemaV2 = true;
+  }
+
+  /**
+   * Resets all column name caches to null, causing the next query to use {@code SELECT *} and
+   * re-learn the available columns from the response. Should be called on reconnect.
+   */
+  @Override
+  public void resetColumnCaches() {
+    localColumns = null;
+    peersColumns = null;
+    peersV2Columns = null;
+  }
+
+  /**
+   * Returns a new list containing only the elements of {@code serverColumns} that are present in
+   * {@code needed}, preserving the server-response order. Returns an empty list (never {@code
+   * null}) if no columns match.
+   *
+   * <p>This is used when populating the column caches from a {@code SELECT *} response: rather than
+   * caching all server columns, we cache only the subset the driver actually reads, so that
+   * subsequent projected queries skip unused columns (e.g. large collection columns the driver
+   * never inspects).
+   */
+  private static List<String> intersectWithNeeded(
+      List<String> serverColumns, ImmutableSet<String> needed) {
+    return serverColumns.stream().filter(needed::contains).collect(ImmutableList.toImmutableList());
+  }
+
+  /**
+   * Builds a {@code SELECT} query string.
+   *
+   * @param columns the column names to project, in the order they will appear in the query, or
+   *     {@code null} to use {@code SELECT *}
+   * @param table the table name (e.g. {@code "system.local"})
+   * @return the query string without a trailing WHERE clause
+   */
+  private String buildQuery(List<String> columns, String table) {
+    String projection = (columns == null) ? "*" : String.join(", ", columns);
+    return "SELECT " + projection + " FROM " + table;
+  }
+
+  /**
+   * Builds a {@code SELECT} query string with a WHERE clause.
+   *
+   * @param columns the column names to project, in the order they will appear in the query, or
+   *     {@code null} to use {@code SELECT *}
+   * @param table the table name
+   * @param where the WHERE clause (without the {@code WHERE} keyword)
+   * @return the full query string
+   */
+  private String buildQuery(List<String> columns, String table, String where) {
+    return buildQuery(columns, table) + " WHERE " + where;
+  }
+
+  /** Returns the peers column cache appropriate for the current schema version. */
+  private List<String> getPeerColumnsCache() {
+    return isSchemaV2 ? peersV2Columns : peersColumns;
   }
 
   @Override
@@ -127,12 +308,12 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     } else if (node.getBroadcastAddress().isPresent()) {
       CompletionStage<AdminResult> query;
       if (isSchemaV2) {
+        // Use SELECT * for narrow WHERE-clause queries: projecting a single-row result gives
+        // negligible benefit, and the fixed WHERE form is easier to prime in test infrastructure.
         query =
             query(
                 channel,
-                "SELECT * FROM "
-                    + getPeerTableName()
-                    + " WHERE peer = :address and peer_port = :port",
+                buildQuery(null, getPeerTableName(), "peer = :address and peer_port = :port"),
                 ImmutableMap.of(
                     "address",
                     node.getBroadcastAddress().get().getAddress(),
@@ -142,12 +323,12 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
         query =
             query(
                 channel,
-                "SELECT * FROM " + getPeerTableName() + " WHERE peer = :address",
+                buildQuery(null, getPeerTableName(), "peer = :address"),
                 ImmutableMap.of("address", node.getBroadcastAddress().get().getAddress()));
       }
       return query.thenApply(result -> firstPeerRowAsNodeInfo(result, localEndPoint));
     } else {
-      return query(channel, "SELECT * FROM " + getPeerTableName())
+      return query(channel, buildQuery(getPeerColumnsCache(), getPeerTableName()))
           .thenApply(result -> findInPeers(result, node.getHostId(), localEndPoint));
     }
   }
@@ -160,7 +341,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     LOG.debug("[{}] Fetching info for new node {}", logPrefix, broadcastRpcAddress);
     DriverChannel channel = controlConnection.channel();
     EndPoint localEndPoint = channel.getEndPoint();
-    return query(channel, "SELECT * FROM " + getPeerTableName())
+    return query(channel, buildQuery(getPeerColumnsCache(), getPeerTableName()))
         .thenApply(result -> findInPeers(result, broadcastRpcAddress, localEndPoint));
   }
 
@@ -170,9 +351,13 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
       return CompletableFutures.failedFuture(new IllegalStateException("closed"));
     }
     EndPoint localEndPoint = channel.getEndPoint();
-    return query(channel, "SELECT * FROM system.local WHERE key='local'")
+    return query(channel, buildQuery(localColumns, "system.local", "key='local'"))
         .thenApply(
             result -> {
+              if (localColumns == null && !result.getColumnNames().isEmpty()) {
+                localColumns =
+                    intersectWithNeeded(result.getColumnNames(), LOCAL_COLUMNS_OF_INTEREST);
+              }
               Iterator<AdminRow> iterator = result.iterator();
               if (!iterator.hasNext()) {
                 throw new IllegalStateException(
@@ -197,8 +382,9 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     savePort(channel);
 
     CompletionStage<AdminResult> localQuery =
-        query(channel, "SELECT * FROM system.local WHERE key='local'");
-    CompletionStage<AdminResult> peersV2Query = query(channel, "SELECT * FROM system.peers_v2");
+        query(channel, buildQuery(localColumns, "system.local", "key='local'"));
+    CompletionStage<AdminResult> peersV2Query =
+        query(channel, buildQuery(peersV2Columns, "system.peers_v2"));
     CompletableFuture<AdminResult> peersQuery = new CompletableFuture<>();
 
     peersV2Query.whenComplete(
@@ -215,12 +401,16 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
                       && error.message.contains("Unknown keyspace/cf pair (system.peers_v2)"))) {
                 this.isSchemaV2 = false; // We should not attempt this query in the future.
                 CompletableFutures.completeFrom(
-                    query(channel, "SELECT * FROM system.peers"), peersQuery);
+                    query(channel, buildQuery(peersColumns, "system.peers")), peersQuery);
                 return;
               }
             }
             peersQuery.completeExceptionally(t);
           } else {
+            if (peersV2Columns == null && !r.getColumnNames().isEmpty()) {
+              peersV2Columns =
+                  intersectWithNeeded(r.getColumnNames(), PEERS_V2_COLUMNS_OF_INTEREST);
+            }
             peersQuery.complete(r);
           }
         });
@@ -228,6 +418,14 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     return localQuery.thenCombine(
         peersQuery,
         (controlNodeResult, peersResult) -> {
+          if (localColumns == null && !controlNodeResult.getColumnNames().isEmpty()) {
+            localColumns =
+                intersectWithNeeded(controlNodeResult.getColumnNames(), LOCAL_COLUMNS_OF_INTEREST);
+          }
+          if (!isSchemaV2 && peersColumns == null && !peersResult.getColumnNames().isEmpty()) {
+            peersColumns =
+                intersectWithNeeded(peersResult.getColumnNames(), PEERS_COLUMNS_OF_INTEREST);
+          }
           List<NodeInfo> nodeInfos = new ArrayList<>();
           AdminRow localRow = controlNodeResult.iterator().next();
           InetSocketAddress localBroadcastRpcAddress =

@@ -565,6 +565,10 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       }
 
       // Otherwise, perform a full refresh (we don't know how long we were disconnected)
+      // Reset any cached column projections so the next topology refresh re-learns what
+      // columns are available via SELECT * (the cluster may have changed after reconnect).
+      context.getTopologyMonitor().resetColumnCaches();
+
       // If client routes are active, wait for the routes refresh to complete before refreshing
       // nodes, so that buildNodeEndPoint sees up-to-date route data.
       CompletionStage<Void> routesReady;

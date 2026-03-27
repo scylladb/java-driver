@@ -104,14 +104,19 @@ public class PreparedStatementCancellationIT {
     CompletableFuture<PreparedStatement> cf2 = toCompletableFuture(session, cql);
     assertThat(cache.size()).isEqualTo(1);
 
-    CompletableFuture<PreparedStatement> future = Iterables.get(cache.asMap().values(), 0);
-    PreparedStatement stmt = future.get();
+    // Wait for cf1 and cf2 directly — they are dependent futures wrapping the cached future,
+    // so the cached future completing does not synchronously guarantee cf1/cf2 are done yet.
+    PreparedStatement stmt1 = cf1.get(30, TimeUnit.SECONDS);
+    PreparedStatement stmt2 = cf2.get(30, TimeUnit.SECONDS);
 
     assertThat(cf1.isDone()).isTrue();
     assertThat(cf2.isDone()).isTrue();
 
-    assertThat(cf1.join()).isEqualTo(stmt);
-    assertThat(cf2.join()).isEqualTo(stmt);
+    CompletableFuture<PreparedStatement> future = Iterables.get(cache.asMap().values(), 0);
+    PreparedStatement stmt = future.get(30, TimeUnit.SECONDS);
+
+    assertThat(stmt1).isEqualTo(stmt);
+    assertThat(stmt2).isEqualTo(stmt);
   }
 
   // A holdover from work done on JAVA-3055.  This probably isn't _desired_ behaviour but this test
