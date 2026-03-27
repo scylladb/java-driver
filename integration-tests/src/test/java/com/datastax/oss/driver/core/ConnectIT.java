@@ -20,7 +20,6 @@ package com.datastax.oss.driver.core;
 import static com.datastax.oss.simulacron.common.stubbing.PrimeDsl.rows;
 import static com.datastax.oss.simulacron.common.stubbing.PrimeDsl.when;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.awaitility.Awaitility.await;
 
@@ -30,9 +29,11 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.context.DriverContext;
+import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
+import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
@@ -43,8 +44,11 @@ import com.datastax.oss.simulacron.common.stubbing.PrimeDsl;
 import com.datastax.oss.simulacron.server.BoundCluster;
 import com.datastax.oss.simulacron.server.RejectScope;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.Map;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -125,28 +129,25 @@ public class ConnectIT {
   }
 
   /**
-   * Test for JAVA-1948. This ensures that when the LBP initialization fails that any connections
-   * are cleaned up appropriately.
+   * Test for JAVA-1948, updated after control-connection-based DC inference was added. The driver
+   * can now infer the local DC from the control connection endpoint, so explicit contact points
+   * without a local DC no longer fail — the session should connect successfully.
    */
   @Test
-  public void should_cleanup_on_lbp_init_failure() {
+  public void should_infer_local_dc_from_control_connection() {
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .without(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)
             .build();
-    assertThatThrownBy(
-            () ->
-                CqlSession.builder()
-                    .addContactEndPoints(SIMULACRON_RULE.getContactPoints())
-                    .withConfigLoader(loader)
-                    .build())
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(
-            "Since you provided explicit contact points, the local DC must be explicitly set");
-    // One second should be plenty of time for connections to close server side
-    await()
-        .atMost(1, TimeUnit.SECONDS)
-        .until(() -> SIMULACRON_RULE.cluster().getConnections().getConnections().isEmpty());
+    try (CqlSession session =
+        CqlSession.builder()
+            .addContactEndPoints(SIMULACRON_RULE.getContactPoints())
+            .withConfigLoader(loader)
+            .build()) {
+      assertThat(session.getMetadata().getNodes()).isNotEmpty();
+      Node controlNode = session.getMetadata().getNodes().values().iterator().next();
+      assertThat(controlNode.getDatacenter()).isEqualTo("dc1");
+    }
   }
 
   /**
@@ -185,6 +186,40 @@ public class ConnectIT {
     }
   }
 
+  /**
+   * Tests that when the load balancing policy fails to initialize, the session cleans up properly
+   * (closes all connections) and surfaces the error.
+   */
+  @Test
+  public void should_cleanup_on_lbp_init_failure() {
+    DriverConfigLoader loader =
+        SessionUtils.configLoaderBuilder()
+            .withClass(
+                DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS, FailingLoadBalancingPolicy.class)
+            .build();
+
+    Throwable t =
+        catchThrowable(
+            () ->
+                CqlSession.builder()
+                    .addContactEndPoints(SIMULACRON_RULE.getContactPoints())
+                    .withConfigLoader(loader)
+                    .build());
+
+    assertThat(t).isInstanceOf(IllegalStateException.class);
+    assertThat(t).hasMessageContaining("LBP init failure for testing");
+
+    // Verify that all connections were cleaned up
+    await()
+        .pollInterval(500, TimeUnit.MILLISECONDS)
+        .atMost(5, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertThat(SIMULACRON_RULE.cluster().getActiveConnections())
+                    .as("All connections should be cleaned up after LBP init failure")
+                    .isEqualTo(0));
+  }
+
   @SuppressWarnings("unchecked")
   private CompletionStage<? extends Session> newSessionAsync(DriverConfigLoader loader) {
     return SessionUtils.baseBuilder()
@@ -215,5 +250,43 @@ public class ConnectIT {
             "should not be called with isInitialConnection==false");
       }
     }
+  }
+
+  /**
+   * Test policy that always fails during {@link #init}. Used to verify that the session cleans up
+   * connections properly when the LBP fails to initialize.
+   */
+  public static class FailingLoadBalancingPolicy implements LoadBalancingPolicy {
+
+    @SuppressWarnings("unused")
+    public FailingLoadBalancingPolicy(DriverContext context, String profileName) {
+      // constructor needed for loading via config.
+    }
+
+    @Override
+    public void init(@NonNull Map<UUID, Node> nodes, @NonNull DistanceReporter distanceReporter) {
+      throw new IllegalStateException("LBP init failure for testing");
+    }
+
+    @NonNull
+    @Override
+    public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+      return new ArrayDeque<>();
+    }
+
+    @Override
+    public void onAdd(@NonNull Node node) {}
+
+    @Override
+    public void onUp(@NonNull Node node) {}
+
+    @Override
+    public void onDown(@NonNull Node node) {}
+
+    @Override
+    public void onRemove(@NonNull Node node) {}
+
+    @Override
+    public void close() {}
   }
 }

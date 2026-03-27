@@ -40,8 +40,7 @@ public class DcInferringLoadBalancingPolicyDistanceTest
             ise ->
                 assertThat(ise)
                     .hasMessageContaining(
-                        "No local DC was provided, but the contact points are from different DCs")
-                    .hasMessageContaining("node1=null")
+                        "No local DC was provided, but the cluster nodes resolve to nodes in different DCs")
                     .hasMessageContaining("node2=dc1")
                     .hasMessageContaining("node3=dc2"));
   }

@@ -39,9 +39,6 @@ public class DefaultLoadBalancingPolicyDistanceTest extends BasicLoadBalancingPo
             ise ->
                 assertThat(ise)
                     .hasMessageContaining("the local DC must be explicitly set")
-                    .hasMessageContaining("node1=null")
-                    .hasMessageContaining("node2=dc1")
-                    .hasMessageContaining("node3=dc2")
                     .hasMessageContaining("Current DCs in this cluster are: dc1, dc2"));
   }
 

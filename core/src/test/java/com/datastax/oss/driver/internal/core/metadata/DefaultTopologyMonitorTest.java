@@ -38,7 +38,6 @@ import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.internal.core.addresstranslation.PassThroughAddressTranslator;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
@@ -425,21 +424,21 @@ public class DefaultTopologyMonitorTest {
   }
 
   @Test
-  public void should_fail_get_channel_endpoint_if_local_result_is_empty() {
+  public void should_fail_get_channel_node_info_if_local_result_is_empty() {
     // Given
     topologyMonitor.stubQueries(
         new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult()));
 
     // When
-    CompletionStage<EndPoint> futureEndpoint = topologyMonitor.getChannelEndpoint(channel);
+    CompletionStage<NodeInfo> futureNodeInfo = topologyMonitor.getChannelNodeInfo(channel);
 
     // Then
-    assertThatStage(futureEndpoint)
+    assertThatStage(futureNodeInfo)
         .isFailed(
             error -> {
               assertThat(error).isInstanceOf(IllegalStateException.class);
               assertThat(error.getMessage())
-                  .contains("Expected a row in system.local for endpoint resolution");
+                  .contains("Expected a row in system.local for node info resolution");
             });
   }
 

@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core.control;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
@@ -29,6 +28,7 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
@@ -38,8 +38,10 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
+import com.datastax.oss.driver.internal.core.metadata.NodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
@@ -49,6 +51,9 @@ import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoop;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Exchanger;
@@ -81,6 +86,7 @@ abstract class ControlConnectionTestBase {
 
   protected DefaultNode node1;
   protected DefaultNode node2;
+  protected Map<UUID, Node> registeredNodes;
 
   protected ControlConnection controlConnection;
 
@@ -124,8 +130,24 @@ abstract class ControlConnectionTestBase {
     mockQueryPlan(node1, node2);
 
     when(metadataManager.refreshNodes()).thenReturn(CompletableFuture.completedFuture(null));
-    when(metadataManager.refreshSchema(anyString(), anyBoolean(), anyBoolean()))
+    when(metadataManager.refreshSchema(any(), anyBoolean(), anyBoolean()))
         .thenReturn(CompletableFuture.completedFuture(null));
+    // Track registered nodes so that getMetadata().getNodes() returns them
+    // (used by onSuccessfulReconnect to verify the control node is still in metadata).
+    registeredNodes = new HashMap<>();
+    registeredNodes.put(node1.getHostId(), node1);
+    registeredNodes.put(node2.getHostId(), node2);
+    when(metadataManager.registerNode(any(NodeInfo.class)))
+        .thenAnswer(
+            invocation -> {
+              NodeInfo info = invocation.getArgument(0);
+              DefaultNode n = TestNodeFactory.newNode(info, context);
+              registeredNodes.put(n.getHostId(), n);
+              return CompletableFuture.completedFuture(n);
+            });
+    Metadata metadata = mock(Metadata.class);
+    when(metadata.getNodes()).thenAnswer(invocation -> new HashMap<>(registeredNodes));
+    when(metadataManager.getMetadata()).thenReturn(metadata);
     when(context.getMetadataManager()).thenReturn(metadataManager);
 
     when(context.getConfig()).thenReturn(config);
@@ -139,11 +161,15 @@ abstract class ControlConnectionTestBase {
         .thenReturn(false);
 
     TopologyMonitor topologyMonitor = mock(TopologyMonitor.class);
-    when(topologyMonitor.getChannelEndpoint(any(DriverChannel.class)))
+    when(topologyMonitor.getChannelNodeInfo(any(DriverChannel.class)))
         .thenAnswer(
             invocation -> {
               DriverChannel ch = invocation.getArgument(0);
-              return CompletableFuture.completedFuture(ch.getEndPoint());
+              return CompletableFuture.completedFuture(
+                  DefaultNodeInfo.builder()
+                      .withEndPoint(ch.getEndPoint())
+                      .withHostId(UUID.randomUUID())
+                      .build());
             });
     when(context.getTopologyMonitor()).thenReturn(topologyMonitor);
 

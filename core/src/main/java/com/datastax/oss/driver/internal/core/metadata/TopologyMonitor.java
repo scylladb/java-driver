@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
@@ -115,14 +114,14 @@ public interface TopologyMonitor extends AsyncAutoCloseable {
   CompletionStage<Iterable<NodeInfo>> refreshNodeList();
 
   /**
-   * Resolves the endpoint for the node at the other end of the given channel by querying
-   * system.local. This is used by the control connection after establishing a channel to resolve
-   * the node's identity (e.g., host_id) and build the appropriate endpoint type.
+   * Resolves the full identity and metadata of the node at the other end of the given channel by
+   * querying system.local. This is used by the control connection after establishing a channel to
+   * resolve the contact point's full identity (hostId, datacenter, rack, endpoint, etc.).
    *
    * @param channel the channel to query system.local on.
-   * @return a future that completes with the resolved endpoint.
+   * @return a future that completes with the resolved node info.
    */
-  CompletionStage<EndPoint> getChannelEndpoint(DriverChannel channel);
+  CompletionStage<NodeInfo> getChannelNodeInfo(DriverChannel channel);
 
   /**
    * Checks whether the nodes in the cluster agree on a common schema version.

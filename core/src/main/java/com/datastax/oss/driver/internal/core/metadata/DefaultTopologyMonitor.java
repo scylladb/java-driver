@@ -165,7 +165,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
   }
 
   @Override
-  public CompletionStage<EndPoint> getChannelEndpoint(DriverChannel channel) {
+  public CompletionStage<NodeInfo> getChannelNodeInfo(DriverChannel channel) {
     if (closeFuture.isDone()) {
       return CompletableFutures.failedFuture(new IllegalStateException("closed"));
     }
@@ -176,12 +176,12 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
               Iterator<AdminRow> iterator = result.iterator();
               if (!iterator.hasNext()) {
                 throw new IllegalStateException(
-                    "Expected a row in system.local for endpoint resolution, got empty result");
+                    "Expected a row in system.local for node info resolution, got empty result");
               }
               AdminRow localRow = iterator.next();
               InetSocketAddress broadcastRpcAddress =
                   getBroadcastRpcAddress(localRow, localEndPoint);
-              return buildNodeEndPoint(localRow, broadcastRpcAddress, localEndPoint);
+              return nodeInfoBuilder(localRow, broadcastRpcAddress, localEndPoint).build();
             });
   }
 
@@ -382,7 +382,10 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
             .withCassandraVersion(row.getString("release_version"))
             .withTokens(row.getSetOfString("tokens"))
             .withPartitioner(row.getString("partitioner"))
-            .withHostId(Objects.requireNonNull(row.getUuid("host_id")))
+            .withHostId(
+                Objects.requireNonNull(
+                    row.getUuid("host_id"),
+                    "host_id is null in system.local, node may still be bootstrapping"))
             .withSchemaVersion(row.getUuid("schema_version"));
 
     // Handle DSE-specific columns, if present

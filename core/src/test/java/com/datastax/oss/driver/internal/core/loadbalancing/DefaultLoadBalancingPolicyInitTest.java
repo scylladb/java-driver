@@ -19,14 +19,12 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.filter;
-import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
@@ -92,61 +90,17 @@ public class DefaultLoadBalancingPolicyInitTest extends LoadBalancingPolicyTestB
   }
 
   @Test
-  public void should_infer_local_dc_if_no_explicit_contact_points() {
+  public void should_require_local_dc_if_not_configured_and_no_control_connection() {
     // Given
     when(defaultProfile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER))
         .thenReturn(false);
-    when(metadataManager.getContactPoints()).thenReturn(ImmutableSet.of(node1));
-    when(metadataManager.wasImplicitContactPoint()).thenReturn(true);
-    DefaultLoadBalancingPolicy policy = createPolicy();
-
-    // When
-    policy.init(ImmutableMap.of(UUID.randomUUID(), node1), distanceReporter);
-
-    // Then
-    assertThat(policy.getLocalDatacenter()).isEqualTo("dc1");
-  }
-
-  @Test
-  public void should_require_local_dc_if_explicit_contact_points() {
-    // Given
-    when(defaultProfile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER))
-        .thenReturn(false);
-    when(metadataManager.wasImplicitContactPoint()).thenReturn(false);
     DefaultLoadBalancingPolicy policy = createPolicy();
 
     // When
     assertThatThrownBy(
-            () -> policy.init(ImmutableMap.of(UUID.randomUUID(), node2), distanceReporter))
+            () -> policy.init(ImmutableMap.of(UUID.randomUUID(), node1), distanceReporter))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(
-            "Since you provided explicit contact points, the local DC must be explicitly set");
-  }
-
-  @Test
-  public void should_warn_if_contact_points_not_in_local_dc() {
-    // Given
-    when(node2.getDatacenter()).thenReturn("dc2");
-    when(node3.getDatacenter()).thenReturn("dc3");
-    when(metadataManager.getContactPoints()).thenReturn(ImmutableSet.of(node1, node2, node3));
-    DefaultLoadBalancingPolicy policy = createPolicy();
-
-    // When
-    policy.init(
-        ImmutableMap.of(
-            UUID.randomUUID(), node1, UUID.randomUUID(), node2, UUID.randomUUID(), node3),
-        distanceReporter);
-
-    // Then
-    verify(appender, atLeast(1)).doAppend(loggingEventCaptor.capture());
-    Iterable<ILoggingEvent> warnLogs =
-        filter(loggingEventCaptor.getAllValues()).with("level", Level.WARN).get();
-    assertThat(warnLogs).hasSize(1);
-    assertThat(warnLogs.iterator().next().getFormattedMessage())
-        .contains(
-            "You specified dc1 as the local DC, but some contact points are from a different DC")
-        .contains("node2=dc2")
-        .contains("node3=dc3");
+        .hasMessageContaining("the local DC must be explicitly set");
   }
 
   @Test
@@ -216,6 +170,44 @@ public class DefaultLoadBalancingPolicyInitTest extends LoadBalancingPolicyTestB
     verify(distanceReporter).setDistance(node2, NodeDistance.LOCAL);
     verify(distanceReporter).setDistance(node3, NodeDistance.LOCAL);
     assertThat(policy.getLiveNodes().dc("dc1")).containsExactly(node2, node3);
+  }
+
+  @Test
+  public void should_infer_local_dc_from_control_node_hostId() {
+    // Given — DC not configured, but controlNode returns a node whose hostId is in the nodes map
+    when(defaultProfile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER))
+        .thenReturn(false);
+    UUID node1HostId = UUID.randomUUID();
+    when(node1.getHostId()).thenReturn(node1HostId);
+    when(controlConnection.controlNode()).thenReturn(node1);
+
+    DefaultLoadBalancingPolicy policy = createPolicy();
+
+    // When
+    policy.init(ImmutableMap.of(node1HostId, node1), distanceReporter);
+
+    // Then — DC should be inferred from the control node's hostId lookup
+    assertThat(policy.getLocalDatacenter()).isEqualTo("dc1");
+  }
+
+  @Test
+  public void should_warn_if_configured_dc_matches_no_node() {
+    // Given — DC is configured as "dc1" but nodes are all in "dc2"
+    when(metadataManager.getContactPoints()).thenReturn(ImmutableSet.of(node1));
+    when(node1.getDatacenter()).thenReturn("dc2");
+    DefaultLoadBalancingPolicy policy = createPolicy();
+
+    // When
+    policy.init(ImmutableMap.of(UUID.randomUUID(), node1), distanceReporter);
+
+    // Then — should log a warning about the configured DC not matching any node
+    verify(appender, atLeastOnce()).doAppend(loggingEventCaptor.capture());
+    assertThat(
+            loggingEventCaptor.getAllValues().stream()
+                .filter(e -> e.getLevel() == Level.WARN)
+                .anyMatch(
+                    e -> e.getFormattedMessage().contains("does not match any node's datacenter")))
+        .isTrue();
   }
 
   @NonNull

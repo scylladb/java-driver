@@ -44,15 +44,19 @@ import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Debouncer;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.util.concurrent.EventExecutor;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import net.jcip.annotations.ThreadSafe;
@@ -82,6 +86,7 @@ public class MetadataManager implements AsyncAutoCloseable {
   private volatile boolean tokenMapEnabled;
   private volatile Set<DefaultNode> contactPoints;
   private volatile boolean wasImplicitContactPoint;
+
   private volatile TypeCodec<TupleValue> tabletPayloadCodec = null;
 
   public MetadataManager(InternalDriverContext context) {
@@ -163,8 +168,6 @@ public class MetadataManager implements AsyncAutoCloseable {
   /**
    * The contact points that were used by the driver to initialize. If none were provided
    * explicitly, this will be the default (127.0.0.1:9042).
-   *
-   * @see #wasImplicitContactPoint()
    */
   public Set<DefaultNode> getContactPoints() {
     return contactPoints;
@@ -173,6 +176,61 @@ public class MetadataManager implements AsyncAutoCloseable {
   /** Whether the default contact point was used (because none were provided explicitly). */
   public boolean wasImplicitContactPoint() {
     return wasImplicitContactPoint;
+  }
+
+  /**
+   * Creates a new metadata node from the given {@link NodeInfo} and registers it into metadata so
+   * that subsequent refreshes can find and reuse it by hostId. If a node with the same hostId
+   * already exists, returns the existing node.
+   *
+   * <p>Note: this always creates a new {@link DefaultNode} rather than reusing the caller's contact
+   * point node. Contact point nodes are ephemeral objects used only for the connection query plan;
+   * they are never added to metadata and never exposed to user-facing APIs (events, {@link
+   * com.datastax.oss.driver.api.core.metadata.Metadata#getNodes()}, or {@link
+   * com.datastax.oss.driver.api.core.metadata.NodeStateListener} callbacks).
+   */
+  public CompletionStage<Node> registerNode(NodeInfo nodeInfo) {
+    Preconditions.checkNotNull(nodeInfo.getHostId(), "Cannot register node without hostId");
+    CompletableFuture<Node> result = new CompletableFuture<>();
+    RunOrSchedule.on(
+        adminExecutor,
+        () -> {
+          try {
+            assert adminExecutor.inEventLoop();
+            Node existing = metadata.getNodes().get(nodeInfo.getHostId());
+            if (existing != null) {
+              LOG.debug(
+                  "[{}] Node with hostId {} already in metadata, returning existing node",
+                  logPrefix,
+                  nodeInfo.getHostId());
+              result.complete(existing);
+              return;
+            }
+            DefaultNode newNode = new DefaultNode(nodeInfo.getEndPoint(), context);
+            NodesRefresh.copyInfos(nodeInfo, newNode, context);
+            Map<UUID, Node> newNodes = new HashMap<>(metadata.getNodes());
+            newNodes.put(newNode.getHostId(), newNode);
+            this.metadata =
+                new DefaultMetadata(
+                    ImmutableMap.copyOf(newNodes),
+                    metadata.getKeyspaces(),
+                    metadata.getTokenMap().orElse(null),
+                    metadata.getClusterName().orElse(null),
+                    metadata.getTabletMap().orElse(DefaultTabletMap.emptyMap()));
+            if (singleThreaded.didFirstNodeListRefresh) {
+              LOG.debug(
+                  "[{}] registerNode inserting new node {} after initial refresh, "
+                      + "firing added event",
+                  logPrefix,
+                  nodeInfo.getHostId());
+              context.getEventBus().fire(NodeStateEvent.added(newNode));
+            }
+            result.complete(newNode);
+          } catch (Exception e) {
+            result.completeExceptionally(e);
+          }
+        });
+    return result;
   }
 
   public CompletionStage<Void> refreshNodes() {
@@ -340,7 +398,7 @@ public class MetadataManager implements AsyncAutoCloseable {
       MetadataRefresh refresh =
           didFirstNodeListRefresh
               ? new FullNodeListRefresh(nodeInfos)
-              : new InitialNodeListRefresh(nodeInfos, contactPoints);
+              : new InitialNodeListRefresh(nodeInfos);
       didFirstNodeListRefresh = true;
       return apply(refresh);
     }

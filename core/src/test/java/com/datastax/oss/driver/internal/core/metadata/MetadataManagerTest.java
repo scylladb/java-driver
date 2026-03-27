@@ -120,7 +120,6 @@ public class MetadataManagerTest {
     assertThat(metadataManager.getContactPoints())
         .extracting(Node::getEndPoint)
         .containsOnly(END_POINT2);
-    assertThat(metadataManager.wasImplicitContactPoint()).isFalse();
   }
 
   @Test
@@ -132,11 +131,10 @@ public class MetadataManagerTest {
     assertThat(metadataManager.getContactPoints())
         .extracting(Node::getEndPoint)
         .containsOnly(MetadataManager.DEFAULT_CONTACT_POINT);
-    assertThat(metadataManager.wasImplicitContactPoint()).isTrue();
   }
 
   @Test
-  public void should_copy_contact_points_on_refresh_of_all_nodes() {
+  public void should_create_initial_refresh_on_first_node_list() {
     // Given
     // Run previous scenario to trigger the addition of the default contact point:
     should_use_default_if_no_contact_points_provided();
@@ -154,9 +152,6 @@ public class MetadataManagerTest {
     assertThatStage(refreshNodesFuture).isSuccess();
     assertThat(metadataManager.refreshes).hasSize(1);
     InitialNodeListRefresh refresh = (InitialNodeListRefresh) metadataManager.refreshes.get(0);
-    assertThat(refresh.contactPoints)
-        .extracting(Node::getEndPoint)
-        .containsOnly(MetadataManager.DEFAULT_CONTACT_POINT);
     assertThat(refresh.nodeInfos).containsExactlyInAnyOrder(info1, info2);
   }
 
@@ -165,7 +160,7 @@ public class MetadataManagerTest {
     // Given
     // Run previous scenario to trigger the addition of the default contact point and a first
     // refresh:
-    should_copy_contact_points_on_refresh_of_all_nodes();
+    should_create_initial_refresh_on_first_node_list();
     // Discard that first refresh, we don't really care about it in the context of this test, only
     // that the next one won't be the first
     metadataManager.refreshes.clear();
@@ -403,6 +398,96 @@ public class MetadataManagerTest {
         () -> result1.toCompletableFuture().isDone() && result2.toCompletableFuture().isDone());
     assertThatStage(result1).isFailed(t -> assertThat(t).isEqualTo(expectedException));
     assertThatStage(result2).isFailed(t -> assertThat(t).isEqualTo(expectedException));
+  }
+
+  @Test
+  public void should_reuse_existing_node_on_duplicate_registerNode() {
+    // Given — register a node with a specific hostId
+    UUID hostId = UUID.randomUUID();
+    NodeInfo nodeInfo =
+        DefaultNodeInfo.builder().withEndPoint(END_POINT2).withHostId(hostId).build();
+
+    // When — register the node
+    CompletionStage<Node> firstResult = metadataManager.registerNode(nodeInfo);
+    waitForPendingAdminTasks(() -> firstResult.toCompletableFuture().isDone());
+
+    // Then — node should be registered
+    assertThatStage(firstResult).isSuccess();
+    Node firstNode = firstResult.toCompletableFuture().join();
+    assertThat(firstNode.getHostId()).isEqualTo(hostId);
+    assertThat(metadataManager.getMetadata().getNodes()).containsKey(hostId);
+
+    // When — register again with the same hostId (simulating concurrent refresh)
+    NodeInfo duplicateInfo =
+        DefaultNodeInfo.builder().withEndPoint(END_POINT3).withHostId(hostId).build();
+    CompletionStage<Node> secondResult = metadataManager.registerNode(duplicateInfo);
+    waitForPendingAdminTasks(() -> secondResult.toCompletableFuture().isDone());
+
+    // Then — should return the same node instance, not create a duplicate
+    assertThatStage(secondResult).isSuccess();
+    Node secondNode = secondResult.toCompletableFuture().join();
+    assertThat(secondNode).isSameAs(firstNode);
+    assertThat(metadataManager.getMetadata().getNodes()).hasSize(1);
+  }
+
+  @Test
+  public void should_handle_concurrent_registerNode_calls_with_same_hostId() {
+    // Given — two concurrent registerNode calls for the same hostId
+    UUID hostId = UUID.randomUUID();
+    NodeInfo nodeInfo1 =
+        DefaultNodeInfo.builder().withEndPoint(END_POINT2).withHostId(hostId).build();
+    NodeInfo nodeInfo2 =
+        DefaultNodeInfo.builder().withEndPoint(END_POINT3).withHostId(hostId).build();
+
+    // When — submit both calls before either completes on the admin executor
+    CompletionStage<Node> result1 = metadataManager.registerNode(nodeInfo1);
+    CompletionStage<Node> result2 = metadataManager.registerNode(nodeInfo2);
+
+    // Then — both should complete successfully, returning the same node
+    waitForPendingAdminTasks(
+        () -> result1.toCompletableFuture().isDone() && result2.toCompletableFuture().isDone());
+    assertThatStage(result1).isSuccess();
+    assertThatStage(result2).isSuccess();
+    Node node1 = result1.toCompletableFuture().join();
+    Node node2 = result2.toCompletableFuture().join();
+    assertThat(node1.getHostId()).isEqualTo(hostId);
+    assertThat(node2).isSameAs(node1);
+    assertThat(metadataManager.getMetadata().getNodes()).hasSize(1);
+  }
+
+  @Test
+  public void should_fire_added_event_on_registerNode_after_initial_refresh() {
+    // Given — trigger a refresh cycle to set didFirstNodeListRefresh = true
+    NodeInfo info = mock(NodeInfo.class);
+    when(topologyMonitor.refreshNodeList())
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(info)));
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    metadataManager.refreshNodes();
+    waitForPendingAdminTasks(() -> metadataManager.refreshes.size() == 1);
+
+    // When — register a new node after the initial refresh
+    UUID hostId = UUID.randomUUID();
+    NodeInfo nodeInfo =
+        DefaultNodeInfo.builder().withEndPoint(END_POINT2).withHostId(hostId).build();
+    CompletionStage<Node> result = metadataManager.registerNode(nodeInfo);
+    waitForPendingAdminTasks(() -> result.toCompletableFuture().isDone());
+
+    // Then — NodeStateEvent.added should have been fired
+    assertThatStage(result).isSuccess();
+    Node registeredNode = result.toCompletableFuture().join();
+    verify(eventBus, timeout(500)).fire(NodeStateEvent.added((DefaultNode) registeredNode));
+  }
+
+  @Test
+  public void should_throw_on_registerNode_with_null_hostId() {
+    // Given — a NodeInfo with null hostId
+    NodeInfo nodeInfo = DefaultNodeInfo.builder().withEndPoint(END_POINT2).build();
+
+    // When/Then — should throw NullPointerException from Preconditions.checkNotNull
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> metadataManager.registerNode(nodeInfo))
+        .isInstanceOf(NullPointerException.class)
+        .hasMessageContaining("Cannot register node without hostId");
   }
 
   private static class TestMetadataManager extends MetadataManager {

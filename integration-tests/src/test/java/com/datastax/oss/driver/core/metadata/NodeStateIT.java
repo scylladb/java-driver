@@ -26,7 +26,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -83,8 +82,6 @@ import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -111,8 +108,6 @@ public class NodeStateIT {
           .build();
 
   @Rule public TestRule chain = RuleChain.outerRule(simulacron).around(sessionRule);
-
-  private @Captor ArgumentCaptor<DefaultNode> nodeCaptor;
 
   private InternalDriverContext driverContext;
   private ConfigurableIgnoresPolicy defaultLoadBalancingPolicy;
@@ -184,10 +179,14 @@ public class NodeStateIT {
                 .findNode(simulacronRegularNode.inetSocketAddress())
                 .orElseThrow(AssertionError::new);
 
-    // SessionRule uses all nodes as contact points, so we only get onUp notifications for them (no
-    // onAdd)
-    inOrder.verify(nodeStateListener, timeout(500)).onUp(metadataControlNode);
-    inOrder.verify(nodeStateListener, timeout(500)).onUp(metadataRegularNode);
+    // The control node was pre-registered via registerNode, so no onAdd event is fired for it.
+    // The regular node is new to metadata (contact points are no longer copied into
+    // InitialNodeListRefresh), so it gets an onAdd event when first discovered.
+    verify(nodeStateListener, timeout(500)).onUp(metadataControlNode);
+    verify(nodeStateListener, timeout(500)).onUp(metadataRegularNode);
+    verify(nodeStateListener, timeout(500)).onAdd(metadataRegularNode);
+    // Create fresh inOrder for subsequent test method verifications
+    inOrder = inOrder(nodeStateListener);
   }
 
   @After
@@ -552,16 +551,10 @@ public class NodeStateIT {
       Node localMetadataNode1 = metadata.findNode(endPoint1).orElseThrow(AssertionError::new);
       Node localMetadataNode2 = metadata.findNode(endPoint2).orElseThrow(AssertionError::new);
 
-      // The order of the calls is not deterministic because contact points are shuffled, but it
-      // does not matter here since Mockito.verify does not enforce order.
-      verify(localNodeStateListener, timeout(500)).onRemove(nodeCaptor.capture());
-      assertThat(nodeCaptor.getValue().getEndPoint()).isEqualTo(wrongContactPoint);
+      // Node1 is a reused contact point (no onAdd), node2 is discovered fresh (onAdd).
+      // The wrong contact point is simply not in the discovered list.
       verify(localNodeStateListener, timeout(500)).onUp(localMetadataNode1);
       verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode2);
-
-      // Note: there might be an additional onDown for wrongContactPoint if it was hit first at
-      // init. This is hard to test since the node was removed later, so we simply don't call
-      // verifyNoMoreInteractions.
     }
   }
 
@@ -604,14 +597,21 @@ public class NodeStateIT {
             // Stopped node was tried first and marked down, that's our target scenario
             verify(localNodeStateListener, timeout(500)).onDown(localMetadataNode2);
             verify(localNodeStateListener, timeout(500)).onUp(localMetadataNode1);
+            // The non-control node is new to metadata (contact points are no longer copied
+            // into InitialNodeListRefresh) and gets an onAdd event when first discovered.
+            verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode2);
             verify(localNodeStateListener, timeout(500)).onSessionReady(localSession);
-            verifyNoMoreInteractions(localNodeStateListener);
+            // Note: there may also be an onDown for the contact point node (a temporary object
+            // separate from the metadata node) when the control connection first fails to connect
+            // to it. We don't assert strict verifyNoMoreInteractions because of this.
             return;
           } else {
             // Stopped node was not tried
             assertThat(localMetadataNode2).isUnknown();
             verify(localNodeStateListener, timeout(500)).onUp(localMetadataNode1);
-            verifyNoMoreInteractions(localNodeStateListener);
+            // The non-control node is new to metadata (contact points are no longer copied
+            // into InitialNodeListRefresh) and gets an onAdd event when first discovered.
+            verify(localNodeStateListener, timeout(500)).onAdd(localMetadataNode2);
           }
         }
         reset(localNodeStateListener);
