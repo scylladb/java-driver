@@ -936,7 +936,7 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
       }
 
       boolean resolveAddresses =
-          defaultConfig.getBoolean(DefaultDriverOption.RESOLVE_CONTACT_POINTS, true);
+          defaultConfig.getBoolean(DefaultDriverOption.RESOLVE_CONTACT_POINTS, false);
 
       Set<EndPoint> contactPoints =
           ContactPoints.merge(programmaticContactPoints, configContactPoints, resolveAddresses);

@@ -292,7 +292,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.TIMESTAMP_GENERATOR_FORCE_JAVA_CLOCK, false);
     map.put(TypedDriverOption.REQUEST_THROTTLER_CLASS, "PassThroughRequestThrottler");
     map.put(TypedDriverOption.ADDRESS_TRANSLATOR_CLASS, "PassThroughAddressTranslator");
-    map.put(TypedDriverOption.RESOLVE_CONTACT_POINTS, true);
+    map.put(TypedDriverOption.RESOLVE_CONTACT_POINTS, false);
     map.put(TypedDriverOption.PROTOCOL_MAX_FRAME_LENGTH, 256L * 1024 * 1024);
     map.put(TypedDriverOption.REQUEST_WARN_IF_SET_KEYSPACE, true);
     map.put(TypedDriverOption.REQUEST_TRACE_ATTEMPTS, 5);
