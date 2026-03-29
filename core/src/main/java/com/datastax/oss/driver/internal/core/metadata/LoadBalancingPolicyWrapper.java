@@ -164,24 +164,23 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
 
   @NonNull
   public Queue<Node> newControlReconnectionQueryPlan() {
-    // First try the original way
     Queue<Node> regularQueryPlan = newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
-    if (!regularQueryPlan.isEmpty()) return regularQueryPlan;
 
     if (context
         .getConfig()
         .getDefaultProfile()
         .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)) {
       Set<DefaultNode> originalNodes = context.getMetadataManager().getContactPoints();
-      List<Node> nodes = new ArrayList<>();
+      List<Node> contactNodes = new ArrayList<>();
       for (DefaultNode node : originalNodes) {
-        nodes.add(DefaultNode.newContactPoint(node.getEndPoint(), context));
+        contactNodes.add(DefaultNode.newContactPoint(node.getEndPoint(), context));
       }
-      Collections.shuffle(nodes);
-      return new ConcurrentLinkedQueue<>(nodes);
-    } else {
-      return regularQueryPlan;
+      Collections.shuffle(contactNodes);
+      // Append contact points to the end of the regular query plan so they serve as a fallback
+      regularQueryPlan.addAll(contactNodes);
     }
+
+    return regularQueryPlan;
   }
 
   // when it comes in from the outside

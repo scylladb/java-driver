@@ -27,10 +27,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy.DistanceReporter;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
@@ -68,6 +71,8 @@ public class LoadBalancingPolicyWrapperTest {
   private Queue<Node> defaultPolicyQueryPlan;
 
   @Mock private InternalDriverContext context;
+  @Mock private DriverConfig config;
+  @Mock private DriverExecutionProfile defaultProfile;
   @Mock private LoadBalancingPolicy policy1;
   @Mock private LoadBalancingPolicy policy2;
   @Mock private LoadBalancingPolicy policy3;
@@ -97,6 +102,11 @@ public class LoadBalancingPolicyWrapperTest {
     when(metadata.getNodes()).thenReturn(allNodes);
     when(metadataManager.getContactPoints()).thenReturn(contactPoints);
     when(context.getMetadataManager()).thenReturn(metadataManager);
+
+    when(context.getConfig()).thenReturn(config);
+    when(config.getDefaultProfile()).thenReturn(defaultProfile);
+    when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
+        .thenReturn(false);
 
     defaultPolicyQueryPlan = Lists.newLinkedList(ImmutableList.of(node3, node2, node1));
     when(policy1.newQueryPlan(null, null)).thenReturn(defaultPolicyQueryPlan);
@@ -174,6 +184,63 @@ public class LoadBalancingPolicyWrapperTest {
     // no-arg newQueryPlan() uses the default profile
     verify(policy1).newQueryPlan(null, null);
     assertThat(queryPlan).isEqualTo(defaultPolicyQueryPlan);
+  }
+
+  @Test
+  public void
+      should_append_contact_points_to_query_plan_when_reconnect_contact_points_is_enabled() {
+    // Given
+    when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
+        .thenReturn(true);
+    wrapper.init();
+
+    // When
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then
+    // 3 policy nodes + 2 contact point nodes
+    assertThat(queryPlan.size()).isEqualTo(5);
+    // First nodes come from the policy query plan (node3, node2, node1)
+    assertThat(queryPlan.poll()).isEqualTo(node3);
+    assertThat(queryPlan.poll()).isEqualTo(node2);
+    assertThat(queryPlan.poll()).isEqualTo(node1);
+    // Remaining nodes are contact points appended at the end.
+    // They are new DefaultNode instances created via newContactPoint, so compare by endpoint.
+    Set<EndPoint> remainingEndpoints = new java.util.HashSet<>();
+    for (Node n : queryPlan) {
+      remainingEndpoints.add(n.getEndPoint());
+    }
+    Set<EndPoint> contactEndpoints = new java.util.HashSet<>();
+    for (DefaultNode n : contactPoints) {
+      contactEndpoints.add(n.getEndPoint());
+    }
+    assertThat(remainingEndpoints).isEqualTo(contactEndpoints);
+  }
+
+  @Test
+  public void should_return_contact_points_when_query_plan_empty_and_flag_enabled() {
+    // Given
+    when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
+        .thenReturn(true);
+    wrapper.init();
+    // Make the policy return an empty query plan
+    when(policy1.newQueryPlan(null, null)).thenReturn(Lists.newLinkedList(ImmutableList.of()));
+
+    // When
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then
+    // Should get the contact points (compare by endpoint since they are new instances)
+    assertThat(queryPlan.size()).isEqualTo(contactPoints.size());
+    Set<EndPoint> resultEndpoints = new java.util.HashSet<>();
+    for (Node n : queryPlan) {
+      resultEndpoints.add(n.getEndPoint());
+    }
+    Set<EndPoint> contactEndpoints = new java.util.HashSet<>();
+    for (DefaultNode n : contactPoints) {
+      contactEndpoints.add(n.getEndPoint());
+    }
+    assertThat(resultEndpoints).isEqualTo(contactEndpoints);
   }
 
   @Test
