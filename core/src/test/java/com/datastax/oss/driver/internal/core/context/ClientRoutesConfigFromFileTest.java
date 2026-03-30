@@ -109,7 +109,7 @@ public class ClientRoutesConfigFromFileTest {
     assertThat(cfg.getEndpoints()).hasSize(1);
     ClientRouteProxy ep = cfg.getEndpoints().get(0);
     assertThat(ep.getConnectionId()).isEqualTo("11111111-1111-1111-1111-111111111111");
-    assertThat(ep.getConnectionAddr()).isNull();
+    assertThat(ep.getConnectionAddrOverride()).isNull();
   }
 
   @Test
@@ -128,7 +128,7 @@ public class ClientRoutesConfigFromFileTest {
     List<ClientRouteProxy> eps = cfg.getEndpoints();
     assertThat(eps).hasSize(1);
     assertThat(eps.get(0).getConnectionId()).isEqualTo("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-    assertThat(eps.get(0).getConnectionAddr()).isEqualTo("cluster.example.com");
+    assertThat(eps.get(0).getConnectionAddrOverride()).isEqualTo("cluster.example.com");
   }
 
   @Test
@@ -147,10 +147,11 @@ public class ClientRoutesConfigFromFileTest {
     assertThat(cfg.getEndpoints()).hasSize(2);
     assertThat(cfg.getEndpoints().get(0).getConnectionId())
         .isEqualTo("11111111-1111-1111-1111-111111111111");
-    assertThat(cfg.getEndpoints().get(0).getConnectionAddr()).isEqualTo("node1.example.com");
+    assertThat(cfg.getEndpoints().get(0).getConnectionAddrOverride())
+        .isEqualTo("node1.example.com");
     assertThat(cfg.getEndpoints().get(1).getConnectionId())
         .isEqualTo("22222222-2222-2222-2222-222222222222");
-    assertThat(cfg.getEndpoints().get(1).getConnectionAddr()).isNull();
+    assertThat(cfg.getEndpoints().get(1).getConnectionAddrOverride()).isNull();
   }
 
   // ---------------------------------------------------------------------------
