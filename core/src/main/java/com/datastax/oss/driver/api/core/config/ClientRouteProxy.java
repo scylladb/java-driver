@@ -42,7 +42,7 @@ public final class ClientRouteProxy {
   private static final Pattern VALID_HOSTNAME_OR_IP = Pattern.compile("^[a-zA-Z0-9._:\\[\\]-]+$");
 
   private final String connectionId;
-  private final String connectionAddr;
+  private final String connectionAddrOverride;
 
   /**
    * Creates a new endpoint with the given connection ID and no connection address.
@@ -57,35 +57,35 @@ public final class ClientRouteProxy {
    * Creates a new endpoint with the given connection ID and connection address.
    *
    * @param connectionId the connection ID (must not be null).
-   * @param connectionAddr the DNS name or IP address used to override the {@code address} column
-   *     from the {@code system.client_routes} table for the matching {@code connection_id} (may be
-   *     null). Must be a plain hostname or IP address without a port (e.g. {@code
+   * @param connectionAddrOverride the DNS name or IP address used to override the {@code address}
+   *     column from the {@code system.client_routes} table for the matching {@code connection_id}
+   *     (may be null). Must be a plain hostname or IP address without a port (e.g. {@code
    *     "my-cluster.example.com"} or {@code "10.0.1.5"}).
    */
-  public ClientRouteProxy(@NonNull String connectionId, @Nullable String connectionAddr) {
+  public ClientRouteProxy(@NonNull String connectionId, @Nullable String connectionAddrOverride) {
     this.connectionId = Objects.requireNonNull(connectionId, "connectionId must not be null");
     if (connectionId.trim().isEmpty()) {
       throw new IllegalArgumentException("connectionId must not be empty");
     }
-    if (connectionAddr != null) {
-      if (connectionAddr.trim().isEmpty()) {
+    if (connectionAddrOverride != null) {
+      if (connectionAddrOverride.trim().isEmpty()) {
         throw new IllegalArgumentException(
-            "connectionAddr must not be empty or blank when non-null");
+            "connectionAddrOverride must not be empty or blank when non-null");
       }
-      if (containsPort(connectionAddr)) {
+      if (containsPort(connectionAddrOverride)) {
         throw new IllegalArgumentException(
-            "connectionAddr must be a plain hostname or IP address without a port, got: "
-                + connectionAddr);
+            "connectionAddrOverride must be a plain hostname or IP address without a port, got: "
+                + connectionAddrOverride);
       }
-      if (!VALID_HOSTNAME_OR_IP.matcher(connectionAddr).matches()) {
+      if (!VALID_HOSTNAME_OR_IP.matcher(connectionAddrOverride).matches()) {
         throw new IllegalArgumentException(
-            "connectionAddr contains invalid characters "
+            "connectionAddrOverride contains invalid characters "
                 + "(expected hostname or IP address with only alphanumeric characters, "
                 + "dots, hyphens, underscores, colons, or brackets): "
-                + connectionAddr);
+                + connectionAddrOverride);
       }
     }
-    this.connectionAddr = connectionAddr;
+    this.connectionAddrOverride = connectionAddrOverride;
   }
 
   /**
@@ -124,10 +124,25 @@ public final class ClientRouteProxy {
    * <p>This is a plain hostname or IP address (e.g. {@code "my-cluster.example.com"} or {@code
    * "10.0.1.5"}). When provided, the {@code address} column from the {@code system.client_routes}
    * table is overridden with this value for the matching {@code connection_id}.
+   *
+   * @deprecated use {@link ClientRouteProxy#getConnectionAddrOverride()} instead
    */
   @Nullable
+  @Deprecated
   public String getConnectionAddr() {
-    return connectionAddr;
+    return connectionAddrOverride;
+  }
+
+  /**
+   * Returns the connection address override for this endpoint, or null if not specified.
+   *
+   * <p>This is a plain hostname or IP address (e.g. {@code "my-cluster.example.com"} or {@code
+   * "10.0.1.5"}). When provided, the {@code address} column from the {@code system.client_routes}
+   * table is overridden with this value for the matching {@code connection_id}.
+   */
+  @Nullable
+  public String getConnectionAddrOverride() {
+    return connectionAddrOverride;
   }
 
   @Override
@@ -140,12 +155,12 @@ public final class ClientRouteProxy {
     }
     ClientRouteProxy that = (ClientRouteProxy) o;
     return connectionId.equals(that.connectionId)
-        && Objects.equals(connectionAddr, that.connectionAddr);
+        && Objects.equals(connectionAddrOverride, that.connectionAddrOverride);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(connectionId, connectionAddr);
+    return Objects.hash(connectionId, connectionAddrOverride);
   }
 
   @Override
@@ -154,7 +169,9 @@ public final class ClientRouteProxy {
         + "connectionId='"
         + connectionId
         + "'"
-        + (connectionAddr != null ? ", connectionAddr='" + connectionAddr + "'" : "")
+        + (connectionAddrOverride != null
+            ? ", connectionAddrOverride='" + connectionAddrOverride + "'"
+            : "")
         + "}";
   }
 }

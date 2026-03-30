@@ -36,7 +36,7 @@ public class ClientRoutesConfigTest {
 
     assertThat(config.getEndpoints()).hasSize(1);
     assertThat(config.getEndpoints().get(0).getConnectionId()).isEqualTo(connectionId);
-    assertThat(config.getEndpoints().get(0).getConnectionAddr()).isEqualTo(connectionAddr);
+    assertThat(config.getEndpoints().get(0).getConnectionAddrOverride()).isEqualTo(connectionAddr);
     assertThat(config.getTableName()).isEqualTo("system.client_routes");
   }
 
@@ -80,7 +80,7 @@ public class ClientRoutesConfigTest {
     ClientRouteProxy endpoint = new ClientRouteProxy(connectionId);
 
     assertThat(endpoint.getConnectionId()).isEqualTo(connectionId);
-    assertThat(endpoint.getConnectionAddr()).isNull();
+    assertThat(endpoint.getConnectionAddrOverride()).isNull();
   }
 
   @Test
@@ -90,7 +90,7 @@ public class ClientRoutesConfigTest {
     ClientRouteProxy endpoint = new ClientRouteProxy(connectionId, connectionAddr);
 
     assertThat(endpoint.getConnectionId()).isEqualTo(connectionId);
-    assertThat(endpoint.getConnectionAddr()).isEqualTo(connectionAddr);
+    assertThat(endpoint.getConnectionAddrOverride()).isEqualTo(connectionAddr);
   }
 
   @Test
@@ -118,7 +118,7 @@ public class ClientRoutesConfigTest {
   public void should_reject_blank_connection_addr() {
     assertThatThrownBy(() -> new ClientRouteProxy("conn-id-1", "  "))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("connectionAddr must not be empty");
+        .hasMessageContaining("connectionAddrOverride must not be empty");
   }
 
   @Test
@@ -220,20 +220,20 @@ public class ClientRoutesConfigTest {
   @Test
   public void should_accept_plain_hostname_connection_addr() {
     ClientRouteProxy ep = new ClientRouteProxy("conn-id-1", "host.example.com");
-    assertThat(ep.getConnectionAddr()).isEqualTo("host.example.com");
+    assertThat(ep.getConnectionAddrOverride()).isEqualTo("host.example.com");
   }
 
   @Test
   public void should_accept_ipv4_connection_addr() {
     ClientRouteProxy ep = new ClientRouteProxy("conn-id-1", "10.0.1.5");
-    assertThat(ep.getConnectionAddr()).isEqualTo("10.0.1.5");
+    assertThat(ep.getConnectionAddrOverride()).isEqualTo("10.0.1.5");
   }
 
   @Test
   public void should_accept_bare_ipv6_connection_addr() {
     // Bare IPv6 contains multiple colons — should NOT be treated as host:port
     ClientRouteProxy ep = new ClientRouteProxy("conn-id-1", "::1");
-    assertThat(ep.getConnectionAddr()).isEqualTo("::1");
+    assertThat(ep.getConnectionAddrOverride()).isEqualTo("::1");
   }
 
   @Test

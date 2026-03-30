@@ -139,10 +139,11 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     this.connectionAddrOverrides =
         Collections.unmodifiableMap(
             config.getEndpoints().stream()
-                .filter(ep -> ep.getConnectionAddr() != null)
+                .filter(ep -> ep.getConnectionAddrOverride() != null)
                 .collect(
                     Collectors.toMap(
-                        ClientRouteProxy::getConnectionId, ClientRouteProxy::getConnectionAddr)));
+                        ClientRouteProxy::getConnectionId,
+                        ClientRouteProxy::getConnectionAddrOverride)));
     this.logPrefix = context.getSessionName();
     this.resolvedRoutesCache = new AtomicReference<>(Collections.emptyMap());
     this.useSSL = context.getSslEngineFactory().isPresent();
