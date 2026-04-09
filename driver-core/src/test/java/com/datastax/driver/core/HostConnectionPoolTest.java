@@ -300,6 +300,26 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
     }
   }
 
+  @Test(groups = "short")
+  public void should_close_uninitialized_pool_without_npe() throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      Session session = cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      SessionManager sessionManager = (SessionManager) session;
+      HostConnectionPool pool = new HostConnectionPool(host, HostDistance.LOCAL, sessionManager);
+
+      CloseFuture closeFuture = pool.closeAsync();
+
+      closeFuture.get(5, TimeUnit.SECONDS);
+      assertThat(pool.isClosed()).isTrue();
+      assertThat(pool.opened()).isEqualTo(0);
+      assertThat(pool.trashed()).isEqualTo(0);
+    } finally {
+      cluster.close();
+    }
+  }
+
   /**
    * Validates that if the keyspace tied to the Session's pool state is different than the keyspace
    * on the connection being used in dequeue that {@link Connection#setKeyspaceAsync(String)} is set
