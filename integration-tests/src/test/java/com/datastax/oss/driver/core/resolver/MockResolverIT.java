@@ -201,6 +201,48 @@ public class MockResolverIT {
     }
   }
 
+  /**
+   * Verifies that the driver can connect to a cluster when the first DNS entry for the contact
+   * point hostname resolves to a non-responsive IP address (DRIVER-201).
+   *
+   * <p>With {@code RESOLVE_CONTACT_POINTS=false} (the default), the hostname is kept unresolved
+   * until connection time. Previously, only the first IP returned by DNS was tried, causing an
+   * {@code AllNodesFailedException} when that IP was unreachable. The fix expands the hostname to
+   * all IPs at connection time and tries each one in sequence.
+   */
+  @Test
+  public void should_connect_when_first_dns_entry_is_non_responsive() {
+    // Use a 2-node cluster on 127.0.1.x.  Node 11 (127.0.1.11) does not exist and is therefore
+    // non-responsive; nodes 1 and 2 are real.
+    try (CcmBridge ccmBridge = CcmBridge.builder().withNodes(2).withIpPrefix("127.0.1.").build()) {
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      // First entry intentionally points to a non-existent/non-responsive address.
+      MultimapHostResolverProvider.addResolverEntry("test.cluster.fake", "127.0.1.11");
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      ccmBridge.create();
+      ccmBridge.start();
+
+      DriverConfigLoader loader =
+          new DefaultProgrammaticDriverConfigLoaderBuilder()
+              .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
+              .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), false)
+              .withStringList(
+                  TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                  Collections.singletonList("test.cluster.fake:9042"))
+              .build();
+
+      // The session must open successfully despite the first DNS entry being unreachable.
+      try (CqlSession session = new CqlSessionBuilder().withConfigLoader(loader).build()) {
+        ResultSet rs = session.execute("select * from system.local where key='local'");
+        assertThat(rs.one()).isNotNull();
+        waitForAllNodesUp(session, 2);
+      }
+    }
+  }
+
   // This is too long to run during CI, but is useful for manual investigations.
   @SuppressWarnings("unused")
   public void cannot_reconnect_with_resolved_socket() {
