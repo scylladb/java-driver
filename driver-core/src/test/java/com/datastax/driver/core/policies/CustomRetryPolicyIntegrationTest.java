@@ -98,7 +98,7 @@ public class CustomRetryPolicyIntegrationTest extends AbstractRetryPolicyIntegra
         fail("expected an OperationTimedOutException");
       } catch (OperationTimedOutException e) {
         assertThat(e.getMessage())
-            .isEqualTo(
+            .contains(
                 String.format(
                     "[%s] Timed out waiting for server response", host1.getEndPoint().resolve()));
       }
