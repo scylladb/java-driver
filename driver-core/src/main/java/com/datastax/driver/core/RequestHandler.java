@@ -1007,9 +1007,24 @@ class RequestHandler {
 
       Host queriedHost = current;
 
+      HostConnectionPool pool = queriedHost == null ? null : manager.pools.get(queriedHost);
+      long configuredTimeoutMs =
+          connectionHandler != null
+              ? connectionHandler.readTimeoutMillis
+              : OperationTimedOutException.UNAVAILABLE;
+      int connInFlight = connection.inFlight.get();
+      int poolPendingBorrows =
+          pool != null ? pool.pendingBorrowCount.get() : OperationTimedOutException.UNAVAILABLE;
+      int poolTotalInFlight =
+          pool != null ? pool.totalInFlight.get() : OperationTimedOutException.UNAVAILABLE;
+
       OperationTimedOutException timeoutException =
           new OperationTimedOutException(
-              connection.endPoint, "Timed out waiting for server response");
+              connection.endPoint,
+              configuredTimeoutMs,
+              connInFlight,
+              poolPendingBorrows,
+              poolTotalInFlight);
 
       try {
         connection.release();

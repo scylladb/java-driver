@@ -1887,7 +1887,7 @@ class Connection {
     final int streamId;
     final ResponseCallback callback;
     final int retryCount;
-    private final long readTimeoutMillis;
+    final long readTimeoutMillis;
 
     private final long startTime;
     private volatile Timeout timeout;

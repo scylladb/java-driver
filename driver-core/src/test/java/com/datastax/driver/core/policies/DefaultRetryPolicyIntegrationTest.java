@@ -213,12 +213,18 @@ public class DefaultRetryPolicyIntegrationTest extends AbstractRetryPolicyIntegr
         assertThat(e.getErrors().keySet())
             .hasSize(3)
             .containsOnly(host1.getEndPoint(), host2.getEndPoint(), host3.getEndPoint());
-        assertThat(e.getErrors().values())
-            .hasOnlyElementsOfType(OperationTimedOutException.class)
-            .extractingResultOf("getMessage")
-            .containsOnlyOnce(
-                String.format("[%s] Timed out waiting for server response", host1.getEndPoint()),
-                String.format("[%s] Timed out waiting for server response", host2.getEndPoint()),
+        assertThat(e.getErrors().values()).hasOnlyElementsOfType(OperationTimedOutException.class);
+        assertThat(
+                ((OperationTimedOutException) e.getErrors().get(host1.getEndPoint())).getMessage())
+            .contains(
+                String.format("[%s] Timed out waiting for server response", host1.getEndPoint()));
+        assertThat(
+                ((OperationTimedOutException) e.getErrors().get(host2.getEndPoint())).getMessage())
+            .contains(
+                String.format("[%s] Timed out waiting for server response", host2.getEndPoint()));
+        assertThat(
+                ((OperationTimedOutException) e.getErrors().get(host3.getEndPoint())).getMessage())
+            .contains(
                 String.format("[%s] Timed out waiting for server response", host3.getEndPoint()));
       }
       assertOnRequestErrorWasCalled(3, OperationTimedOutException.class);
