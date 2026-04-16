@@ -12,7 +12,26 @@ CCM_SCYLLA_REPO ?= github.com/scylladb/scylla-ccm
 CCM_SCYLLA_VERSION ?= master
 
 SCYLLA_EXT_OPTS ?= --smp=2 --memory=4G
-MVNCMD ?= mvn -B -X -ntp
+ifdef CI
+# In CI, the build job runs `make install-all` once to compile, package, and install
+# all modules into .m2/repository. Downstream jobs restore .m2 from cache and target/
+# dirs from artifact upload — no compilation prerequisites needed for test targets.
+
+MAVEN_OFFLINE_FLAG ?= -o
+MAVEN_DEBUG_FLAG :=
+GUAVA_SHADED_DEP :=
+INSTALL_ALL_DEP :=
+PREPARE_CCM_DEP :=
+MAVEN_IT_PL_ARGS ?= -pl integration-tests
+else
+MAVEN_OFFLINE_FLAG ?=
+MAVEN_DEBUG_FLAG = -X
+GUAVA_SHADED_DEP := .install-guava-shaded
+INSTALL_ALL_DEP := .install-all-modules
+PREPARE_CCM_DEP = .prepare-cassandra-ccm
+MAVEN_IT_PL_ARGS ?=
+endif
+MVNCMD ?= mvn -B $(MAVEN_DEBUG_FLAG) $(MAVEN_OFFLINE_FLAG) -ntp
 
 GET_VERSION_VERSION ?= 0.4.3
 
@@ -39,8 +58,14 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 .install-all-modules:
 	$(MVNCMD) install -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
+# dependency:go-offline doesn't resolve surefire providers (surefire-junit4, surefire-testng)
+# because they are lazy-loaded at test runtime. We explicitly download them for offline mode.
+SUREFIRE_VERSION := $(shell grep '<surefire.version>' pom.xml | sed 's/.*<surefire.version>\(.*\)<\/surefire.version>.*/\1/')
 .download-test-dependencies:
-	$(MVNCMD) test -Dtest=TestThatDoesNotExists -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
+	$(MVNCMD) dependency:go-offline -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
+	$(MVNCMD) dependency:get -Dartifact=org.apache.maven.surefire:surefire-junit4:$(SUREFIRE_VERSION) -Dtransitive=true || true
+	$(MVNCMD) dependency:get -Dartifact=org.apache.maven.surefire:surefire-junit47:$(SUREFIRE_VERSION) -Dtransitive=true || true
+	$(MVNCMD) dependency:get -Dartifact=org.apache.maven.surefire:surefire-testng:$(SUREFIRE_VERSION) -Dtransitive=true || true
 
 .download-verify-dependencies:
 	$(MVNCMD) verify -DskipTests || true
@@ -82,6 +107,7 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 
 install-cassandra-ccm:
 	@echo "Install CCM ${CCM_CASSANDRA_VERSION}"
+	pip install "setuptools<81"
 	pip install "git+https://${CCM_CASSANDRA_REPO}.git@${CCM_CASSANDRA_VERSION}"
 	mkdir ${CCM_CONFIG_DIR} 2>/dev/null || true
 	echo CASSANDRA > ${CCM_CONFIG_DIR}/ccm-type
@@ -94,7 +120,7 @@ install-scylla-ccm:
 	echo SCYLLA > ${CCM_CONFIG_DIR}/ccm-type
 	echo ${CCM_SCYLLA_VERSION} > ${CCM_CONFIG_DIR}/ccm-version
 
-download-all-dependencies: compile-all .download-test-dependencies .download-verify-dependencies
+download-all-dependencies: .download-test-dependencies .download-verify-dependencies
 
 CASSANDRA_VERSION_FILE=/tmp/cassandra-version-${CASSANDRA_VERSION}.resolved
 resolve-cassandra-version: .prepare-get-version
@@ -171,7 +197,7 @@ checkout-one-commit-before:
 		git tag -d ${RELEASE_TARGET_TAG}
 	fi
 
-download-cassandra: .prepare-scylla-ccm resolve-cassandra-version
+download-cassandra: $(PREPARE_CCM_DEP) resolve-cassandra-version
 	@if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		CASSANDRA_VERSION_RESOLVED=$$(cat '${CASSANDRA_VERSION_FILE}')
 	fi
@@ -245,19 +271,25 @@ release-dry-run: .require-release-env
 	mkdir /tmp/java-driver-release-logs/ 2>/dev/null || true
 	$(MVNCMD) release:perform > >(tee /tmp/java-driver-release-logs/stdout.log) 2> >(tee /tmp/java-driver-release-logs/stderr.log)
 
-compile-all: .install-guava-shaded
-	mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+# Full install: builds all modules and installs JARs to .m2/repository.
+# In CI, the build job calls this once; downstream jobs skip it and rely on
+# cached .m2/repository + uploaded target/ dirs from the build job.
+install-all: .install-all-modules
 
+compile-all: $(GUAVA_SHADED_DEP)
+	$(MVNCMD) compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+
+# Full verification: runs all plugins (fmt, clirr, animal-sniffer) that install-all skips.
 check:
 	$(MVNCMD) verify -DskipTests
 
 fix:
 	$(MVNCMD) fmt:format xml-format:xml-format
 
-test-unit: .install-guava-shaded
+test-unit: $(GUAVA_SHADED_DEP)
 	$(MVNCMD) test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
-test-integration-scylla: .install-all-modules .prepare-scylla-ccm resolve-scylla-version .prepare-environment-update-aio-max-nr
+test-integration-scylla: $(INSTALL_ALL_DEP) .prepare-scylla-ccm resolve-scylla-version .prepare-environment-update-aio-max-nr
 	@if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]]; then
 		SCYLLA_VERSION_RESOLVED=`cat '${SCYLLA_VERSION_FILE}'`
 	fi
@@ -265,9 +297,9 @@ test-integration-scylla: .install-all-modules .prepare-scylla-ccm resolve-scylla
 		echo "ScyllaDB version ${SCYLLA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B -e verify -pl integration-tests -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
+	$(MVNCMD) -e verify $(MAVEN_IT_PL_ARGS) -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
-test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cassandra-version
+test-integration-cassandra: $(INSTALL_ALL_DEP) $(PREPARE_CCM_DEP) resolve-cassandra-version
 	@if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		CASSANDRA_VERSION_RESOLVED=`cat '${CASSANDRA_VERSION_FILE}'`
 	fi
@@ -275,7 +307,7 @@ test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cas
 		echo "Cassandra version ${CASSANDRA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B -e verify -pl integration-tests -Dccm.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
+	$(MVNCMD) -e verify $(MAVEN_IT_PL_ARGS) -Dccm.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
 check-no-compile-warnings:
 	@$(MAKE) compile-all | grep WARNING >/tmp/all-compile-warnings.log || true

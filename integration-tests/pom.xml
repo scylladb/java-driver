@@ -231,6 +231,11 @@
   </dependencies>
   <build>
     <plugins>
+      <!--
+        Failsafe executions intentionally omit <jvm>${testing.jvm}/bin/java</jvm>.
+        Integration tests run on Maven's own JVM (set by setup-java in CI).
+        Cross-version JDK testing is not used for integration tests.
+      -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
@@ -241,14 +246,12 @@
               <goal>integration-test</goal>
             </goals>
             <configuration>
-              <jvm>${testing.jvm}/bin/java</jvm>
               <groups>com.datastax.oss.driver.categories.ParallelizableTests</groups>
               <parallel>classes</parallel>
               <threadCountClasses>${test.parallel.threads}</threadCountClasses>
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-parallelized.xml</summaryFile>
               <skipITs>${skipParallelizableITs}</skipITs>
               <argLine>${blockhound.argline}</argLine>
-              <jvm>${testing.jvm}/bin/java</jvm>
             </configuration>
           </execution>
           <execution>
@@ -261,7 +264,6 @@
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-serial.xml</summaryFile>
               <skipITs>${skipSerialITs}</skipITs>
               <argLine>${blockhound.argline}</argLine>
-              <jvm>${testing.jvm}/bin/java</jvm>
             </configuration>
           </execution>
           <execution>
@@ -277,7 +279,6 @@
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-isolated.xml</summaryFile>
               <skipITs>${skipIsolatedITs}</skipITs>
               <argLine>${blockhound.argline}</argLine>
-              <jvm>${testing.jvm}/bin/java</jvm>
             </configuration>
           </execution>
           <execution>
