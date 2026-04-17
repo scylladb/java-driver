@@ -40,10 +40,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up JDK ${{ matrix.java-version }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
@@ -53,7 +53,7 @@ jobs:
         run: echo "value=${{ hashFiles('**/pom.xml') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: java-cache
         with:
           path: ~/.m2/repository
@@ -67,7 +67,7 @@ jobs:
         run: make download-all-dependencies
 
       - name: Save maven repository cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.java-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.m2/repository
@@ -85,16 +85,16 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up JDK ${{ matrix.java-version }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
       - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -114,16 +114,16 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up JDK 8
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
       - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -139,14 +139,14 @@ jobs:
           cp --parents ./**/target/*-reports/*.xml unit/
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: test-results
           path: "*/**/target/*-reports/*.xml"
 
       - name: Parse test results
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
         if: always()
         with:
           check_name: Unit tests report
@@ -164,10 +164,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Setup Python 3
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.13'
 
@@ -186,22 +186,22 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up JDK ${{ matrix.java-version }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
       - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Setup Python 3
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.13'
 
@@ -215,7 +215,7 @@ jobs:
         run: make resolve-cassandra-version
 
       - name: Pull CCM image from the cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: ccm-cache
         with:
           path: ~/.ccm/repository
@@ -229,7 +229,7 @@ jobs:
 
       - name: Save CCM image into the cache
         if: steps.ccm-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.ccm/repository
           key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
@@ -259,20 +259,20 @@ jobs:
 
       - name: Upload test results
         if: steps.run-integration-tests.outcome == 'failure'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-results-${{ matrix.java-version }}-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: ccm-log-cassandra-${{ matrix.java-version }}-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
           path: /tmp/ccm*/ccm*/node*/logs/*
 
       - name: Parse test results
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
         if: always()
         with:
           check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }} (${{ matrix.test-group }})
@@ -298,22 +298,22 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up JDK ${{ matrix.java-version }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
 
       - name: Restore maven repository cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Setup Python 3
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.13'
 
@@ -327,7 +327,7 @@ jobs:
         run: make resolve-scylla-version
 
       - name: Pull CCM image from the cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: ccm-cache
         with:
           path: ~/.ccm/scylla-repository
@@ -340,7 +340,7 @@ jobs:
         run: make download-scylla
 
       - name: Save CCM image into the cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: steps.ccm-cache.outputs.cache-hit != 'true'
         with:
           path: ~/.ccm/scylla-repository
@@ -370,21 +370,21 @@ jobs:
           cp --parents ./**/target/*-reports/*.xml scylla-${{ matrix.scylla-version }}-${{ matrix.test-group }}/
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: steps.run-integration-tests.outcome == 'failure'
         with:
           name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}-${{ matrix.test-group }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Upload CCM logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure()
         with:
           name: ccm-log-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}-${{ matrix.test-group }}
           path: /tmp/ccm*/ccm*/node*/logs/*
 
       - name: Parse test results
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
         if: always()
         with:
           check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }} (${{ matrix.test-group }})
