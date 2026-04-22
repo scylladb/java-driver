@@ -99,16 +99,15 @@ public class SchemaChangesIT {
         null,
         String.format(
             "CREATE KEYSPACE %s "
-                + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
             newKeyspaceId),
         metadata -> metadata.getKeyspace(newKeyspaceId),
         keyspace -> {
           assertThat(keyspace.getName()).isEqualTo(newKeyspaceId);
           assertThat(keyspace.isDurableWrites()).isTrue();
           assertThat(keyspace.getReplication())
-              .hasSize(2)
-              .containsEntry("class", "org.apache.cassandra.locator.SimpleStrategy")
-              .containsEntry("replication_factor", "1");
+              .containsEntry("class", "org.apache.cassandra.locator.NetworkTopologyStrategy")
+              .containsEntry("dc1", "1");
         },
         (listener, keyspace) -> verify(listener).onKeyspaceCreated(keyspace),
         newKeyspaceId);
@@ -121,7 +120,7 @@ public class SchemaChangesIT {
         ImmutableList.of(
             String.format(
                 "CREATE KEYSPACE %s "
-                    + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                    + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
                 newKeyspaceId.asCql(true))),
         String.format("DROP KEYSPACE %s", newKeyspaceId.asCql(true)),
         metadata -> metadata.getKeyspace(newKeyspaceId),
@@ -136,11 +135,11 @@ public class SchemaChangesIT {
         ImmutableList.of(
             String.format(
                 "CREATE KEYSPACE %s "
-                    + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                    + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
                 newKeyspaceId.asCql(true))),
         String.format(
             "ALTER KEYSPACE %s "
-                + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} "
+                + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1} "
                 + "AND durable_writes = 'false'",
             newKeyspaceId.asCql(true)),
         metadata -> metadata.getKeyspace(newKeyspaceId),

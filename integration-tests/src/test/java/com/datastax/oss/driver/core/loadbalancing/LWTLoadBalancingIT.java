@@ -72,7 +72,8 @@ public class LWTLoadBalancingIT {
     session.execute(
         "CREATE KEYSPACE "
             + keyspace.asCql(false)
-            + " WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 3}");
+            + " WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 3}"
+            + " AND tablets = {'enabled': false}");
     session.execute("USE " + keyspace.asCql(false));
     session.execute("CREATE TABLE foo (pk int, ck int, v int, PRIMARY KEY (pk, ck))");
   }

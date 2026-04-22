@@ -56,10 +56,10 @@ public abstract class TokenITBase {
     for (String statement :
         ImmutableList.of(
             String.format(
-                "CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                "CREATE KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
                 KS1.asCql(false)),
             String.format(
-                "CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2}",
+                "CREATE KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 2}",
                 KS2.asCql(false)),
 
             // Shouldn't really do that, but it makes the rest of the tests a bit prettier.

@@ -67,7 +67,7 @@ public class QueryKeyspaceAndTableIT {
         ImmutableList.of(
             "CREATE TABLE foo(k int PRIMARY KEY)",
             String.format(
-                "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
                 OTHER_KEYSPACE.asCql(false)),
             String.format("CREATE TABLE %s.foo(k int PRIMARY KEY)", OTHER_KEYSPACE.asCql(false)))) {
       session.execute(
