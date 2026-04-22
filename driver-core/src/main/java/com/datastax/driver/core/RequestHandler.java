@@ -319,6 +319,8 @@ class RequestHandler {
         long latency);
 
     void register(RequestHandler handler);
+
+    void registerReadTimeoutMillis(long readTimeoutMillis);
   }
 
   /**
@@ -943,11 +945,19 @@ class RequestHandler {
                 queryStateRef.get());
             return false;
           }
+          long configuredTimeoutMs =
+              connectionHandler != null
+                  ? connectionHandler.readTimeoutMillis
+                  : OperationTimedOutException.UNAVAILABLE;
+          OperationTimedOutException timeoutException =
+              connection.newTimeoutException(
+                  "Timed out waiting for response to PREPARE message",
+                  configuredTimeoutMs,
+                  latency,
+                  retryCount,
+                  position);
           connection.release();
-          logError(
-              connection.endPoint,
-              new OperationTimedOutException(
-                  connection.endPoint, "Timed out waiting for response to PREPARE message"));
+          logError(connection.endPoint, timeoutException);
           retry(false, null);
           return true;
         }
@@ -1006,25 +1016,13 @@ class RequestHandler {
       }
 
       Host queriedHost = current;
-
-      HostConnectionPool pool = queriedHost == null ? null : manager.pools.get(queriedHost);
       long configuredTimeoutMs =
           connectionHandler != null
               ? connectionHandler.readTimeoutMillis
               : OperationTimedOutException.UNAVAILABLE;
-      int connInFlight = connection.inFlight.get();
-      int poolPendingBorrows =
-          pool != null ? pool.pendingBorrowCount.get() : OperationTimedOutException.UNAVAILABLE;
-      int poolTotalInFlight =
-          pool != null ? pool.totalInFlight.get() : OperationTimedOutException.UNAVAILABLE;
 
       OperationTimedOutException timeoutException =
-          new OperationTimedOutException(
-              connection.endPoint,
-              configuredTimeoutMs,
-              connInFlight,
-              poolPendingBorrows,
-              poolTotalInFlight);
+          connection.newTimeoutException(configuredTimeoutMs, latency, retryCount, position);
 
       try {
         connection.release();

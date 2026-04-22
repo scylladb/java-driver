@@ -962,6 +962,9 @@ class Connection {
       throws ConnectionException, BusyConnectionException {
 
     ResponseHandler handler = new ResponseHandler(this, statementReadTimeoutMillis, callback);
+    if (callback instanceof RequestHandler.Callback) {
+      ((RequestHandler.Callback) callback).registerReadTimeoutMillis(handler.readTimeoutMillis);
+    }
     dispatcher.add(handler);
 
     Message.Request request = callback.request().setStreamId(handler.streamId);
@@ -1060,6 +1063,97 @@ class Connection {
 
   public ProtocolFeatureStore getProtocolFeatureStore() {
     return protocolFeatureStore;
+  }
+
+  OperationTimedOutException newTimeoutException(long elapsedTimeoutNanos, int retryCount) {
+    return newTimeoutException(
+        null,
+        factory.getReadTimeoutMillis(),
+        elapsedTimeoutNanos,
+        retryCount,
+        OperationTimedOutException.UNAVAILABLE);
+  }
+
+  OperationTimedOutException newTimeoutException(
+      long configuredTimeoutMs,
+      long elapsedTimeoutNanos,
+      int retryCount,
+      int speculativeExecutionIndex) {
+    return newTimeoutException(
+        null, configuredTimeoutMs, elapsedTimeoutNanos, retryCount, speculativeExecutionIndex);
+  }
+
+  OperationTimedOutException newTimeoutException(
+      String message,
+      long configuredTimeoutMs,
+      long elapsedTimeoutNanos,
+      int retryCount,
+      int speculativeExecutionIndex) {
+    HostConnectionPool pool = ownerPool();
+    ShardingInfo.ConnectionShardingInfo connectionShardingInfo =
+        protocolFeatureStore == null ? null : protocolFeatureStore.getConnectionShardingInfo();
+    ShardingInfo hostShardingInfo =
+        connectionShardingInfo != null
+            ? connectionShardingInfo.shardingInfo
+            : pool != null ? pool.host.getShardingInfo() : null;
+    int connectionShardId =
+        connectionShardingInfo != null ? shardId() : OperationTimedOutException.UNAVAILABLE;
+    int hostShardsCount =
+        hostShardingInfo != null
+            ? hostShardingInfo.getShardsCount()
+            : OperationTimedOutException.UNAVAILABLE;
+    int poolPendingBorrows =
+        pool != null ? pool.pendingBorrowCount.get() : OperationTimedOutException.UNAVAILABLE;
+    int poolPendingBorrowsForShard =
+        pool != null && connectionShardId != OperationTimedOutException.UNAVAILABLE
+            ? pool.pendingBorrowCountForShard(connectionShardId)
+            : OperationTimedOutException.UNAVAILABLE;
+    int poolTotalInFlight =
+        pool != null ? pool.totalInFlight.get() : OperationTimedOutException.UNAVAILABLE;
+    int poolOpenConnectionsForShard =
+        pool != null && connectionShardId != OperationTimedOutException.UNAVAILABLE
+            ? pool.openConnectionCountForShard(connectionShardId)
+            : OperationTimedOutException.UNAVAILABLE;
+    int poolMaxConnectionsPerShard =
+        pool != null ? pool.maxConnectionsPerShard() : OperationTimedOutException.UNAVAILABLE;
+    long elapsedTimeoutMs = TimeUnit.NANOSECONDS.toMillis(elapsedTimeoutNanos);
+
+    if (message == null) {
+      return new OperationTimedOutException(
+          endPoint,
+          configuredTimeoutMs,
+          elapsedTimeoutMs,
+          retryCount,
+          speculativeExecutionIndex,
+          inFlight.get(),
+          connectionShardId,
+          hostShardsCount,
+          poolPendingBorrows,
+          poolPendingBorrowsForShard,
+          poolTotalInFlight,
+          poolOpenConnectionsForShard,
+          poolMaxConnectionsPerShard);
+    }
+    return new OperationTimedOutException(
+        endPoint,
+        message,
+        configuredTimeoutMs,
+        elapsedTimeoutMs,
+        retryCount,
+        speculativeExecutionIndex,
+        inFlight.get(),
+        connectionShardId,
+        hostShardsCount,
+        poolPendingBorrows,
+        poolPendingBorrowsForShard,
+        poolTotalInFlight,
+        poolOpenConnectionsForShard,
+        poolMaxConnectionsPerShard);
+  }
+
+  private HostConnectionPool ownerPool() {
+    Owner owner = ownerRef.get();
+    return owner instanceof HostConnectionPool ? (HostConnectionPool) owner : null;
   }
 
   /**
@@ -1812,6 +1906,11 @@ class Connection {
     @Override
     public void register(RequestHandler handler) {
       // noop, we don't care about the handler here so far
+    }
+
+    @Override
+    public void registerReadTimeoutMillis(long readTimeoutMillis) {
+      // noop, direct connection writes keep the legacy timeout exception shape
     }
 
     @Override

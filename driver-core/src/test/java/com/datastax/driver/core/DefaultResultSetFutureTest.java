@@ -15,14 +15,18 @@
  */
 package com.datastax.driver.core;
 
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
+import com.datastax.driver.core.exceptions.OperationTimedOutException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.testng.annotations.Test;
 
 /**
@@ -79,6 +83,43 @@ public class DefaultResultSetFutureTest {
     }
   }
 
+  @Test(groups = "unit")
+  public void should_use_dispatched_timeout_snapshot_for_internal_timeouts() throws Exception {
+    DefaultResultSetFuture future =
+        new DefaultResultSetFuture(
+            null, ProtocolVersion.V4, new Requests.Query("SELECT cluster_name FROM system.local"));
+    Connection connection = allocateInstance(Connection.class);
+    EndPoint endPoint = EndPoints.forAddress("127.0.0.1", 9042);
+
+    setField(connection, "endPoint", endPoint);
+    setField(connection, "inFlight", new AtomicInteger(1));
+    setField(connection, "ownerRef", new AtomicReference<Connection.Owner>());
+    future.registerReadTimeoutMillis(17L);
+
+    future.onTimeout(connection, TimeUnit.MILLISECONDS.toNanos(123), 2);
+
+    try {
+      future.getUninterruptibly();
+      fail("Should have thrown exception");
+    } catch (OperationTimedOutException e) {
+      assertEquals(e.getConfiguredTimeoutMs(), 17L);
+      assertEquals(e.getElapsedTimeoutMs(), 123L);
+      assertEquals(e.getRetryCount(), 2);
+      assertEquals(e.getSpeculativeExecutionIndex(), OperationTimedOutException.UNAVAILABLE);
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private <T> T allocateInstance(Class<T> clazz) throws Exception {
+    Class<?> unsafeClass = Class.forName("sun.misc.Unsafe");
+    Field unsafeField = unsafeClass.getDeclaredField("theUnsafe");
+    unsafeField.setAccessible(true);
+    Object unsafe = unsafeField.get(null);
+    java.lang.reflect.Method allocateInstance =
+        unsafeClass.getMethod("allocateInstance", Class.class);
+    return (T) allocateInstance.invoke(unsafe, clazz);
+  }
+
   /**
    * Creates minimal test objects needed for testing. Uses Unsafe to create instances without
    * invoking constructors.
@@ -122,9 +163,18 @@ public class DefaultResultSetFutureTest {
 
   /** Helper to set a field value using reflection. */
   private void setField(Object obj, String fieldName, Object value) throws Exception {
-    Field field = obj.getClass().getDeclaredField(fieldName);
-    field.setAccessible(true);
-    field.set(obj, value);
+    Class<?> current = obj.getClass();
+    while (current != null) {
+      try {
+        Field field = current.getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(obj, value);
+        return;
+      } catch (NoSuchFieldException e) {
+        current = current.getSuperclass();
+      }
+    }
+    throw new NoSuchFieldException(fieldName);
   }
 
   /**

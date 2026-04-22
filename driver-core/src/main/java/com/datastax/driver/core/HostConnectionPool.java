@@ -29,6 +29,7 @@ import static com.datastax.driver.core.Connection.State.TRASHED;
 import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
+import com.datastax.driver.core.exceptions.OperationTimedOutException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.annotations.VisibleForTesting;
@@ -206,6 +207,27 @@ class HostConnectionPool implements Connection.Owner {
   public void tempBlockAdvShardAwareness(long millis) {
     advShardAwarenessBlockedUntil =
         Math.max(System.currentTimeMillis() + millis, advShardAwarenessBlockedUntil);
+  }
+
+  int pendingBorrowCountForShard(int shardId) {
+    if (pendingBorrows == null || shardId < 0 || shardId >= pendingBorrows.length) {
+      return OperationTimedOutException.UNAVAILABLE;
+    }
+    return pendingBorrows[shardId].size();
+  }
+
+  int openConnectionCountForShard(int shardId) {
+    if (connections == null || shardId < 0 || shardId >= connections.length) {
+      return OperationTimedOutException.UNAVAILABLE;
+    }
+    return connections[shardId].size();
+  }
+
+  int maxConnectionsPerShard() {
+    if (connections == null) {
+      return OperationTimedOutException.UNAVAILABLE;
+    }
+    return maxConnectionsPerShard;
   }
 
   private final ConnectionTasksSharedState connectionTasksSharedState =
