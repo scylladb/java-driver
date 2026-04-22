@@ -124,3 +124,31 @@ sudo ifconfig lo0 alias 127.0.1.1 up
 sudo ifconfig lo0 alias 127.0.1.2 up
 ...
 ```
+
+## Updating GitHub Actions workflows
+
+GitHub Actions workflows in this repository pin all third-party actions to specific commit SHAs
+instead of mutable version tags (e.g. `@v5`). This is a supply chain security measure: tags can be
+moved to point to different commits, but a SHA is immutable.
+
+The format used is:
+
+```yaml
+uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+```
+
+There is no need to update workflow action versions on every release. Only do so when the current
+version has a known vulnerability or when a new feature is needed.
+
+### How to update a pinned action
+
+1. Go to the action's GitHub repository (e.g. `github.com/actions/checkout`).
+2. Navigate to the desired release tag (e.g. `v5.0.2`) via the Tags page.
+3. Copy the full 40-character commit SHA from that tag's commit page.
+4. Verify the commit is not an [impostor commit](https://www.chainguard.dev/unchained/what-the-fork-imposter-commits-in-github-actions-and-ci-cd):
+   open the commit on GitHub and ensure there is **no** banner saying
+   "This commit does not belong to any branch on this repository".
+5. Replace the SHA and version comment in all workflow files.
+6. Update the repository allowlist under
+   `Settings -> Actions -> General -> Allow or block specified actions and reusable workflows`
+   to include the new SHA.
