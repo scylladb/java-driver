@@ -18,6 +18,7 @@ package com.datastax.driver.core;
 import com.datastax.driver.core.Frame.Header;
 import com.datastax.driver.core.Requests.QueryFlag;
 import com.datastax.driver.core.exceptions.UnsupportedFeatureException;
+import com.google.common.annotations.Beta;
 import com.google.common.collect.ImmutableList;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -267,13 +268,10 @@ public class BatchStatement extends Statement {
 
   @Override
   public ByteBuffer getRoutingKey(ProtocolVersion protocolVersion, CodecRegistry codecRegistry) {
-    for (Statement statement : statements) {
-      if (statement instanceof StatementWrapper)
-        statement = ((StatementWrapper) statement).getWrappedStatement();
-      ByteBuffer rk = statement.getRoutingKey(protocolVersion, codecRegistry);
-      if (rk != null) return rk;
-    }
-    return null;
+    Statement routingStatement = getRoutingStatement(protocolVersion, codecRegistry);
+    return routingStatement == null
+        ? null
+        : routingStatement.getRoutingKey(protocolVersion, codecRegistry);
   }
 
   @Override
@@ -296,6 +294,22 @@ public class BatchStatement extends Statement {
   void ensureAllSet() {
     for (Statement statement : statements)
       if (statement instanceof BoundStatement) ((BoundStatement) statement).ensureAllSet();
+  }
+
+  /**
+   * Returns the first statement in this batch that provides a routing key for the given protocol
+   * version and codec registry.
+   */
+  @Beta
+  public Statement getRoutingStatement(
+      ProtocolVersion protocolVersion, CodecRegistry codecRegistry) {
+    for (Statement statement : statements) {
+      if (statement instanceof StatementWrapper)
+        statement = ((StatementWrapper) statement).getWrappedStatement();
+      ByteBuffer rk = statement.getRoutingKey(protocolVersion, codecRegistry);
+      if (rk != null) return statement;
+    }
+    return null;
   }
 
   static class IdAndValues {

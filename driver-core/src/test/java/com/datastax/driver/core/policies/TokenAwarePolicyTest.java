@@ -29,12 +29,16 @@ import static com.datastax.driver.core.policies.TokenAwarePolicy.ReplicaOrdering
 import static com.datastax.driver.core.policies.TokenAwarePolicy.ReplicaOrdering.TOPOLOGICAL;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.CCMBridge;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.CodecRegistry;
+import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Configuration;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
@@ -153,6 +157,65 @@ public class TokenAwarePolicyTest {
     Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, statement);
     // then
     assertThat(queryPlan).containsOnlyOnce(host1, host2, host3, host4).endsWith(host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_use_table_name_from_bound_statement_for_tablet_routing() {
+    // given
+    BoundStatement bound = newBoundStatement("tablets_table", routingKey);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2));
+    when(childPolicy.newQueryPlan(KEYSPACE, bound))
+        .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, bound);
+
+    // then
+    assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
+    verify(metadata).getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey);
+  }
+
+  @Test(groups = "unit")
+  public void should_use_table_name_from_routed_statement_in_batch_for_tablet_routing() {
+    // given
+    BoundStatement skippedBound = newBoundStatement("ignored_table", null);
+    BoundStatement routedBound = newBoundStatement("tablets_table", routingKey);
+
+    BatchStatement batch = new BatchStatement().add(skippedBound).add(routedBound);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2));
+    when(childPolicy.newQueryPlan(KEYSPACE, batch))
+        .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, batch);
+
+    // then
+    assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
+    verify(metadata).getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey);
+    verify(metadata, never())
+        .getReplicasList(Metadata.quote(KEYSPACE), "ignored_table", null, routingKey);
+  }
+
+  private BoundStatement newBoundStatement(String table, ByteBuffer routingKey) {
+    BoundStatement bound = mock(BoundStatement.class);
+    PreparedStatement prepared = mock(PreparedStatement.class);
+    ColumnDefinitions variables = mock(ColumnDefinitions.class);
+    when(bound.getKeyspace()).thenReturn(KEYSPACE);
+    when(bound.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(bound.preparedStatement()).thenReturn(prepared);
+    when(prepared.getVariables()).thenReturn(variables);
+    when(variables.size()).thenReturn(1);
+    when(variables.getTable(0)).thenReturn(table);
+    return bound;
   }
 
   @Test(groups = "unit", dataProvider = "shuffleProvider")
