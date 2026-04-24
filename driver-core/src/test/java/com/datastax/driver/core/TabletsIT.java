@@ -298,6 +298,29 @@ public class TabletsIT extends CCMTestsSupport {
     }
   }
 
+  @Test(groups = "short")
+  public void batch_statement_should_deliver_tablet_info_and_route_properly() {
+    prepareCluster();
+    Session session = newSession();
+    try {
+      session
+          .getCluster()
+          .getMetadata()
+          .getTabletMap()
+          .removeTableMappings(KEYSPACE_NAME.toLowerCase());
+
+      PreparedStatement preparedStatement = session.prepare(STMT_INSERT);
+      Assert.assertTrue(
+          executeOnAllHostsAndReturnIfResultHasTabletsInfo(session, preparedStatement.bind(2, 2)));
+      Assert.assertTrue(waitSessionLearnedTabletInfo(session));
+
+      BatchStatement routedBatch = new BatchStatement().add(preparedStatement.bind(2, 2));
+      Assert.assertTrue(checkIfRoutedProperly(session, routedBatch));
+    } finally {
+      session.close();
+    }
+  }
+
   private static boolean waitSessionLearnedTabletInfo(Session session) {
     if (isSessionLearnedTabletInfo(session)) {
       return true;

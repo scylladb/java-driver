@@ -21,6 +21,7 @@
  */
 package com.datastax.driver.core.policies;
 
+import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.CodecRegistry;
@@ -429,16 +430,7 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     if (partitionKey == null || keyspace == null)
       return childPolicy.newQueryPlan(keyspace, statement);
 
-    String tableName = null;
-    ColumnDefinitions defs = null;
-    if (statement instanceof BoundStatement) {
-      defs = ((BoundStatement) statement).preparedStatement().getVariables();
-    } else if (statement instanceof PreparedStatement) {
-      defs = ((PreparedStatement) statement).getVariables();
-    }
-    if (defs != null && defs.size() > 0) {
-      tableName = defs.getTable(0);
-    }
+    String tableName = getRoutingTable(statement);
 
     final List<Host> replicas =
         clusterMetadata.getReplicasList(
@@ -451,6 +443,28 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       default:
         return newQueryPlanRegular(keyspace, statement, replicas);
     }
+  }
+
+  private String getRoutingTable(Statement statement) {
+    ColumnDefinitions defs = getRoutingVariables(statement);
+    return (defs == null || defs.size() == 0) ? null : defs.getTable(0);
+  }
+
+  private ColumnDefinitions getRoutingVariables(Statement statement) {
+    Statement target = statement;
+    if (statement instanceof BatchStatement) {
+      target = ((BatchStatement) statement).getRoutingStatement(protocolVersion, codecRegistry);
+      if (target == null) {
+        return null;
+      }
+    }
+
+    if (target instanceof BoundStatement) {
+      return ((BoundStatement) target).preparedStatement().getVariables();
+    } else if (target instanceof PreparedStatement) {
+      return ((PreparedStatement) target).getVariables();
+    }
+    return null;
   }
 
   private QueryOptions.RequestRoutingMethod getRequestRouting(Statement statement) {
