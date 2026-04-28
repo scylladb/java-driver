@@ -64,7 +64,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
       String keyspace = (String) objects[0];
       execute(
           String.format(
-              "create keyspace %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+              "create keyspace %s WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}",
               keyspace),
           String.format("create table %s.foo(k int, v int, primary key (k, v))", keyspace));
       for (int v = 1; v <= 100; v++)

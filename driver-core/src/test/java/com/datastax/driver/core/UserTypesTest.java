@@ -150,7 +150,7 @@ public class UserTypesTest extends CCMTestsSupport {
             "CREATE KEYSPACE "
                 + otherKeyspaceName
                 + " "
-                + "WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}");
+                + "WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1'}");
 
     KeyspaceMetadata otherKeyspace = cluster().getMetadata().getKeyspace(otherKeyspaceName);
     assertThat(otherKeyspace.getUserType(quote("\"User Address\""))).isNull();
