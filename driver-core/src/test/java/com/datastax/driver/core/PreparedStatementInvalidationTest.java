@@ -482,7 +482,7 @@ public class PreparedStatementInvalidationTest extends CCMTestsSupport {
             .init();
     Session session = cluster.connect();
     session.execute(
-        "CREATE KEYSPACE IF NOT EXISTS cql4_loopholes_test WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor': '1' }");
+        "CREATE KEYSPACE IF NOT EXISTS cql4_loopholes_test WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1' }");
     session.execute("USE cql4_loopholes_test");
     return session;
   }

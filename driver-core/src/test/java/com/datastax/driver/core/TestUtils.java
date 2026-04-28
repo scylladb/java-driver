@@ -86,7 +86,7 @@ public abstract class TestUtils {
   private static final Logger logger = LoggerFactory.getLogger(TestUtils.class);
 
   public static final String CREATE_KEYSPACE_SIMPLE_FORMAT =
-      "CREATE KEYSPACE %s WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor' : %d }";
+      "CREATE KEYSPACE %s WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1' : %d }";
   public static final String CREATE_KEYSPACE_GENERIC_FORMAT =
       "CREATE KEYSPACE %s WITH replication = { 'class' : '%s', %s }";
 

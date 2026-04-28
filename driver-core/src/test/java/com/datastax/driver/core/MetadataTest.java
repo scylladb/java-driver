@@ -63,7 +63,7 @@ public class MetadataTest extends CCMTestsSupport {
     session.execute(
         "CREATE KEYSPACE "
             + keyspace
-            + " WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+            + " WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}");
     Metadata metadata = cluster.getMetadata();
 
     // Capture all Token data.

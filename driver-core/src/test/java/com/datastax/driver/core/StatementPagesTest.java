@@ -8,7 +8,7 @@ public class StatementPagesTest extends CCMTestsSupport {
   @Override
   public void onTestContextInitialized() {
     execute(
-        "CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+        "CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}");
     execute("CREATE TABLE IF NOT EXISTS ks.t (pk int, ck int, v int, PRIMARY KEY(pk, ck))");
 
     for (int i = 0; i < 50; i++) {

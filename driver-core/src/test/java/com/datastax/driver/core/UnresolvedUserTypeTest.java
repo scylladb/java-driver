@@ -34,7 +34,7 @@ public class UnresolvedUserTypeTest extends CCMTestsSupport {
 
   private static final String EXPECTED_SCHEMA =
       String.format(
-          "CREATE KEYSPACE %s WITH REPLICATION = { 'class' : 'org.apache.cassandra.locator.SimpleStrategy', 'replication_factor': '1' } AND DURABLE_WRITES = true;\n"
+          "CREATE KEYSPACE %s WITH REPLICATION = { 'class' : 'org.apache.cassandra.locator.NetworkTopologyStrategy', 'datacenter1': '1' } AND DURABLE_WRITES = true;\n"
               + "\n"
               + "CREATE TYPE %s.g (\n"
               + "    f1 int\n"
@@ -89,7 +89,7 @@ public class UnresolvedUserTypeTest extends CCMTestsSupport {
 
          Topological sort order should be : gh,FE,D,CB,A
          */
-        "CREATE KEYSPACE unresolved_user_type_test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}",
+        "CREATE KEYSPACE unresolved_user_type_test WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': '1'}",
         String.format("CREATE TYPE %s.h (f1 int)", KEYSPACE),
         String.format("CREATE TYPE %s.g (f1 int)", KEYSPACE),
         String.format("CREATE TYPE %s.\"F\" (f1 frozen<h>)", KEYSPACE),

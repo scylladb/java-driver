@@ -119,7 +119,7 @@ public class ControlConnectionTest extends CCMTestsSupport {
     Cluster cluster = register(createClusterBuilder().build());
     Session session = cluster.connect();
     session.execute(
-        "create keyspace ControlConnectionTest_ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+        "create keyspace ControlConnectionTest_ks WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}");
     session.execute("create type ControlConnectionTest_ks.foo (i int)");
     cluster.close();
 

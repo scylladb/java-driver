@@ -95,7 +95,7 @@ public class ShardAwarenessTest extends CCMTestsSupport {
     session().execute("DROP KEYSPACE IF EXISTS shardawaretest");
     session()
         .execute(
-            "CREATE KEYSPACE shardawaretest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '3'}");
+            "CREATE KEYSPACE shardawaretest WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': '3'}");
     session()
         .execute("CREATE TABLE shardawaretest.t (pk text, ck text, v text, PRIMARY KEY (pk, ck))");
 

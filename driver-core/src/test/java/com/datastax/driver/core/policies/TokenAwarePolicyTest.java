@@ -22,7 +22,6 @@
 package com.datastax.driver.core.policies;
 
 import static com.datastax.driver.core.Assertions.assertThat;
-import static com.datastax.driver.core.TestUtils.CREATE_KEYSPACE_SIMPLE_FORMAT;
 import static com.datastax.driver.core.TestUtils.nonQuietClusterCloseOptions;
 import static com.datastax.driver.core.policies.TokenAwarePolicy.ReplicaOrdering.NEUTRAL;
 import static com.datastax.driver.core.policies.TokenAwarePolicy.ReplicaOrdering.RANDOM;
@@ -1043,7 +1042,16 @@ public class TokenAwarePolicyTest {
       Session session = cluster.connect();
 
       String ks = TestUtils.generateIdentifier("ks_");
-      session.execute(String.format(CREATE_KEYSPACE_SIMPLE_FORMAT, ks, 1));
+      // Use NTS with tablets explicitly disabled. When tablets are enabled (the default on modern
+      // Scylla), replica placement is controlled by the tablet map rather than the token map.
+      // The 3.x driver's tablet-aware getReplicas() path would then route to a different node than
+      // the hardcoded expectation (token 4881097376275569167 → node 1), causing a flaky failure.
+      // Disabling tablets forces deterministic token-map-based replica placement.
+      session.execute(
+          String.format(
+              "CREATE KEYSPACE %s WITH replication = { 'class' : 'NetworkTopologyStrategy',"
+                  + " 'datacenter1' : 1 } AND tablets = {'enabled': false}",
+              ks));
       session.execute("USE " + ks);
       session.execute("CREATE TABLE composite (k1 int, k2 int, i int, PRIMARY KEY ((k1, k2)))");
 
