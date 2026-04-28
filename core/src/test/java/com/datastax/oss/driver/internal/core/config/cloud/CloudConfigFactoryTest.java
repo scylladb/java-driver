@@ -37,8 +37,10 @@ import com.github.tomakehurst.wiremock.http.StubRequestHandler;
 import com.github.tomakehurst.wiremock.jetty9.JettyHttpServer;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import com.google.common.base.Joiner;
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -46,11 +48,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 import org.eclipse.jetty.io.NetworkTrafficListener;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,21 +72,39 @@ public class CloudConfigFactoryTest {
   public WireMockRule wireMockRule =
       new WireMockRule(
           wireMockConfig()
-              .httpsPort(30443)
               .dynamicPort()
+              .dynamicHttpsPort()
               .httpServerFactory(new HttpsServerFactory())
               .needClientAuth(true)
               .keystorePath(path("/config/cloud/identity.jks").toString())
               .keystorePassword("fakePasswordForTests")
+              .keyManagerPassword("fakePasswordForTests")
+              .keystoreType("JKS")
               .trustStorePath(path("/config/cloud/trustStore.jks").toString())
-              .trustStorePassword("fakePasswordForTests2"));
+              .trustStorePassword("fakePasswordForTests2")
+              .trustStoreType("JKS"));
+
+  private Path tempBundlePath;
+
+  @Before
+  public void createBundle() throws Exception {
+    tempBundlePath = Files.createTempFile("secure-connect", ".zip");
+    Files.write(tempBundlePath, secureBundle());
+  }
+
+  @After
+  public void cleanupBundle() throws IOException {
+    if (tempBundlePath != null) {
+      Files.deleteIfExists(tempBundlePath);
+    }
+  }
 
   public CloudConfigFactoryTest() throws URISyntaxException {}
 
   @Test
   public void should_load_config_from_local_filesystem() throws Exception {
     // given
-    URL configFile = getClass().getResource(BUNDLE_PATH);
+    URL configFile = tempBundlePath.toUri().toURL();
     mockProxyMetadataService(jsonMetadata());
     // when
     CloudConfigFactory cloudConfigFactory = new CloudConfigFactory();
@@ -91,7 +116,7 @@ public class CloudConfigFactoryTest {
   @Test
   public void should_load_config_from_external_location() throws Exception {
     // given
-    mockHttpSecureBundle(secureBundle());
+    mockHttpSecureBundle(Files.readAllBytes(tempBundlePath));
     mockProxyMetadataService(jsonMetadata());
     // when
     URL configFile = new URL("http", "localhost", wireMockRule.port(), BUNDLE_PATH);
@@ -130,7 +155,7 @@ public class CloudConfigFactoryTest {
   @Test
   public void should_throw_when_metadata_not_found() throws Exception {
     // given
-    mockHttpSecureBundle(secureBundle());
+    mockHttpSecureBundle(Files.readAllBytes(tempBundlePath));
     stubFor(any(urlPathEqualTo("/metadata")).willReturn(aResponse().withStatus(404)));
     // when
     URL configFile = new URL("http", "localhost", wireMockRule.port(), BUNDLE_PATH);
@@ -142,7 +167,7 @@ public class CloudConfigFactoryTest {
   @Test
   public void should_throw_when_metadata_not_readable() throws Exception {
     // given
-    mockHttpSecureBundle(secureBundle());
+    mockHttpSecureBundle(Files.readAllBytes(tempBundlePath));
     mockProxyMetadataService("not a valid json payload");
     // when
     URL configFile = new URL("http", "localhost", wireMockRule.port(), BUNDLE_PATH);
@@ -171,8 +196,37 @@ public class CloudConfigFactoryTest {
                     .withBody(jsonMetadata)));
   }
 
-  private byte[] secureBundle() throws IOException, URISyntaxException {
-    return Files.readAllBytes(path(BUNDLE_PATH));
+  private byte[] secureBundle() throws IOException {
+    try (InputStream in = getClass().getResourceAsStream(BUNDLE_PATH);
+        ZipInputStream zipIn = new ZipInputStream(in);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ZipOutputStream zipOut = new ZipOutputStream(out)) {
+      ZipEntry entry;
+      byte[] buffer = new byte[8192];
+      while ((entry = zipIn.getNextEntry()) != null) {
+        zipOut.putNextEntry(new ZipEntry(entry.getName()));
+        if ("config.json".equals(entry.getName())) {
+          ByteArrayOutputStream configBuffer = new ByteArrayOutputStream();
+          int len;
+          while ((len = zipIn.read(buffer)) != -1) {
+            configBuffer.write(buffer, 0, len);
+          }
+          String config =
+              new String(configBuffer.toByteArray(), StandardCharsets.UTF_8)
+                  .replace("\"port\": 30443", "\"port\": " + wireMockRule.httpsPort());
+          zipOut.write(config.getBytes(StandardCharsets.UTF_8));
+        } else {
+          int len;
+          while ((len = zipIn.read(buffer)) != -1) {
+            zipOut.write(buffer, 0, len);
+          }
+        }
+        zipOut.closeEntry();
+        zipIn.closeEntry();
+      }
+      zipOut.finish();
+      return out.toByteArray();
+    }
   }
 
   private String jsonMetadata() throws IOException, URISyntaxException {
@@ -218,7 +272,8 @@ public class CloudConfigFactoryTest {
             int port,
             NetworkTrafficListener listener,
             ConnectionFactory... connectionFactories) {
-          if (port == options.httpsSettings().port()) {
+          if (connectionFactories.length > 0
+              && connectionFactories[0] instanceof SslConnectionFactory) {
             SslConnectionFactory sslConnectionFactory =
                 (SslConnectionFactory) connectionFactories[0];
             SslContextFactory sslContextFactory = sslConnectionFactory.getSslContextFactory();

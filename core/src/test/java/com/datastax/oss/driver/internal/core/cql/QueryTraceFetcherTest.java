@@ -71,6 +71,7 @@ public class QueryTraceFetcherTest {
   private static final UUID TRACING_ID = UUID.randomUUID();
   private static final ByteBuffer PAGING_STATE = Bytes.fromHexString("0xdeadbeef");
   private static final int PORT = 7000;
+  private final InetAddress address = InetAddress.getLoopbackAddress();
 
   @Mock private CqlSession session;
   @Mock private InternalDriverContext context;
@@ -79,8 +80,6 @@ public class QueryTraceFetcherTest {
   @Mock private NettyOptions nettyOptions;
   @Mock private EventExecutorGroup adminEventExecutorGroup;
   @Mock private EventExecutor eventExecutor;
-  @Mock private InetAddress address;
-
   @Captor private ArgumentCaptor<SimpleStatement> statementCaptor;
 
   @Before
