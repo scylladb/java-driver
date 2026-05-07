@@ -456,6 +456,9 @@ public class ControlConnectionTest extends CCMTestsSupport {
               .build();
 
       scassandras.node(1).primingClient().clearAllPrimes();
+      // Reset the column caches so the driver re-discovers columns via SELECT * rather than
+      // sending projected queries against the now-cleared Scassandra primes.
+      cluster.manager.controlConnection.resetColumnCaches();
 
       // the driver will attempt to locate host2 in system.peers by its old broadcast address, and
       // that will fail
