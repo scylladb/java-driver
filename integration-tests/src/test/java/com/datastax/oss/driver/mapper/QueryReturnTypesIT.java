@@ -50,6 +50,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -71,6 +72,10 @@ public class QueryReturnTypesIT {
 
   private static TestDao dao;
 
+  private static final AtomicInteger UNIQUE_ID = new AtomicInteger();
+
+  private int testId;
+
   @BeforeClass
   public static void createSchema() {
     CqlSession session = SESSION_RULE.session();
@@ -87,38 +92,39 @@ public class QueryReturnTypesIT {
 
   @Before
   public void insertData() {
+    testId = UNIQUE_ID.getAndIncrement();
     for (int i = 0; i < 10; i++) {
-      dao.insert(new TestEntity(1, i, i));
+      dao.insert(new TestEntity(testId, i, i));
     }
   }
 
   @Test
   public void should_execute_query_and_map_to_void() {
-    dao.delete(1, 1);
-    assertThat(dao.findByIdAndRank(1, 1)).isNull();
+    dao.delete(testId, 1);
+    assertThat(dao.findByIdAndRank(testId, 1)).isNull();
   }
 
   @Test
   public void should_execute_async_query_and_map_to_void() {
-    CompletableFutures.getUninterruptibly(dao.deleteAsync(1, 1).toCompletableFuture());
-    assertThat(dao.findByIdAndRank(1, 1)).isNull();
+    CompletableFutures.getUninterruptibly(dao.deleteAsync(testId, 1).toCompletableFuture());
+    assertThat(dao.findByIdAndRank(testId, 1)).isNull();
   }
 
   @Test
   public void should_execute_conditional_query_and_map_to_boolean() {
-    assertThat(dao.deleteIfExists(1, 1)).isTrue();
-    assertThat(dao.deleteIfExists(1, 1)).isFalse();
+    assertThat(dao.deleteIfExists(testId, 1)).isTrue();
+    assertThat(dao.deleteIfExists(testId, 1)).isFalse();
   }
 
   @Test
   public void should_execute_async_conditional_query_and_map_to_boolean() {
-    assertThat(CompletableFutures.getUninterruptibly(dao.deleteIfExistsAsync(1, 1))).isTrue();
-    assertThat(CompletableFutures.getUninterruptibly(dao.deleteIfExistsAsync(1, 1))).isFalse();
+    assertThat(CompletableFutures.getUninterruptibly(dao.deleteIfExistsAsync(testId, 1))).isTrue();
+    assertThat(CompletableFutures.getUninterruptibly(dao.deleteIfExistsAsync(testId, 1))).isFalse();
   }
 
   @Test
   public void should_execute_count_query_and_map_to_long() {
-    assertThat(dao.countById(1)).isEqualTo(10);
+    assertThat(dao.countById(testId)).isEqualTo(10);
   }
 
   @Test
@@ -133,111 +139,111 @@ public class QueryReturnTypesIT {
 
   @Test
   public void should_execute_async_count_query_and_map_to_long() {
-    assertThat(CompletableFutures.getUninterruptibly(dao.countByIdAsync(1))).isEqualTo(10);
+    assertThat(CompletableFutures.getUninterruptibly(dao.countByIdAsync(testId))).isEqualTo(10);
   }
 
   @Test
   public void should_execute_query_and_map_to_row() {
-    Row row = dao.findRowByIdAndRank(1, 1);
+    Row row = dao.findRowByIdAndRank(testId, 1);
     assertThat(row).isNotNull();
     assertThat(row.getColumnDefinitions().size()).isEqualTo(3);
-    assertThat(row.getInt("id")).isEqualTo(1);
+    assertThat(row.getInt("id")).isEqualTo(testId);
     assertThat(row.getInt("rank")).isEqualTo(1);
     assertThat(row.getInt("value")).isEqualTo(1);
   }
 
   @Test
   public void should_execute_async_query_and_map_to_row() {
-    Row row = CompletableFutures.getUninterruptibly(dao.findRowByIdAndRankAsync(1, 1));
+    Row row = CompletableFutures.getUninterruptibly(dao.findRowByIdAndRankAsync(testId, 1));
     assertThat(row).isNotNull();
     assertThat(row.getColumnDefinitions().size()).isEqualTo(3);
-    assertThat(row.getInt("id")).isEqualTo(1);
+    assertThat(row.getInt("id")).isEqualTo(testId);
     assertThat(row.getInt("rank")).isEqualTo(1);
     assertThat(row.getInt("value")).isEqualTo(1);
   }
 
   @Test
   public void should_execute_query_and_map_to_result_set() {
-    ResultSet resultSet = dao.findRowsById(1);
+    ResultSet resultSet = dao.findRowsById(testId);
     assertThat(resultSet.all()).hasSize(10);
   }
 
   @Test
   public void should_execute_async_query_and_map_to_result_set() {
-    AsyncResultSet resultSet = CompletableFutures.getUninterruptibly(dao.findRowsByIdAsync(1));
+    AsyncResultSet resultSet = CompletableFutures.getUninterruptibly(dao.findRowsByIdAsync(testId));
     assertThat(ImmutableList.copyOf(resultSet.currentPage())).hasSize(10);
     assertThat(resultSet.hasMorePages()).isFalse();
   }
 
   @Test
   public void should_execute_query_and_map_to_entity() {
-    TestEntity entity = dao.findByIdAndRank(1, 1);
-    assertThat(entity.getId()).isEqualTo(1);
+    TestEntity entity = dao.findByIdAndRank(testId, 1);
+    assertThat(entity.getId()).isEqualTo(testId);
     assertThat(entity.getRank()).isEqualTo(1);
     assertThat(entity.getValue()).isEqualTo(1);
 
-    entity = dao.findByIdAndRank(2, 1);
+    entity = dao.findByIdAndRank(-(testId + 1), 1);
     assertThat(entity).isNull();
   }
 
   @Test
   public void should_execute_async_query_and_map_to_entity() {
-    TestEntity entity = CompletableFutures.getUninterruptibly(dao.findByIdAndRankAsync(1, 1));
-    assertThat(entity.getId()).isEqualTo(1);
+    TestEntity entity = CompletableFutures.getUninterruptibly(dao.findByIdAndRankAsync(testId, 1));
+    assertThat(entity.getId()).isEqualTo(testId);
     assertThat(entity.getRank()).isEqualTo(1);
     assertThat(entity.getValue()).isEqualTo(1);
 
-    entity = dao.findByIdAndRank(2, 1);
+    entity = dao.findByIdAndRank(-(testId + 1), 1);
     assertThat(entity).isNull();
   }
 
   @Test
   public void should_execute_query_and_map_to_optional_entity() {
-    Optional<TestEntity> maybeEntity = dao.findOptionalByIdAndRank(1, 1);
+    Optional<TestEntity> maybeEntity = dao.findOptionalByIdAndRank(testId, 1);
     assertThat(maybeEntity)
         .hasValueSatisfying(
             entity -> {
-              assertThat(entity.getId()).isEqualTo(1);
+              assertThat(entity.getId()).isEqualTo(testId);
               assertThat(entity.getRank()).isEqualTo(1);
               assertThat(entity.getValue()).isEqualTo(1);
             });
 
-    maybeEntity = dao.findOptionalByIdAndRank(2, 1);
+    maybeEntity = dao.findOptionalByIdAndRank(-(testId + 1), 1);
     assertThat(maybeEntity).isEmpty();
   }
 
   @Test
   public void should_execute_async_query_and_map_to_optional_entity() {
     Optional<TestEntity> maybeEntity =
-        CompletableFutures.getUninterruptibly(dao.findOptionalByIdAndRankAsync(1, 1));
+        CompletableFutures.getUninterruptibly(dao.findOptionalByIdAndRankAsync(testId, 1));
     assertThat(maybeEntity)
         .hasValueSatisfying(
             entity -> {
-              assertThat(entity.getId()).isEqualTo(1);
+              assertThat(entity.getId()).isEqualTo(testId);
               assertThat(entity.getRank()).isEqualTo(1);
               assertThat(entity.getValue()).isEqualTo(1);
             });
 
-    maybeEntity = dao.findOptionalByIdAndRank(2, 1);
+    maybeEntity = dao.findOptionalByIdAndRank(-(testId + 1), 1);
     assertThat(maybeEntity).isEmpty();
   }
 
   @Test
   public void should_execute_query_and_map_to_iterable() {
-    PagingIterable<TestEntity> iterable = dao.findById(1);
+    PagingIterable<TestEntity> iterable = dao.findById(testId);
     assertThat(iterable.all()).hasSize(10);
   }
 
   @Test
   public void should_execute_query_and_map_to_stream() {
-    Stream<TestEntity> stream = dao.findByIdAsStream(1);
+    Stream<TestEntity> stream = dao.findByIdAsStream(testId);
     assertThat(stream).hasSize(10);
   }
 
   @Test
   public void should_execute_async_query_and_map_to_iterable() {
     MappedAsyncPagingIterable<TestEntity> iterable =
-        CompletableFutures.getUninterruptibly(dao.findByIdAsync(1));
+        CompletableFutures.getUninterruptibly(dao.findByIdAsync(testId));
     assertThat(ImmutableList.copyOf(iterable.currentPage())).hasSize(10);
     assertThat(iterable.hasMorePages()).isFalse();
   }
@@ -245,7 +251,7 @@ public class QueryReturnTypesIT {
   @Test
   public void should_execute_query_and_map_to_stream_async()
       throws ExecutionException, InterruptedException {
-    CompletableFuture<Stream<TestEntity>> stream = dao.findByIdAsStreamAsync(1);
+    CompletableFuture<Stream<TestEntity>> stream = dao.findByIdAsStreamAsync(testId);
     assertThat(stream.get()).hasSize(10);
   }
 
