@@ -82,6 +82,13 @@ public class ScassandraCluster {
 
   private final boolean peersV2;
 
+  /**
+   * One stable UUID per node (keyed by 1-based nodeCount), computed once at construction so that
+   * system.local and system.peers rows for the same node always carry the same host_id regardless
+   * of which Scassandra process is being primed or how many times primeMetadata() is called.
+   */
+  private final Map<Integer, java.util.UUID> hostIdByNodeCount;
+
   ScassandraCluster(
       Integer[] nodes,
       String ipPrefix,
@@ -147,6 +154,17 @@ public class ScassandraCluster {
     }
     instances = instanceListBuilder.build();
     dcNodeMap = dcNodeMapBuilder.build();
+
+    // Compute stable host_id UUIDs once so every primeMetadata() call uses the same values.
+    Map<Integer, java.util.UUID> hostIds = new HashMap<>();
+    int tempCount = 1;
+    for (Integer dc : new TreeSet<Integer>(dcNodeMap.keySet())) {
+      for (int n = 0; n < dcNodeMap.get(dc).size(); n++) {
+        hostIds.put(tempCount, UUIDs.random());
+        tempCount++;
+      }
+    }
+    this.hostIdByNodeCount = hostIds;
 
     // Prime correct keyspace table based on C* version.
     String[] versionArray = this.cassandraVersion.split("\\.|-");
@@ -357,6 +375,11 @@ public class ScassandraCluster {
     logger.debug("Starting node {}.", node);
     Scassandra scassandra = node(node);
     scassandra.start();
+    // Re-prime after restart: Scassandra loses all primes when its process restarts.
+    // Without re-priming, the driver may query an unprimed node (e.g. if the control
+    // connection temporarily reconnects to this host), get empty system table responses,
+    // and fail to bring the node back up within the allowed window.
+    primeMetadata(scassandra);
     assertThat(cluster).host(node).comesUpWithin(10, TimeUnit.SECONDS);
   }
 
@@ -386,6 +409,7 @@ public class ScassandraCluster {
 
   private void primeMetadata(Scassandra node) {
     PrimingClient client = node.primingClient();
+
     int nodeCount = 1;
 
     ImmutableList.Builder<Map<String, ?>> rows = ImmutableList.builder();
@@ -396,6 +420,7 @@ public class ScassandraCluster {
       for (int n = 0; n < nodesInDc.size(); n++) {
         InetSocketAddress binaryAddress = address(nodeCount);
         InetSocketAddress listenAddress = listenAddress(nodeCount);
+        java.util.UUID hostId = hostIdByNodeCount.get(nodeCount);
         nodeCount++;
         Scassandra peer = nodesInDc.get(n);
         if (node == peer) { // prime system.local.
@@ -423,7 +448,7 @@ public class ScassandraCluster {
               "release_version",
               getPeerInfo(dc, n + 1, "release_version", cassandraVersion));
           addPeerInfo(row, dc, n + 1, "tokens", ImmutableSet.of(tokens.get(n)));
-          addPeerInfo(row, dc, n + 1, "host_id", UUIDs.random());
+          addPeerInfo(row, dc, n + 1, "host_id", hostId);
           addPeerInfo(row, dc, n + 1, "schema_version", schemaVersion);
           addPeerInfo(row, dc, n + 1, "graph", false);
 
@@ -444,6 +469,19 @@ public class ScassandraCluster {
                             .withRows(Collections.<Map<String, ?>>singletonList(row))
                             .build())
                     .build());
+            // Also prime the projected query that the driver sends after the cache is warm.
+            ColumnMetadata[] projectedLocal =
+                projectedColumnMetadata(
+                    SELECT_LOCAL, SystemColumnProjection.LOCAL_COLUMNS_OF_INTEREST);
+            client.prime(
+                PrimingRequest.queryBuilder()
+                    .withQuery(projectedQueryString(projectedLocal, "system.local", "key='local'"))
+                    .withThen(
+                        then()
+                            .withColumnTypes(projectedLocal)
+                            .withRows(Collections.<Map<String, ?>>singletonList(row))
+                            .build())
+                    .build());
           } else {
             addPeerInfo(row, dc, n + 1, "broadcast_port", listenAddress.getPort());
             addPeerInfo(row, dc, n + 1, "listen_port", listenAddress.getPort());
@@ -453,6 +491,20 @@ public class ScassandraCluster {
                     .withThen(
                         then()
                             .withColumnTypes(SELECT_LOCAL_V2)
+                            .withRows(Collections.<Map<String, ?>>singletonList(row))
+                            .build())
+                    .build());
+            // Also prime the projected query that the driver sends after the cache is warm.
+            ColumnMetadata[] projectedLocalV2 =
+                projectedColumnMetadata(
+                    SELECT_LOCAL_V2, SystemColumnProjection.LOCAL_COLUMNS_OF_INTEREST);
+            client.prime(
+                PrimingRequest.queryBuilder()
+                    .withQuery(
+                        projectedQueryString(projectedLocalV2, "system.local", "key='local'"))
+                    .withThen(
+                        then()
+                            .withColumnTypes(projectedLocalV2)
                             .withRows(Collections.<Map<String, ?>>singletonList(row))
                             .build())
                     .build());
@@ -489,7 +541,6 @@ public class ScassandraCluster {
           addPeerInfo(row, dc, n + 1, "tokens", ImmutableSet.of(Long.toString(tokens.get(n))));
           addPeerInfo(rowV2, dc, n + 1, "tokens", ImmutableSet.of(Long.toString(tokens.get(n))));
 
-          java.util.UUID hostId = UUIDs.random();
           addPeerInfo(row, dc, n + 1, "host_id", hostId);
           addPeerInfo(rowV2, dc, n + 1, "host_id", hostId);
 
@@ -546,6 +597,14 @@ public class ScassandraCluster {
             .withQuery("SELECT * FROM system.peers")
             .withThen(then().withColumnTypes(SELECT_PEERS).withRows(rows.build()).build())
             .build());
+    // Also prime the projected full-scan that the driver sends after the cache is warm.
+    ColumnMetadata[] projectedPeersFullScan =
+        projectedColumnMetadata(SELECT_PEERS, SystemColumnProjection.PEERS_COLUMNS_OF_INTEREST);
+    client.prime(
+        PrimingRequest.queryBuilder()
+            .withQuery(projectedQueryString(projectedPeersFullScan, "system.peers", null))
+            .withThen(then().withColumnTypes(projectedPeersFullScan).withRows(rows.build()).build())
+            .build());
 
     // return invalid error for peers_v2, indicating the table doesn't exist.
     if (!peersV2) {
@@ -559,6 +618,16 @@ public class ScassandraCluster {
           PrimingRequest.queryBuilder()
               .withQuery("SELECT * FROM system.peers_v2")
               .withThen(then().withColumnTypes(SELECT_PEERS_V2).withRows(rowsV2.build()).build())
+              .build());
+      // Also prime the projected full-scan for peers_v2.
+      ColumnMetadata[] projectedPeersV2FullScan =
+          projectedColumnMetadata(
+              SELECT_PEERS_V2, SystemColumnProjection.PEERS_V2_COLUMNS_OF_INTEREST);
+      client.prime(
+          PrimingRequest.queryBuilder()
+              .withQuery(projectedQueryString(projectedPeersV2FullScan, "system.peers_v2", null))
+              .withThen(
+                  then().withColumnTypes(projectedPeersV2FullScan).withRows(rowsV2.build()).build())
               .build());
     }
 
@@ -751,6 +820,34 @@ public class ScassandraCluster {
     column("validator", TEXT),
   };
 
+  /** Returns the subset of {@code full} whose names are in {@code interest}, preserving order. */
+  private static ColumnMetadata[] projectedColumnMetadata(
+      ColumnMetadata[] full, Set<String> interest) {
+    List<ColumnMetadata> result = new ArrayList<>();
+    for (ColumnMetadata col : full) {
+      if (interest.contains(col.getName())) result.add(col);
+    }
+    return result.toArray(new ColumnMetadata[0]);
+  }
+
+  /** Builds a projected SELECT query string from a ColumnMetadata array. */
+  private static String projectedQueryString(
+      ColumnMetadata[] cols, String table, String whereClause) {
+    // Sort alphabetically to match the order produced by
+    // SystemColumnProjection.buildProjectedQuery.
+    List<String> names = new ArrayList<>();
+    for (ColumnMetadata col : cols) names.add(col.getName());
+    Collections.sort(names);
+    StringBuilder sb = new StringBuilder("SELECT ");
+    for (int i = 0; i < names.size(); i++) {
+      if (i > 0) sb.append(", ");
+      sb.append(names.get(i));
+    }
+    sb.append(" FROM ").append(table);
+    if (whereClause != null) sb.append(" WHERE ").append(whereClause);
+    return sb.toString();
+  }
+
   // Primes a minimal system.local row on an Scassandra node.
   // We need a host_id so that the driver can store it in Metadata.hosts
   public static void primeSystemLocalRow(Scassandra scassandra) {
@@ -766,6 +863,18 @@ public class ScassandraCluster {
                     then()
                         .withColumnTypes(
                             localMetadata.toArray(new ColumnMetadata[localMetadata.size()]))
+                        .withRows(Collections.<Map<String, ?>>singletonList(row))));
+    // Also prime the projected query that the driver sends after the cache is warm.
+    ColumnMetadata[] projectedLocal =
+        projectedColumnMetadata(SELECT_LOCAL, SystemColumnProjection.LOCAL_COLUMNS_OF_INTEREST);
+    scassandra
+        .primingClient()
+        .prime(
+            PrimingRequest.queryBuilder()
+                .withQuery(projectedQueryString(projectedLocal, "system.local", "key='local'"))
+                .withThen(
+                    then()
+                        .withColumnTypes(projectedLocal)
                         .withRows(Collections.<Map<String, ?>>singletonList(row))));
   }
 
