@@ -1119,7 +1119,27 @@ public enum DefaultDriverOption implements DriverOption {
    *
    * <p>Value type: boolean
    */
-  CLIENT_ROUTES_SHARD_AWARENESS_ENABLED("advanced.client-routes.shard-awarness-enabled");
+  CLIENT_ROUTES_SHARD_AWARENESS_ENABLED("advanced.client-routes.shard-awarness-enabled"),
+
+  /**
+   * Whether the driver may fall back to a direct connection when no client route is available for a
+   * node.
+   *
+   * <p>When {@code true} (the default), nodes that have no matching entry in {@code
+   * system.client_routes} — or whose proxy address cannot be reached or resolved — are contacted
+   * directly using their broadcast address. This preserves backward-compatible mixed proxy/direct
+   * topologies where some nodes are behind the private endpoint and others are not.
+   *
+   * <p>When {@code false}, the driver never falls back to a direct connection. Any node without a
+   * reachable route is treated as unreachable: it stays DOWN and the reconnection loop retries
+   * until a {@code CLIENT_ROUTES_CHANGE} event publishes the route. Note that setting this to
+   * {@code false} does <em>not</em> actively close existing direct connections; connection pools
+   * that were established before the flag was applied may continue to operate until naturally
+   * recycled.
+   *
+   * <p>Value type: boolean
+   */
+  CLIENT_ROUTES_DIRECT_CONNECTION_FALLBACK("advanced.client-routes.direct-connection-fallback");
 
   private final String path;
 

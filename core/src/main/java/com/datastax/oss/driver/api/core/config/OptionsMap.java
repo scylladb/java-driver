@@ -400,6 +400,7 @@ public class OptionsMap implements Serializable {
     // values) with no sensible scalar default, analogous to how CONFIG_RELOAD_INTERVAL is omitted.
     map.put(TypedDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, 9042);
     map.put(TypedDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, false);
+    map.put(TypedDriverOption.CLIENT_ROUTES_DIRECT_CONNECTION_FALLBACK, true);
   }
 
   @Immutable
