@@ -47,22 +47,39 @@ public class ClientRoutesEndPointTest {
     when(topologyMonitor.resolve(hostId)).thenReturn(expected);
 
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
 
     assertThat(ep.resolve()).isEqualTo(expected);
   }
 
   @Test
-  public void should_fallback_when_resolve_returns_null() throws UnknownHostException {
+  public void should_throw_when_direct_connection_fallback_disabled_and_no_route()
+      throws UnknownHostException {
     UUID hostId = UUID.randomUUID();
-    InetSocketAddress fallbackAddr = new InetSocketAddress("10.0.0.1", 9042);
     when(topologyMonitor.resolve(hostId)).thenReturn(null);
-    when(fallbackEndPoint.resolve()).thenReturn(fallbackAddr);
 
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, false);
 
-    assertThat(ep.resolve()).isEqualTo(fallbackAddr);
+    assertThatThrownBy(ep::resolve)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("No client route entry found")
+        .hasMessageContaining(hostId.toString())
+        .hasMessageContaining("direct-connection-fallback");
+  }
+
+  @Test
+  public void should_fall_back_to_broadcast_when_direct_connection_fallback_enabled()
+      throws UnknownHostException {
+    UUID hostId = UUID.randomUUID();
+    InetSocketAddress fallbackAddress = new InetSocketAddress("10.0.0.1", 9042);
+    when(topologyMonitor.resolve(hostId)).thenReturn(null);
+    when(fallbackEndPoint.resolve()).thenReturn(fallbackAddress);
+
+    ClientRoutesEndPoint ep =
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
+
+    assertThat(ep.resolve()).isEqualTo(fallbackAddress);
   }
 
   @Test
@@ -71,7 +88,7 @@ public class ClientRoutesEndPointTest {
     when(topologyMonitor.resolve(hostId)).thenThrow(new UnknownHostException("no-such-host"));
 
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
 
     assertThatThrownBy(ep::resolve)
         .isInstanceOf(UncheckedIOException.class)
@@ -86,7 +103,7 @@ public class ClientRoutesEndPointTest {
     when(topologyMonitor.resolve(hostId)).thenReturn(addr1);
 
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
 
     assertThat(ep.resolve()).isEqualTo(addr1);
 
@@ -102,9 +119,9 @@ public class ClientRoutesEndPointTest {
   public void should_be_equal_when_same_host_id() {
     UUID hostId = UUID.randomUUID();
     ClientRoutesEndPoint ep1 =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
     ClientRoutesEndPoint ep2 =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
 
     assertThat(ep1).isEqualTo(ep2);
     assertThat(ep1.hashCode()).isEqualTo(ep2.hashCode());
@@ -113,9 +130,9 @@ public class ClientRoutesEndPointTest {
   @Test
   public void should_not_be_equal_when_different_host_id() {
     ClientRoutesEndPoint ep1 =
-        new ClientRoutesEndPoint(topologyMonitor, UUID.randomUUID(), null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, UUID.randomUUID(), null, fallbackEndPoint, true);
     ClientRoutesEndPoint ep2 =
-        new ClientRoutesEndPoint(topologyMonitor, UUID.randomUUID(), null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, UUID.randomUUID(), null, fallbackEndPoint, true);
 
     assertThat(ep1).isNotEqualTo(ep2);
   }
@@ -124,7 +141,7 @@ public class ClientRoutesEndPointTest {
   public void should_not_be_equal_to_non_client_routes_endpoint() {
     UUID hostId = UUID.randomUUID();
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
 
     assertThat(ep).isNotEqualTo("not an endpoint");
     assertThat(ep).isNotEqualTo(null);
@@ -136,7 +153,7 @@ public class ClientRoutesEndPointTest {
   public void should_use_host_id_as_metric_prefix_when_address_is_null() {
     UUID hostId = UUID.randomUUID();
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
 
     assertThat(ep.asMetricPrefix()).isEqualTo(hostId.toString());
   }
@@ -146,7 +163,7 @@ public class ClientRoutesEndPointTest {
     UUID hostId = UUID.randomUUID();
     InetAddress ipv4 = InetAddress.getByAddress(new byte[] {10, 0, 0, 1});
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, ipv4, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, ipv4, fallbackEndPoint, true);
 
     assertThat(ep.asMetricPrefix()).isEqualTo("10_0_0_1_" + hostId);
   }
@@ -157,7 +174,7 @@ public class ClientRoutesEndPointTest {
     InetAddress ipv6 =
         InetAddress.getByAddress(new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1});
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, ipv6, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, ipv6, fallbackEndPoint, true);
 
     // IPv6 keeps colons (consistent with DefaultEndPoint), dots replaced by underscores
     assertThat(ep.asMetricPrefix()).isEqualTo("0:0:0:0:0:0:0:1_" + hostId);
@@ -169,7 +186,7 @@ public class ClientRoutesEndPointTest {
   public void should_return_host_id_as_string() {
     UUID hostId = UUID.randomUUID();
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint, true);
 
     assertThat(ep.toString()).isEqualTo("ClientRoutesEndPoint(" + hostId + ")");
   }
