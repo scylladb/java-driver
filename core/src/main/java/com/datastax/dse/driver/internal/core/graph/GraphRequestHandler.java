@@ -17,6 +17,8 @@
  */
 package com.datastax.dse.driver.internal.core.graph;
 
+import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
+
 import com.datastax.dse.driver.api.core.graph.AsyncGraphResultSet;
 import com.datastax.dse.driver.api.core.graph.GraphNode;
 import com.datastax.dse.driver.api.core.graph.GraphStatement;
@@ -26,6 +28,7 @@ import com.datastax.dse.driver.internal.core.graph.binary.GraphBinaryModule;
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
+import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -56,6 +59,7 @@ import com.datastax.oss.driver.internal.core.cql.DefaultExecutionInfo;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
 import com.datastax.oss.driver.internal.core.tracker.RequestLogger;
@@ -68,6 +72,7 @@ import com.datastax.oss.protocol.internal.response.Result;
 import com.datastax.oss.protocol.internal.response.result.Rows;
 import com.datastax.oss.protocol.internal.response.result.Void;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.handler.codec.EncoderException;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
@@ -209,12 +214,15 @@ public class GraphRequestHandler implements Throttled {
     if (timeoutDuration != null && timeoutDuration.toNanos() > 0) {
       try {
         return this.timer.newTimeout(
-            (Timeout timeout1) ->
-                setFinalError(
-                    initialStatement,
-                    new DriverTimeoutException("Query timed out after " + timeoutDuration),
-                    null,
-                    NO_SUCCESSFUL_EXECUTION),
+            (Timeout timeout1) -> {
+              NodeDiagnostics diagnostics = buildNodeDiagnostics();
+              setFinalError(
+                  initialStatement,
+                  new DriverTimeoutException(
+                      "Query timed out after " + timeoutDuration, diagnostics),
+                  null,
+                  NO_SUCCESSFUL_EXECUTION);
+            },
             timeoutDuration.toNanos(),
             TimeUnit.NANOSECONDS);
       } catch (IllegalStateException e) {
@@ -227,6 +235,23 @@ public class GraphRequestHandler implements Throttled {
       }
     }
     return null;
+  }
+
+  @Nullable
+  private NodeDiagnostics buildNodeDiagnostics() {
+    List<NodeResponseCallback> callbacks = inFlightCallbacks;
+    if (callbacks.isEmpty()) {
+      return null;
+    }
+    NodeResponseCallback cb = callbacks.get(0);
+    int channelInFlight = cb.channel.getInFlight();
+    ChannelPool pool = session.getPools().get(cb.node);
+    return NodeDiagnostics.of(
+        cb.node.getEndPoint(),
+        channelInFlight,
+        pool != null ? pool.getInFlight() : UNAVAILABLE,
+        pool != null ? pool.getAvailableIds() : UNAVAILABLE,
+        pool != null ? pool.getOrphanedIds() : UNAVAILABLE);
   }
 
   /**

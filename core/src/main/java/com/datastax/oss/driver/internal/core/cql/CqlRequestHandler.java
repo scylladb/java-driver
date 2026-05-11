@@ -23,10 +23,13 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
+import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
+
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
+import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -66,6 +69,7 @@ import com.datastax.oss.driver.internal.core.metadata.token.DefaultTokenMap;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenLong64;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.protocol.TabletInfo;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
@@ -86,6 +90,7 @@ import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.response.result.Void;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.handler.codec.EncoderException;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
@@ -224,12 +229,15 @@ public class CqlRequestHandler implements Throttled {
     if (timeoutDuration.toNanos() > 0) {
       try {
         return this.timer.newTimeout(
-            (Timeout timeout1) ->
-                setFinalError(
-                    initialStatement,
-                    new DriverTimeoutException("Query timed out after " + timeoutDuration),
-                    null,
-                    -1),
+            (Timeout timeout1) -> {
+              NodeDiagnostics diagnostics = buildNodeDiagnostics();
+              setFinalError(
+                  initialStatement,
+                  new DriverTimeoutException(
+                      "Query timed out after " + timeoutDuration, diagnostics),
+                  null,
+                  -1);
+            },
             timeoutDuration.toNanos(),
             TimeUnit.NANOSECONDS);
       } catch (IllegalStateException e) {
@@ -242,6 +250,23 @@ public class CqlRequestHandler implements Throttled {
       }
     }
     return null;
+  }
+
+  @Nullable
+  private NodeDiagnostics buildNodeDiagnostics() {
+    List<NodeResponseCallback> callbacks = inFlightCallbacks;
+    if (callbacks.isEmpty()) {
+      return null;
+    }
+    NodeResponseCallback cb = callbacks.get(0);
+    int channelInFlight = cb.channel.getInFlight();
+    ChannelPool pool = session.getPools().get(cb.node);
+    return NodeDiagnostics.of(
+        cb.node.getEndPoint(),
+        channelInFlight,
+        pool != null ? pool.getInFlight() : UNAVAILABLE,
+        pool != null ? pool.getAvailableIds() : UNAVAILABLE,
+        pool != null ? pool.getOrphanedIds() : UNAVAILABLE);
   }
 
   private Token getRoutingToken(Statement statement) {

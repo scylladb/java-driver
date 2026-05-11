@@ -17,9 +17,12 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
+import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
+
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
+import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
@@ -45,6 +48,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.ThrottledAdminRequestH
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
@@ -55,6 +59,7 @@ import com.datastax.oss.protocol.internal.request.Prepare;
 import com.datastax.oss.protocol.internal.response.Error;
 import com.datastax.oss.protocol.internal.response.result.Prepared;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.concurrent.Future;
@@ -165,7 +170,10 @@ public class CqlPrepareHandler implements Throttled {
     if (timeoutDuration.toNanos() > 0) {
       return this.timer.newTimeout(
           (Timeout timeout1) -> {
-            setFinalError(new DriverTimeoutException("Query timed out after " + timeoutDuration));
+            NodeDiagnostics diagnostics = buildNodeDiagnostics();
+            setFinalError(
+                new DriverTimeoutException(
+                    "Query timed out after " + timeoutDuration, diagnostics));
             if (initialCallback != null) {
               initialCallback.cancel();
             }
@@ -175,6 +183,22 @@ public class CqlPrepareHandler implements Throttled {
     } else {
       return null;
     }
+  }
+
+  @Nullable
+  private NodeDiagnostics buildNodeDiagnostics() {
+    InitialPrepareCallback cb = initialCallback;
+    if (cb == null) {
+      return null;
+    }
+    int channelInFlight = cb.channel.getInFlight();
+    ChannelPool pool = session.getPools().get(cb.node);
+    return NodeDiagnostics.of(
+        cb.node.getEndPoint(),
+        channelInFlight,
+        pool != null ? pool.getInFlight() : UNAVAILABLE,
+        pool != null ? pool.getAvailableIds() : UNAVAILABLE,
+        pool != null ? pool.getOrphanedIds() : UNAVAILABLE);
   }
 
   private void cancelTimeout() {
