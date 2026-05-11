@@ -171,7 +171,7 @@ public class GraphTimeoutsIT {
       // client timeout for this request. We cannot know for sure if it will be a client timeout
       // error, or a server timeout, and during tests, both happened and not deterministically.
     } catch (DriverTimeoutException e) {
-      assertThat(e).hasMessage("Query timed out after " + clientTimeout);
+      assertThat(e).hasMessageStartingWith("Query timed out after " + clientTimeout);
     } catch (InvalidQueryException e) {
       assertThat(e)
           .hasMessageContainingAll(

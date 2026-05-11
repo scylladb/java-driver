@@ -17,6 +17,8 @@
  */
 package com.datastax.dse.driver.internal.core.cql.continuous;
 
+import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
+
 import com.datastax.dse.driver.api.core.DseProtocolVersion;
 import com.datastax.dse.driver.api.core.cql.continuous.ContinuousAsyncResultSet;
 import com.datastax.dse.driver.internal.core.DseProtocolFeature;
@@ -26,6 +28,7 @@ import com.datastax.dse.protocol.internal.response.result.DseRowsMetadata;
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
+import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
@@ -62,6 +65,7 @@ import com.datastax.oss.driver.internal.core.cql.DefaultExecutionInfo;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.util.Loggers;
@@ -390,11 +394,30 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
     }
     LOG.trace("[{}] Scheduling global timeout for pages in {}", logPrefix, globalTimeout);
     return timer.newTimeout(
-        timeout ->
-            abortGlobalRequestOrChosenCallback(
-                new DriverTimeoutException("Query timed out after " + globalTimeout)),
+        timeout -> {
+          NodeDiagnostics diagnostics = buildNodeDiagnostics();
+          abortGlobalRequestOrChosenCallback(
+              new DriverTimeoutException("Query timed out after " + globalTimeout, diagnostics));
+        },
         globalTimeout.toNanos(),
         TimeUnit.NANOSECONDS);
+  }
+
+  @Nullable
+  private NodeDiagnostics buildNodeDiagnostics() {
+    List<NodeResponseCallback> callbacks = inFlightCallbacks;
+    if (callbacks.isEmpty()) {
+      return null;
+    }
+    NodeResponseCallback cb = callbacks.get(0);
+    int channelInFlight = cb.channel.getInFlight();
+    ChannelPool pool = session.getPools().get(cb.node);
+    return NodeDiagnostics.of(
+        cb.node.getEndPoint(),
+        channelInFlight,
+        pool != null ? pool.getInFlight() : UNAVAILABLE,
+        pool != null ? pool.getAvailableIds() : UNAVAILABLE,
+        pool != null ? pool.getOrphanedIds() : UNAVAILABLE);
   }
 
   /**
@@ -718,9 +741,17 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
       lock.lock();
       try {
         if (state == expectedPage) {
+          int channelInFlight = channel.getInFlight();
+          ChannelPool pool = session.getPools().get(node);
           abort(
               new DriverTimeoutException(
-                  String.format("Timed out waiting for page %d", expectedPage)),
+                  "Timed out waiting for page " + expectedPage,
+                  NodeDiagnostics.of(
+                      node.getEndPoint(),
+                      channelInFlight,
+                      pool != null ? pool.getInFlight() : UNAVAILABLE,
+                      pool != null ? pool.getAvailableIds() : UNAVAILABLE,
+                      pool != null ? pool.getOrphanedIds() : UNAVAILABLE)),
               false);
         } else {
           // Ignore timeout if the request has moved on in the interim.

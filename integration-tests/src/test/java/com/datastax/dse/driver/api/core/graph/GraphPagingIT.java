@@ -408,7 +408,7 @@ public class GraphPagingIT {
                     .setExecutionProfile(profile));
         fail("Expecting DriverTimeoutException");
       } catch (DriverTimeoutException e) {
-        assertThat(e).hasMessage("Query timed out after " + timeout);
+        assertThat(e).hasMessageStartingWith("Query timed out after " + timeout);
       }
     } finally {
       CCM_RULE.getCcmBridge().resume(1);
@@ -433,7 +433,7 @@ public class GraphPagingIT {
                     .setTimeout(timeout));
         fail("Expecting DriverTimeoutException");
       } catch (DriverTimeoutException e) {
-        assertThat(e).hasMessage("Query timed out after " + timeout);
+        assertThat(e).hasMessageStartingWith("Query timed out after " + timeout);
       }
     } finally {
       CCM_RULE.getCcmBridge().resume(1);
@@ -461,7 +461,7 @@ public class GraphPagingIT {
       result.toCompletableFuture().get();
       fail("Expecting DriverTimeoutException");
     } catch (ExecutionException e) {
-      assertThat(e.getCause()).hasMessage("Query timed out after " + timeout);
+      assertThat(e.getCause()).hasMessageStartingWith("Query timed out after " + timeout);
     } finally {
       CCM_RULE.getCcmBridge().resume(1);
     }
