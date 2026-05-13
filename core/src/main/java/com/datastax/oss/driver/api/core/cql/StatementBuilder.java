@@ -23,6 +23,7 @@ import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
+import com.datastax.oss.driver.internal.core.cql.RequestRoutingTypeAccessor;
 import com.datastax.oss.driver.internal.core.util.RoutingKey;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -89,7 +90,15 @@ public abstract class StatementBuilder<
     this.timeout = template.getTimeout();
     this.node = template.getNode();
     this.nowInSeconds = template.getNowInSeconds();
-    this.requestRoutingType = template.getRequestRoutingType();
+    this.requestRoutingType = getConfiguredRequestRoutingType(template);
+  }
+
+  @Nullable
+  private RequestRoutingType getConfiguredRequestRoutingType(StatementT template) {
+    if (template instanceof RequestRoutingTypeAccessor) {
+      return ((RequestRoutingTypeAccessor) template).getConfiguredRequestRoutingType();
+    }
+    return template.getRequestRoutingType();
   }
 
   /** @see Statement#setExecutionProfileName(String) */

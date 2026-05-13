@@ -23,9 +23,11 @@ package com.datastax.oss.driver.core.loadbalancing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.junit.Assume.assumeTrue;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.Version;
@@ -33,8 +35,10 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchStatementBuilder;
 import com.datastax.oss.driver.api.core.cql.BatchType;
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
@@ -57,6 +61,7 @@ import org.junit.rules.TestRule;
 public class LWTLoadBalancingMultiDcIT {
   private static final String LOCAL_DC = "dc1";
   private static final String KEYSPACE = "test";
+  private static final String LOCAL_SERIAL_PROFILE = "local-serial";
 
   private static final CustomCcmRule CCM_RULE =
       CustomCcmRule.builder().withNodes(2, 1).build(); // 2 nodes in DC1, 1 node in DC2
@@ -67,7 +72,12 @@ public class LWTLoadBalancingMultiDcIT {
           .withConfigLoader(
               SessionUtils.configLoaderBuilder()
                   .withString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER, LOCAL_DC)
+                  .withString(
+                      DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
+                      "PRESERVE_REPLICA_ORDER")
                   .withDuration(DefaultDriverOption.REQUEST_TIMEOUT, Duration.ofSeconds(30))
+                  .startProfile(LOCAL_SERIAL_PROFILE)
+                  .withString(DefaultDriverOption.REQUEST_CONSISTENCY, "LOCAL_SERIAL")
                   .build())
           .build();
 
@@ -76,6 +86,7 @@ public class LWTLoadBalancingMultiDcIT {
 
   public static final int FIRST_TEST_PARTITION_KEY = 4242;
   public static final int SECOND_TEST_PARTITION_KEY = 4343;
+  public static final int THIRD_TEST_PARTITION_KEY = 4444;
   public static final int NUM_TEST_ITERATIONS = 30;
 
   @BeforeClass
@@ -206,5 +217,60 @@ public class LWTLoadBalancingMultiDcIT {
     assertThat(coordinators).isSubsetOf(allReplicas);
     assertThat(coordinators).isSubsetOf(localReplicas);
     assertThat(coordinatorDcs).containsOnly(LOCAL_DC);
+  }
+
+  @Test
+  public void should_route_prepared_local_serial_simple_select_as_lwt() {
+    assumeTrue(CcmBridge.isDistributionOf(BackendType.SCYLLA));
+
+    CqlSession session = SESSION_RULE.session();
+    SimpleStatement simpleSelect =
+        SimpleStatement.builder("SELECT * FROM test.foo WHERE pk = ? AND ck = ?")
+            .setConsistencyLevel(DefaultConsistencyLevel.LOCAL_SERIAL)
+            .build();
+    PreparedStatement select = session.prepare(simpleSelect);
+    BoundStatement statement = select.bind(THIRD_TEST_PARTITION_KEY, 0);
+
+    assertThat(simpleSelect.isLWT()).isFalse();
+    assertThat(simpleSelect.getRequestRoutingType()).isEqualTo(RequestRoutingType.LWT);
+    assertThat(simpleSelect.getConsistencyLevel()).isEqualTo(DefaultConsistencyLevel.LOCAL_SERIAL);
+
+    assertThat(select.getRequestRoutingType()).isEqualTo(RequestRoutingType.LWT);
+
+    assertThat(statement.getRequestRoutingType()).isEqualTo(RequestRoutingType.LWT);
+    assertThat(statement.getRoutingKeyspace()).isEqualTo(CqlIdentifier.fromCql(KEYSPACE));
+    assertThat(statement.getRoutingKey()).isNotNull();
+    assertThat(statement.getConsistencyLevel()).isEqualTo(DefaultConsistencyLevel.LOCAL_SERIAL);
+
+    ResultSet result = session.execute(statement);
+    assertThat(result.getExecutionInfo().getCoordinator()).isNotNull();
+  }
+
+  @Test
+  public void should_route_prepared_profiled_local_serial_simple_select_with_lwt_policy() {
+    assumeTrue(CcmBridge.isDistributionOf(BackendType.SCYLLA));
+
+    CqlSession session = SESSION_RULE.session();
+    SimpleStatement simpleSelect =
+        SimpleStatement.builder("SELECT * FROM test.foo WHERE pk = ? AND ck = ?")
+            .setExecutionProfileName(LOCAL_SERIAL_PROFILE)
+            .build();
+    PreparedStatement select = session.prepare(simpleSelect);
+    BoundStatement statement = select.bind(THIRD_TEST_PARTITION_KEY, 0);
+
+    assertThat(simpleSelect.isLWT()).isFalse();
+    assertThat(simpleSelect.getRequestRoutingType()).isNull();
+    assertThat(simpleSelect.getConsistencyLevel()).isNull();
+
+    assertThat(select.getRequestRoutingType()).isNull();
+
+    assertThat(statement.getRequestRoutingType()).isNull();
+    assertThat(statement.getExecutionProfileName()).isEqualTo(LOCAL_SERIAL_PROFILE);
+    assertThat(statement.getRoutingKeyspace()).isEqualTo(CqlIdentifier.fromCql(KEYSPACE));
+    assertThat(statement.getRoutingKey()).isNotNull();
+    assertThat(statement.getConsistencyLevel()).isNull();
+
+    ResultSet result = session.execute(statement);
+    assertThat(result.getExecutionInfo().getCoordinator()).isNotNull();
   }
 }

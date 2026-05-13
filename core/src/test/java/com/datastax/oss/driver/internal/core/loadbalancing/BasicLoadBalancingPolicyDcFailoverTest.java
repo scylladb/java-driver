@@ -33,8 +33,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
@@ -56,6 +58,45 @@ public class BasicLoadBalancingPolicyDcFailoverTest extends BasicLoadBalancingPo
   @Mock protected DefaultNode node7;
   @Mock protected DefaultNode node8;
   @Mock protected DefaultNode node9;
+
+  @Test
+  public void should_not_add_remote_nodes_for_preserve_routing_with_local_serial_consistency() {
+    when(defaultProfile.getString(
+            DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+        .thenReturn("PRESERVE_REPLICA_ORDER");
+    policy = createAndInitPolicy();
+    SimpleStatement statement =
+        SimpleStatement.newInstance("SELECT * FROM ks.foo")
+            .setConsistencyLevel(DefaultConsistencyLevel.LOCAL_SERIAL)
+            .setRoutingKeyspace(KEYSPACE)
+            .setRoutingKey(ROUTING_KEY);
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node7, node1, node2));
+
+    assertThat(policy.newQueryPlan(statement, session))
+        .containsOnlyElementsOf(policy.getLiveNodes().dc("dc1"));
+  }
+
+  @Test
+  public void should_ignore_down_replicas_for_preserve_routing_with_local_serial_consistency() {
+    when(defaultProfile.getString(
+            DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+        .thenReturn("PRESERVE_REPLICA_ORDER");
+    policy = createAndInitPolicy();
+    SimpleStatement statement =
+        SimpleStatement.newInstance("SELECT * FROM ks.foo")
+            .setConsistencyLevel(DefaultConsistencyLevel.LOCAL_SERIAL)
+            .setRoutingKeyspace(KEYSPACE)
+            .setRoutingKey(ROUTING_KEY);
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node7, node1, node2));
+
+    for (Node node : ImmutableList.copyOf(policy.getLiveNodes().dc("dc1"))) {
+      policy.onDown(node);
+    }
+
+    assertThat(policy.newQueryPlan(statement, session)).isEmpty();
+  }
 
   @Test
   @Override

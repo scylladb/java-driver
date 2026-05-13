@@ -430,7 +430,7 @@ public class Conversions {
         context.getProtocolVersion(),
         lwtInfo != null && lwtInfo.isLwt(response.variablesMetadata.flags)
             ? RequestRoutingType.LWT
-            : RequestRoutingType.REGULAR);
+            : null);
   }
 
   public static ColumnDefinitions toColumnDefinitions(

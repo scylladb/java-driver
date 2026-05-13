@@ -189,11 +189,35 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     if (request == null) {
       return RequestRoutingMethod.REGULAR;
     }
-    if (request.getRequestRoutingType() == RequestRoutingType.LWT) {
+    RequestRoutingType requestRoutingType = request.getRequestRoutingType();
+    if (requestRoutingType == RequestRoutingType.LWT
+        || (requestRoutingType == null && hasSerialConsistency(request))) {
       return lwtRequestRoutingMethod;
     } else {
       return RequestRoutingMethod.REGULAR;
     }
+  }
+
+  private boolean hasSerialConsistency(@NonNull Request request) {
+    if (!(request instanceof Statement)) {
+      return false;
+    }
+
+    return getEffectiveConsistency((Statement<?>) request).isSerial();
+  }
+
+  @NonNull
+  private Optional<DriverExecutionProfile> getRequestProfile(@NonNull Request request) {
+    DriverExecutionProfile requestProfile = request.getExecutionProfile();
+    if (requestProfile != null) {
+      return Optional.of(requestProfile);
+    }
+
+    String profileName = request.getExecutionProfileName();
+    if (profileName != null && !profileName.isEmpty()) {
+      return Optional.of(context.getConfig().getProfile(profileName));
+    }
+    return Optional.of(profile);
   }
 
   /**
@@ -362,16 +386,29 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
       for (Object obj : getLiveNodes().dc(null).toArray()) {
         allNodes.add((Node) obj);
       }
+      replicas = filterNodesIn(replicas, new LinkedHashSet<>(allNodes));
       queryPlan.addAll(replicas);
       addRotatedNonReplicas(queryPlan, allNodes, replicas, request);
     } else {
-      // With local DC: prioritize local, then remote
-      Map<String, List<Node>> nodesByDc = getAllNodesByDc();
+      boolean includeRemoteDcs = isDcFailoverAllowedForRequest(request);
+      Map<String, List<Node>> nodesByDc =
+          includeRemoteDcs
+              ? getAllNodesByDc()
+              : Collections.singletonMap(localDc, dcNodeList(localDc));
+      Set<Node> liveNodesForPlan =
+          nodesByDc.values().stream()
+              .flatMap(List::stream)
+              .collect(Collectors.toCollection(LinkedHashSet::new));
+      replicas = filterNodesIn(replicas, liveNodesForPlan);
       addReplicasByDc(queryPlan, replicas, localDc);
       addNonReplicasByDc(queryPlan, nodesByDc, replicas, localDc, request);
     }
 
     return new SimpleQueryPlan(queryPlan.toArray());
+  }
+
+  private List<Node> filterNodesIn(List<Node> nodes, Set<Node> nodesToKeep) {
+    return nodes.stream().filter(nodesToKeep::contains).collect(Collectors.toList());
   }
 
   /** Collect all live nodes grouped by DC, with preferred remote DCs ordered first. */
@@ -537,20 +574,36 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     if (maxNodesPerRemoteDc <= 0 || localDc == null) {
       return local;
     }
-    if (!allowDcFailoverForLocalCl && request instanceof Statement) {
-      Statement<?> statement = (Statement<?>) request;
-      ConsistencyLevel consistency = statement.getConsistencyLevel();
-      if (consistency == null) {
-        consistency = defaultConsistencyLevel;
-      }
-      if (consistency.isDcLocal()) {
-        return local;
-      }
+    if (!isDcFailoverAllowedForRequest(request)) {
+      return local;
     }
     if (preferredRemoteDcs.isEmpty()) {
       return new CompositeQueryPlan(local, buildRemoteQueryPlanAll());
     }
     return new CompositeQueryPlan(local, buildRemoteQueryPlanPreferred());
+  }
+
+  private boolean isDcFailoverAllowedForRequest(@Nullable Request request) {
+    if (!allowDcFailoverForLocalCl && request instanceof Statement) {
+      return !getEffectiveConsistency((Statement<?>) request).isDcLocal();
+    }
+    return true;
+  }
+
+  @NonNull
+  private ConsistencyLevel getEffectiveConsistency(@NonNull Statement<?> statement) {
+    ConsistencyLevel consistency = statement.getConsistencyLevel();
+    if (consistency != null) {
+      return consistency;
+    }
+
+    return getRequestProfile(statement)
+        .map(
+            requestProfile ->
+                context
+                    .getConsistencyLevelRegistry()
+                    .nameToLevel(requestProfile.getString(DefaultDriverOption.REQUEST_CONSISTENCY)))
+        .orElse(defaultConsistencyLevel);
   }
 
   private QueryPlan buildRemoteQueryPlanAll() {
