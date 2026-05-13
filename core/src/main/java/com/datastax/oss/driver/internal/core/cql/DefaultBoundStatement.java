@@ -44,11 +44,10 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import net.jcip.annotations.Immutable;
 
 @Immutable
-public class DefaultBoundStatement implements BoundStatement {
+public class DefaultBoundStatement implements BoundStatement, RequestRoutingTypeAccessor {
 
   private final PreparedStatement preparedStatement;
   private final ColumnDefinitions variableDefinitions;
@@ -805,9 +804,22 @@ public class DefaultBoundStatement implements BoundStatement {
   @Nullable
   @Override
   public RequestRoutingType getRequestRoutingType() {
-    return Objects.nonNull(requestRoutingType)
-        ? requestRoutingType
-        : preparedStatement.getRequestRoutingType();
+    if (requestRoutingType != null) {
+      return requestRoutingType;
+    }
+    if (consistencyLevel != null && consistencyLevel.isSerial()) {
+      return RequestRoutingType.LWT;
+    }
+    if (preparedStatement instanceof RequestRoutingTypeAccessor) {
+      return ((RequestRoutingTypeAccessor) preparedStatement).getConfiguredRequestRoutingType();
+    }
+    return preparedStatement.getRequestRoutingType();
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getConfiguredRequestRoutingType() {
+    return requestRoutingType;
   }
 
   @NonNull

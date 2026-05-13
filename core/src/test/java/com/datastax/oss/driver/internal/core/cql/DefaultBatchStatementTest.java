@@ -104,6 +104,18 @@ public class DefaultBatchStatementTest {
   }
 
   @Test
+  public void should_not_infer_lwt_status_from_serial_consistency_level_option() {
+    BatchStatement batch =
+        BatchStatement.builder(BatchType.LOGGED)
+            .addStatement(SimpleStatement.newInstance("UPDATE foo SET v = ? WHERE pk = ?", 1, 1))
+            .setSerialConsistencyLevel(DefaultConsistencyLevel.LOCAL_SERIAL)
+            .build();
+
+    assertThat(batch.getRequestRoutingType()).isEqualTo(RequestRoutingType.REGULAR);
+    assertThat(batch.isLWT()).isFalse();
+  }
+
+  @Test
   public void should_infer_lwt_status() {
     // SELECT is not allowed in practice but is sufficient for unit testing
     SimpleStatement simpleStatement =

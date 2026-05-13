@@ -49,7 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Immutable
-public class DefaultBatchStatement implements BatchStatement {
+public class DefaultBatchStatement implements BatchStatement, RequestRoutingTypeAccessor {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultBatchStatement.class);
 
   private final BatchType batchType;
@@ -857,6 +857,8 @@ public class DefaultBatchStatement implements BatchStatement {
   public RequestRoutingType getRequestRoutingType() {
     if (Objects.nonNull(requestRoutingType)) {
       return requestRoutingType;
+    } else if (consistencyLevel != null && consistencyLevel.isSerial()) {
+      return RequestRoutingType.LWT;
     } else if (Objects.isNull(
         cachedStatementsRequestRoutingType)) { // Immutability of the statement list and statements
       // allows us to cache the result
@@ -868,6 +870,12 @@ public class DefaultBatchStatement implements BatchStatement {
               .orElse(RequestRoutingType.REGULAR);
     }
     return cachedStatementsRequestRoutingType;
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getConfiguredRequestRoutingType() {
+    return requestRoutingType;
   }
 
   @NonNull

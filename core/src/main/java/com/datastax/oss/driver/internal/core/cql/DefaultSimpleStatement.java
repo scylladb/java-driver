@@ -42,7 +42,7 @@ import java.util.Objects;
 import net.jcip.annotations.Immutable;
 
 @Immutable
-public class DefaultSimpleStatement implements SimpleStatement {
+public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTypeAccessor {
 
   private final String query;
   private final List<Object> positionalValues;
@@ -776,6 +776,18 @@ public class DefaultSimpleStatement implements SimpleStatement {
   @Nullable
   @Override
   public RequestRoutingType getRequestRoutingType() {
+    if (requestRoutingType != null) {
+      return requestRoutingType;
+    }
+    if (consistencyLevel != null && consistencyLevel.isSerial()) {
+      return RequestRoutingType.LWT;
+    }
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getConfiguredRequestRoutingType() {
     return requestRoutingType;
   }
 

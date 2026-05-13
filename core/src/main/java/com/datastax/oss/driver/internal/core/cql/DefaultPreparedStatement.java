@@ -58,7 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @ThreadSafe
-public class DefaultPreparedStatement implements PreparedStatement {
+public class DefaultPreparedStatement implements PreparedStatement, RequestRoutingTypeAccessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultPreparedStatement.class);
   private static final Splitter SPACE_SPLITTER = Splitter.onPattern("\\s+");
   private static final Splitter COMMA_SPLITTER = Splitter.onPattern(",");
@@ -196,6 +196,20 @@ public class DefaultPreparedStatement implements PreparedStatement {
   @Nullable
   @Override
   public RequestRoutingType getRequestRoutingType() {
+    if (requestRoutingType != null) {
+      return requestRoutingType;
+    }
+
+    if (consistencyLevelForBoundStatements != null
+        && consistencyLevelForBoundStatements.isSerial()) {
+      return RequestRoutingType.LWT;
+    }
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getConfiguredRequestRoutingType() {
     return requestRoutingType;
   }
 
