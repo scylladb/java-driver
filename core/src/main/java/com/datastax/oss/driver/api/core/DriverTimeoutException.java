@@ -18,7 +18,9 @@
 package com.datastax.oss.driver.api.core;
 
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
+import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.metadata.NodeState;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 
@@ -43,8 +45,14 @@ public class DriverTimeoutException extends DriverException {
    * <p>Fields:
    *
    * <ul>
+   *   <li>{@link #getNodeState()}: the state of the node (UP, DOWN, etc.) at timeout time.
+   *   <li>{@link #getNodeDistance()}: the distance assigned to the node by the load-balancing
+   *       policy (LOCAL, REMOTE, or IGNORED).
+   *   <li>{@link #getDatacenter()}: the datacenter the node belongs to.
    *   <li>{@link #getChannelInFlight()}: requests currently awaiting a response on the specific
    *       connection used for this request.
+   *   <li>{@link #getPoolSize()}: number of active connections in the pool ({@link #UNAVAILABLE} if
+   *       the pool was already removed).
    *   <li>{@link #getPoolInFlight()}: total in-flight across all connections to this host ({@link
    *       #UNAVAILABLE} if the pool was already removed).
    *   <li>{@link #getPoolAvailableIds()}: remaining stream IDs available to send new requests; a
@@ -63,12 +71,18 @@ public class DriverTimeoutException extends DriverException {
    *       were sent but not answered within the timeout.
    *   <li>High {@code poolOrphanedIds} → previous timeouts consumed stream IDs that the driver is
    *       still waiting to reclaim.
+   *   <li>{@code poolSize} below expected → pool is degraded; some connections have been lost.
+   *   <li>{@code nodeState} DOWN or FORCED_DOWN → node is known to be unavailable.
    * </ul>
    */
   public static final class NodeDiagnostics {
 
     @NonNull private final EndPoint endPoint;
+    @Nullable private final NodeState nodeState;
+    @Nullable private final NodeDistance nodeDistance;
+    @Nullable private final String datacenter;
     private final int channelInFlight;
+    private final int poolSize;
     private final int poolInFlight;
     private final int poolAvailableIds;
     private final int poolOrphanedIds;
@@ -77,19 +91,31 @@ public class DriverTimeoutException extends DriverException {
      * Creates a full diagnostic snapshot (pool was available at timeout time).
      *
      * @param endPoint the endpoint of the node.
+     * @param nodeState the state of the node at timeout time.
+     * @param nodeDistance the distance assigned to the node by the load-balancing policy.
+     * @param datacenter the datacenter the node belongs to.
      * @param channelInFlight in-flight count on the specific channel.
+     * @param poolSize number of active connections in the pool.
      * @param poolInFlight total in-flight across the pool for this host.
      * @param poolAvailableIds remaining stream IDs available in the pool.
      * @param poolOrphanedIds orphaned stream IDs in the pool.
      */
     public NodeDiagnostics(
         @NonNull EndPoint endPoint,
+        @Nullable NodeState nodeState,
+        @Nullable NodeDistance nodeDistance,
+        @Nullable String datacenter,
         int channelInFlight,
+        int poolSize,
         int poolInFlight,
         int poolAvailableIds,
         int poolOrphanedIds) {
       this.endPoint = endPoint;
+      this.nodeState = nodeState;
+      this.nodeDistance = nodeDistance;
+      this.datacenter = datacenter;
       this.channelInFlight = channelInFlight;
+      this.poolSize = poolSize;
       this.poolInFlight = poolInFlight;
       this.poolAvailableIds = poolAvailableIds;
       this.poolOrphanedIds = poolOrphanedIds;
@@ -97,14 +123,32 @@ public class DriverTimeoutException extends DriverException {
 
     /**
      * Creates a partial diagnostic snapshot for when the pool was unavailable at timeout time. The
-     * pool-related fields ({@link #getPoolInFlight()}, {@link #getPoolAvailableIds()}, {@link
-     * #getPoolOrphanedIds()}) will be {@link DriverTimeoutException#UNAVAILABLE}.
+     * pool-related fields ({@link #getPoolSize()}, {@link #getPoolInFlight()}, {@link
+     * #getPoolAvailableIds()}, {@link #getPoolOrphanedIds()}) will be {@link
+     * DriverTimeoutException#UNAVAILABLE}.
      *
      * @param endPoint the endpoint of the node.
+     * @param nodeState the state of the node at timeout time.
+     * @param nodeDistance the distance assigned to the node by the load-balancing policy.
+     * @param datacenter the datacenter the node belongs to.
      * @param channelInFlight in-flight count on the specific channel.
      */
-    public NodeDiagnostics(@NonNull EndPoint endPoint, int channelInFlight) {
-      this(endPoint, channelInFlight, UNAVAILABLE, UNAVAILABLE, UNAVAILABLE);
+    public NodeDiagnostics(
+        @NonNull EndPoint endPoint,
+        @Nullable NodeState nodeState,
+        @Nullable NodeDistance nodeDistance,
+        @Nullable String datacenter,
+        int channelInFlight) {
+      this(
+          endPoint,
+          nodeState,
+          nodeDistance,
+          datacenter,
+          channelInFlight,
+          UNAVAILABLE,
+          UNAVAILABLE,
+          UNAVAILABLE,
+          UNAVAILABLE);
     }
 
     /**
@@ -113,7 +157,12 @@ public class DriverTimeoutException extends DriverException {
      * timeout time.
      *
      * @param endPoint the endpoint of the node.
+     * @param nodeState the state of the node at timeout time.
+     * @param nodeDistance the distance assigned to the node by the load-balancing policy.
+     * @param datacenter the datacenter the node belongs to.
      * @param channelInFlight in-flight count on the specific channel.
+     * @param poolSize number of active connections in the pool, or {@link
+     *     DriverTimeoutException#UNAVAILABLE}.
      * @param poolInFlight total in-flight across the pool, or {@link
      *     DriverTimeoutException#UNAVAILABLE}.
      * @param poolAvailableIds remaining stream IDs in the pool, or {@link
@@ -124,12 +173,24 @@ public class DriverTimeoutException extends DriverException {
     @NonNull
     public static NodeDiagnostics of(
         @NonNull EndPoint endPoint,
+        @Nullable NodeState nodeState,
+        @Nullable NodeDistance nodeDistance,
+        @Nullable String datacenter,
         int channelInFlight,
+        int poolSize,
         int poolInFlight,
         int poolAvailableIds,
         int poolOrphanedIds) {
       return new NodeDiagnostics(
-          endPoint, channelInFlight, poolInFlight, poolAvailableIds, poolOrphanedIds);
+          endPoint,
+          nodeState,
+          nodeDistance,
+          datacenter,
+          channelInFlight,
+          poolSize,
+          poolInFlight,
+          poolAvailableIds,
+          poolOrphanedIds);
     }
 
     /** Returns the endpoint of the node that had in-flight requests at timeout time. */
@@ -139,11 +200,43 @@ public class DriverTimeoutException extends DriverException {
     }
 
     /**
+     * Returns the state of the node at timeout time (e.g. UP, DOWN, FORCED_DOWN), or {@code null}
+     * if not available.
+     */
+    @Nullable
+    public NodeState getNodeState() {
+      return nodeState;
+    }
+
+    /**
+     * Returns the distance assigned to this node by the load-balancing policy at timeout time (e.g.
+     * LOCAL, REMOTE, IGNORED), or {@code null} if not available.
+     */
+    @Nullable
+    public NodeDistance getNodeDistance() {
+      return nodeDistance;
+    }
+
+    /** Returns the datacenter this node belongs to, or {@code null} if not available. */
+    @Nullable
+    public String getDatacenter() {
+      return datacenter;
+    }
+
+    /**
      * Returns the number of in-flight requests on the specific connection at timeout time, or
      * {@link DriverTimeoutException#UNAVAILABLE} if not available.
      */
     public int getChannelInFlight() {
       return channelInFlight;
+    }
+
+    /**
+     * Returns the number of active connections in the pool at timeout time, or {@link
+     * DriverTimeoutException#UNAVAILABLE} if the pool was no longer available.
+     */
+    public int getPoolSize() {
+      return poolSize;
     }
 
     /**
@@ -174,12 +267,33 @@ public class DriverTimeoutException extends DriverException {
 
     @Override
     public String toString() {
-      if (poolInFlight == UNAVAILABLE) {
-        return String.format("%s [channel in-flight: %d, pool: n/a]", endPoint, channelInFlight);
+      StringBuilder sb = new StringBuilder();
+      sb.append(endPoint);
+      sb.append(" [");
+      if (nodeState != null) {
+        sb.append("state: ").append(nodeState).append(", ");
       }
-      return String.format(
-          "%s [channel in-flight: %d, pool in-flight: %d, pool available ids: %d, pool orphaned ids: %d]",
-          endPoint, channelInFlight, poolInFlight, poolAvailableIds, poolOrphanedIds);
+      if (nodeDistance != null) {
+        sb.append("distance: ").append(nodeDistance).append(", ");
+      }
+      if (datacenter != null) {
+        sb.append("dc: ").append(datacenter).append(", ");
+      }
+      sb.append("channel in-flight: ").append(channelInFlight).append(", ");
+      if (poolInFlight == UNAVAILABLE) {
+        sb.append("pool: n/a");
+      } else {
+        sb.append("pool size: ")
+            .append(poolSize)
+            .append(", pool in-flight: ")
+            .append(poolInFlight)
+            .append(", pool available ids: ")
+            .append(poolAvailableIds)
+            .append(", pool orphaned ids: ")
+            .append(poolOrphanedIds);
+      }
+      sb.append("]");
+      return sb.toString();
     }
   }
 
