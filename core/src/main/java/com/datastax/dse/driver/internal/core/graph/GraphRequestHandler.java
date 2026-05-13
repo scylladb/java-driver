@@ -248,7 +248,11 @@ public class GraphRequestHandler implements Throttled {
     ChannelPool pool = session.getPools().get(cb.node);
     return NodeDiagnostics.of(
         cb.node.getEndPoint(),
+        cb.node.getState(),
+        cb.node.getDistance(),
+        cb.node.getDatacenter(),
         channelInFlight,
+        pool != null ? pool.size() : UNAVAILABLE,
         pool != null ? pool.getInFlight() : UNAVAILABLE,
         pool != null ? pool.getAvailableIds() : UNAVAILABLE,
         pool != null ? pool.getOrphanedIds() : UNAVAILABLE);
