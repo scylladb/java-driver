@@ -954,6 +954,15 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DefaultDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, GenericType.BOOLEAN);
 
+  /**
+   * Whether the driver may fall back to a direct connection when no client route is available for a
+   * node. When {@code true} (default), nodes without a reachable route are contacted directly via
+   * their broadcast address. When {@code false}, no fallback is attempted and the node stays DOWN.
+   */
+  public static final TypedDriverOption<Boolean> CLIENT_ROUTES_DIRECT_CONNECTION_FALLBACK =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CLIENT_ROUTES_DIRECT_CONNECTION_FALLBACK, GenericType.BOOLEAN);
+
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {
       ImmutableList.Builder<TypedDriverOption<?>> result = ImmutableList.builder();

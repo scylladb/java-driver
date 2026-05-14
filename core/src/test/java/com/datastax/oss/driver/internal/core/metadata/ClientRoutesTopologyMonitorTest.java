@@ -38,7 +38,6 @@ import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -143,6 +142,8 @@ public class ClientRoutesTopologyMonitorTest {
     when(defaultProfile.getDuration(DefaultDriverOption.CONTROL_CONNECTION_TIMEOUT))
         .thenReturn(Duration.ofSeconds(5));
     when(defaultProfile.getBoolean(DefaultDriverOption.RECONNECT_ON_INIT)).thenReturn(false);
+    when(defaultProfile.getBoolean(DefaultDriverOption.CLIENT_ROUTES_DIRECT_CONNECTION_FALLBACK))
+        .thenReturn(true);
     when(context.getSslEngineFactory()).thenReturn(Optional.empty());
     ClientRoutesConfig config =
         ClientRoutesConfig.builder()
@@ -161,6 +162,21 @@ public class ClientRoutesTopologyMonitorTest {
     when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
         .thenReturn(CompletableFuture.completedFuture(null));
     handler.init();
+  }
+
+  /**
+   * Creates a fresh handler with the given {@code directConnectionFallback} setting, sharing all
+   * other context stubs from {@link #setup()}.
+   */
+  private TestableClientRoutesTopologyMonitor createHandlerWithDirectConnectionFallback(
+      boolean directConnectionFallback) {
+    when(defaultProfile.getBoolean(DefaultDriverOption.CLIENT_ROUTES_DIRECT_CONNECTION_FALLBACK))
+        .thenReturn(directConnectionFallback);
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRouteProxy(connectionId, "host1"))
+            .build();
+    return new TestableClientRoutesTopologyMonitor(context, config);
   }
 
   // ---- resolve() -------------------------------------------------------
@@ -1041,19 +1057,16 @@ public class ClientRoutesTopologyMonitorTest {
   // ---- buildNodeEndPoint fallback -----------------------------------------
 
   @Test
-  public void should_build_default_endpoint_when_host_id_is_null() {
-    // row.getUuid("host_id") returns null, triggering the hostId == null
-    // branch in buildNodeEndPoint which delegates to super.buildNodeEndPoint().
+  public void should_throw_when_host_id_is_null() {
+    // row.getUuid("host_id") returns null — with client routes configured, the driver
+    // must not fall back to direct broadcast address, so buildNodeEndPoint throws.
     AdminRow row = Mockito.mock(AdminRow.class);
     when(row.getUuid("host_id")).thenReturn(null);
-    when(row.contains("peer")).thenReturn(false); // local-node row → super returns localEndPoint
     EndPoint localEndPoint = Mockito.mock(EndPoint.class);
 
-    EndPoint result = handler.buildNodeEndPoint(row, null, localEndPoint);
-
-    // hostId == null branch → super.buildNodeEndPoint() is called → returns localEndPoint
-    assertThat(result).isNotInstanceOf(ClientRoutesEndPoint.class);
-    assertThat(result).isSameAs(localEndPoint);
+    assertThatThrownBy(() -> handler.buildNodeEndPoint(row, null, localEndPoint))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("host_id is null");
   }
 
   @Test
@@ -1065,7 +1078,6 @@ public class ClientRoutesTopologyMonitorTest {
     UUID hostId = UUID.randomUUID();
     AdminRow row = Mockito.mock(AdminRow.class);
     when(row.getUuid("host_id")).thenReturn(hostId);
-    when(row.contains("peer")).thenReturn(false);
     EndPoint localEndPoint = Mockito.mock(EndPoint.class);
 
     EndPoint result = handler.buildNodeEndPoint(row, null, localEndPoint);
@@ -1138,24 +1150,44 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
-  public void should_resolve_to_fallback_when_no_route_for_host_id() {
-    // Simulates a node that is not accessed via PrivateLink (no route in cache for its host_id).
-    // resolve() must return the regular endpoint address (the fallback), not throw.
+  public void should_throw_when_no_route_for_host_id_and_direct_connection_fallback_disabled() {
+    // With direct-connection-fallback=false: resolve() must throw instead of falling back to
+    // broadcast address, to prevent the driver from bypassing proxy infrastructure.
+    TestableClientRoutesTopologyMonitor noFallbackHandler =
+        createHandlerWithDirectConnectionFallback(false);
     UUID hostId = UUID.randomUUID();
-    InetSocketAddress fallbackAddress = new InetSocketAddress("127.0.0.99", 9999);
     AdminRow row = Mockito.mock(AdminRow.class);
     when(row.getUuid("host_id")).thenReturn(hostId);
-    when(row.contains("peer")).thenReturn(false);
     EndPoint localEndPoint = Mockito.mock(EndPoint.class);
-    when(localEndPoint.resolve()).thenReturn(fallbackAddress);
 
+    EndPoint endpoint = noFallbackHandler.buildNodeEndPoint(row, null, localEndPoint);
+    assertThat(endpoint).isInstanceOf(ClientRoutesEndPoint.class);
+
+    // Cache is empty (no route for this host_id) → must throw, not fall back
+    assertThatThrownBy(endpoint::resolve)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("No client route entry found")
+        .hasMessageContaining(hostId.toString());
+  }
+
+  @Test
+  public void should_fall_back_to_broadcast_when_no_route_and_direct_connection_fallback_enabled()
+      throws Exception {
+    // With direct-connection-fallback=true (default): resolve() delegates to the fallback endpoint
+    // when no route exists, supporting mixed proxy/direct topologies.
+    UUID hostId = UUID.randomUUID();
+    AdminRow row = Mockito.mock(AdminRow.class);
+    when(row.getUuid("host_id")).thenReturn(hostId);
+    EndPoint localEndPoint = Mockito.mock(EndPoint.class);
+    InetSocketAddress directAddress = new InetSocketAddress("10.0.0.1", 9042);
+    when(localEndPoint.resolve()).thenReturn(directAddress);
+
+    // handler uses directConnectionFallback=true (set in setup())
     EndPoint endpoint = handler.buildNodeEndPoint(row, null, localEndPoint);
     assertThat(endpoint).isInstanceOf(ClientRoutesEndPoint.class);
 
-    // Cache is empty (no PrivateLink route) → resolves to the regular endpoint address
-    SocketAddress resolved = ((ClientRoutesEndPoint) endpoint).resolve();
-    assertThat(resolved).isEqualTo(fallbackAddress);
-    Mockito.verify(localEndPoint).resolve();
+    // Cache is empty → falls back to the direct broadcast address
+    assertThat(endpoint.resolve()).isEqualTo(directAddress);
   }
 
   // ---- savePort() --------------------------------------------------------

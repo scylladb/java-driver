@@ -82,6 +82,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   private final String logPrefix;
   private final AtomicReference<Map<UUID, ClientRouteRecord>> resolvedRoutesCache;
   private final boolean useSSL;
+  private final boolean directConnectionFallback;
   private volatile boolean closed = false;
   private final AtomicInteger consecutiveEmptyResults = new AtomicInteger(0);
 
@@ -147,6 +148,11 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     this.logPrefix = context.getSessionName();
     this.resolvedRoutesCache = new AtomicReference<>(Collections.emptyMap());
     this.useSSL = context.getSslEngineFactory().isPresent();
+    this.directConnectionFallback =
+        context
+            .getConfig()
+            .getDefaultProfile()
+            .getBoolean(DefaultDriverOption.CLIENT_ROUTES_DIRECT_CONNECTION_FALLBACK);
   }
 
   @Override
@@ -459,14 +465,15 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     UUID hostId = row.getUuid("host_id");
     if (hostId == null) {
       LOG.warn(
-          "[{}] host_id is null in system row for address {} — cannot assign a client route. "
-              + "This may indicate corrupted system tables. "
-              + "Falling back to default endpoint resolution.",
+          "[{}] host_id is null in system row for address {} — cannot build a client-routes"
+              + " endpoint. This may indicate corrupted system tables. The node will be ignored.",
           logPrefix,
           broadcastRpcAddress);
-      return super.buildNodeEndPoint(row, broadcastRpcAddress, localEndPoint);
+      throw new IllegalStateException(
+          "host_id is null in system row for address "
+              + broadcastRpcAddress
+              + "; cannot build a ClientRoutesEndPoint without a host_id");
     }
-    EndPoint fallback = super.buildNodeEndPoint(row, broadcastRpcAddress, localEndPoint);
     InetAddress broadcastInetAddress = null;
     if (broadcastRpcAddress != null) {
       broadcastInetAddress = broadcastRpcAddress.getAddress();
@@ -477,7 +484,9 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     if (broadcastInetAddress == null) {
       broadcastInetAddress = row.getInetAddress("peer");
     }
-    return new ClientRoutesEndPoint(this, hostId, broadcastInetAddress, fallback);
+    EndPoint fallback = super.buildNodeEndPoint(row, broadcastRpcAddress, localEndPoint);
+    return new ClientRoutesEndPoint(
+        this, hostId, broadcastInetAddress, fallback, directConnectionFallback);
   }
 
   /**
