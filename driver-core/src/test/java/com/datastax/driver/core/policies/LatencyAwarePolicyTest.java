@@ -227,4 +227,46 @@ public class LatencyAwarePolicyTest extends ScassandraTestBase {
       cluster.close();
     }
   }
+
+  @Test(groups = "short")
+  public void should_not_reorder_query_plan_for_serial_consistency_queries() throws Exception {
+    // given
+    String query = "SELECT foo FROM bar";
+    primingClient.prime(queryBuilder().withQuery(query).build());
+
+    LatencyAwarePolicy latencyAwarePolicy =
+        LatencyAwarePolicy.builder(new RoundRobinPolicy()).withMininumMeasurements(1).build();
+
+    Cluster.Builder builder = super.createClusterBuilder();
+    builder.withLoadBalancingPolicy(latencyAwarePolicy);
+
+    Cluster cluster = builder.build();
+    try {
+      cluster.init();
+
+      // Create a statement with LOCAL_SERIAL consistency (not isLWT)
+      Statement serialStatement =
+          new SimpleStatement(query)
+              .setConsistencyLevel(com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL);
+
+      // Make a request to populate latency metrics
+      LatencyTrackerBarrier barrier = new LatencyTrackerBarrier(1);
+      cluster.register(barrier);
+      Session session = cluster.connect();
+      session.execute(query);
+      barrier.await();
+      latencyAwarePolicy.new Updater().run();
+
+      // when
+      Iterator<Host> plan1 = latencyAwarePolicy.newQueryPlan("ks", serialStatement);
+      Iterator<Host> plan2 = latencyAwarePolicy.newQueryPlan("ks", serialStatement);
+
+      // then: ordering is preserved (not reordered by latency)
+      Host host = retrieveSingleHost(cluster);
+      assertThat(Lists.newArrayList(plan1)).containsExactly(host);
+      assertThat(Lists.newArrayList(plan2)).containsExactly(host);
+    } finally {
+      cluster.close();
+    }
+  }
 }

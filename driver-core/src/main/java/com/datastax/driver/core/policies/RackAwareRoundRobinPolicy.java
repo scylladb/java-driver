@@ -246,8 +246,13 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
   @Override
   public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
 
-    // For LWT queries, skip rack prioritization and use all local DC hosts equally
-    final boolean isLWT = statement != null && statement.isLWT();
+    // For LWT queries or serial consistency queries, skip rack prioritization and use all local DC
+    // hosts equally
+    ConsistencyLevel defaultCl =
+        configuration != null ? configuration.getQueryOptions().getConsistencyLevel() : null;
+    final boolean isLWT =
+        statement != null
+            && (statement.isLWT() || Statement.hasSerialConsistency(statement, defaultCl));
 
     // For LWT queries, include all local DC hosts in the first part of the plan, not just those in
     // the local rack
