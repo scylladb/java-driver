@@ -1214,6 +1214,38 @@ public class RackAwareRoundRobinPolicyTest {
     Assertions.assertThat(queryPlan.subList(0, 2)).containsOnly(host1, host2);
   }
 
+  /**
+   * Ensures that {@link RackAwareRoundRobinPolicy} skips rack prioritization for serial consistency
+   * queries (LOCAL_SERIAL/SERIAL), treating them like LWT queries.
+   *
+   * @test_category load_balancing:rack_aware
+   */
+  @Test(groups = "unit")
+  public void should_skip_rack_prioritization_for_serial_consistency_queries() {
+    // given: a policy with 4 local DC hosts (2 in local rack, 2 in remote rack)
+    RackAwareRoundRobinPolicy policy =
+        new RackAwareRoundRobinPolicy("localDC", "localRack", 1, false, false, false);
+    policy.init(cluster, ImmutableList.of(host3, host1, host4, host2, host5, host6));
+
+    // Create a non-LWT statement with LOCAL_SERIAL consistency
+    Statement serialStatement = mock(Statement.class);
+    when(serialStatement.isLWT()).thenReturn(false);
+    when(serialStatement.getConsistencyLevel()).thenReturn(ConsistencyLevel.LOCAL_SERIAL);
+
+    // when: generating query plans
+    policy.index.set(0);
+    List<Host> queryPlan = Lists.newArrayList(policy.newQueryPlan("keyspace", serialStatement));
+
+    // then: all 4 local DC hosts should appear before any remote DC host (no rack prioritization)
+    List<Host> localHosts =
+        queryPlan.stream()
+            .filter(h -> h == host1 || h == host2 || h == host3 || h == host4)
+            .collect(Collectors.toList());
+    Assertions.assertThat(localHosts).containsOnly(host1, host2, host3, host4);
+    // then: should follow insertion order, not rack-aware order
+    Assertions.assertThat(localHosts).startsWith(host3);
+  }
+
   @DataProvider(name = "distanceTestCases")
   public Object[][] distanceTestCases() {
     return new Object[][] {

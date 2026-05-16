@@ -26,6 +26,7 @@ import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.CodecRegistry;
 import com.datastax.driver.core.ColumnDefinitions;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Metadata;
@@ -266,6 +267,7 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     private final List<Host> replicas;
     private final String keyspace;
     private final Statement statement;
+    private final boolean localOnly;
     private List<Host> nonLocalReplicas;
     private Iterator<Host> nonLocalReplicasIterator;
     private Set<Host> returnedHosts;
@@ -276,6 +278,11 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       this.statement = statement;
       this.replicas = replicas;
       this.replicasIterator = replicas.iterator();
+      ConsistencyLevel cl = statement.getConsistencyLevel();
+      if (cl == null && queryOptions != null) {
+        cl = queryOptions.getConsistencyLevel();
+      }
+      this.localOnly = cl == ConsistencyLevel.LOCAL_SERIAL;
     }
 
     @Override
@@ -307,7 +314,7 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       }
 
       // Second pass: return remote replicas that are UP and not IGNORED
-      if (nonLocalReplicas != null) {
+      if (nonLocalReplicas != null && !localOnly) {
         if (nonLocalReplicasIterator == null) {
           nonLocalReplicasIterator = nonLocalReplicas.iterator();
         }
@@ -347,6 +354,7 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
   private volatile Metadata clusterMetadata;
   private volatile ProtocolVersion protocolVersion;
   private volatile CodecRegistry codecRegistry;
+  private volatile QueryOptions queryOptions;
   private volatile QueryOptions.RequestRoutingMethod defaultLwtRequestRoutingMethod;
 
   /**
@@ -395,8 +403,8 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     clusterMetadata = cluster.getMetadata();
     protocolVersion = cluster.getConfiguration().getProtocolOptions().getProtocolVersion();
     codecRegistry = cluster.getConfiguration().getCodecRegistry();
-    defaultLwtRequestRoutingMethod =
-        cluster.getConfiguration().getQueryOptions().getLoadBalancingLwtRequestRoutingMethod();
+    queryOptions = cluster.getConfiguration().getQueryOptions();
+    defaultLwtRequestRoutingMethod = queryOptions.getLoadBalancingLwtRequestRoutingMethod();
     childPolicy.init(cluster, hosts);
   }
 
@@ -468,10 +476,14 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
   }
 
   private QueryOptions.RequestRoutingMethod getRequestRouting(Statement statement) {
-    if (!statement.isLWT() || defaultLwtRequestRoutingMethod == null) {
+    if (defaultLwtRequestRoutingMethod == null) {
       return QueryOptions.RequestRoutingMethod.REGULAR;
     }
-    return defaultLwtRequestRoutingMethod;
+    if (statement.isLWT()
+        || Statement.hasSerialConsistency(statement, queryOptions.getConsistencyLevel())) {
+      return defaultLwtRequestRoutingMethod;
+    }
+    return QueryOptions.RequestRoutingMethod.REGULAR;
   }
 
   private Iterator<Host> newQueryPlanRegular(

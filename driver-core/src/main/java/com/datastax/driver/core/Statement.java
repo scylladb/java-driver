@@ -92,6 +92,27 @@ public abstract class Statement {
   }
 
   /**
+   * Returns {@code true} if this statement's effective consistency level is serial ({@link
+   * ConsistencyLevel#SERIAL} or {@link ConsistencyLevel#LOCAL_SERIAL}). When no consistency level
+   * has been explicitly set on this statement, falls back to the provided default.
+   *
+   * <p>This is used by load-balancing policies to route serial-consistency statements through the
+   * LWT path, even when {@link #isLWT()} returns {@code false}.
+   *
+   * @param defaultConsistencyLevel the cluster-wide default consistency level to fall back to when
+   *     this statement has no explicit consistency level set.
+   * @return whether the effective consistency level is serial.
+   */
+  public static boolean hasSerialConsistency(
+      Statement statement, ConsistencyLevel defaultConsistencyLevel) {
+    ConsistencyLevel cl = statement.getConsistencyLevel();
+    if (cl == null) {
+      cl = defaultConsistencyLevel;
+    }
+    return cl != null && cl.isSerial();
+  }
+
+  /**
    * Sets the consistency level for the query.
    *
    * @param consistency the consistency level to set.

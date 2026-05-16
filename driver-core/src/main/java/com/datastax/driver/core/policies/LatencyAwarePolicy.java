@@ -22,6 +22,7 @@ import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.LatencyTracker;
 import com.datastax.driver.core.Metrics;
 import com.datastax.driver.core.MetricsUtil;
+import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.BootstrappingException;
 import com.datastax.driver.core.exceptions.DriverException;
@@ -102,6 +103,7 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
   private final long retryPeriod;
   private final long minMeasure;
   private volatile Metrics metrics;
+  private volatile QueryOptions queryOptions;
 
   private LatencyAwarePolicy(
       LoadBalancingPolicy childPolicy,
@@ -218,6 +220,7 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
     }
     cluster.register(latencyTracker);
     metrics = cluster.getMetrics();
+    queryOptions = cluster.getConfiguration().getQueryOptions();
     if (metrics != null) {
       metrics
           .getRegistry()
@@ -258,10 +261,13 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
    */
   @Override
   public Iterator<Host> newQueryPlan(String loggedKeyspace, Statement statement) {
-    // For LWT queries, preserve the child policy's ordering.
+    // For LWT queries or serial consistency queries, preserve the child policy's ordering.
     // LWT routing can rely on deterministic replica ordering (e.g. by TokenAwarePolicy), and
     // latency-based reordering can undermine those assumptions.
-    if (statement != null && statement.isLWT()) {
+    if (statement != null
+        && (statement.isLWT()
+            || Statement.hasSerialConsistency(
+                statement, queryOptions != null ? queryOptions.getConsistencyLevel() : null))) {
       return childPolicy.newQueryPlan(loggedKeyspace, statement);
     }
 

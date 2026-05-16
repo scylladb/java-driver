@@ -664,6 +664,183 @@ public class TokenAwarePolicyTest {
     assertThat(queryPlan).containsExactly(host1, host3, host2, host4, host5);
   }
 
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_route_serial_consistency_statement_as_lwt(
+      TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: a non-LWT statement with LOCAL_SERIAL consistency level
+    Statement serialStatement = mock(Statement.class);
+    when(serialStatement.isLWT()).thenReturn(false);
+    when(serialStatement.getConsistencyLevel())
+        .thenReturn(com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL);
+    when(serialStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(serialStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(childPolicy.newQueryPlan(KEYSPACE, serialStatement))
+        .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, serialStatement);
+
+    // then: preserve replica order (LWT routing applied)
+    assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_route_serial_consistency_statement_as_lwt_with_serial(
+      TokenAwarePolicy.ReplicaOrdering ordering) {
+    // given: a non-LWT statement with SERIAL consistency level
+    Statement serialStatement = mock(Statement.class);
+    when(serialStatement.isLWT()).thenReturn(false);
+    when(serialStatement.getConsistencyLevel())
+        .thenReturn(com.datastax.driver.core.ConsistencyLevel.SERIAL);
+    when(serialStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(serialStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(childPolicy.newQueryPlan(KEYSPACE, serialStatement))
+        .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, serialStatement);
+
+    // then: preserve replica order (LWT routing applied), including remote replicas for SERIAL
+    assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_not_route_serial_consistency_level_option_as_lwt() {
+    // given: a statement with serial consistency level set only as the serial CL option
+    // (not the main consistency level)
+    Statement regularStatement = mock(Statement.class);
+    when(regularStatement.isLWT()).thenReturn(false);
+    when(regularStatement.getConsistencyLevel()).thenReturn(null);
+    when(regularStatement.getSerialConsistencyLevel())
+        .thenReturn(com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL);
+    when(regularStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(regularStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(childPolicy.newQueryPlan(KEYSPACE, regularStatement))
+        .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, regularStatement);
+
+    // then: regular routing (not LWT), uses TOPOLOGICAL ordering
+    assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_not_include_remote_replicas_for_local_serial() {
+    // given: a LOCAL_SERIAL statement with some replicas in remote DC
+    Statement localSerialStatement = mock(Statement.class);
+    when(localSerialStatement.isLWT()).thenReturn(false);
+    when(localSerialStatement.getConsistencyLevel())
+        .thenReturn(com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL);
+    when(localSerialStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(localSerialStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2, host3));
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.REMOTE);
+    when(childPolicy.distance(host3)).thenReturn(HostDistance.LOCAL);
+    when(childPolicy.newQueryPlan(KEYSPACE, localSerialStatement))
+        .thenReturn(Lists.newArrayList(host4, host5).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, localSerialStatement);
+
+    // then: only local replicas (host1, host3), no remote replica (host2), then non-replicas
+    assertThat(queryPlan).containsExactly(host1, host3, host4, host5);
+  }
+
+  @Test(groups = "unit")
+  public void should_include_remote_replicas_for_serial() {
+    // given: a SERIAL statement with some replicas in remote DC
+    Statement serialStatement = mock(Statement.class);
+    when(serialStatement.isLWT()).thenReturn(false);
+    when(serialStatement.getConsistencyLevel())
+        .thenReturn(com.datastax.driver.core.ConsistencyLevel.SERIAL);
+    when(serialStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(serialStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2, host3));
+    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.REMOTE);
+    when(childPolicy.distance(host3)).thenReturn(HostDistance.LOCAL);
+    when(childPolicy.newQueryPlan(KEYSPACE, serialStatement))
+        .thenReturn(Lists.newArrayList(host4, host5).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, serialStatement);
+
+    // then: local replicas (host1, host3), then remote replica (host2), then non-replicas
+    assertThat(queryPlan).containsExactly(host1, host3, host2, host4, host5);
+  }
+
+  @Test(groups = "unit")
+  public void should_fallback_to_regular_when_routing_method_is_null_for_serial() {
+    // given: routing method is null (not configured)
+    when(queryOptions.getLoadBalancingLwtRequestRoutingMethod()).thenReturn(null);
+    Statement serialStatement = mock(Statement.class);
+    when(serialStatement.isLWT()).thenReturn(false);
+    when(serialStatement.getConsistencyLevel())
+        .thenReturn(com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL);
+    when(serialStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(serialStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(childPolicy.newQueryPlan(KEYSPACE, serialStatement))
+        .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, serialStatement);
+
+    // then: regular routing (TOPOLOGICAL ordering applied, not preserve order)
+    assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_route_as_lwt_when_default_consistency_is_local_serial() {
+    // given: statement has no explicit CL, but cluster-wide default is LOCAL_SERIAL
+    when(queryOptions.getConsistencyLevel())
+        .thenReturn(com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL);
+    Statement noClStatement = mock(Statement.class);
+    when(noClStatement.isLWT()).thenReturn(false);
+    when(noClStatement.getConsistencyLevel()).thenReturn(null);
+    when(noClStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+        .thenReturn(routingKey);
+    when(noClStatement.getKeyspace()).thenReturn(KEYSPACE);
+    when(childPolicy.newQueryPlan(KEYSPACE, noClStatement))
+        .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
+
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+
+    // when
+    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, noClStatement);
+
+    // then: preserve replica order (LWT routing via default CL fallback)
+    assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
+  }
+
   /**
    * Ensures that {@link TokenAwarePolicy} will shuffle discovered replicas depending on the value
    * of shuffleReplicas used when constructing with {@link
