@@ -40,7 +40,6 @@ import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEv
 import com.datastax.oss.driver.internal.core.session.BuiltInRequestProcessors;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.RequestProcessorRegistry;
-import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder;
 import com.datastax.oss.driver.shaded.guava.common.cache.RemovalListener;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.Uninterruptibles;
 import com.google.common.collect.ImmutableList;
@@ -136,9 +135,7 @@ public class PreparedStatementCachingIT {
     public TestCqlPrepareAsyncProcessor(@NonNull Optional<DefaultDriverContext> context) {
       // Default CqlPrepareAsyncProcessor uses weak values here as well.  We avoid doing so
       // to prevent cache entries from unexpectedly disappearing mid-test.
-      super(
-          context,
-          builder -> CacheBuilder.newBuilder().removalListener(buildCacheRemoveCallback(context)));
+      super(context, builder -> builder.removalListener(buildCacheRemoveCallback(context)));
     }
   }
 

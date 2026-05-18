@@ -44,6 +44,7 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
 import com.datastax.oss.driver.api.core.time.TimestampGenerator;
+import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
 import com.datastax.oss.driver.internal.core.DefaultConsistencyLevelRegistry;
 import com.datastax.oss.driver.internal.core.ProtocolFeature;
@@ -69,6 +70,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -194,6 +196,9 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     when(context.getRequestThrottler()).thenReturn(new PassThroughRequestThrottler(context));
 
     when(context.getRequestTracker()).thenReturn(new NoopRequestTracker(context));
+
+    when(context.getRequestIdGenerator())
+        .thenReturn(Optional.ofNullable(builder.requestIdGenerator));
   }
 
   public DefaultSession getSession() {
@@ -226,6 +231,7 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     private final List<PoolBehavior> poolBehaviors = new ArrayList<>();
     private boolean defaultIdempotence;
     private ProtocolVersion protocolVersion;
+    private RequestIdGenerator requestIdGenerator;
 
     /**
      * Sets the given node as the next one in the query plan; an empty pool will be simulated when
@@ -278,6 +284,11 @@ public class RequestHandlerTestHarness implements AutoCloseable {
 
     public Builder withProtocolVersion(ProtocolVersion protocolVersion) {
       this.protocolVersion = protocolVersion;
+      return this;
+    }
+
+    public Builder withRequestIdGenerator(RequestIdGenerator requestIdGenerator) {
+      this.requestIdGenerator = requestIdGenerator;
       return this;
     }
 

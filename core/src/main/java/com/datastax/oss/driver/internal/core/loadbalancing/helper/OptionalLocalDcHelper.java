@@ -67,22 +67,33 @@ public class OptionalLocalDcHelper implements LocalDcHelper {
   @Override
   @NonNull
   public Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {
-    String localDc = context.getLocalDatacenter(profile.getName());
-    if (localDc != null) {
-      LOG.debug("[{}] Local DC set programmatically: {}", logPrefix, localDc);
-    } else if (profile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)) {
-      localDc = profile.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER);
-      LOG.debug("[{}] Local DC set from configuration: {}", logPrefix, localDc);
+    Optional<String> localDc = configuredLocalDc();
+    if (localDc.isPresent()) {
+      checkLocalDatacenterCompatibility(
+          localDc.get(), context.getMetadataManager().getContactPoints());
     } else {
       LOG.debug("[{}] Local DC not set, DC awareness will be disabled", logPrefix);
-      return Optional.empty();
     }
-    if (!nodes.isEmpty()) {
-      boolean found = false;
-      for (Node node : nodes.values()) {
-        if (localDc.equals(node.getDatacenter())) {
-          found = true;
-          break;
+    return localDc;
+  }
+
+  /**
+   * Checks if the contact points are compatible with the local datacenter specified either through
+   * configuration, or programmatically.
+   *
+   * <p>The default implementation logs a warning when a contact point reports a datacenter
+   * different from the local one, and only for the default profile.
+   *
+   * @param localDc The local datacenter, as specified in the config, or programmatically.
+   * @param contactPoints The contact points provided when creating the session.
+   */
+  protected void checkLocalDatacenterCompatibility(
+      @NonNull String localDc, Set<? extends Node> contactPoints) {
+    if (profile.getName().equals(DriverExecutionProfile.DEFAULT_NAME)) {
+      Set<Node> badContactPoints = new LinkedHashSet<>();
+      for (Node node : contactPoints) {
+        if (!Objects.equals(localDc, node.getDatacenter())) {
+          badContactPoints.add(node);
         }
       }
       if (!found) {
@@ -165,5 +176,20 @@ public class OptionalLocalDcHelper implements LocalDcHelper {
       }
     }
     return String.join(", ", new TreeSet<>(l));
+  }
+
+  /** @return Local data center set programmatically or from configuration file. */
+  @NonNull
+  public Optional<String> configuredLocalDc() {
+    String localDc = context.getLocalDatacenter(profile.getName());
+    if (localDc != null) {
+      LOG.debug("[{}] Local DC set programmatically: {}", logPrefix, localDc);
+      return Optional.of(localDc);
+    } else if (profile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)) {
+      localDc = profile.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER);
+      LOG.debug("[{}] Local DC set from configuration: {}", logPrefix, localDc);
+      return Optional.of(localDc);
+    }
+    return Optional.empty();
   }
 }

@@ -162,16 +162,8 @@ public class CqlPrepareAsyncProcessor
                   });
         }
       }
-      if (result.isDone()) {
-        // Once a CompletableFuture is completed, cancel(), complete(), and
-        // completeExceptionally() are no-ops (return false), so returning the cached
-        // instance directly is safe from concurrent callers. This also keeps the cache
-        // entry alive via the caller's strong reference, preventing premature weak-value
-        // eviction under GC pressure.
-        return result;
-      }
-      // Defensive copy for in-flight preparations only: protects the shared cached future
-      // from cancellation by one of multiple concurrent waiters.
+      // Return a defensive copy. So if a client cancels its request, the cache won't be impacted
+      // nor a potential concurrent request.
       return result.thenApply(x -> x); // copy() is available only since Java 9
     } catch (ExecutionException e) {
       return CompletableFutures.failedFuture(e.getCause());
