@@ -267,7 +267,6 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     private final List<Host> replicas;
     private final String keyspace;
     private final Statement statement;
-    private final boolean localOnly;
     private List<Host> nonLocalReplicas;
     private Iterator<Host> nonLocalReplicasIterator;
     private Set<Host> returnedHosts;
@@ -278,11 +277,6 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       this.statement = statement;
       this.replicas = replicas;
       this.replicasIterator = replicas.iterator();
-      ConsistencyLevel cl = statement.getConsistencyLevel();
-      if (cl == null && queryOptions != null) {
-        cl = queryOptions.getConsistencyLevel();
-      }
-      this.localOnly = cl == ConsistencyLevel.LOCAL_SERIAL;
     }
 
     @Override
@@ -314,7 +308,7 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       }
 
       // Second pass: return remote replicas that are UP and not IGNORED
-      if (nonLocalReplicas != null && !localOnly) {
+      if (nonLocalReplicas != null) {
         if (nonLocalReplicasIterator == null) {
           nonLocalReplicasIterator = nonLocalReplicas.iterator();
         }
@@ -479,8 +473,11 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     if (defaultLwtRequestRoutingMethod == null) {
       return QueryOptions.RequestRoutingMethod.REGULAR;
     }
-    if (statement.isLWT()
-        || Statement.hasSerialConsistency(statement, queryOptions.getConsistencyLevel())) {
+    ConsistencyLevel cl = statement.getConsistencyLevel();
+    if (cl == null) {
+      cl = queryOptions.getConsistencyLevel();
+    }
+    if (statement.isLWT() || (cl != null && cl.isSerial())) {
       return defaultLwtRequestRoutingMethod;
     }
     return QueryOptions.RequestRoutingMethod.REGULAR;

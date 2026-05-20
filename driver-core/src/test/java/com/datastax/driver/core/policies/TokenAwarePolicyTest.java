@@ -125,6 +125,14 @@ public class TokenAwarePolicyTest {
     };
   }
 
+  @DataProvider(name = "serialConsistencyProvider")
+  public Object[][] serialConsistencyProvider() {
+    return new Object[][] {
+      {com.datastax.driver.core.ConsistencyLevel.SERIAL},
+      {com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL}
+    };
+  }
+
   @Test(groups = "unit")
   public void should_respect_topological_order() {
     // given
@@ -737,41 +745,13 @@ public class TokenAwarePolicyTest {
     assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
   }
 
-  @Test(groups = "unit")
-  public void should_not_include_remote_replicas_for_local_serial() {
-    // given: a LOCAL_SERIAL statement with some replicas in remote DC
-    Statement localSerialStatement = mock(Statement.class);
-    when(localSerialStatement.isLWT()).thenReturn(false);
-    when(localSerialStatement.getConsistencyLevel())
-        .thenReturn(com.datastax.driver.core.ConsistencyLevel.LOCAL_SERIAL);
-    when(localSerialStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
-        .thenReturn(routingKey);
-    when(localSerialStatement.getKeyspace()).thenReturn(KEYSPACE);
-    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), null, null, routingKey))
-        .thenReturn(Lists.newArrayList(host1, host2, host3));
-    when(childPolicy.distance(host1)).thenReturn(HostDistance.LOCAL);
-    when(childPolicy.distance(host2)).thenReturn(HostDistance.REMOTE);
-    when(childPolicy.distance(host3)).thenReturn(HostDistance.LOCAL);
-    when(childPolicy.newQueryPlan(KEYSPACE, localSerialStatement))
-        .thenReturn(Lists.newArrayList(host4, host5).iterator());
-
-    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
-    policy.init(cluster, null);
-
-    // when
-    Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, localSerialStatement);
-
-    // then: only local replicas (host1, host3), no remote replica (host2), then non-replicas
-    assertThat(queryPlan).containsExactly(host1, host3, host4, host5);
-  }
-
-  @Test(groups = "unit")
-  public void should_include_remote_replicas_for_serial() {
-    // given: a SERIAL statement with some replicas in remote DC
+  @Test(groups = "unit", dataProvider = "serialConsistencyProvider")
+  public void should_include_remote_replicas_for_serial_consistency(
+      com.datastax.driver.core.ConsistencyLevel serialCl) {
+    // given: a serial-CL statement with some replicas in remote DC
     Statement serialStatement = mock(Statement.class);
     when(serialStatement.isLWT()).thenReturn(false);
-    when(serialStatement.getConsistencyLevel())
-        .thenReturn(com.datastax.driver.core.ConsistencyLevel.SERIAL);
+    when(serialStatement.getConsistencyLevel()).thenReturn(serialCl);
     when(serialStatement.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
         .thenReturn(routingKey);
     when(serialStatement.getKeyspace()).thenReturn(KEYSPACE);
@@ -789,7 +769,7 @@ public class TokenAwarePolicyTest {
     // when
     Iterator<Host> queryPlan = policy.newQueryPlan(KEYSPACE, serialStatement);
 
-    // then: local replicas (host1, host3), then remote replica (host2), then non-replicas
+    // then: local replicas first (host1, host3), then remote replica (host2), then non-replicas
     assertThat(queryPlan).containsExactly(host1, host3, host2, host4, host5);
   }
 
