@@ -17,12 +17,12 @@ package com.datastax.driver.core.policies;
 
 import com.codahale.metrics.Gauge;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.LatencyTracker;
 import com.datastax.driver.core.Metrics;
 import com.datastax.driver.core.MetricsUtil;
-import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.BootstrappingException;
 import com.datastax.driver.core.exceptions.DriverException;
@@ -103,7 +103,7 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
   private final long retryPeriod;
   private final long minMeasure;
   private volatile Metrics metrics;
-  private volatile QueryOptions queryOptions;
+  private volatile ConsistencyLevel defaultConsistencyLevel;
 
   private LatencyAwarePolicy(
       LoadBalancingPolicy childPolicy,
@@ -220,7 +220,7 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
     }
     cluster.register(latencyTracker);
     metrics = cluster.getMetrics();
-    queryOptions = cluster.getConfiguration().getQueryOptions();
+    defaultConsistencyLevel = cluster.getConfiguration().getQueryOptions().getConsistencyLevel();
     if (metrics != null) {
       metrics
           .getRegistry()
@@ -265,9 +265,7 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
     // LWT routing can rely on deterministic replica ordering (e.g. by TokenAwarePolicy), and
     // latency-based reordering can undermine those assumptions.
     if (statement != null
-        && (statement.isLWT()
-            || Statement.hasSerialConsistency(
-                statement, queryOptions != null ? queryOptions.getConsistencyLevel() : null))) {
+        && (statement.isLWT() || isEffectiveConsistencySerial(statement.getConsistencyLevel()))) {
       return childPolicy.newQueryPlan(loggedKeyspace, statement);
     }
 
@@ -338,6 +336,11 @@ public class LatencyAwarePolicy implements ChainableLoadBalancingPolicy {
         return endOfData();
       };
     };
+  }
+
+  private boolean isEffectiveConsistencySerial(ConsistencyLevel statementCl) {
+    ConsistencyLevel cl = statementCl != null ? statementCl : defaultConsistencyLevel;
+    return cl != null && cl.isSerial();
   }
 
   /**

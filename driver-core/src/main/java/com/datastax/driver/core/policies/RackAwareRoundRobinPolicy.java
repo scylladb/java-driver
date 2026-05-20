@@ -250,9 +250,12 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
     // hosts equally
     ConsistencyLevel defaultCl =
         configuration != null ? configuration.getQueryOptions().getConsistencyLevel() : null;
+    ConsistencyLevel effectiveCl =
+        statement != null && statement.getConsistencyLevel() != null
+            ? statement.getConsistencyLevel()
+            : defaultCl;
     final boolean isLWT =
-        statement != null
-            && (statement.isLWT() || Statement.hasSerialConsistency(statement, defaultCl));
+        statement != null && (statement.isLWT() || (effectiveCl != null && effectiveCl.isSerial()));
 
     // For LWT queries, include all local DC hosts in the first part of the plan, not just those in
     // the local rack
