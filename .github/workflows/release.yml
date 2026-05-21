@@ -18,6 +18,11 @@ on:
         description: 'target-tag: tag or branch name to release. Use to re-release tagged releases'
         default: scylla-3.x
 
+      matrix-branch:
+        type: string
+        description: 'matrix-branch: scylla-java-driver-matrix branch to use for patch validation'
+        default: master
+
 jobs:
   release:
     name: Release
@@ -61,6 +66,29 @@ jobs:
           RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
         run: |
           make release-prepare
+
+      - name: Validate matrix patches
+        run: |
+          RELEASE_TAG=$(grep '^scm.tag=' release.properties | cut -d= -f2)
+          echo "Release tag: ${RELEASE_TAG}"
+
+          if [[ -z "${RELEASE_TAG}" ]]; then
+            echo "::error::Could not determine release tag from release.properties"
+            exit 1
+          fi
+
+          git clone --depth 1 --branch "${{ inputs.matrix-branch }}" \
+            https://github.com/scylladb/scylla-java-driver-matrix.git /tmp/matrix
+
+          pip install --quiet -r /tmp/matrix/scripts/requirements.txt
+
+          echo "=== Validating scylla driver patches for ${RELEASE_TAG} ==="
+          python3 /tmp/matrix/main.py . \
+            --versions "${RELEASE_TAG}" \
+            --driver-type scylla \
+            --patch-only
+
+          echo "Matrix patches apply cleanly to ${RELEASE_TAG}"
 
       - name: Perform release
         if: inputs.dry-run == false
