@@ -438,7 +438,11 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
         clusterMetadata.getReplicasList(
             Metadata.quote(keyspace), tableName, statement.getPartitioner(), partitionKey);
 
-    switch (getRequestRouting(statement)) {
+    QueryOptions.RequestRoutingMethod routing =
+        defaultLwtRequestRoutingMethod != null
+            ? getRequestRouting(statement)
+            : QueryOptions.RequestRoutingMethod.REGULAR;
+    switch (routing) {
       case PRESERVE_REPLICA_ORDER:
         return newQueryPlanPreserveReplicaOrder(keyspace, statement, replicas);
       case REGULAR:
@@ -470,14 +474,14 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
   }
 
   private QueryOptions.RequestRoutingMethod getRequestRouting(Statement statement) {
-    if (defaultLwtRequestRoutingMethod == null) {
-      return QueryOptions.RequestRoutingMethod.REGULAR;
+    if (statement.isLWT()) {
+      return defaultLwtRequestRoutingMethod;
     }
-    ConsistencyLevel cl = statement.getConsistencyLevel();
-    if (cl == null) {
-      cl = queryOptions.getConsistencyLevel();
-    }
-    if (statement.isLWT() || (cl != null && cl.isSerial())) {
+    ConsistencyLevel cl =
+        statement.getConsistencyLevel() != null
+            ? statement.getConsistencyLevel()
+            : queryOptions.getConsistencyLevel();
+    if (cl != null && cl.isSerial()) {
       return defaultLwtRequestRoutingMethod;
     }
     return QueryOptions.RequestRoutingMethod.REGULAR;
