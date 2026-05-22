@@ -384,7 +384,7 @@ public class CqlRequestHandler implements Throttled {
         || (channel =
                 session.getChannel(
                     node,
-                    logPrefix,
+                    handlerLogPrefix,
                     getRoutingToken(statement),
                     getShardFromTabletMap(statement, node, getRoutingToken(statement))))
             == null) {
@@ -392,7 +392,7 @@ public class CqlRequestHandler implements Throttled {
         channel =
             session.getChannel(
                 node,
-                logPrefix,
+                handlerLogPrefix,
                 getRoutingToken(statement),
                 getShardFromTabletMap(statement, node, getRoutingToken(statement)));
         if (channel != null) {
@@ -672,7 +672,7 @@ public class CqlRequestHandler implements Throttled {
       this.execution = execution;
       this.retryCount = retryCount;
       this.scheduleNextExecution = scheduleNextExecution;
-      this.logPrefix = logPrefix + "|" + execution;
+      this.logPrefix = logPrefix;
     }
 
     // this gets invoked once the write completes.

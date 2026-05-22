@@ -403,18 +403,8 @@ public class CcmBridge implements AutoCloseable {
         updateConfArguments.append(configKey).append(':').append(configValue).append(' ');
       }
 
-      // If we're dealing with anything more recent than 2.2 explicitly enable UDF... but run it
-      // through our conversion process to make
-      // sure more recent versions don't have a problem.
-      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0 || isDistributionOf(BackendType.HCD)) {
-        String originalKey = "enable_user_defined_functions";
-        Object originalValue = "true";
-        execute(
-            "updateconf",
-            String.join(
-                ":",
-                getConfigKey(originalKey, originalValue, cassandraVersion),
-                getConfigValue(originalKey, originalValue, cassandraVersion)));
+      if (updateConfArguments.length() > 0) {
+        execute("updateconf", updateConfArguments.toString());
       }
 
       // Note that we aren't performing any substitution on DSE key/value props (at least for now)
@@ -651,26 +641,6 @@ public class CcmBridge implements AutoCloseable {
 
   public String getNodeIpAddress(int nodeId) {
     return ipPrefix + nodeId;
-
-  private Optional<Integer> overrideJvmVersionForDseWorkloads() {
-    if (getCurrentJvmMajorVersion() <= 8) {
-      return Optional.empty();
-    }
-
-    if (!isDistributionOf(BackendType.DSE)) {
-      return Optional.empty();
-    }
-
-    if (getDistributionVersion().compareTo(Version.V6_9_0) >= 0) {
-      // DSE 6.9.0 supports only JVM 11 onwards (also with graph workload)
-      return Optional.empty();
-    }
-
-    if (dseWorkloads.contains("graph")) {
-      return Optional.of(8);
-    }
-
-    return Optional.empty();
   }
 
   private static final String IN_MS_STR = "_in_ms";

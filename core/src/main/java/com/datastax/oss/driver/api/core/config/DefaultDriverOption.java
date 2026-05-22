@@ -1154,7 +1154,7 @@ public enum DefaultDriverOption implements DriverOption {
    * }
    * </pre>
    *
-   * Note: subnets must be represented as prefix blocks, see {@link
+   * Note: subnets must be represented as prefix blocks, see {@code
    * inet.ipaddr.Address#isPrefixBlock()}.
    *
    * <p>Value type: {@link java.util.Map Map}&#60;{@link String},{@link String}&#62;

@@ -26,6 +26,7 @@ package com.datastax.oss.driver.internal.querybuilder.select;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatementBuilder;
+import com.datastax.oss.driver.api.core.data.CqlDuration;
 import com.datastax.oss.driver.api.core.data.CqlVector;
 import com.datastax.oss.driver.api.core.metadata.schema.ClusteringOrder;
 import com.datastax.oss.driver.api.querybuilder.BindMarker;
@@ -77,7 +78,9 @@ public class DefaultSelect implements SelectFrom, Select {
         null,
         null,
         null,
-        false);
+        false,
+        false,
+        null);
   }
 
   /**
@@ -329,23 +332,6 @@ public class DefaultSelect implements SelectFrom, Select {
         relations,
         groupByClauses,
         newOrderings,
-        ann,
-        limit,
-        perPartitionLimit,
-        allowsFiltering);
-  }
-
-  @NonNull
-  Select withAnn(@NonNull Ann ann) {
-    return new DefaultSelect(
-        keyspace,
-        table,
-        isJson,
-        isDistinct,
-        selectors,
-        relations,
-        groupByClauses,
-        orderings,
         ann,
         limit,
         perPartitionLimit,

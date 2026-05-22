@@ -664,6 +664,14 @@
               <!-- The previous release used DataStax groupId, remove this after the next release -->
               <artifact>${project.groupId}:${project.artifactId}:RELEASE</artifact>
             </oldArtifacts>
+            <analysisConfiguration>
+              <revapi.ignore>
+                <item>
+                  <!-- We don't consider this a problem -->
+                  <code>java.class.externalClassExposedInAPI</code>
+                </item>
+              </revapi.ignore>
+            </analysisConfiguration>
             <analysisConfigurationFiles>
               <file>revapi.json</file>
             </analysisConfigurationFiles>

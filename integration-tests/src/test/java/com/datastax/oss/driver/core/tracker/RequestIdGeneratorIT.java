@@ -29,6 +29,8 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
@@ -36,17 +38,23 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import org.junit.Rule;
+import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
+// Scylla does not support custom payload (RequestIdGenerator writes request IDs into the custom
+// payload); Scylla returns a truncated-frame protocol error when custom payload entries are
+// present.
+@BackendRequirement(
+    type = BackendType.CASSANDRA,
+    description = "Custom payload (request ID) not supported on Scylla")
 @Category(ParallelizableTests.class)
 public class RequestIdGeneratorIT {
-  private CcmRule ccmRule = CcmRule.getInstance();
+  private static CcmRule ccmRule = CcmRule.getInstance();
 
-  @Rule public TestRule chain = RuleChain.outerRule(ccmRule);
+  @ClassRule public static TestRule chain = RuleChain.outerRule(ccmRule);
 
   @Test
   public void should_write_uuid_to_custom_payload_with_key() {
