@@ -379,6 +379,7 @@ for (ColumnDefinitions.Definition definition : row.getColumnDefinitions()) {
    pooling/*
    query_timestamps/*
    reactive/*
+   request_id/*
    reconnection/*
    request_tracker/*
    retries/*

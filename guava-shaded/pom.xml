@@ -23,7 +23,7 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.0.10-SNAPSHOT</version>
+    <version>4.19.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-guava-shaded</artifactId>
   <name>Scylla Java Driver - guava shaded dep</name>
@@ -46,6 +46,7 @@
           <artifactId>error_prone_annotations</artifactId>
         </exclusion>
       </exclusions>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.graalvm.nativeimage</groupId>
@@ -56,6 +57,32 @@
   </dependencies>
   <build>
     <plugins>
+      <plugin>
+        <!--
+          Do not attempt to recompile the module if we are not running JVM 1.8.
+          Having additional Java source files and having to shade Guava will break
+          in CI environment, when we run 'mvn verify' on newer JVM and assume that
+          all classes have been compiled with JVM 1.8.
+        -->
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>1.12</version>
+        <executions>
+          <execution>
+            <id>regex-property</id>
+            <goals>
+              <goal>regex-property</goal>
+            </goals>
+            <configuration>
+              <name>maven.main.skip</name>
+              <value>${java.version}</value>
+              <regex>^(?!1.8).+</regex>
+              <replacement>true</replacement>
+              <failIfNoMatch>false</failIfNoMatch>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <executions>

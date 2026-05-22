@@ -54,6 +54,9 @@ public class MockedDriverContextFactory {
                   .thenReturn(true);
               when(blankProfile.getString(DefaultDriverOption.METRICS_FACTORY_CLASS))
                   .thenReturn("DefaultMetricsFactory");
+              when(blankProfile.getString(
+                      DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+                  .thenReturn("PRESERVE_REPLICA_ORDER");
               return blankProfile;
             });
 
@@ -62,7 +65,6 @@ public class MockedDriverContextFactory {
     final DriverConfigLoader configLoader = mock(DriverConfigLoader.class);
     when(configLoader.getInitialConfig()).thenReturn(driverConfig);
     when(driverConfig.getDefaultProfile()).thenReturn(profile);
-
     ProgrammaticArguments args =
         ProgrammaticArguments.builder()
             .withNodeStateListener(mock(NodeStateListener.class))

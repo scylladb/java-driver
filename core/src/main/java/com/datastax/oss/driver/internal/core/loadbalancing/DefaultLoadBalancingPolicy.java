@@ -267,7 +267,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       long latencyNanos,
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
-      @NonNull String logPrefix) {
+      @NonNull String nodeRequestLogPrefix) {
     updateResponseTimes(node);
   }
 
@@ -278,7 +278,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       long latencyNanos,
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
-      @NonNull String logPrefix) {
+      @NonNull String nodeRequestLogPrefix) {
     updateResponseTimes(node);
   }
 
@@ -326,7 +326,8 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     @VisibleForTesting protected final OptionalLong newest;
 
     private NodeResponseRateSample() {
-      this.oldest = nanoTime();
+      long now = nanoTime();
+      this.oldest = now;
       this.newest = OptionalLong.empty();
     }
 

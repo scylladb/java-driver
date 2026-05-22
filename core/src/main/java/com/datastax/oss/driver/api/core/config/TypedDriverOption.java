@@ -248,6 +248,10 @@ public class TypedDriverOption<ValueT> {
    */
   public static final TypedDriverOption<Boolean> SSL_HOSTNAME_VALIDATION =
       new TypedDriverOption<>(DefaultDriverOption.SSL_HOSTNAME_VALIDATION, GenericType.BOOLEAN);
+
+  public static final TypedDriverOption<Boolean> SSL_ALLOW_DNS_REVERSE_LOOKUP_SAN =
+      new TypedDriverOption<>(
+          DefaultDriverOption.SSL_ALLOW_DNS_REVERSE_LOOKUP_SAN, GenericType.BOOLEAN);
   /** The location of the keystore file. */
   public static final TypedDriverOption<String> SSL_KEYSTORE_PATH =
       new TypedDriverOption<>(DefaultDriverOption.SSL_KEYSTORE_PATH, GenericType.STRING);
@@ -295,6 +299,10 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<List<String>> REQUEST_TRACKER_CLASSES =
       new TypedDriverOption<>(
           DefaultDriverOption.REQUEST_TRACKER_CLASSES, GenericType.listOf(String.class));
+
+  /** The class of a session-wide component that generates request IDs. */
+  public static final TypedDriverOption<String> REQUEST_ID_GENERATOR_CLASS =
+      new TypedDriverOption<>(DefaultDriverOption.REQUEST_ID_GENERATOR_CLASS, GenericType.STRING);
 
   /** Whether to log successful requests. */
   public static final TypedDriverOption<Boolean> REQUEST_LOGGER_SUCCESS_ENABLED =
@@ -922,6 +930,20 @@ public class TypedDriverOption<ValueT> {
           new TypedDriverOption<>(
               DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_ALLOW_FOR_LOCAL_CONSISTENCY_LEVELS,
               GenericType.BOOLEAN);
+
+  public static final TypedDriverOption<String> ADDRESS_TRANSLATOR_ADVERTISED_HOSTNAME =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADDRESS_TRANSLATOR_ADVERTISED_HOSTNAME, GenericType.STRING);
+  public static final TypedDriverOption<Map<String, String>> ADDRESS_TRANSLATOR_SUBNET_ADDRESSES =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADDRESS_TRANSLATOR_SUBNET_ADDRESSES,
+          GenericType.mapOf(GenericType.STRING, GenericType.STRING));
+  public static final TypedDriverOption<String> ADDRESS_TRANSLATOR_DEFAULT_ADDRESS =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADDRESS_TRANSLATOR_DEFAULT_ADDRESS, GenericType.STRING);
+  public static final TypedDriverOption<Boolean> ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES, GenericType.BOOLEAN);
 
   /**
    * Ordered preference list of remote dcs optionally supplied for automatic failover and included

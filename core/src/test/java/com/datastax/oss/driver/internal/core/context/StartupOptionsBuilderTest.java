@@ -41,6 +41,7 @@ public class StartupOptionsBuilderTest {
     DriverExecutionProfile defaultProfile = mock(DriverExecutionProfile.class);
     when(defaultProfile.getString(DefaultDriverOption.PROTOCOL_COMPRESSION, "none"))
         .thenReturn(compression);
+    when(defaultProfile.getName()).thenReturn(DriverExecutionProfile.DEFAULT_NAME);
     return MockedDriverContextFactory.defaultDriverContext(Optional.of(defaultProfile));
   }
 

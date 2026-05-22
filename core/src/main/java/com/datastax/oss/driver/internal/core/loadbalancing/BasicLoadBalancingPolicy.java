@@ -173,6 +173,9 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   private RequestRoutingMethod parseLwtRequestRoutingMethod() {
     String methodString =
         profile.getString(DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD);
+    if (methodString == null) {
+      return RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
+    }
     try {
       return RequestRoutingMethod.valueOf(methodString.toUpperCase());
     } catch (IllegalArgumentException e) {
