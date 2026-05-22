@@ -34,7 +34,6 @@ import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.MapMaker;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -48,7 +47,6 @@ import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLongArray;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
@@ -368,14 +366,5 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       long threshold = now - RESPONSE_COUNT_RESET_INTERVAL_NANOS;
       return this.oldest - threshold >= 0;
     }
-  }
-
-  @NonNull
-  @Override
-  public Map<String, ?> getStartupConfiguration() {
-    Map<String, ?> parent = super.getStartupConfiguration();
-    return ImmutableMap.of(
-        DefaultLoadBalancingPolicy.class.getSimpleName(),
-        parent.get(BasicLoadBalancingPolicy.class.getSimpleName()));
   }
 }

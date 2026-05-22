@@ -59,7 +59,6 @@ import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.base.Predicates;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
 import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -174,6 +173,9 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   private RequestRoutingMethod parseLwtRequestRoutingMethod() {
     String methodString =
         profile.getString(DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD);
+    if (methodString == null) {
+      return RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
+    }
     try {
       return RequestRoutingMethod.valueOf(methodString.toUpperCase());
     } catch (IllegalArgumentException e) {
@@ -233,40 +235,13 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
    * Before initialization, this method always returns null.
    */
   @Nullable
-  public String getLocalDatacenter() {
+  protected String getLocalDatacenter() {
     return localDc;
   }
 
   @Nullable
   protected String getLocalRack() {
     return localRack;
-
-  @NonNull
-  @Override
-  public Map<String, ?> getStartupConfiguration() {
-    ImmutableMap.Builder<String, Object> builder = new ImmutableMap.Builder<>();
-    if (localDc != null) {
-      builder.put("localDc", localDc);
-    } else {
-      // Local data center may not be discovered prior to connection pool initialization.
-      // In such scenario, return configured local data center name.
-      // Note that when using DC inferring load balancing policy, startup configuration
-      // may not show local DC name, because it will be discovered only once control connection
-      // is established and datacenter of contact points known.
-      Optional<String> configuredDc =
-          new OptionalLocalDcHelper(context, profile, logPrefix).configuredLocalDc();
-      configuredDc.ifPresent(d -> builder.put("localDc", d));
-    }
-    if (!preferredRemoteDcs.isEmpty()) {
-      builder.put("preferredRemoteDcs", preferredRemoteDcs);
-    }
-    if (allowDcFailoverForLocalCl) {
-      builder.put("allowDcFailoverForLocalCl", allowDcFailoverForLocalCl);
-    }
-    if (maxNodesPerRemoteDc > 0) {
-      builder.put("maxNodesPerRemoteDc", maxNodesPerRemoteDc);
-    }
-    return ImmutableMap.of(BasicLoadBalancingPolicy.class.getSimpleName(), builder.build());
   }
 
   /** @return The nodes currently considered as live. */

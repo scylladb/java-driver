@@ -26,6 +26,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -67,10 +68,39 @@ public class OptionalLocalDcHelper implements LocalDcHelper {
   @Override
   @NonNull
   public Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {
-    Optional<String> localDc = configuredLocalDc();
+    String localDcStr = context.getLocalDatacenter(profile.getName());
+    Optional<String> localDc;
+    if (localDcStr != null) {
+      LOG.debug("[{}] Local DC set programmatically: {}", logPrefix, localDcStr);
+      localDc = Optional.of(localDcStr);
+    } else if (profile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)) {
+      localDcStr = profile.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER);
+      LOG.debug("[{}] Local DC set from configuration: {}", logPrefix, localDcStr);
+      localDc = Optional.of(localDcStr);
+    } else {
+      localDc = Optional.empty();
+    }
     if (localDc.isPresent()) {
       checkLocalDatacenterCompatibility(
           localDc.get(), context.getMetadataManager().getContactPoints());
+      // Also warn if the configured DC doesn't match any node in the cluster
+      if (!nodes.isEmpty()) {
+        boolean found = false;
+        for (Node node : nodes.values()) {
+          if (localDc.get().equals(node.getDatacenter())) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          LOG.warn(
+              "[{}] Configured local DC '{}' does not match any node's datacenter"
+                  + " (available DCs: {}); please verify your configuration",
+              logPrefix,
+              localDc.get(),
+              formatDcs(nodes.values()));
+        }
+      }
     } else {
       LOG.debug("[{}] Local DC not set, DC awareness will be disabled", logPrefix);
     }
@@ -96,16 +126,15 @@ public class OptionalLocalDcHelper implements LocalDcHelper {
           badContactPoints.add(node);
         }
       }
-      if (!found) {
+      if (!badContactPoints.isEmpty()) {
         LOG.warn(
-            "[{}] Configured local DC '{}' does not match any node's datacenter"
-                + " (available DCs: {}); please verify your configuration",
+            "[{}] You specified {} as the local DC, but some contact points are from a different DC: {}; "
+                + "please provide the correct local DC, or check your contact points",
             logPrefix,
             localDc,
-            formatDcs(nodes.values()));
+            formatNodesAndDcs(badContactPoints));
       }
     }
-    return Optional.of(localDc);
   }
 
   /**
@@ -176,20 +205,5 @@ public class OptionalLocalDcHelper implements LocalDcHelper {
       }
     }
     return String.join(", ", new TreeSet<>(l));
-  }
-
-  /** @return Local data center set programmatically or from configuration file. */
-  @NonNull
-  public Optional<String> configuredLocalDc() {
-    String localDc = context.getLocalDatacenter(profile.getName());
-    if (localDc != null) {
-      LOG.debug("[{}] Local DC set programmatically: {}", logPrefix, localDc);
-      return Optional.of(localDc);
-    } else if (profile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)) {
-      localDc = profile.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER);
-      LOG.debug("[{}] Local DC set from configuration: {}", logPrefix, localDc);
-      return Optional.of(localDc);
-    }
-    return Optional.empty();
   }
 }
