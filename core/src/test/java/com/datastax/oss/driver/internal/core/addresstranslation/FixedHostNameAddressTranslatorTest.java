@@ -42,6 +42,7 @@ public class FixedHostNameAddressTranslatorTest {
         new FixedHostNameAddressTranslator(defaultDriverContext);
     InetSocketAddress address = new InetSocketAddress("192.0.2.5", 6061);
 
-    assertThat(translator.translate(address)).isEqualTo(new InetSocketAddress("myaddress", 6061));
+    assertThat(translator.translate(address))
+        .isEqualTo(InetSocketAddress.createUnresolved("myaddress", 6061));
   }
 }

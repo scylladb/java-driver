@@ -61,8 +61,12 @@ public class SubnetAddressTranslator implements AddressTranslator {
             .getDefaultProfile()
             .getBoolean(ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES, false);
     this.subnetAddresses =
-        context.getConfig().getDefaultProfile().getStringMap(ADDRESS_TRANSLATOR_SUBNET_ADDRESSES)
-            .entrySet().stream()
+        context
+            .getConfig()
+            .getDefaultProfile()
+            .getStringMap(ADDRESS_TRANSLATOR_SUBNET_ADDRESSES)
+            .entrySet()
+            .stream()
             .map(
                 e -> {
                   // Quoted and/or containing forward slashes map keys in reference.conf are read to

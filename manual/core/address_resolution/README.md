@@ -185,7 +185,7 @@ datastax-java-driver {
 
 DNS is resolved at connection time (not at route discovery time). The driver delegates to
 `InetAddress.getByName()`, which is a blocking call that uses the JVM's built-in DNS cache
-(30 s default TTL in Java 8+). Because this runs on Netty I/O threads, slow or unresponsive
+(30 s default TTL in the JDK). Because this runs on Netty I/O threads, slow or unresponsive
 DNS can block connection establishment and impact driver throughput. To mitigate this, configure
 the JVM DNS cache TTL via the `networkaddress.cache.ttl` security property (e.g. in
 `$JAVA_HOME/conf/security/java.security` or programmatically with

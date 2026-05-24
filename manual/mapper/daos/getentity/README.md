@@ -159,7 +159,6 @@ If the return type doesn't match the parameter type (for example [PagingIterable
 [Row]:                       https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/Row.html
 [UdtValue]:                  https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/data/UdtValue.html
 
-[Stream]: https://docs.oracle.com/javase/8/docs/api/java/util/stream/Stream.html
-
+[Stream]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/stream/Stream.html
 
 

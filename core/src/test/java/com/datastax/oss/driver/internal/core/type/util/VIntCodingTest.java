@@ -41,7 +41,7 @@ public class VIntCodingTest {
       -1,
       1
     };
-  };
+  }
 
   private static final long[] LONGS =
       new long[] {

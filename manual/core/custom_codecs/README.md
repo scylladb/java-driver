@@ -698,17 +698,17 @@ private static String formatRow(Row row) {
 [MappingCodec]:     https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/type/codec/MappingCodec.html
 [SessionBuilder.addTypeCodecs]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/SessionBuilder.html#addTypeCodecs-com.datastax.oss.driver.api.core.type.codec.TypeCodec...-
 
-[Enums]: https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html
-[Enum.name()]: https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html#name--
-[Enum.ordinal()]: https://docs.oracle.com/javase/8/docs/api/java/lang/Enum.html#ordinal--
-[java.nio.ByteBuffer]: https://docs.oracle.com/javase/8/docs/api/java/nio/ByteBuffer.html
-[java.util.List]: https://docs.oracle.com/javase/8/docs/api/java/util/List.html
-[java.util.Optional]: https://docs.oracle.com/javase/8/docs/api/java/util/Optional.html
-[Optional.empty()]: https://docs.oracle.com/javase/8/docs/api/java/util/Optional.html#empty--
-[java.time.Instant]: https://docs.oracle.com/javase/8/docs/api/java/time/Instant.html
-[java.time.ZonedDateTime]: https://docs.oracle.com/javase/8/docs/api/java/time/ZonedDateTime.html
-[java.time.LocalDateTime]: https://docs.oracle.com/javase/8/docs/api/java/time/LocalDateTime.html
-[java.time.ZoneId]: https://docs.oracle.com/javase/8/docs/api/java/time/ZoneId.html
+[Enums]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Enum.html
+[Enum.name()]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Enum.html#name--
+[Enum.ordinal()]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Enum.html#ordinal--
+[java.nio.ByteBuffer]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/nio/ByteBuffer.html
+[java.util.List]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/List.html
+[java.util.Optional]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Optional.html
+[Optional.empty()]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Optional.html#empty--
+[java.time.Instant]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/Instant.html
+[java.time.ZonedDateTime]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/ZonedDateTime.html
+[java.time.LocalDateTime]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/LocalDateTime.html
+[java.time.ZoneId]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/time/ZoneId.html
 
 [ExtraTypeCodecs]:                           https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html
 [ExtraTypeCodecs.BLOB_TO_ARRAY]:             https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/type/codec/ExtraTypeCodecs.html#BLOB_TO_ARRAY

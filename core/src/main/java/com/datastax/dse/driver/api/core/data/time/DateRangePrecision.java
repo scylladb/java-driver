@@ -131,9 +131,9 @@ public enum DateRangePrecision {
   private final ChronoUnit roundingUnit;
   // The formatter is only used for formatting (parsing is done with  DateRangeUtil.parseCalendar to
   // be exactly the same as DSE's).
-  // If that ever were to change, note that DateTimeFormatters with a time zone have a parsing bug
-  // in Java 8: the formatter's zone will always be used, even if the input string specifies one
-  // explicitly.
+  // If that ever were to change, note that DateTimeFormatters with a time zone had a parsing bug
+  // on older JDKs: the formatter's zone would always be used, even if the input string specified
+  // one explicitly.
   // See https://stackoverflow.com/questions/41999421
   private final DateTimeFormatter formatter;
 

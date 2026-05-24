@@ -49,25 +49,26 @@ public interface DriverContext extends AttachmentPoint {
   @NonNull
   String getSessionName();
 
-  /** @return The driver's configuration; never {@code null}. */
+  /** Returns the driver's configuration; never {@code null}. */
   @NonNull
   DriverConfig getConfig();
 
-  /** @return The driver's configuration loader; never {@code null}. */
+  /** Returns the driver's configuration loader; never {@code null}. */
   @NonNull
   DriverConfigLoader getConfigLoader();
 
   /**
-   * @return The driver's load balancing policies, keyed by profile name; the returned map is
-   *     guaranteed to never be {@code null} and to always contain an entry for the {@value
-   *     DriverExecutionProfile#DEFAULT_NAME} profile.
+   * Returns the driver's load balancing policies, keyed by profile name; the returned map is
+   * guaranteed to never be {@code null} and to always contain an entry for the {@value
+   * DriverExecutionProfile#DEFAULT_NAME} profile.
    */
   @NonNull
   Map<String, LoadBalancingPolicy> getLoadBalancingPolicies();
 
   /**
+   * Returns the driver's load balancing policy for the given profile; never {@code null}.
+   *
    * @param profileName the profile name; never {@code null}.
-   * @return The driver's load balancing policy for the given profile; never {@code null}.
    */
   @NonNull
   default LoadBalancingPolicy getLoadBalancingPolicy(@NonNull String profileName) {
@@ -79,16 +80,17 @@ public interface DriverContext extends AttachmentPoint {
   }
 
   /**
-   * @return The driver's retry policies, keyed by profile name; the returned map is guaranteed to
-   *     never be {@code null} and to always contain an entry for the {@value
-   *     DriverExecutionProfile#DEFAULT_NAME} profile.
+   * Returns the driver's retry policies, keyed by profile name; the returned map is guaranteed to
+   * never be {@code null} and to always contain an entry for the {@value
+   * DriverExecutionProfile#DEFAULT_NAME} profile.
    */
   @NonNull
   Map<String, RetryPolicy> getRetryPolicies();
 
   /**
+   * Returns the driver's retry policy for the given profile; never {@code null}.
+   *
    * @param profileName the profile name; never {@code null}.
-   * @return The driver's retry policy for the given profile; never {@code null}.
    */
   @NonNull
   default RetryPolicy getRetryPolicy(@NonNull String profileName) {
@@ -97,16 +99,17 @@ public interface DriverContext extends AttachmentPoint {
   }
 
   /**
-   * @return The driver's speculative execution policies, keyed by profile name; the returned map is
-   *     guaranteed to never be {@code null} and to always contain an entry for the {@value
-   *     DriverExecutionProfile#DEFAULT_NAME} profile.
+   * Returns the driver's speculative execution policies, keyed by profile name; the returned map is
+   * guaranteed to never be {@code null} and to always contain an entry for the {@value
+   * DriverExecutionProfile#DEFAULT_NAME} profile.
    */
   @NonNull
   Map<String, SpeculativeExecutionPolicy> getSpeculativeExecutionPolicies();
 
   /**
+   * Returns the driver's speculative execution policy for the given profile; never {@code null}.
+   *
    * @param profileName the profile name; never {@code null}.
-   * @return The driver's speculative execution policy for the given profile; never {@code null}.
    */
   @NonNull
   default SpeculativeExecutionPolicy getSpeculativeExecutionPolicy(@NonNull String profileName) {
@@ -116,27 +119,27 @@ public interface DriverContext extends AttachmentPoint {
         : getSpeculativeExecutionPolicies().get(DriverExecutionProfile.DEFAULT_NAME);
   }
 
-  /** @return The driver's timestamp generator; never {@code null}. */
+  /** Returns the driver's timestamp generator; never {@code null}. */
   @NonNull
   TimestampGenerator getTimestampGenerator();
 
-  /** @return The driver's reconnection policy; never {@code null}. */
+  /** Returns the driver's reconnection policy; never {@code null}. */
   @NonNull
   ReconnectionPolicy getReconnectionPolicy();
 
-  /** @return The driver's address translator; never {@code null}. */
+  /** Returns the driver's address translator; never {@code null}. */
   @NonNull
   AddressTranslator getAddressTranslator();
 
-  /** @return The authentication provider, if authentication was configured. */
+  /** Returns the authentication provider, if authentication was configured. */
   @NonNull
   Optional<AuthProvider> getAuthProvider();
 
-  /** @return The SSL engine factory, if SSL was configured. */
+  /** Returns the SSL engine factory, if SSL was configured. */
   @NonNull
   Optional<SslEngineFactory> getSslEngineFactory();
 
-  /** @return The driver's request tracker; never {@code null}. */
+  /** Returns the driver's request tracker; never {@code null}. */
   @NonNull
   RequestTracker getRequestTracker();
 
@@ -144,15 +147,15 @@ public interface DriverContext extends AttachmentPoint {
   @NonNull
   Optional<RequestIdGenerator> getRequestIdGenerator();
 
-  /** @return The driver's request throttler; never {@code null}. */
+  /** Returns the driver's request throttler; never {@code null}. */
   @NonNull
   RequestThrottler getRequestThrottler();
 
-  /** @return The driver's node state listener; never {@code null}. */
+  /** Returns the driver's node state listener; never {@code null}. */
   @NonNull
   NodeStateListener getNodeStateListener();
 
-  /** @return The driver's schema change listener; never {@code null}. */
+  /** Returns the driver's schema change listener; never {@code null}. */
   @NonNull
   SchemaChangeListener getSchemaChangeListener();
 }

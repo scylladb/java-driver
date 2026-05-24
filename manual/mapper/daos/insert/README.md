@@ -135,6 +135,6 @@ entity class and the [naming strategy](../../entities/#naming-strategy)).
 [BoundStatement]:               https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/BoundStatement.html
 [ReactiveResultSet]:            https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/reactive/ReactiveResultSet.html
 
-[CompletionStage]: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html
-[CompletableFuture]: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html
-[Optional]: https://docs.oracle.com/javase/8/docs/api/java/util/Optional.html
+[CompletionStage]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/CompletionStage.html
+[CompletableFuture]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/CompletableFuture.html
+[Optional]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/Optional.html

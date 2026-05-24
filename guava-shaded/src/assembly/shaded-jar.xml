@@ -38,6 +38,7 @@
       <directory>${project.build.outputDirectory}</directory>
       <excludes>
         <exclude>META-INF/maven/com.scylladb/java-driver-guava-shaded/pom.xml</exclude>
+        <exclude>**/module-info.class</exclude>
       </excludes>
       <outputDirectory/>
     </fileSet>

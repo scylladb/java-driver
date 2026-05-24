@@ -101,5 +101,5 @@ entity class and the naming convention).
 [@PartitionKey]:          https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/PartitionKey.html
 [@CqlName]:             https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/CqlName.html
 
-[CompletionStage]:   https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html
-[CompletableFuture]: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletableFuture.html
+[CompletionStage]:   https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/CompletionStage.html
+[CompletableFuture]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/CompletableFuture.html

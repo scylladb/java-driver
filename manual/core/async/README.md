@@ -21,7 +21,7 @@ under the License.
 
 ### Quick overview
 
-Async driver methods return Java 8's [CompletionStage].
+Async driver methods return the JDK's [CompletionStage].
 
 * don't call synchronous methods from asynchronous callbacks (the driver detects that and throws).
 * callbacks execute on I/O threads: consider providing your own executor for expensive computations.
@@ -224,6 +224,6 @@ even when iterating through the results of a request. `session.executeAsync` ret
 This greatly simplifies asynchronous paging; see the [paging](../paging/#asynchronous-paging)
 documentation for more details and an example. 
 
-[CompletionStage]: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html
+[CompletionStage]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/CompletionStage.html
 
 [AsyncResultSet]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/AsyncResultSet.html

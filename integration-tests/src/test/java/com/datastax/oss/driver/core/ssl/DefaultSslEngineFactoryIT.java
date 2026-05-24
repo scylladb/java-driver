@@ -117,7 +117,7 @@ public class DefaultSslEngineFactoryIT {
       countNoLookups++;
       return super.hostNoLookup(addr);
     }
-  };
+  }
 
   @Test
   public void should_respect_config_for_san_resolution() {

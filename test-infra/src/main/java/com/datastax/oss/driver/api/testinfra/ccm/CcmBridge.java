@@ -279,7 +279,8 @@ public class CcmBridge implements AutoCloseable {
         if (configDir != null) {
           execute(CommandLine.parse("ccm remove get_version --config-dir=" + configDir));
         }
-      } catch (Exception ignored) {
+      } catch (Exception e) {
+        LOG.warn("Failed to remove temporary CCM cluster used to resolve {}", versionString, e);
       }
     }
     return result;

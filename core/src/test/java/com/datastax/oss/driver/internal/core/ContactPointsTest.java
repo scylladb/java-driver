@@ -73,8 +73,7 @@ public class ContactPointsTest {
     Set<EndPoint> endPoints =
         ContactPoints.merge(Collections.emptySet(), ImmutableList.of("127.0.0.1:9042"), true);
 
-    assertThat(endPoints)
-        .containsExactly(new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042)));
+    assertThat(endPoints).containsExactly(new DefaultEndPoint(socketAddress("127.0.0.1", 9042)));
   }
 
   @Test
@@ -85,8 +84,8 @@ public class ContactPointsTest {
 
     assertThat(endPoints)
         .containsExactly(
-            new DefaultEndPoint(new InetSocketAddress("::1", 9042)),
-            new DefaultEndPoint(new InetSocketAddress("::2", 9042)));
+            new DefaultEndPoint(socketAddress("::1", 9042)),
+            new DefaultEndPoint(socketAddress("::2", 9042)));
   }
 
   @Test
@@ -139,26 +138,25 @@ public class ContactPointsTest {
   public void should_merge_programmatic_and_configuration() {
     Set<EndPoint> endPoints =
         ContactPoints.merge(
-            ImmutableSet.of(new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042))),
+            ImmutableSet.of(new DefaultEndPoint(socketAddress("127.0.0.1", 9042))),
             ImmutableList.of("127.0.0.2:9042"),
             true);
 
     assertThat(endPoints)
         .containsOnly(
-            new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042)),
-            new DefaultEndPoint(new InetSocketAddress("127.0.0.2", 9042)));
+            new DefaultEndPoint(socketAddress("127.0.0.1", 9042)),
+            new DefaultEndPoint(socketAddress("127.0.0.2", 9042)));
   }
 
   @Test
   public void should_warn_if_duplicate_between_programmatic_and_configuration() {
     Set<EndPoint> endPoints =
         ContactPoints.merge(
-            ImmutableSet.of(new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042))),
+            ImmutableSet.of(new DefaultEndPoint(socketAddress("127.0.0.1", 9042))),
             ImmutableList.of("127.0.0.1:9042"),
             true);
 
-    assertThat(endPoints)
-        .containsOnly(new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042)));
+    assertThat(endPoints).containsOnly(new DefaultEndPoint(socketAddress("127.0.0.1", 9042)));
     assertLog(Level.WARN, "Duplicate contact point /127.0.0.1:9042");
   }
 
@@ -168,9 +166,31 @@ public class ContactPointsTest {
         ContactPoints.merge(
             Collections.emptySet(), ImmutableList.of("127.0.0.1:9042", "127.0.0.1:9042"), true);
 
-    assertThat(endPoints)
-        .containsOnly(new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042)));
+    assertThat(endPoints).containsOnly(new DefaultEndPoint(socketAddress("127.0.0.1", 9042)));
     assertLog(Level.WARN, "Duplicate contact point /127.0.0.1:9042");
+  }
+
+  private static InetSocketAddress socketAddress(String host, int port) {
+    try {
+      switch (host) {
+        case "127.0.0.1":
+          return new InetSocketAddress(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}), port);
+        case "127.0.0.2":
+          return new InetSocketAddress(InetAddress.getByAddress(new byte[] {127, 0, 0, 2}), port);
+        case "::1":
+          return new InetSocketAddress(
+              InetAddress.getByAddress(new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}),
+              port);
+        case "::2":
+          return new InetSocketAddress(
+              InetAddress.getByAddress(new byte[] {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}),
+              port);
+        default:
+          return new InetSocketAddress(InetAddress.getByName(host), port);
+      }
+    } catch (UnknownHostException e) {
+      throw new AssertionError(e);
+    }
   }
 
   private void assertLog(Level level, String message) {

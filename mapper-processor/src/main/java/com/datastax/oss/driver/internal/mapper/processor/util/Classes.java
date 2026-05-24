@@ -106,7 +106,7 @@ public class Classes {
   }
 
   /**
-   * Whether a type mirror is a parameterized Java 8 future ({@code CompletionStage or
+   * Whether a type mirror is a parameterized future such as {@code CompletionStage} or {@code
    * CompletableFuture}.
    */
   public boolean isFuture(DeclaredType declaredType) {

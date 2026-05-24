@@ -50,7 +50,7 @@ builder](manual/query_builder/), [mapper](manual/mapper)).
 
 The driver is compatible with Scylla and Apache Cassandra® 2.1 and higher.
 
-It requires Java 8 or higher.
+It requires Java 11 or higher.
 
 ## Migrating from previous versions
 

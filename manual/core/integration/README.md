@@ -134,7 +134,7 @@ $ find . -type f
 ##### Project descriptor
 
 `pom.xml` is the [Project Object Model][maven_pom] that describes your application. We declare the
-dependencies, and tell Maven that we're going to use Java 8:
+dependencies, and tell Maven that we're going to use Java 11:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -165,8 +165,8 @@ dependencies, and tell Maven that we're going to use Java 8:
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
+          <source>11</source>
+          <target>11</target>
         </configuration>
       </plugin>
     </plugins>
@@ -281,7 +281,7 @@ version '1.0.0-SNAPSHOT'
 
 apply plugin: 'java'
 
-sourceCompatibility = 1.8
+sourceCompatibility = 11
 
 repositories {
     mavenCentral()
