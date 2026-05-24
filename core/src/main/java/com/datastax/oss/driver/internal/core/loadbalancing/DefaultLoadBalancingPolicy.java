@@ -331,10 +331,6 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       this.newest = OptionalLong.empty();
     }
 
-    private NodeResponseRateSample(long oldestSample) {
-      this(oldestSample, nanoTime());
-    }
-
     private NodeResponseRateSample(long oldestSample, long newestSample) {
       this.oldest = oldestSample;
       this.newest = OptionalLong.of(newestSample);

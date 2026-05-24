@@ -370,6 +370,7 @@ public class GenericType<T> {
    *
    * @leaks-private-api
    */
+  @SuppressWarnings("InvalidBlockTag")
   @NonNull
   public TypeToken<T> __getToken() {
     return token;

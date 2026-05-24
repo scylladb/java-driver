@@ -52,8 +52,8 @@ configuration (make sure you use version 3.5 or higher):
       <artifactId>maven-compiler-plugin</artifactId>
       <version>3.8.1</version>
       <configuration>
-        <source>1.8</source> <!-- (or higher) -->
-        <target>1.8</target> <!-- (or higher) -->
+        <source>11</source> <!-- (or higher) -->
+        <target>11</target> <!-- (or higher) -->
         <annotationProcessorPaths>
           <path>
             <groupId>com.scylladb</groupId>
@@ -65,7 +65,7 @@ configuration (make sure you use version 3.5 or higher):
           <path>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-nop</artifactId>
-            <version>1.7.26</version>
+            <version>2.0.18</version>
           </path>
         </annotationProcessorPaths>
       </configuration>

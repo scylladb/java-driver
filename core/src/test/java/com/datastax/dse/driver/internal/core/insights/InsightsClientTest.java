@@ -109,7 +109,7 @@ public class InsightsClientTest {
     OS os = new OS("linux", "1.2", "x64");
     CPUS cpus = new CPUS(8, "intel i7");
     Map<String, RuntimeAndCompileTimeVersions> javaDeps =
-        ImmutableMap.of("version", new RuntimeAndCompileTimeVersions("1.8.0", "1.8.0", false));
+        ImmutableMap.of("version", new RuntimeAndCompileTimeVersions("11.0.0", "11.0.0", false));
     Map<String, Map<String, RuntimeAndCompileTimeVersions>> runtimeInfo =
         ImmutableMap.of("java", javaDeps);
     InsightsPlatformInfo insightsPlatformInfo = new InsightsPlatformInfo(os, cpus, runtimeInfo);

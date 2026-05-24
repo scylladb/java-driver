@@ -222,7 +222,7 @@ Copyright (C) 2018 Christian Stein
 This product includes software developed by Christian Stein
 see ci/install-jdk.sh
 
-This product bundles Java Native Runtime - POSIX 3.1.15,
+This product bundles Java Native Runtime - POSIX 3.1.22,
 which is available under the Eclipse Public License version 2.0.
 see licenses/jnr-posix.txt
 
@@ -234,14 +234,14 @@ This product bundles ASM 9.2: a very small and fast Java bytecode manipulation f
 which is available under the 3-Clause BSD License.
 see licenses/asm.txt
 
-This product bundles HdrHistogram 2.1.12: A High Dynamic Range (HDR) Histogram,
+This product bundles HdrHistogram 2.2.2: A High Dynamic Range (HDR) Histogram,
 which is available under the 2-Clause BSD License.
 see licenses/HdrHistogram.txt
 
-This product bundles The Simple Logging Facade for Java (SLF4J) API 1.7.26,
+This product bundles The Simple Logging Facade for Java (SLF4J) API 2.0.18,
 which is available under the MIT License.
 see licenses/slf4j-api.txt
 
-This product bundles Reactive Streams 1.0.3,
+This product bundles Reactive Streams 1.0.4,
 which is available under the MIT License.
 see licenses/reactive-streams.txt

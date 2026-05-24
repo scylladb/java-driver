@@ -47,7 +47,7 @@ ensemble:
     configuration_manager:
       - name: ctool
         properties:
-          java.version: openjdk8
+          java.version: openjdk11
           product.install.type: tarball
           product.type: {{server_type}}
           product.version: {{server_version}}
@@ -69,7 +69,7 @@ ensemble:
     configuration_manager:
       - name: ctool
         properties:
-          java.version: openjdk8
+          java.version: openjdk11
           install.maven: true
       - name: java_driver
         properties:

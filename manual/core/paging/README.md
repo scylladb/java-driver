@@ -279,6 +279,6 @@ and offset paging.
 [OffsetPager]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/paging/OffsetPager.html
 [PagingState]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/PagingState.html
 
-[CompletionStage]: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/CompletionStage.html
+[CompletionStage]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/CompletionStage.html
 
 [driver examples]: https://github.com/datastax/java-driver/tree/4.x/examples/src/main/java/com/datastax/oss/driver/examples/paging

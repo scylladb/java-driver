@@ -106,7 +106,7 @@ available.
 
 ### I want to set a date on a bound statement, where did `setTimestamp()` go?
 
-The driver now uses Java 8's improved date and time API. CQL type `timestamp` is mapped to
+The driver now uses the JDK's improved date and time API. CQL type `timestamp` is mapped to
 `java.time.Instant`, and the corresponding getter and setter are `getInstant` and `setInstant`.
 
 See [Temporal types](../manual/core/temporal_types/) for more details.

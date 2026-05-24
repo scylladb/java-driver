@@ -35,7 +35,7 @@ jobs:
 
     strategy:
       matrix:
-        java-version: [8]
+        java-version: [11, 17]
       fail-fast: false
 
     steps:
@@ -80,7 +80,7 @@ jobs:
 
     strategy:
       matrix:
-        java-version: [8]
+        java-version: [11, 17]
       fail-fast: false
 
     steps:
@@ -109,14 +109,14 @@ jobs:
 
     strategy:
       matrix:
-        java-version: [8]
+        java-version: [11, 17]
       fail-fast: false
 
     steps:
       - name: Checkout source
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
-      - name: Set up JDK 8
+      - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: ${{ matrix.java-version }}
@@ -142,14 +142,14 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: test-results
+          name: test-results-${{ matrix.java-version }}
           path: "*/**/target/*-reports/*.xml"
 
       - name: Parse test results
         uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
         if: always()
         with:
-          check_name: Unit tests report
+          check_name: Unit tests report (JDK ${{ matrix.java-version }})
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true
@@ -180,7 +180,7 @@ jobs:
     strategy:
       matrix:
         cassandra-version: [3-LATEST, 4-LATEST]
-        java-version: [8]
+        java-version: [11, 17]
         test-group: [parallelizable, serial, isolated]
       fail-fast: false
 
@@ -278,7 +278,7 @@ jobs:
         uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
         if: always()
         with:
-          check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }} (${{ matrix.test-group }})
+          check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }} (${{ matrix.test-group }}, JDK ${{ matrix.java-version }})
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true
@@ -295,7 +295,7 @@ jobs:
     strategy:
       matrix:
         scylla-version: [LTS-LATEST, LTS-PRIOR, LATEST]
-        java-version: [8]
+        java-version: [11, 17]
         test-group: [parallelizable, serial, isolated]
       fail-fast: false
 
@@ -391,7 +391,7 @@ jobs:
         uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
         if: always()
         with:
-          check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }} (${{ matrix.test-group }})
+          check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }} (${{ matrix.test-group }}, JDK ${{ matrix.java-version }})
           require_tests: true
           report_paths: "*/**/target/*-reports/*.xml"
           follow_symlink: true

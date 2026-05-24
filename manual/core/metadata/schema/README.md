@@ -352,4 +352,4 @@ take a look at the [Performance](../../performance/#schema-updates) page for a f
 [DseAggregateMetadata]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/metadata/schema/DseAggregateMetadata.html
 
 [JAVA-750]: https://datastax-oss.atlassian.net/browse/JAVA-750
-[java.util.regex.Pattern]: https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
+[java.util.regex.Pattern]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/regex/Pattern.html

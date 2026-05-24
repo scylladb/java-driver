@@ -42,6 +42,7 @@ public interface Metrics {
    *     (Dropwizard Metrics manual)</a>
    * @leaks-private-api
    */
+  @SuppressWarnings("InvalidBlockTag")
   @NonNull
   MetricRegistry getRegistry();
 
