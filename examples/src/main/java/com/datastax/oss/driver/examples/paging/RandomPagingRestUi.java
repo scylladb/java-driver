@@ -129,7 +129,7 @@ public class RandomPagingRestUi {
         int videoid = i * 100 + j;
         session.execute(
             prepare.bind(
-                i, "user " + i, Instant.ofEpochMilli(j * 100000), videoid, "video " + videoid));
+                i, "user " + i, Instant.ofEpochMilli(j * 100000L), videoid, "video " + videoid));
       }
     }
   }

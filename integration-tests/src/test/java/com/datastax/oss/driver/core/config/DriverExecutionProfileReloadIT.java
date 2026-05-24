@@ -125,8 +125,8 @@ public class DriverExecutionProfileReloadIT {
 
       // Bump up request timeout to 10 seconds and trigger a manual reload.
       configSource.set("basic.request.timeout = 10s");
-      session.getContext().getConfigLoader().reload();
-      waitForConfigChange(session, 500, TimeUnit.MILLISECONDS);
+      waitForConfigChange(
+          session, () -> session.getContext().getConfigLoader().reload(), 3, TimeUnit.SECONDS);
 
       // Execute again, should not timeout.
       session.execute(query);
@@ -217,11 +217,17 @@ public class DriverExecutionProfileReloadIT {
   }
 
   private void waitForConfigChange(CqlSession session, long timeout, TimeUnit unit) {
+    waitForConfigChange(session, () -> {}, timeout, unit);
+  }
+
+  private void waitForConfigChange(
+      CqlSession session, Runnable trigger, long timeout, TimeUnit unit) {
     CountDownLatch latch = new CountDownLatch(1);
     ((InternalDriverContext) session.getContext())
         .getEventBus()
         .register(ConfigChangeEvent.class, (e) -> latch.countDown());
     try {
+      trigger.run();
       boolean success = latch.await(timeout, unit);
       assertThat(success).isTrue();
     } catch (InterruptedException e) {

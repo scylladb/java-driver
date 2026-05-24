@@ -389,9 +389,9 @@ public class MetadataManagerTest {
     CompletionStage<MetadataManager.RefreshSchemaResult> result2 =
         metadataManager.refreshSchema("bar", true, true);
 
-    // Now complete the agreement check - first refresh will fail at newInstance(),
-    // and onSchemaRefreshComplete should drain the queued second refresh
-    agreementFuture.complete(true);
+    // Now complete the agreement check on the admin event loop - first refresh will fail at
+    // newInstance(), and onSchemaRefreshComplete should drain the queued second refresh.
+    adminEventLoopGroup.next().execute(() -> agreementFuture.complete(true));
 
     // Then both requests should complete (not hang forever)
     waitForPendingAdminTasks(

@@ -166,6 +166,23 @@
   <build>
     <plugins>
       <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <annotationProcessorPaths combine.children="append">
+            <path>
+              <groupId>com.scylladb</groupId>
+              <artifactId>java-driver-mapper-processor</artifactId>
+              <version>${project.version}</version>
+            </path>
+            <path>
+              <groupId>com.scylladb</groupId>
+              <artifactId>java-driver-mapper-runtime</artifactId>
+              <version>${project.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.apache.servicemix.tooling</groupId>
         <artifactId>depends-maven-plugin</artifactId>
         <version>1.5.0</version>
