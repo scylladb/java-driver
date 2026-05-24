@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
  * the domain name of the target instance. Then it performs a forward DNS lookup of the domain name;
  * the EC2 DNS does the private/public switch automatically based on location.
  */
+@SuppressWarnings("BanJNDI")
 public class Ec2MultiRegionAddressTranslator implements AddressTranslator {
 
   private static final Logger LOG = LoggerFactory.getLogger(Ec2MultiRegionAddressTranslator.class);

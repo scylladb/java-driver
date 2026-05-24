@@ -71,7 +71,7 @@ public class ReloadingKeyManagerFactory extends KeyManagerFactory implements Aut
    * @param keystorePassword the keystore password
    * @param reloadInterval the duration between reload attempts. Set to {@link Optional#empty()} to
    *     disable scheduled reloading.
-   * @return
+   * @return a reloading key manager factory backed by the given keystore
    */
   static ReloadingKeyManagerFactory create(
       Path keystorePath, String keystorePassword, Optional<Duration> reloadInterval)

@@ -18,7 +18,6 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
-import com.datastax.oss.driver.shaded.guava.common.primitives.Longs;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import net.jcip.annotations.Immutable;
 
@@ -57,6 +56,6 @@ public abstract class TokenLong64 implements Token {
     Preconditions.checkArgument(
         other instanceof TokenLong64, "Cannot compare with non-64-bit-integer token");
     TokenLong64 that = (TokenLong64) other;
-    return Longs.compare(this.value, that.value);
+    return Long.compare(this.value, that.value);
   }
 }

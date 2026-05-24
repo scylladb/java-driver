@@ -22,7 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
@@ -121,7 +121,7 @@ public abstract class AccessibleByIndexTestBase<T extends GettableByIndex & Sett
     t = t.setBytesUnsafe(0, Bytes.fromHexString("0x00000001"));
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(t.getBytesUnsafe(0)).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
 
@@ -135,7 +135,7 @@ public abstract class AccessibleByIndexTestBase<T extends GettableByIndex & Sett
     t = t.setToNull(0);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(t.getBytesUnsafe(0)).isNull();
   }
 
@@ -182,7 +182,7 @@ public abstract class AccessibleByIndexTestBase<T extends GettableByIndex & Sett
     t = t.set(0, "1", intToStringCodec);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     verify(intToStringCodec).encode("1", ProtocolVersion.DEFAULT);
     assertThat(t.getBytesUnsafe(0)).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
@@ -273,7 +273,7 @@ public abstract class AccessibleByIndexTestBase<T extends GettableByIndex & Sett
     ByteBuffer bytes = t.getBytesUnsafe(0);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(bytes).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
 
@@ -287,7 +287,7 @@ public abstract class AccessibleByIndexTestBase<T extends GettableByIndex & Sett
     boolean isNull = t.isNull(0);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(isNull).isTrue();
   }
 
@@ -337,7 +337,7 @@ public abstract class AccessibleByIndexTestBase<T extends GettableByIndex & Sett
     String s = t.get(0, intToStringCodec);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     verify(intToStringCodec).decode(any(ByteBuffer.class), eq(ProtocolVersion.DEFAULT));
     assertThat(s).isEqualTo("1");
   }

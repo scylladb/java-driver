@@ -410,8 +410,7 @@ public class ChannelFactory {
         ChannelPipeline pipeline = channel.pipeline();
         context
             .getSslHandlerFactory()
-            .map(f -> f.newSslHandler(channel, endPoint))
-            .map(h -> pipeline.addLast(SSL_HANDLER_NAME, h));
+            .ifPresent(f -> pipeline.addLast(SSL_HANDLER_NAME, f.newSslHandler(channel, endPoint)));
 
         // Only add meter handlers on the pipeline if metrics are enabled.
         SessionMetricUpdater sessionMetricUpdater = context.getMetricsFactory().getSessionUpdater();

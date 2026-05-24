@@ -18,9 +18,6 @@
 package com.datastax.dse.driver.internal.core.insights;
 
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
-import com.datastax.oss.driver.shaded.guava.common.base.Joiner;
-import java.util.Arrays;
-import java.util.regex.Pattern;
 
 class PackageUtil {
   static final String DEFAULT_SPECULATIVE_EXECUTION_PACKAGE =
@@ -28,8 +25,6 @@ class PackageUtil {
   static final String DEFAULT_LOAD_BALANCING_PACKAGE =
       "com.datastax.oss.driver.internal.core.loadbalancing";
   static final String DEFAULT_AUTH_PROVIDER_PACKAGE = "com.datastax.oss.driver.internal.core.auth";
-  private static final Pattern PACKAGE_SPLIT_REGEX = Pattern.compile("\\.");
-  private static final Joiner DOT_JOINER = Joiner.on(".");
 
   static String getNamespace(Class<?> tClass) {
     String namespace = "";
@@ -61,18 +56,14 @@ class PackageUtil {
 
   @VisibleForTesting
   static String getClassName(String classSetting) {
-    String[] split = PACKAGE_SPLIT_REGEX.split(classSetting);
-    if (split.length == 0) {
-      return "";
-    }
-    return split[split.length - 1];
+    int lastDot = classSetting.lastIndexOf('.');
+    return lastDot < 0 ? classSetting : classSetting.substring(lastDot + 1);
   }
 
   @VisibleForTesting
   static String getFullPackageOrDefault(String classSetting, String defaultValue) {
-    String[] split = PACKAGE_SPLIT_REGEX.split(classSetting);
-    if (split.length <= 1) return defaultValue;
-    return DOT_JOINER.join(Arrays.copyOf(split, split.length - 1));
+    int lastDot = classSetting.lastIndexOf('.');
+    return lastDot < 0 ? defaultValue : classSetting.substring(0, lastDot);
   }
 
   static class ClassSettingDetails {

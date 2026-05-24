@@ -403,7 +403,7 @@ public class GraphSON2SerdeTP {
 
       private static final long serialVersionUID = 1L;
 
-      protected ObjectGraphNodeGraphSON2Serializer() {
+      ObjectGraphNodeGraphSON2Serializer() {
         super(ObjectGraphNode.class);
       }
 

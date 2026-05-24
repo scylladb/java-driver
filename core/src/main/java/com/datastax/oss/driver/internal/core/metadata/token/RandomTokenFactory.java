@@ -43,8 +43,7 @@ public class RandomTokenFactory implements TokenFactory {
     prototype = createMessageDigest();
     boolean supportsClone;
     try {
-      prototype.clone();
-      supportsClone = true;
+      supportsClone = prototype.clone() instanceof MessageDigest;
     } catch (CloneNotSupportedException e) {
       supportsClone = false;
     }
@@ -104,7 +103,8 @@ public class RandomTokenFactory implements TokenFactory {
     if (supportsClone) {
       try {
         return (MessageDigest) prototype.clone();
-      } catch (CloneNotSupportedException ignored) {
+      } catch (CloneNotSupportedException e) {
+        return createMessageDigest();
       }
     }
     return createMessageDigest();

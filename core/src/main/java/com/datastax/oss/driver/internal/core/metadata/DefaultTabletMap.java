@@ -33,11 +33,12 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Thread-safety notes: This class uses ConcurrentMap and ConcurrentSkipListSet underneath. It is
  * safe to have multiple threads accessing it. However, multiple modifications i.e. multiple calls
- * of {@link DefaultTabletMap#addTablet(CqlIdentifier, CqlIdentifier, Tablet) will race with each
+ * of {@link DefaultTabletMap#addTablet(CqlIdentifier, CqlIdentifier, Tablet)} will race with each
  * other. This may result in unexpected state of this structure when used in a vacuum. For example
- * it may end up containing overlapping tablet ranges.</p> <p>In actual use by the driver {@link
- * MetadataManager} solves this by running modifications sequentially. It schedules them on {@link
- * MetadataManager#adminExecutor}}'s thread.
+ * it may end up containing overlapping tablet ranges.
+ *
+ * <p>In actual use by the driver {@link MetadataManager} solves this by running modifications
+ * sequentially. It schedules them on the {@link MetadataManager#adminExecutor} thread.
  */
 @Beta
 public class DefaultTabletMap implements TabletMap {
@@ -209,7 +210,7 @@ public class DefaultTabletMap implements TabletMap {
      * firstToken} and unspecified other fields. Used for lookup of sorted collections of proper
      * {@link DefaultTablet}.
      *
-     * @param lastToken
+     * @param lastToken the upper bound of the tablet range
      * @return New {@link DefaultTablet} object
      */
     public static DefaultTablet malformedTablet(long lastToken) {

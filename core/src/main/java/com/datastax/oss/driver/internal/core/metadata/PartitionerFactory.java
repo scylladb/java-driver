@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Returns correct Partitioner to use for given query, for example @code{CDCTokenFactory} for
+ * Returns correct Partitioner to use for given query, for example {@code CDCTokenFactory} for
  * queries to CDC log table.
  */
 public class PartitionerFactory {

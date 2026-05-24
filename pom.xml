@@ -722,7 +722,7 @@
           <compilerArgs combine.children="override">
             <compilerArg>-XDcompilePolicy=simple</compilerArg>
             <compilerArg>--should-stop=ifError=FLOW</compilerArg>
-            <compilerArg>-Xplugin:ErrorProne -Xep:FutureReturnValueIgnored:OFF -Xep:PreferJavaTimeOverload:OFF -Xep:AnnotateFormatMethod:OFF -Xep:WildcardImport:WARN -Xep:MissingSummary:OFF -Xep:StringCaseLocaleUsage:OFF -Xep:InlineMeSuggester:OFF -Xep:AddressSelection:OFF -XepExcludedPaths:.*/target/(?:generated-sources|generated-test-sources)/.*</compilerArg>
+            <compilerArg>-Xplugin:ErrorProne -Xep:FutureReturnValueIgnored:OFF -Xep:PreferJavaTimeOverload:OFF -Xep:AnnotateFormatMethod:OFF -Xep:WildcardImport:WARN -Xep:MissingSummary:OFF -Xep:StringCaseLocaleUsage:OFF -Xep:InlineMeSuggester:OFF -Xep:AddressSelection:OFF -XepExcludedPaths:.*/(?:src/test|target/(?:generated-sources|generated-test-sources))/.*</compilerArg>
           </compilerArgs>
           <annotationProcessorPaths>
             <path>

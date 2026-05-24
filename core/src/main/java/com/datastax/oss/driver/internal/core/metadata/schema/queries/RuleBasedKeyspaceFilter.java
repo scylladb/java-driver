@@ -79,9 +79,9 @@ class RuleBasedKeyspaceFilter implements KeyspaceFilter {
           exactExcludes.add(name);
         }
       } else if ((matcher = REGEX_INCLUDE.matcher(spec)).matches()) {
-        compile(matcher.group(1)).map(regexIncludes::add);
+        compile(matcher.group(1)).ifPresent(regexIncludes::add);
       } else if ((matcher = REGEX_EXCLUDE.matcher(spec)).matches()) {
-        compile(matcher.group(1)).map(regexExcludes::add);
+        compile(matcher.group(1)).ifPresent(regexExcludes::add);
       } else {
         LOG.warn(
             "[{}] Error while parsing {}: invalid element '{}', skipping",

@@ -64,7 +64,6 @@ public class DefaultDseAggregateMetadata extends DefaultAggregateMetadata
   }
 
   @Override
-  @Nullable
   public Optional<Boolean> getDeterministic() {
     return Optional.ofNullable(deterministic);
   }

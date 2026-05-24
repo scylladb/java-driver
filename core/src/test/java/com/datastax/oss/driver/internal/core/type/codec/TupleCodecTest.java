@@ -21,8 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.ProtocolVersion;
@@ -104,7 +104,7 @@ public class TupleCodecTest extends CodecTestBase<TupleValue> {
 
     verify(intCodec).encodePrimitive(1, ProtocolVersion.DEFAULT);
     // null values are handled directly in the tuple codec, without calling the child codec:
-    verifyZeroInteractions(doubleCodec);
+    verifyNoInteractions(doubleCodec);
     verify(textCodec).encode("a", ProtocolVersion.DEFAULT);
   }
 
@@ -122,7 +122,7 @@ public class TupleCodecTest extends CodecTestBase<TupleValue> {
     assertThat(tuple.getString(2)).isEqualTo("a");
 
     verify(intCodec).decodePrimitive(Bytes.fromHexString("0x00000001"), ProtocolVersion.DEFAULT);
-    verifyZeroInteractions(doubleCodec);
+    verifyNoInteractions(doubleCodec);
     verify(textCodec).decode(Bytes.fromHexString("0x61"), ProtocolVersion.DEFAULT);
   }
 
@@ -141,9 +141,9 @@ public class TupleCodecTest extends CodecTestBase<TupleValue> {
     assertThat(tuple.isNull(1)).isTrue();
     assertThat(tuple.isNull(2)).isTrue();
 
-    verifyZeroInteractions(intCodec);
-    verifyZeroInteractions(doubleCodec);
-    verifyZeroInteractions(textCodec);
+    verifyNoInteractions(intCodec);
+    verifyNoInteractions(doubleCodec);
+    verifyNoInteractions(textCodec);
   }
 
   @Test

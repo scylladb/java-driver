@@ -22,7 +22,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.data.TupleValue;
@@ -80,7 +81,7 @@ public class CachingCodecRegistryTest {
     Class<?> javaClass = (Class<?>) javaType.__getToken().getType();
     assertThat(registry.codecFor(cqlType, javaClass)).isSameAs(codec);
     // Primitive mappings never hit the cache
-    verifyZeroInteractions(mockCache);
+    verifyNoInteractions(mockCache);
   }
 
   @Test
@@ -90,7 +91,7 @@ public class CachingCodecRegistryTest {
   public void should_find_primitive_codecs_for_value(Object value, TypeCodec<?> codec) {
     TestCachingCodecRegistry registry = new TestCachingCodecRegistry(mockCache);
     assertThat(registry.codecFor(value)).isEqualTo(codec);
-    verifyZeroInteractions(mockCache);
+    verifyNoInteractions(mockCache);
   }
 
   @Test
@@ -101,7 +102,7 @@ public class CachingCodecRegistryTest {
       DataType cqlType, Object value, TypeCodec<?> codec) {
     TestCachingCodecRegistry registry = new TestCachingCodecRegistry(mockCache);
     assertThat(registry.codecFor(cqlType, value)).isEqualTo(codec);
-    verifyZeroInteractions(mockCache);
+    verifyNoInteractions(mockCache);
   }
 
   @Test
@@ -123,7 +124,7 @@ public class CachingCodecRegistryTest {
     assertThat(registry.codecFor(DataTypes.INT)).isSameAs(TypeCodecs.INT);
     assertThat(registry.codecFor("123")).isSameAs(TypeCodecs.TEXT);
 
-    verifyZeroInteractions(mockCache);
+    verifyNoMoreInteractions(mockCache);
   }
 
   @Test
@@ -144,7 +145,7 @@ public class CachingCodecRegistryTest {
     // The search by CQL type only still returns the built-in codec
     assertThat(registry.codecFor(DataTypes.TEXT)).isSameAs(TypeCodecs.TEXT);
 
-    verifyZeroInteractions(mockCache);
+    verifyNoMoreInteractions(mockCache);
   }
 
   @Test
@@ -521,7 +522,7 @@ public class CachingCodecRegistryTest {
     assertThat(registry.codecFor(DataTypes.INT)).isSameAs(TypeCodecs.INT);
     assertThat(registry.codecFor("123")).isSameAs(TypeCodecs.TEXT);
 
-    verifyZeroInteractions(mockCache);
+    verifyNoMoreInteractions(mockCache);
   }
 
   @Test

@@ -78,6 +78,7 @@ public class DefaultTraceEvent implements TraceEvent {
   }
 
   @Override
+  @SuppressWarnings("JavaUtilDate")
   public String toString() {
     return String.format("%s on %s[%s] at %s", activity, source, threadName, new Date(timestamp));
   }

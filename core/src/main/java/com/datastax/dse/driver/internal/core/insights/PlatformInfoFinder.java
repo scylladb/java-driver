@@ -24,6 +24,7 @@ import com.datastax.dse.driver.internal.core.insights.schema.InsightsPlatformInf
 import com.datastax.dse.driver.internal.core.insights.schema.InsightsPlatformInfo.CPUS;
 import com.datastax.oss.driver.internal.core.os.Native;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.shaded.guava.common.base.Splitter;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,11 +38,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 
 class PlatformInfoFinder {
   private static final String MAVEN_IGNORE_LINE = "The following files have been resolved:";
-  private static final Pattern DEPENDENCY_SPLIT_REGEX = Pattern.compile(":");
+  private static final Splitter DEPENDENCY_SPLITTER = Splitter.on(':');
   static final String UNVERIFIED_RUNTIME_VERSION = "UNVERIFIED";
   private final Function<DependencyFromFile, URL> propertiesUrlProvider;
 
@@ -197,11 +197,13 @@ class PlatformInfoFinder {
   }
 
   private DependencyFromFile extractDependencyFromLine(String line) {
-    String[] split = DEPENDENCY_SPLIT_REGEX.split(line);
-    if (split.length == 6) { // case for i.e.: com.github.jnr:jffi:jar:native:1.2.16:compile
-      return new DependencyFromFile(split[0], split[1], split[4], checkIsOptional(split[5]));
+    List<String> split = DEPENDENCY_SPLITTER.splitToList(line);
+    if (split.size() == 6) { // case for i.e.: com.github.jnr:jffi:jar:native:1.2.16:compile
+      return new DependencyFromFile(
+          split.get(0), split.get(1), split.get(4), checkIsOptional(split.get(5)));
     } else { // case for normal: org.ow2.asm:asm:jar:5.0.3:compile
-      return new DependencyFromFile(split[0], split[1], split[3], checkIsOptional(split[4]));
+      return new DependencyFromFile(
+          split.get(0), split.get(1), split.get(3), checkIsOptional(split.get(4)));
     }
   }
 
