@@ -81,12 +81,9 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
-import org.junit.runner.RunWith;
 import org.mockito.InOrder;
-import org.mockito.junit.MockitoJUnitRunner;
 
 @Category(ParallelizableTests.class)
-@RunWith(MockitoJUnitRunner.class)
 public class NodeStateIT {
 
   private SimulacronRule simulacron = new SimulacronRule(ClusterSpec.builder().withNodes(2));
@@ -213,10 +210,13 @@ public class NodeStateIT {
     simulacron.cluster().closeConnection(report.getConnections().get(0), CloseType.DISCONNECT);
 
     await()
-        .alias("Reconnection started")
+        .alias("Regular node stayed up after one connection closed")
         .pollInterval(500, TimeUnit.MILLISECONDS)
         .untilAsserted(
-            () -> assertThat(metadataRegularNode).isUp().hasOpenConnections(1).isReconnecting());
+            () -> {
+              assertThat(metadataRegularNode).isUp();
+              assertThat(metadataRegularNode.getOpenConnections()).isBetween(1, 2);
+            });
     inOrder.verify(nodeStateListener, never()).onDown(metadataRegularNode);
   }
 

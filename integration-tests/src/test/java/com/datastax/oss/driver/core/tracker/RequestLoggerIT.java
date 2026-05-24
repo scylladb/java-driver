@@ -59,16 +59,14 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
-import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.mockito.internal.verification.VerificationModeFactory;
-import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.verification.Timeout;
 import org.slf4j.LoggerFactory;
 
-@RunWith(MockitoJUnitRunner.class)
 @Category(ParallelizableTests.class)
 public class RequestLoggerIT {
   private static final Pattern LOG_PREFIX_PER_REQUEST = Pattern.compile("\\[s\\d*\\|\\d*]");
@@ -192,9 +190,11 @@ public class RequestLoggerIT {
   @Mock private Appender<ILoggingEvent> appender;
   private Logger logger;
   private Level oldLevel;
+  private AutoCloseable mocks;
 
   @Before
   public void setup() {
+    mocks = MockitoAnnotations.openMocks(this);
     logger = (Logger) LoggerFactory.getLogger(RequestLogger.class);
     oldLevel = logger.getLevel();
     logger.setLevel(Level.INFO);
@@ -202,9 +202,14 @@ public class RequestLoggerIT {
   }
 
   @After
-  public void teardown() {
-    logger.detachAppender(appender);
-    logger.setLevel(oldLevel);
+  public void teardown() throws Exception {
+    if (logger != null) {
+      logger.detachAppender(appender);
+      logger.setLevel(oldLevel);
+    }
+    if (mocks != null) {
+      mocks.close();
+    }
   }
 
   @Test

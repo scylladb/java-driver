@@ -55,14 +55,14 @@ public abstract class MicrometerMetricUpdater<MetricT> extends AbstractMetricUpd
   @Override
   public void incrementCounter(MetricT metric, @Nullable String profileName, long amount) {
     if (isEnabled(metric, profileName)) {
-      getOrCreateCounterFor(metric).increment(amount);
+      getOrCreateCounterFor(metric).increment((double) amount);
     }
   }
 
   @Override
   public void updateHistogram(MetricT metric, @Nullable String profileName, long value) {
     if (isEnabled(metric, profileName)) {
-      getOrCreateDistributionSummaryFor(metric).record(value);
+      getOrCreateDistributionSummaryFor(metric).record((double) value);
     }
   }
 
@@ -70,7 +70,7 @@ public abstract class MicrometerMetricUpdater<MetricT> extends AbstractMetricUpd
   public void markMeter(MetricT metric, @Nullable String profileName, long amount) {
     if (isEnabled(metric, profileName)) {
       // There is no meter type in Micrometer, so use a counter
-      getOrCreateCounterFor(metric).increment(amount);
+      getOrCreateCounterFor(metric).increment((double) amount);
     }
   }
 

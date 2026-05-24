@@ -42,19 +42,19 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
-import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.mockito.junit.MockitoJUnitRunner;
+import org.mockito.MockitoAnnotations;
 
 @Category(ParallelizableTests.class)
-@RunWith(MockitoJUnitRunner.class)
 public class ListenersIT {
 
   @ClassRule
@@ -70,6 +70,18 @@ public class ListenersIT {
 
   @Captor private ArgumentCaptor<Node> nodeCaptor1;
   @Captor private ArgumentCaptor<Node> nodeCaptor2;
+
+  private AutoCloseable mocks;
+
+  @Before
+  public void setup() {
+    mocks = MockitoAnnotations.openMocks(this);
+  }
+
+  @After
+  public void teardown() throws Exception {
+    mocks.close();
+  }
 
   @Test
   @Ignore(

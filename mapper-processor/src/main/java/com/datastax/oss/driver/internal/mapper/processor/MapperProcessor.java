@@ -92,7 +92,7 @@ public class MapperProcessor extends AbstractProcessor {
         roundEnvironment, Dao.class, ElementKind.INTERFACE, generatorFactory::newDaoImplementation);
     processAnnotatedTypes(
         roundEnvironment, Mapper.class, ElementKind.INTERFACE, generatorFactory::newMapper);
-    return true;
+    return false;
   }
 
   protected ProcessorContext buildContext(
