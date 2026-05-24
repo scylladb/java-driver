@@ -33,6 +33,9 @@
   <artifactId>java-driver-osgi-tests</artifactId>
   <packaging>jar</packaging>
   <name>Java driver for Scylla and Apache Cassandra(R) - OSGi tests</name>
+  <properties>
+    <api.plumber.skip>true</api.plumber.skip>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>com.scylladb</groupId>
