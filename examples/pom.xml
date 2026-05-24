@@ -33,6 +33,9 @@
   <artifactId>java-driver-examples</artifactId>
   <name>Java driver for Scylla and Apache Cassandra(R) - examples.</name>
   <description>A collection of examples to demonstrate Java Driver for Scylla and Apache Cassandra(R).</description>
+  <properties>
+    <api.plumber.skip>true</api.plumber.skip>
+  </properties>
   <dependencies>
     <!-- driver dependencies -->
     <dependency>

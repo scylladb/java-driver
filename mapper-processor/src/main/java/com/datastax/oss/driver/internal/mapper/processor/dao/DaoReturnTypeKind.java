@@ -40,7 +40,7 @@ public interface DaoReturnTypeKind {
    * @param helperFieldName the name of the helper for entity conversions (might not get used for
    *     certain kinds, in that case it's ok to pass null).
    * @param methodElement the return type of the method (in case the result must be cast).
-   * @param typeParameters
+   * @param typeParameters the type parameters declared on the DAO method.
    */
   void addExecuteStatement(
       CodeBlock.Builder methodBuilder,

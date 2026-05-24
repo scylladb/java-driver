@@ -41,6 +41,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -115,6 +117,8 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up JDK ${{ matrix.java-version }}
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -182,6 +186,11 @@ jobs:
         cassandra-version: [3-LATEST, 4-LATEST]
         java-version: [11, 17]
         test-group: [parallelizable, serial, isolated]
+        exclude:
+          - cassandra-version: 3-LATEST
+            java-version: 17
+          - cassandra-version: 4-LATEST
+            java-version: 11
       fail-fast: false
 
     steps:
@@ -212,6 +221,7 @@ jobs:
         id: cassandra-version
         env:
           CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
+          GET_VERSION_VERSION: 0.4.5
           GH_TOKEN: ${{ github.token }}
         run: make resolve-cassandra-version
 
@@ -226,6 +236,7 @@ jobs:
         if: steps.ccm-cache.outputs.cache-hit != 'true'
         env:
           CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+          GET_VERSION_VERSION: 0.4.5
         run: make download-cassandra
 
       - name: Save CCM image into the cache
@@ -249,6 +260,7 @@ jobs:
         env:
           CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
           CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+          GET_VERSION_VERSION: 0.4.5
           GH_TOKEN: ${{ github.token }}
           MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
         run: make test-integration-cassandra
@@ -297,6 +309,13 @@ jobs:
         scylla-version: [LTS-LATEST, LTS-PRIOR, LATEST]
         java-version: [11, 17]
         test-group: [parallelizable, serial, isolated]
+        exclude:
+          - scylla-version: LTS-PRIOR
+            java-version: 17
+          - scylla-version: LTS-LATEST
+            java-version: 17
+          - scylla-version: LATEST
+            java-version: 11
       fail-fast: false
 
     steps:

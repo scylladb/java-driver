@@ -20,7 +20,6 @@ package com.datastax.oss.driver.internal.mapper.processor;
 import com.datastax.oss.driver.api.mapper.annotations.Dao;
 import com.datastax.oss.driver.api.mapper.annotations.Entity;
 import com.datastax.oss.driver.api.mapper.annotations.Mapper;
-import com.datastax.oss.driver.shaded.guava.common.base.Strings;
 import com.datastax.oss.driver.shaded.guava.common.base.Throwables;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.lang.annotation.Annotation;
@@ -167,7 +166,7 @@ public class MapperProcessor extends AbstractProcessor {
     if (amountSpec != null) {
       try {
         int amount = Integer.parseInt(amountSpec);
-        return Strings.repeat(tabs ? "\t" : " ", amount);
+        return (tabs ? "\t" : " ").repeat(amount);
       } catch (NumberFormatException e) {
         messager.warn(
             "Could not parse %s: expected a number, got '%s'. Defaulting to %s.",

@@ -101,6 +101,7 @@
     <release.autopublish>false</release.autopublish>
     <pushChanges>false</pushChanges>
     <mockitoopens.argline/>
+    <api.plumber.skip>false</api.plumber.skip>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -717,8 +718,7 @@
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <source>11</source>
-          <target>11</target>
+          <release>11</release>
           <compilerArgs combine.children="override">
             <compilerArg>-XDcompilePolicy=simple</compilerArg>
             <compilerArg>--should-stop=ifError=FLOW</compilerArg>
@@ -879,6 +879,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
             </goals>
             <phase>process-classes</phase>
             <configuration>
+              <skip>${api.plumber.skip}</skip>
               <doclet>com.datastax.oss.doclet.ApiPlumber</doclet>
               <docletArtifact>
                 <groupId>com.datastax.oss</groupId>
@@ -1081,6 +1082,16 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <activation>
         <jdk>[11,)</jdk>
       </activation>
+    </profile>
+    <profile>
+      <!-- ApiPlumber uses the legacy com.sun.javadoc doclet API removed in JDK 13. -->
+      <id>skip-api-plumber-on-jdk-13</id>
+      <activation>
+        <jdk>[13,)</jdk>
+      </activation>
+      <properties>
+        <api.plumber.skip>true</api.plumber.skip>
+      </properties>
     </profile>
     <profile>
       <!-- workarounds for running tests with JDK14 -->
