@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.datastax.dse.driver.DseTestDataProviders;
@@ -250,7 +250,7 @@ public class GraphSupportCheckerTest {
                 graphStatement, executionProfile, mock(InternalDriverContext.class));
 
     assertThat(inferredProtocol).isEqualTo(graphProtocol);
-    verifyZeroInteractions(executionProfile);
+    verifyNoInteractions(executionProfile);
   }
 
   @Test

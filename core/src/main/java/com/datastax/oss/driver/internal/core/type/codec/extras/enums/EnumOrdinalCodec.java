@@ -54,6 +54,7 @@ public class EnumOrdinalCodec<EnumT extends Enum<EnumT>> extends MappingCodec<In
 
   @Nullable
   @Override
+  @SuppressWarnings("EnumOrdinal")
   protected Integer outerToInner(@Nullable EnumT value) {
     return value == null ? null : value.ordinal();
   }

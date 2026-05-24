@@ -52,14 +52,14 @@ public class OptionalCodec<T> extends MappingCodec<T, Optional<T>> {
     return false;
   }
 
-  @Nullable
   @Override
   protected Optional<T> innerToOuter(@Nullable T value) {
-    return Optional.ofNullable(isAbsent(value) ? null : value);
+    return isAbsent(value) ? Optional.empty() : Optional.of(value);
   }
 
   @Nullable
   @Override
+  @SuppressWarnings("NullableOptional")
   protected T outerToInner(@Nullable Optional<T> value) {
     return value != null && value.isPresent() ? value.get() : null;
   }

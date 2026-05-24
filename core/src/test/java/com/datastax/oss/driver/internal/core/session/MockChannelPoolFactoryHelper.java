@@ -23,7 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
@@ -124,7 +124,7 @@ public class MockChannelPoolFactoryHelper {
 
     private Builder(ChannelPoolFactory channelPoolFactory) {
       assertThat(MockUtil.isMock(channelPoolFactory)).as("expected a mock").isTrue();
-      verifyZeroInteractions(channelPoolFactory);
+      verifyNoInteractions(channelPoolFactory);
       this.channelPoolFactory = channelPoolFactory;
     }
 

@@ -68,7 +68,7 @@ public class InsightMetadata {
     }
     InsightMetadata that = (InsightMetadata) o;
     return Objects.equals(name, that.name)
-        && Objects.equals(timestamp, that.timestamp)
+        && timestamp == that.timestamp
         && Objects.equals(tags, that.tags)
         && insightType == that.insightType
         && Objects.equals(insightMappingId, that.insightMappingId);

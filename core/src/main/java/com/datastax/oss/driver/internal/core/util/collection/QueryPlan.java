@@ -52,6 +52,7 @@ import net.jcip.annotations.ThreadSafe;
 @ThreadSafe
 public interface QueryPlan extends Queue<Node> {
 
+  @SuppressWarnings("ClassInitializationDeadlock")
   QueryPlan EMPTY = new EmptyQueryPlan();
 
   /**

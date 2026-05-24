@@ -69,6 +69,7 @@ public class CompletionStageAssert<V>
     return isFailed(f -> {});
   }
 
+  @SuppressWarnings("EmptyCatch")
   public CompletionStageAssert<V> isCancelled() {
     boolean cancelled = false;
     try {
@@ -83,6 +84,7 @@ public class CompletionStageAssert<V>
     return this;
   }
 
+  @SuppressWarnings("EmptyCatch")
   public CompletionStageAssert<V> isNotCancelled() {
     boolean cancelled = false;
     try {

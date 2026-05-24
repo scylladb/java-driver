@@ -27,6 +27,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  * where, and a method that allows the original request to be modified before the retry.
  */
 @FunctionalInterface
+@SuppressWarnings("ClassInitializationDeadlock")
 public interface RetryVerdict {
 
   /** A retry verdict that retries the same request on the same node. */

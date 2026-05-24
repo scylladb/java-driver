@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core.metadata.schema;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.Describable;
-import com.datastax.oss.driver.shaded.guava.common.base.Strings;
 import java.util.function.Consumer;
 import net.jcip.annotations.NotThreadSafe;
 
@@ -42,7 +41,7 @@ public class ScriptBuilder {
 
   public ScriptBuilder append(String s) {
     if (pretty && isAtLineStart && indent > 0) {
-      builder.append(Strings.repeat(" ", indent * INDENT_SIZE));
+      builder.append(" ".repeat(indent * INDENT_SIZE));
     }
     isAtLineStart = false;
     builder.append(s);
@@ -65,7 +64,7 @@ public class ScriptBuilder {
   }
 
   public ScriptBuilder forceNewLine(int count) {
-    builder.append(Strings.repeat("\n", count));
+    builder.append("\n".repeat(count));
     isAtLineStart = true;
     return this;
   }

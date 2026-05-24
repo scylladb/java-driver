@@ -57,6 +57,7 @@ public interface CodecRegistry {
    * but any attempt to {@linkplain MutableCodecRegistry#register(TypeCodec) register new codecs}
    * will throw {@link UnsupportedOperationException}.
    */
+  @SuppressWarnings("ClassInitializationDeadlock")
   CodecRegistry DEFAULT =
       new DefaultCodecRegistry("default") {
         @Override

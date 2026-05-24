@@ -22,7 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
@@ -83,7 +83,7 @@ public abstract class AccessibleByIdTestBase<
     t = t.setBytesUnsafe(FIELD0_ID, Bytes.fromHexString("0x00000001"));
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(t.getBytesUnsafe(FIELD0_ID)).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
 
@@ -97,7 +97,7 @@ public abstract class AccessibleByIdTestBase<
     t = t.setToNull(FIELD0_ID);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(t.getBytesUnsafe(FIELD0_ID)).isNull();
   }
 
@@ -144,7 +144,7 @@ public abstract class AccessibleByIdTestBase<
     t = t.set(FIELD0_ID, "1", intToStringCodec);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     verify(intToStringCodec).encode("1", ProtocolVersion.DEFAULT);
     assertThat(t.getBytesUnsafe(FIELD0_ID)).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
@@ -189,7 +189,7 @@ public abstract class AccessibleByIdTestBase<
     ByteBuffer bytes = t.getBytesUnsafe(FIELD0_ID);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(bytes).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
 
@@ -203,7 +203,7 @@ public abstract class AccessibleByIdTestBase<
     boolean isNull = t.isNull(FIELD0_ID);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(isNull).isTrue();
   }
 
@@ -253,7 +253,7 @@ public abstract class AccessibleByIdTestBase<
     String s = t.get(FIELD0_ID, intToStringCodec);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     verify(intToStringCodec).decode(any(ByteBuffer.class), eq(ProtocolVersion.DEFAULT));
     assertThat(s).isEqualTo("1");
   }
@@ -295,7 +295,7 @@ public abstract class AccessibleByIdTestBase<
     t = t.setBytesUnsafe(FIELD0_NAME, Bytes.fromHexString("0x00000001"));
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(t.getBytesUnsafe(FIELD0_NAME)).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
 
@@ -309,7 +309,7 @@ public abstract class AccessibleByIdTestBase<
     t = t.setToNull(FIELD0_NAME);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(t.getBytesUnsafe(FIELD0_NAME)).isNull();
   }
 
@@ -356,7 +356,7 @@ public abstract class AccessibleByIdTestBase<
     t = t.set(FIELD0_NAME, "1", intToStringCodec);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     verify(intToStringCodec).encode("1", ProtocolVersion.DEFAULT);
     assertThat(t.getBytesUnsafe(FIELD0_NAME)).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
@@ -401,7 +401,7 @@ public abstract class AccessibleByIdTestBase<
     ByteBuffer bytes = t.getBytesUnsafe(FIELD0_NAME);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(bytes).isEqualTo(Bytes.fromHexString("0x00000001"));
   }
 
@@ -415,7 +415,7 @@ public abstract class AccessibleByIdTestBase<
     boolean isNull = t.isNull(FIELD0_NAME);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     assertThat(isNull).isTrue();
   }
 
@@ -465,7 +465,7 @@ public abstract class AccessibleByIdTestBase<
     String s = t.get(FIELD0_NAME, intToStringCodec);
 
     // Then
-    verifyZeroInteractions(codecRegistry);
+    verifyNoInteractions(codecRegistry);
     verify(intToStringCodec).decode(any(ByteBuffer.class), eq(ProtocolVersion.DEFAULT));
     assertThat(s).isEqualTo("1");
   }

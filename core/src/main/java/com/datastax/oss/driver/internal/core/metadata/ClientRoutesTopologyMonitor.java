@@ -55,8 +55,8 @@ import org.slf4j.LoggerFactory;
 public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   private static final Logger LOG = LoggerFactory.getLogger(ClientRoutesTopologyMonitor.class);
 
-  private static final String SELECT_ROUTES_COLUMNS =
-      "SELECT host_id, address, port, tls_port, connection_id FROM %s";
+  private static final String SELECT_ROUTES_PREFIX =
+      "SELECT host_id, address, port, tls_port, connection_id FROM ";
 
   /** Disables result-set paging, matching the convention used by {@link DefaultTopologyMonitor}. */
   private static final int NO_PAGING = -1;
@@ -508,8 +508,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     boolean hasConnectionIds = !connectionIds.isEmpty();
     boolean hasHostIds = eventHostIds != null && !eventHostIds.isEmpty();
 
-    StringBuilder stmt =
-        new StringBuilder(String.format(SELECT_ROUTES_COLUMNS, config.getTableName()));
+    StringBuilder stmt = new StringBuilder(SELECT_ROUTES_PREFIX).append(config.getTableName());
 
     if (hasConnectionIds) {
       // Prepared statements cannot be used here because AdminRequestHandler only supports

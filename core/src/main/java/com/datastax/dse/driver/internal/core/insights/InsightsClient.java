@@ -64,7 +64,6 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -114,7 +113,7 @@ public class InsightsClient {
     DataCentersFinder dataCentersFinder = new DataCentersFinder();
     return new InsightsClient(
         driverContext,
-        () -> new Date().getTime(),
+        System::currentTimeMillis,
         insightsConfiguration,
         new PlatformInfoFinder(),
         new ReconnectionPolicyInfoFinder(),
