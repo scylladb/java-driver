@@ -83,12 +83,12 @@ public class CqlPrepareAsyncProcessor
         });
   }
 
-  private static boolean typeMatches(UserDefinedType oldType, DataType typeToCheck) {
+  static boolean typeMatches(UserDefinedType oldType, DataType typeToCheck) {
 
     switch (typeToCheck.getProtocolCode()) {
       case ProtocolConstants.DataType.UDT:
         UserDefinedType udtType = (UserDefinedType) typeToCheck;
-        return udtType.equals(oldType)
+        return sameTypeName(udtType, oldType)
             ? true
             : Iterables.any(udtType.getFieldTypes(), (testType) -> typeMatches(oldType, testType));
       case ProtocolConstants.DataType.LIST:
@@ -110,7 +110,14 @@ public class CqlPrepareAsyncProcessor
     }
   }
 
+  private static boolean sameTypeName(UserDefinedType left, UserDefinedType right) {
+    return left.getKeyspace().equals(right.getKeyspace()) && left.getName().equals(right.getName());
+  }
+
   private void onTypeChanged(TypeChangeEvent event) {
+    if (event.oldType == null) {
+      return;
+    }
     for (Map.Entry<PrepareRequest, CompletableFuture<PreparedStatement>> entry :
         this.cache.asMap().entrySet()) {
 

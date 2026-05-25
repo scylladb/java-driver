@@ -21,6 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.oss.driver.api.core.cql.PrepareRequest;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.type.DataTypes;
+import com.datastax.oss.driver.api.core.type.UserDefinedType;
+import com.datastax.oss.driver.internal.core.type.UserDefinedTypeBuilder;
 import com.datastax.oss.driver.shaded.guava.common.cache.Cache;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -84,5 +87,23 @@ public class CqlPrepareAsyncProcessorTest {
     // Cancelling the returned copy should NOT affect the cached future
     returned.toCompletableFuture().cancel(false);
     assertThat(inFlight.isCancelled()).isFalse();
+  }
+
+  @Test
+  public void should_match_udt_by_name_when_field_definitions_differ() {
+    UserDefinedType oldType =
+        new UserDefinedTypeBuilder("ks", "test_type_2")
+            .withField("c", DataTypes.INT)
+            .withField("d", DataTypes.TEXT)
+            .build();
+    UserDefinedType resultType =
+        new UserDefinedTypeBuilder("ks", "test_type_2")
+            .withField("c", DataTypes.INT)
+            .withField("d", DataTypes.TEXT)
+            .withField("i", DataTypes.BLOB)
+            .build();
+
+    assertThat(CqlPrepareAsyncProcessor.typeMatches(oldType, DataTypes.listOf(resultType)))
+        .isTrue();
   }
 }
