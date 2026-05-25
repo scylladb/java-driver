@@ -132,6 +132,9 @@ public class MicrometerSessionMetricUpdaterTest {
     when(context.getMetricIdGenerator()).thenReturn(generator);
     when(profile.getDuration(DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER))
         .thenReturn(Duration.ofHours(1));
+    when(profile.getDuration(lowest)).thenReturn(Duration.ofMillis(10));
+    when(profile.getDuration(highest)).thenReturn(Duration.ofSeconds(1));
+    when(profile.getInt(digits)).thenReturn(5);
     when(profile.isDefined(sla)).thenReturn(false);
     when(profile.getDurationList(sla))
         .thenReturn(Arrays.asList(Duration.ofMillis(100), Duration.ofMillis(500)));
