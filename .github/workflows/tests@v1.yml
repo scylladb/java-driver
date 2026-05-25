@@ -212,6 +212,7 @@ jobs:
         id: cassandra-version
         env:
           CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
+          GH_TOKEN: ${{ github.token }}
         run: make resolve-cassandra-version
 
       - name: Pull CCM image from the cache
@@ -246,7 +247,9 @@ jobs:
       - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }}) - ${{ matrix.test-group }}
         id: run-integration-tests
         env:
+          CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
           CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+          GH_TOKEN: ${{ github.token }}
           MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
         run: make test-integration-cassandra
 
@@ -324,6 +327,7 @@ jobs:
         id: scylla-version
         env:
           SCYLLA_VERSION: ${{ matrix.scylla-version }}
+          GH_TOKEN: ${{ github.token }}
         run: make resolve-scylla-version
 
       - name: Pull CCM image from the cache
