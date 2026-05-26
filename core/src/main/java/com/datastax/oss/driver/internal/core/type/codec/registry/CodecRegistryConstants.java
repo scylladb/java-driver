@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.type.codec.registry;
 
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
@@ -31,7 +32,12 @@ public class CodecRegistryConstants {
    * <p>This is exposed in case you want to call {@link
    * DefaultCodecRegistry#DefaultCodecRegistry(String, int, BiFunction, int, BiConsumer,
    * TypeCodec[])} but only customize the caching options.
+   *
+   * @deprecated use {@link #getPrimitiveCodecs()} instead. This array remains public for binary
+   *     compatibility and will be made non-public in a future release.
    */
+  @Deprecated
+  @SuppressWarnings("MutablePublicArray")
   public static final TypeCodec<?>[] PRIMITIVE_CODECS =
       new TypeCodec<?>[] {
         // Must be declared before AsciiCodec so it gets chosen when CQL type not available
@@ -57,4 +63,12 @@ public class CodecRegistryConstants {
         TypeCodecs.COUNTER,
         TypeCodecs.ASCII
       };
+
+  /**
+   * Returns the driver's default primitive codecs (map all primitive CQL types to their "natural"
+   * Java equivalent).
+   */
+  public static List<TypeCodec<?>> getPrimitiveCodecs() {
+    return List.of(PRIMITIVE_CODECS);
+  }
 }
