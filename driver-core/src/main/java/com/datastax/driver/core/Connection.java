@@ -1329,6 +1329,44 @@ class Connection {
     }
 
     /**
+     * Same as {@link #open(HostConnectionPool)}, but returns a future instead of blocking.
+     *
+     * <p>This avoids blocking the calling thread (e.g. a Netty I/O thread) while waiting for the
+     * protocol handshake to complete, preventing potential cyclic thread deadlocks.
+     */
+    ListenableFuture<Connection> openAsync(final HostConnectionPool pool) {
+      return openAsync(pool, -1, 0);
+    }
+
+    /**
+     * Same as {@link #open(HostConnectionPool, int, int)}, but returns a future instead of
+     * blocking.
+     *
+     * <p>This avoids blocking the calling thread (e.g. a Netty I/O thread) while waiting for the
+     * protocol handshake to complete, preventing potential cyclic thread deadlocks.
+     */
+    ListenableFuture<Connection> openAsync(
+        final HostConnectionPool pool, final int shardId, final int serverPort) {
+      if (isShutdown)
+        return Futures.immediateFailedFuture(
+            new ConnectionException(pool.host.getEndPoint(), "Connection factory is shut down"));
+
+      pool.host.convictionPolicy.signalConnectionsOpening(1);
+      final Connection connection =
+          new Connection(buildConnectionName(pool.host), pool.host.getEndPoint(), this, pool);
+
+      return Futures.transformAsync(
+          connection.initAsync(shardId, serverPort),
+          new AsyncFunction<Void, Connection>() {
+            @Override
+            public ListenableFuture<Connection> apply(Void input) {
+              return Futures.immediateFuture(connection);
+            }
+          },
+          MoreExecutors.directExecutor());
+    }
+
+    /**
      * Creates new connections and associate them to the provided connection pool, but does not
      * start them.
      */
