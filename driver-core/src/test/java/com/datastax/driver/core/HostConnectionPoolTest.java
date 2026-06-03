@@ -61,6 +61,7 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -68,6 +69,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -315,6 +317,70 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       assertThat(pool.isClosed()).isTrue();
       assertThat(pool.opened()).isEqualTo(0);
       assertThat(pool.trashed()).isEqualTo(0);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that {@link HostConnectionPool#initAsync(Connection)} does not block the calling thread
+   * while establishing the first connection for a new pool.
+   *
+   * <p>Previously, {@code initAsync} called the synchronous {@code Connection.Factory.open()},
+   * which internally performed an unbounded {@code .get()} on the connection handshake future. This
+   * could cause a permanent cyclic deadlock when the call was made on a Netty I/O thread (via
+   * {@code directExecutor()} chaining in {@code SessionManager.initAsync()}): if Netty's
+   * round-robin assigned the new channel to the same blocked I/O thread, neither the connection nor
+   * any timeout task queued on that thread could ever complete.
+   *
+   * <p>The fix replaces the blocking {@code open()} with the non-blocking {@code openAsync()}, so
+   * the calling thread is never stalled waiting for the protocol handshake.
+   *
+   * @test_category connection:connection_pool
+   * @see <a href="https://github.com/scylladb/scylla-dtest/pull/7046">scylla-dtest#7046</a>
+   */
+  @Test(groups = "short")
+  public void initAsync_should_not_block_calling_thread() throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      Session session = cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      SessionManager sessionManager = (SessionManager) session;
+
+      // Spy on the factory and stub openAsync() to return a future that never completes,
+      // simulating a connection attempt to a node that does not respond (e.g. firewalled).
+      Connection.Factory factory = spy(cluster.manager.connectionFactory);
+      cluster.manager.connectionFactory = factory;
+      final SettableFuture<Connection> neverCompletingFuture = SettableFuture.create();
+      doReturn(neverCompletingFuture).when(factory).openAsync(any(HostConnectionPool.class));
+
+      final HostConnectionPool pool =
+          new HostConnectionPool(host, HostDistance.LOCAL, sessionManager);
+
+      // Submit initAsync() to the actual Netty I/O thread, reproducing the exact thread context
+      // of the original bug: SessionManager.initAsync() chains updateCreatedPools() via
+      // directExecutor(), which runs on whatever thread completes the last pool-creation future —
+      // potentially a Netty I/O thread.
+      ExecutorService ioThread =
+          (ExecutorService) cluster.manager.connectionFactory.eventLoopGroup.next();
+      java.util.concurrent.Future<ListenableFuture<Void>> submitted =
+          ioThread.submit(
+              new Callable<ListenableFuture<Void>>() {
+                @Override
+                public ListenableFuture<Void> call() {
+                  return pool.initAsync(null);
+                }
+              });
+
+      // initAsync() must return a future promptly without blocking the I/O thread.
+      // With the old blocking open().get() this would time out here — and then deadlock
+      // permanently because the timeout task itself is queued on the same blocked thread.
+      ListenableFuture<Void> initFuture = submitted.get(2, TimeUnit.SECONDS);
+
+      // The returned future should still be pending because openAsync() never completed.
+      assertThat(initFuture.isDone()).isFalse();
+
+      pool.closeAsync().force();
     } finally {
       cluster.close();
     }
