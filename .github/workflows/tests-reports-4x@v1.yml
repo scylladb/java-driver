@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Generate test report
-        uses: dorny/test-reporter@v1
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
           artifact: 'test-results'
           name: 'Test report'
