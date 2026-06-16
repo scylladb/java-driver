@@ -210,5 +210,5 @@ Here is the order of precedence of all the methods described so far:
 
 [gettimeofday]: http://man7.org/linux/man-pages/man2/settimeofday.2.html
 [JNR]: https://github.com/jnr/jnr-posix
-[Lightweight transactions]: https://docs.datastax.com/en/dse/6.0/cql/cql/cql_using/useInsertLWT.html
+[Lightweight transactions]: https://docs.scylladb.com/manual/stable/cql/dml/insert.html
 [Statement.setQueryTimestamp()]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/Statement.html#setQueryTimestamp-long-

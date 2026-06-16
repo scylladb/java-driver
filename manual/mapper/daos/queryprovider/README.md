@@ -161,6 +161,6 @@ Here is the full implementation:
 [entityHelpers]:  https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/QueryProvider.html#entityHelpers--
 [providerMethod]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/QueryProvider.html#providerMethod--
 [MapperContext]:  https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/MapperContext.html
-[EntityHelper]:   https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/EntityHelper.html
+[EntityHelper]:   https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/entity/EntityHelper.html
 [ResultSet]:      https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/ResultSet.html
 [PagingIterable]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/PagingIterable.html

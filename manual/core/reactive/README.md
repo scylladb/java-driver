@@ -402,7 +402,7 @@ more fine-grained control of what should be retried, and how, is required.
 [built-in retry mechanism]: ../retries/
 [request throttling]: ../throttling/
 
-[Managing concurrency in asynchronous query execution]: https://docs.datastax.com/en/devapp/doc/devapp/driverManagingConcurrency.html]
+[Managing concurrency in asynchronous query execution]: https://docs.datastax.com/en/devapp/doc/devapp/driverManagingConcurrency.html
 [Publisher]: https://www.reactive-streams.org/reactive-streams-1.0.2-javadoc/org/reactivestreams/Publisher.html
 [reactive streams]: https://en.wikipedia.org/wiki/Reactive_Streams
 [Reactive Streams API]: https://github.com/reactive-streams/reactive-streams-jvm

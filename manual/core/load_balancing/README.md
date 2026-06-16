@@ -288,10 +288,9 @@ infrastructure. To resume our example above, if Region1 goes down, the load bala
 infrastructure would transparently switch all the traffic intended for that region to Region2,
 possibly scaling up its bandwidth to cope with the network traffic spike. This is by far the best
 solution for the cross-datacenter failover issue in general, but we acknowledge that it also
-requires a purpose-built infrastructure. To help you explore this option, read our [white paper].
+requires a purpose-built infrastructure.
 
 [application-level failover example]: https://github.com/scylladb/java-driver/blob/scylla-4.x/examples/src/main/java/com/datastax/oss/driver/examples/failover/CrossDatacenterFailover.java
-[white paper]: https://www.datastax.com/sites/default/files/content/whitepaper/files/2019-09/Designing-Fault-Tolerant-Applications-DataStax.pdf
 
 #### Token-aware
 

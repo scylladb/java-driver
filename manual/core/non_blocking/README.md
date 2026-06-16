@@ -68,7 +68,7 @@ For example, calling any synchronous method declared in [`SyncCqlSession`], such
 will block until the result is available. These methods should never be used in non-blocking 
 applications.
 
-[`SyncCqlSession`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/SyncCqlSession.html`
+[`SyncCqlSession`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/SyncCqlSession.html
 [`execute`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/SyncCqlSession.html#execute-com.datastax.oss.driver.api.core.cql.Statement-
 
 However, the asynchronous methods declared in [`AsyncCqlSession`], such as [`executeAsync`], are all 
