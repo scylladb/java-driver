@@ -387,7 +387,7 @@ has been deprecated; it should be replaced with a node distance evaluator class 
 
 [JAVA-2899](https://datastax-oss.atlassian.net/browse/JAVA-2899) re-introduced the ability to
 perform cross-datacenter failover using the driver's built-in load balancing policies. See [Load
-balancing](../manual/core/loadbalancing/) in the manual for details.
+balancing](../manual/core/load_balancing/) in the manual for details.
 
 Cross-datacenter failover is disabled by default, therefore existing applications should not
 experience any disruption.

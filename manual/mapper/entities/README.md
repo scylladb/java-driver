@@ -588,7 +588,7 @@ To control how the class hierarchy is scanned, annotate classes with [@Hierarchy
 [@Update]:              https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/Update.html
 [@GetEntity]:           https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/GetEntity.html
 [@Query]:               https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/Query.html
-[aliases]:              http://cassandra.apache.org/doc/latest/cql/dml.html?#aliases
+[aliases]:              https://docs.scylladb.com/manual/stable/cql/dml/select.html#aliases
 [@Transient]:           https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/Transient.html
 [@TransientProperties]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/TransientProperties.html
 [@HierarchyScanStrategy]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/mapper/annotations/HierarchyScanStrategy.html

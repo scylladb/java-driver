@@ -95,7 +95,7 @@ have full control over their network configuration.
 `HeartbeatHandler` is based on Netty's built-in `IdleStateHandler`, so there's not much in there
 apart from the details of the control request.
 
-### InFlightHandler
+### In-Flight Handler
 
 This handler is where most of the connection logic resides. It is responsible for:
 

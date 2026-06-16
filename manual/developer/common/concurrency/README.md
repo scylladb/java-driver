@@ -121,7 +121,7 @@ public interface ExecutionInfo {
 When a public API method is blocking, this is generally clearly stated in its javadocs. 
 
 [`ExecutionInfo.getQueryTrace()`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/ExecutionInfo.html#getQueryTrace--
-[`SyncCqlSession`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/SyncCqlSession.html`
+[`SyncCqlSession`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/SyncCqlSession.html
 
 `BlockingOperation` is a utility to check that those methods aren't called on I/O threads, which
 could introduce deadlocks.

@@ -100,7 +100,7 @@ This ability is considered a misfeature and has been removed from driver 4.0 onw
 However, due to popular demand, cross-datacenter failover has been brought back to driver 4 in
 version 4.10.0.
 
-If you are using a driver version >= 4.10.0, read the [manual](../manual/core/loadbalancing/) to
+If you are using a driver version >= 4.10.0, read the [manual](../manual/core/load_balancing/) to
 understand how to enable this feature; for driver versions < 4.10.0, this feature is simply not
 available.
 

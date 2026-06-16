@@ -363,6 +363,6 @@ CSV files, SLF4J logs and Graphite. Refer to their [manual][Dropwizard manual] f
 [Dropwizard Metrics]: https://metrics.dropwizard.io/4.1.2
 [Dropwizard Manual]: https://metrics.dropwizard.io/4.1.2/getting-started.html
 [Micrometer Metrics]: https://micrometer.io/docs
-[Micrometer JMX]: https://micrometer.io/docs/registry/jmx
+[Micrometer JMX]: https://docs.micrometer.io/micrometer/reference/implementations/jmx.html
 [MicroProfile Metrics]: https://github.com/eclipse/microprofile-metrics
 [reference configuration]: ../configuration/reference/

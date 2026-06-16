@@ -29,8 +29,8 @@ under the License.
   * When using LZ4 [compression](../compression/);
   * Depending on the [logging backend](../logging) in use.
 * DSE-specific features:
-  * [Geospatial types](../dse/geotypes) are supported.
-  * [DSE Graph](../dse/graph) is not officially supported, although it may work.
+  * Geospatial types are supported.
+  * DSE Graph is not officially supported, although it may work.
 * The [shaded jar](../shaded_jar) is not officially supported, although it may work.
 
 -----
@@ -120,7 +120,7 @@ resources are all automatically included in the native image: you should not nee
 manually_. See [Accessing Resources in Native Images] for more information on how classpath 
 resources are handled in native images.
 
-[Accessing Resources in Native Images]: https://www.graalvm.org/reference-manual/native-image/Resources/
+[Accessing Resources in Native Images]: https://www.graalvm.org/latest/reference-manual/native-image/metadata/#resources
 
 ### Configuring the logging backend
 

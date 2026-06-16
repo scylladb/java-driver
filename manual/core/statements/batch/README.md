@@ -83,5 +83,5 @@ to execute such a batch, an `IllegalArgumentException` is thrown.
 [BatchStatement]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/BatchStatement.html
 [BatchStatement.newInstance()]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/BatchStatement.html#newInstance-com.datastax.oss.driver.api.core.cql.BatchType-
 [BatchStatement.builder()]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/BatchStatement.html#builder-com.datastax.oss.driver.api.core.cql.BatchType-
-[batch_dse]: http://docs.datastax.com/en/dse/6.7/cql/cql/cql_using/useBatch.html
+[batch_dse]: https://docs.scylladb.com/manual/stable/cql/dml/batch.html
 [CASSANDRA-10246]: https://issues.apache.org/jira/browse/CASSANDRA-10246
