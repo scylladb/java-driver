@@ -210,11 +210,17 @@ public class ChannelPool implements AsyncAutoCloseable {
 
   /** @return the number of active channels in the pool. */
   public int size() {
+    if (!singleThreaded.initialized) {
+      return 0;
+    }
     return Arrays.stream(channels).mapToInt(ChannelSet::size).sum();
   }
 
   /** @return the number of available stream ids on all channels in the pool. */
   public int getAvailableIds() {
+    if (!singleThreaded.initialized) {
+      return 0;
+    }
     return Arrays.stream(channels).mapToInt(ChannelSet::getAvailableIds).sum();
   }
 
@@ -223,6 +229,9 @@ public class ChannelPool implements AsyncAutoCloseable {
    *     {@link #getOrphanedIds() orphaned ids}).
    */
   public int getInFlight() {
+    if (!singleThreaded.initialized) {
+      return 0;
+    }
     return Arrays.stream(channels).mapToInt(ChannelSet::getInFlight).sum();
   }
 
@@ -232,6 +241,9 @@ public class ChannelPool implements AsyncAutoCloseable {
    *     might still come from the server.
    */
   public int getOrphanedIds() {
+    if (!singleThreaded.initialized) {
+      return 0;
+    }
     return Arrays.stream(channels).mapToInt(ChannelSet::getOrphanedIds).sum();
   }
 

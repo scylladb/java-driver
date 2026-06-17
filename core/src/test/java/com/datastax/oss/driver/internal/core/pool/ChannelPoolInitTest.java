@@ -149,6 +149,34 @@ public class ChannelPoolInitTest extends ChannelPoolTestBase {
   }
 
   @Test
+  public void should_return_zero_for_metric_accessors_when_pool_uninitialized() throws Exception {
+    // Reproduce CUSTOMER-413: when the initial connection attempt fails, connectFuture completes
+    // with channels == null (initialize() is only called on the success path). Before the fix,
+    // any call to size/getAvailableIds/getInFlight/getOrphanedIds threw NullPointerException via
+    // Arrays.stream(null), which propagated through the Dropwizard Metrics gauge lambdas
+    // registered in DropwizardNodeMetricUpdater.
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    MockChannelFactoryHelper.builder(channelFactory)
+        .failure(node, "mock channel init failure")
+        .build();
+
+    CompletionStage<ChannelPool> poolFuture =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test");
+
+    ChannelPool pool = poolFuture.toCompletableFuture().get();
+
+    // Confirm the precondition: pool entered the map but channels was never initialized
+    assertThat(pool.channels).isNull();
+
+    // All four accessor methods must return 0 without throwing
+    assertThat(pool.size()).isEqualTo(0);
+    assertThat(pool.getAvailableIds()).isEqualTo(0);
+    assertThat(pool.getInFlight()).isEqualTo(0);
+    assertThat(pool.getOrphanedIds()).isEqualTo(0);
+  }
+
+  @Test
   public void should_reconnect_when_init_incomplete() throws Exception {
     // Short delay so we don't have to wait in the test
     when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
