@@ -31,7 +31,6 @@ import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.SocketOptions;
 import com.datastax.driver.core.WriteType;
 import com.datastax.driver.core.exceptions.DriverException;
-import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.OperationTimedOutException;
 import com.datastax.driver.core.exceptions.ReadFailureException;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
@@ -370,13 +369,43 @@ public class DowngradingConsistencyRetryPolicyIntegrationTest
 
   /**
    * Ensures that when handling a client timeout with {@link DowngradingConsistencyRetryPolicy} that
-   * a retry is attempted on the next host until all hosts are tried at which point a {@link
-   * NoHostAvailableException} is returned.
+   * a retry is attempted on the next host. If the retry also times out, the exception is rethrown.
    *
    * @test_category retry_policy
    */
   @Test(groups = "short")
-  public void should_try_next_host_on_client_timeouts() {
+  public void should_try_next_host_on_first_client_timeout() {
+    cluster.getConfiguration().getSocketOptions().setReadTimeoutMillis(1);
+    try {
+      scassandras
+          .node(1)
+          .primingClient()
+          .prime(
+              PrimingRequest.queryBuilder()
+                  .withQuery("mock query")
+                  .withThen(then().withFixedDelay(1000L).withRows(row("result", "result1")))
+                  .build());
+      simulateNormalResponse(2);
+
+      query();
+
+      assertOnRequestErrorWasCalled(1, OperationTimedOutException.class);
+      assertThat(errors.getRetries().getCount()).isEqualTo(1);
+      assertThat(errors.getClientTimeouts().getCount()).isEqualTo(1);
+      assertThat(errors.getRetriesOnClientTimeout().getCount()).isEqualTo(1);
+      assertQueried(1, 1);
+      assertQueried(2, 1);
+      assertQueried(3, 0);
+    } finally {
+      cluster
+          .getConfiguration()
+          .getSocketOptions()
+          .setReadTimeoutMillis(SocketOptions.DEFAULT_READ_TIMEOUT_MILLIS);
+    }
+  }
+
+  @Test(groups = "short")
+  public void should_rethrow_on_second_client_timeout() {
     cluster.getConfiguration().getSocketOptions().setReadTimeoutMillis(1);
     try {
       scassandras
@@ -405,32 +434,17 @@ public class DowngradingConsistencyRetryPolicyIntegrationTest
                   .build());
       try {
         query();
-        Assertions.fail("expected a NoHostAvailableException");
-      } catch (NoHostAvailableException e) {
-        assertThat(e.getErrors().keySet())
-            .hasSize(3)
-            .containsOnly(host1.getEndPoint(), host2.getEndPoint(), host3.getEndPoint());
-        assertThat(e.getErrors().values()).hasOnlyElementsOfType(OperationTimedOutException.class);
-        assertThat(
-                ((OperationTimedOutException) e.getErrors().get(host1.getEndPoint())).getMessage())
-            .contains(
-                String.format("[%s] Timed out waiting for server response", host1.getEndPoint()));
-        assertThat(
-                ((OperationTimedOutException) e.getErrors().get(host2.getEndPoint())).getMessage())
-            .contains(
-                String.format("[%s] Timed out waiting for server response", host2.getEndPoint()));
-        assertThat(
-                ((OperationTimedOutException) e.getErrors().get(host3.getEndPoint())).getMessage())
-            .contains(
-                String.format("[%s] Timed out waiting for server response", host3.getEndPoint()));
+        Assertions.fail("expected an OperationTimedOutException");
+      } catch (OperationTimedOutException e) {
+        assertThat(e.getMessage()).contains("Timed out waiting for server response");
       }
-      assertOnRequestErrorWasCalled(3, OperationTimedOutException.class);
-      assertThat(errors.getRetries().getCount()).isEqualTo(3);
-      assertThat(errors.getClientTimeouts().getCount()).isEqualTo(3);
-      assertThat(errors.getRetriesOnClientTimeout().getCount()).isEqualTo(3);
+      assertOnRequestErrorWasCalled(2, OperationTimedOutException.class);
+      assertThat(errors.getRetries().getCount()).isEqualTo(1);
+      assertThat(errors.getClientTimeouts().getCount()).isEqualTo(2);
+      assertThat(errors.getRetriesOnClientTimeout().getCount()).isEqualTo(1);
       assertQueried(1, 1);
       assertQueried(2, 1);
-      assertQueried(3, 1);
+      assertQueried(3, 0);
     } finally {
       cluster
           .getConfiguration()
@@ -441,66 +455,96 @@ public class DowngradingConsistencyRetryPolicyIntegrationTest
 
   /**
    * Ensures that when handling a server error defined in {@link #serverSideErrors} with {@link
-   * DowngradingConsistencyRetryPolicy} that a retry is attempted on the next host until all hosts
-   * are tried at which point a {@link NoHostAvailableException} is raised and it's errors include
-   * the expected exception.
+   * DowngradingConsistencyRetryPolicy} that a retry is attempted on the next host. If the retry
+   * also fails, the exception is rethrown.
    *
    * @param error Server side error to be produced.
    * @param exception The exception we expect to be raised.
    * @test_category retry_policy
    */
   @Test(groups = "short", dataProvider = "serverSideErrors")
-  public void should_try_next_host_on_server_side_error(
+  public void should_try_next_host_on_first_server_side_error(
+      Result error, Class<? extends DriverException> exception) {
+    simulateError(1, error);
+    simulateNormalResponse(2);
+
+    query();
+
+    assertOnRequestErrorWasCalled(1, exception);
+    assertThat(errors.getOthers().getCount()).isEqualTo(1);
+    assertThat(errors.getRetries().getCount()).isEqualTo(1);
+    assertThat(errors.getRetriesOnOtherErrors().getCount()).isEqualTo(1);
+    assertQueried(1, 1);
+    assertQueried(2, 1);
+    assertQueried(3, 0);
+  }
+
+  @Test(groups = "short", dataProvider = "serverSideErrors")
+  public void should_rethrow_on_second_server_side_error(
       Result error, Class<? extends DriverException> exception) {
     simulateError(1, error);
     simulateError(2, error);
     simulateError(3, error);
     try {
       query();
-      Fail.fail("expected a NoHostAvailableException");
-    } catch (NoHostAvailableException e) {
-      assertThat(e.getErrors().keySet())
-          .hasSize(3)
-          .containsOnly(host1.getEndPoint(), host2.getEndPoint(), host3.getEndPoint());
-      assertThat(e.getErrors().values()).hasOnlyElementsOfType(exception);
+      Fail.fail("expected a " + exception.getSimpleName());
+    } catch (DriverException e) {
+      assertThat(e).isInstanceOf(exception);
     }
-    assertOnRequestErrorWasCalled(3, exception);
-    assertThat(errors.getOthers().getCount()).isEqualTo(3);
-    assertThat(errors.getRetries().getCount()).isEqualTo(3);
-    assertThat(errors.getRetriesOnOtherErrors().getCount()).isEqualTo(3);
+    assertOnRequestErrorWasCalled(2, exception);
+    assertThat(errors.getOthers().getCount()).isEqualTo(2);
+    assertThat(errors.getRetries().getCount()).isEqualTo(1);
+    assertThat(errors.getRetriesOnOtherErrors().getCount()).isEqualTo(1);
     assertQueried(1, 1);
     assertQueried(2, 1);
-    assertQueried(3, 1);
+    assertQueried(3, 0);
   }
 
   /**
    * Ensures that when handling a connection error caused by the connection closing during a request
-   * in a way described by {@link #connectionErrors} that the next host is tried.
+   * in a way described by {@link #connectionErrors} that the next host is tried. If the retry also
+   * fails, the exception is rethrown.
    *
    * @param closeType The way the connection should be closed during the request.
    */
   @Test(groups = "short", dataProvider = "connectionErrors")
-  public void should_try_next_host_on_connection_error(ClosedConnectionConfig.CloseType closeType) {
+  public void should_try_next_host_on_first_connection_error(
+      ClosedConnectionConfig.CloseType closeType) {
+    simulateError(1, closed_connection, new ClosedConnectionConfig(closeType));
+    simulateNormalResponse(2);
+
+    query();
+
+    assertOnRequestErrorWasCalled(1, TransportException.class);
+    assertThat(errors.getRetries().getCount()).isEqualTo(1);
+    assertThat(errors.getConnectionErrors().getCount()).isEqualTo(1);
+    assertThat(errors.getIgnoresOnConnectionError().getCount()).isEqualTo(0);
+    assertThat(errors.getRetriesOnConnectionError().getCount()).isEqualTo(1);
+    assertQueried(1, 1);
+    assertQueried(2, 1);
+    assertQueried(3, 0);
+  }
+
+  @Test(groups = "short", dataProvider = "connectionErrors")
+  public void should_rethrow_on_second_connection_error(
+      ClosedConnectionConfig.CloseType closeType) {
     simulateError(1, closed_connection, new ClosedConnectionConfig(closeType));
     simulateError(2, closed_connection, new ClosedConnectionConfig(closeType));
     simulateError(3, closed_connection, new ClosedConnectionConfig(closeType));
     try {
       query();
       Fail.fail("expected a TransportException");
-    } catch (NoHostAvailableException e) {
-      assertThat(e.getErrors().keySet())
-          .hasSize(3)
-          .containsOnly(host1.getEndPoint(), host2.getEndPoint(), host3.getEndPoint());
-      assertThat(e.getErrors().values()).hasOnlyElementsOfType(TransportException.class);
+    } catch (TransportException e) {
+      // expected — rethrown after one retry
     }
-    assertOnRequestErrorWasCalled(3, TransportException.class);
-    assertThat(errors.getRetries().getCount()).isEqualTo(3);
-    assertThat(errors.getConnectionErrors().getCount()).isEqualTo(3);
+    assertOnRequestErrorWasCalled(2, TransportException.class);
+    assertThat(errors.getRetries().getCount()).isEqualTo(1);
+    assertThat(errors.getConnectionErrors().getCount()).isEqualTo(2);
     assertThat(errors.getIgnoresOnConnectionError().getCount()).isEqualTo(0);
-    assertThat(errors.getRetriesOnConnectionError().getCount()).isEqualTo(3);
+    assertThat(errors.getRetriesOnConnectionError().getCount()).isEqualTo(1);
     assertQueried(1, 1);
     assertQueried(2, 1);
-    assertQueried(3, 1);
+    assertQueried(3, 0);
   }
 
   @Test(groups = "short")

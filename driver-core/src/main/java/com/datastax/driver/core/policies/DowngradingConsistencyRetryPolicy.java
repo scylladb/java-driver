@@ -208,21 +208,24 @@ public class DowngradingConsistencyRetryPolicy implements RetryPolicy {
   /**
    * {@inheritDoc}
    *
-   * <p>For historical reasons, this implementation triggers a retry on the next host in the query
-   * plan with the same consistency level, regardless of the statement's idempotence. Note that this
-   * breaks the general rule stated in {@link RetryPolicy#onRequestError(Statement,
-   * ConsistencyLevel, DriverException, int)}: "a retry should only be attempted if the request is
-   * known to be idempotent".`
+   * <p>This implementation triggers a maximum of one retry on the next host in the query plan. The
+   * rationale is that the first coordinator might have been network-isolated or overloaded, and
+   * moving to the next host might resolve the issue. If the retry also fails, the exception is
+   * rethrown.
+   *
+   * <p>Read and write failures are never retried, as they generally indicate a data problem that is
+   * unlikely to be resolved by a retry.
+   *
+   * @return {@code RetryDecision.tryNextHost(cl)} if no retry attempt has yet been tried and the
+   *     error is not a read/write failure, {@code RetryDecision.rethrow()} otherwise.
    */
   @Override
   public RetryDecision onRequestError(
       Statement statement, ConsistencyLevel cl, DriverException e, int nbRetry) {
-    // do not retry these by default as they generally indicate a data problem or
-    // other issue that is unlikely to be resolved by a retry.
     if (e instanceof WriteFailureException || e instanceof ReadFailureException) {
       return RetryDecision.rethrow();
     }
-    return RetryDecision.tryNextHost(cl);
+    return (nbRetry == 0) ? RetryDecision.tryNextHost(cl) : RetryDecision.rethrow();
   }
 
   @Override
