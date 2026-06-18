@@ -34,8 +34,8 @@ import com.datastax.driver.core.exceptions.WriteFailureException;
  *   <li>On a write timeout, retries once on the same host if we timeout while writing the
  *       distributed log used by batch statements.
  *   <li>On an unavailable exception, retries once on the next host.
- *   <li>On a request error, such as a client timeout, the query is retried on the next host. Do not
- *       retry on read or write failures.
+ *   <li>On a request error, such as a client timeout, retries once on the next host. Do not retry
+ *       on read or write failures.
  * </ul>
  *
  * <p>This retry policy is conservative in that it will never retry with a different consistency
@@ -136,16 +136,27 @@ public class DefaultRetryPolicy implements RetryPolicy {
     return (nbRetry == 0) ? RetryDecision.tryNextHost(null) : RetryDecision.rethrow();
   }
 
-  /** {@inheritDoc} */
+  /**
+   * {@inheritDoc}
+   *
+   * <p>This implementation triggers a maximum of one retry on the next host in the query plan. The
+   * rationale is that the first coordinator might have been network-isolated or overloaded, and
+   * moving to the next host might resolve the issue. If the retry also fails, the exception is
+   * rethrown.
+   *
+   * <p>Read and write failures are never retried, as they generally indicate a data problem that is
+   * unlikely to be resolved by a retry.
+   *
+   * @return {@code RetryDecision.tryNextHost(cl)} if no retry attempt has yet been tried and the
+   *     error is not a read/write failure, {@code RetryDecision.rethrow()} otherwise.
+   */
   @Override
   public RetryDecision onRequestError(
       Statement statement, ConsistencyLevel cl, DriverException e, int nbRetry) {
-    // do not retry these by default as they generally indicate a data problem or
-    // other issue that is unlikely to be resolved by a retry.
     if (e instanceof WriteFailureException || e instanceof ReadFailureException) {
       return RetryDecision.rethrow();
     }
-    return RetryDecision.tryNextHost(cl);
+    return (nbRetry == 0) ? RetryDecision.tryNextHost(cl) : RetryDecision.rethrow();
   }
 
   @Override
