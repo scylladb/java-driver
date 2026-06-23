@@ -82,12 +82,17 @@ public class ShardAwarenessTest extends CCMTestsSupport {
           event.getSource(),
           event.getThreadName(),
           event.getDescription());
-      assertThat(event.getThreadName()).startsWith(shard);
+      // Only data-local events carry the owning shard. Scylla 2025.1 adds coordinator-side
+      // events that legitimately run on shard 0 regardless of the data shard. Also, since
+      // Scylla 2025.1 the thread name carries a service-level suffix ("shard N/sl:<level>"),
+      // so strip it before comparing.
       if (event.getDescription().contains("querying locally")) {
         anyLocal = true;
+        String normalized = event.getThreadName().replaceFirst("/sl:[^/]*$", "");
+        assertThat(normalized).startsWith(shard);
       }
     }
-    assertThat(anyLocal);
+    assertTrue(anyLocal, "No 'querying locally' trace event was observed for the query");
   }
 
   @Test(groups = "short")
@@ -95,7 +100,7 @@ public class ShardAwarenessTest extends CCMTestsSupport {
     session().execute("DROP KEYSPACE IF EXISTS shardawaretest");
     session()
         .execute(
-            "CREATE KEYSPACE shardawaretest WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': '3'}");
+            "CREATE KEYSPACE shardawaretest WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': '3'} AND TABLETS = {'enabled': false}");
     session()
         .execute("CREATE TABLE shardawaretest.t (pk text, ck text, v text, PRIMARY KEY (pk, ck))");
 
