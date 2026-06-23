@@ -412,6 +412,9 @@ abstract class ArrayBackedResultSet implements ResultSet {
             public void register(RequestHandler handler) {}
 
             @Override
+            public void registerReadTimeoutMillis(long readTimeoutMillis) {}
+
+            @Override
             public void onSet(
                 Connection connection,
                 Message.Response response,

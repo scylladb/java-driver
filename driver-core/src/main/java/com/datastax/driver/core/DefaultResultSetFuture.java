@@ -41,6 +41,7 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
   private final ProtocolVersion protocolVersion;
   private final Message.Request request;
   private volatile RequestHandler handler;
+  private volatile long readTimeoutMillis = OperationTimedOutException.UNAVAILABLE;
 
   DefaultResultSetFuture(
       SessionManager session, ProtocolVersion protocolVersion, Message.Request request) {
@@ -52,6 +53,11 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
   @Override
   public void register(RequestHandler handler) {
     this.handler = handler;
+  }
+
+  @Override
+  public void registerReadTimeoutMillis(long readTimeoutMillis) {
+    this.readTimeoutMillis = readTimeoutMillis;
   }
 
   @Override
@@ -293,7 +299,9 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
     // RequestHandler).
     // So just set an exception for the final result, which should be handled correctly by said
     // internal call.
-    setException(new OperationTimedOutException(connection.endPoint));
+    setException(
+        connection.newTimeoutException(
+            readTimeoutMillis, latency, retryCount, OperationTimedOutException.UNAVAILABLE));
     return true;
   }
 

@@ -15,8 +15,10 @@
  */
 package com.datastax.driver.core;
 
+import static com.datastax.driver.core.Assertions.assertThat;
 import static org.scassandra.http.client.PrimingRequest.queryBuilder;
 import static org.scassandra.http.client.PrimingRequest.then;
+import static org.testng.Assert.fail;
 
 import com.datastax.driver.core.exceptions.OperationTimedOutException;
 import org.testng.annotations.BeforeMethod;
@@ -38,6 +40,35 @@ public class ReadTimeoutTest extends ScassandraTestBase.PerClassCluster {
   @Test(groups = "short", expectedExceptions = OperationTimedOutException.class)
   public void should_use_default_timeout_if_not_overridden_by_statement() {
     session.execute(query);
+  }
+
+  @Test(groups = "short")
+  public void should_include_timeout_diagnostics() {
+    try {
+      session.execute(query);
+      fail("expected an OperationTimedOutException");
+    } catch (OperationTimedOutException e) {
+      assertThat(e.getConfiguredTimeoutMs()).isEqualTo(10);
+      assertThat(e.getElapsedTimeoutMs()).isGreaterThanOrEqualTo(10);
+      assertThat(e.getRetryCount()).isEqualTo(0);
+      assertThat(e.getSpeculativeExecutionIndex()).isEqualTo(0);
+      assertThat(e.getConnectionInFlight()).isGreaterThanOrEqualTo(1);
+      assertThat(e.getPoolPendingBorrows()).isGreaterThanOrEqualTo(0);
+      assertThat(e.getPoolTotalInFlight()).isGreaterThanOrEqualTo(1);
+      assertThat(e.getConnectionShardId()).isEqualTo(OperationTimedOutException.UNAVAILABLE);
+      assertThat(e.getHostShardsCount()).isEqualTo(OperationTimedOutException.UNAVAILABLE);
+      assertThat(e.getPoolPendingBorrowsForShard())
+          .isEqualTo(OperationTimedOutException.UNAVAILABLE);
+      assertThat(e.getPoolOpenConnectionsForShard())
+          .isEqualTo(OperationTimedOutException.UNAVAILABLE);
+      assertThat(e.getPoolMaxConnectionsPerShard()).isGreaterThanOrEqualTo(1);
+      assertThat(e.getMessage())
+          .contains("Timed out waiting for server response")
+          .contains("configured timeout: 10ms")
+          .contains("elapsed timeout:")
+          .contains("retry count: 0")
+          .contains("speculative execution index: 0");
+    }
   }
 
   @Test(groups = "short")

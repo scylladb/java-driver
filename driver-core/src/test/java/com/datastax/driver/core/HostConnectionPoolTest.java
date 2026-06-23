@@ -51,6 +51,7 @@ import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.exceptions.OperationTimedOutException;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
@@ -503,6 +504,37 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       }
     } finally {
       MockRequest.completeAll(requests);
+      cluster.close();
+    }
+  }
+
+  @Test(groups = "short")
+  public void should_keep_legacy_timeout_exception_for_direct_connection_writes() throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = pool.connections[0].get(0);
+      Connection.Future future = new Connection.Future(new Requests.Query("USE \"slowks\""));
+      future.onTimeout(connection, 0, 0);
+
+      try {
+        Uninterruptibles.getUninterruptibly(future);
+        fail("Should have thrown exception");
+      } catch (ExecutionException e) {
+        assertThat(e.getCause()).isInstanceOf(OperationTimedOutException.class);
+        OperationTimedOutException timeout = (OperationTimedOutException) e.getCause();
+        assertThat(timeout.getMessage())
+            .contains("Operation timed out")
+            .doesNotContain("configured timeout");
+        assertThat(timeout.getConfiguredTimeoutMs())
+            .isEqualTo(OperationTimedOutException.UNAVAILABLE);
+        assertThat(timeout.getElapsedTimeoutMs()).isEqualTo(OperationTimedOutException.UNAVAILABLE);
+        assertThat(timeout.getConnectionInFlight())
+            .isEqualTo(OperationTimedOutException.UNAVAILABLE);
+        assertThat(timeout.getPoolTotalInFlight())
+            .isEqualTo(OperationTimedOutException.UNAVAILABLE);
+      }
+    } finally {
       cluster.close();
     }
   }
