@@ -105,6 +105,40 @@ public class ChannelPoolShutdownTest extends ChannelPoolTestBase {
   }
 
   @Test
+  public void should_force_close_first_reconnected_channel_when_closed_before_initialized()
+      throws Exception {
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    DriverChannel channel1 = newMockDriverChannel(1);
+    CompletableFuture<DriverChannel> channel1Future = new CompletableFuture<>();
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory)
+            // init
+            .failure(node, "mock channel init failure")
+            // reconnection
+            .pending(node, channel1Future)
+            .build();
+
+    CompletionStage<ChannelPool> poolFuture =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test");
+
+    factoryHelper.waitForCalls(node, 2);
+    assertThatStage(poolFuture).isSuccess();
+    ChannelPool pool = poolFuture.toCompletableFuture().get();
+
+    CompletionStage<Void> closeFuture = pool.closeAsync();
+    assertThatStage(closeFuture).isSuccess();
+
+    channel1Future.complete(channel1);
+
+    verify(channel1, VERIFY_TIMEOUT).forceClose();
+    verify(eventBus, never()).fire(ChannelEvent.channelOpened(node));
+
+    factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
   public void should_force_close_all_channels_when_force_closed() throws Exception {
     when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
 
@@ -167,6 +201,40 @@ public class ChannelPoolShutdownTest extends ChannelPoolTestBase {
     ((ChannelPromise) channel3.closeFuture()).setSuccess();
 
     assertThatStage(closeFuture).isSuccess();
+
+    factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_force_close_first_reconnected_channel_when_force_closed_before_initialized()
+      throws Exception {
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    DriverChannel channel1 = newMockDriverChannel(1);
+    CompletableFuture<DriverChannel> channel1Future = new CompletableFuture<>();
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory)
+            // init
+            .failure(node, "mock channel init failure")
+            // reconnection
+            .pending(node, channel1Future)
+            .build();
+
+    CompletionStage<ChannelPool> poolFuture =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test");
+
+    factoryHelper.waitForCalls(node, 2);
+    assertThatStage(poolFuture).isSuccess();
+    ChannelPool pool = poolFuture.toCompletableFuture().get();
+
+    CompletionStage<Void> closeFuture = pool.forceCloseAsync();
+    assertThatStage(closeFuture).isSuccess();
+
+    channel1Future.complete(channel1);
+
+    verify(channel1, VERIFY_TIMEOUT).forceClose();
+    verify(eventBus, never()).fire(ChannelEvent.channelOpened(node));
 
     factoryHelper.verifyNoMoreCalls();
   }

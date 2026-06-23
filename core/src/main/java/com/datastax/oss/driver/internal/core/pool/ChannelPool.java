@@ -418,6 +418,13 @@ public class ChannelPool implements AsyncAutoCloseable {
                 } else {
                   resultFuture.complete(false);
                 }
+              } else if (isClosing) {
+                LOG.debug(
+                    "[{}] New channel added ({}) but the pool was closed, closing it",
+                    logPrefix,
+                    driver);
+                driver.forceClose();
+                resultFuture.complete(true);
               } else {
                 initialize(driver);
                 CompletableFutures.completeFrom(addMissingChannels(), resultFuture);
