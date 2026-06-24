@@ -280,9 +280,6 @@
       </plugin>
       <plugin>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <configuration>
-          <skip>true</skip>
-        </configuration>
         <executions>
           <execution>
             <id>attach-javadocs</id>
@@ -293,11 +290,22 @@
               <sourcepath>${project.build.directory}/shaded-sources</sourcepath>
               <excludePackageNames>com.datastax.*.driver.internal*,com.datastax.oss.driver.shaded*</excludePackageNames>
               <!--
-                javadoc processes the shaded Netty sources (even though they're not included in the
-                report), and will complain if it doesn't find JCTools classes.
-                Add the dependency just to avoid warnings:
+                javadoc processes the shaded Netty and Jackson sources (even though they're not
+                included in the report), and will fail if transitive compile-time dependencies of
+                those libraries are missing from the javadoc classpath. Add the ones that are not
+                already present as transitive compile dependencies of core-shaded.
+                failOnError=false handles any remaining missing packages (e.g. ch.randelshofer:
+                fastdoubleparser, which is bundled-and-shaded inside jackson-core and has no
+                standalone published coordinate we can resolve here).
               -->
+              <failOnError>false</failOnError>
               <additionalDependencies>
+                <additionalDependency>
+                  <!-- Netty 4.1.x uses @NotNull, @VisibleForTesting, @Async.Execute/Schedule -->
+                  <groupId>org.jetbrains</groupId>
+                  <artifactId>annotations</artifactId>
+                  <version>23.0.0</version>
+                </additionalDependency>
                 <additionalDependency>
                   <groupId>org.xerial.snappy</groupId>
                   <artifactId>snappy-java</artifactId>
