@@ -33,10 +33,10 @@ public class MapperKeyspaceTest extends CCMTestsSupport {
   @Override
   public void onTestContextInitialized() {
     execute(
-        "CREATE KEYSPACE IF NOT EXISTS MapperKeyspaceTest WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+        "CREATE KEYSPACE IF NOT EXISTS MapperKeyspaceTest WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}",
         "CREATE TYPE IF NOT EXISTS MapperKeyspaceTest.address(street text)",
         "CREATE TABLE IF NOT EXISTS MapperKeyspaceTest.user(name text PRIMARY KEY, address frozen<address>)",
-        "CREATE KEYSPACE IF NOT EXISTS MapperKeyspaceTest2 WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+        "CREATE KEYSPACE IF NOT EXISTS MapperKeyspaceTest2 WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}",
         "CREATE TYPE IF NOT EXISTS MapperKeyspaceTest2.address(street text)",
         "CREATE TABLE IF NOT EXISTS MapperKeyspaceTest2.user(name text PRIMARY KEY, address frozen<address>)");
   }

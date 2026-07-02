@@ -540,8 +540,8 @@ public class PreparedStatementTest extends CCMTestsSupport {
     session()
         .execute(
             "CREATE KEYSPACE \"Test\" WITH replication = { "
-                + "  'class': 'SimpleStrategy',"
-                + "  'replication_factor': '1'"
+                + "  'class': 'NetworkTopologyStrategy',"
+                + "  'datacenter1': '1'"
                 + "}");
     session().execute("CREATE TABLE \"Test\".\"Foo\" (i int PRIMARY KEY)");
 
