@@ -16,6 +16,7 @@
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
+import static com.datastax.driver.core.ConditionChecker.check;
 import static org.scassandra.cql.MapType.map;
 import static org.scassandra.cql.PrimitiveType.BIG_INT;
 import static org.scassandra.cql.PrimitiveType.BOOLEAN;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import org.scassandra.Scassandra;
 import org.scassandra.ScassandraFactory;
@@ -328,12 +330,32 @@ public class ScassandraCluster {
   public void stop(Cluster cluster, int node) {
     logger.debug("Stopping node {}.", node);
     Scassandra scassandra = node(node);
+    Host host = TestUtils.findHost(cluster, node);
     try {
       scassandra.stop();
     } catch (Exception e) {
       logger.error("Could not stop node " + scassandra, e);
     }
     assertThat(cluster).host(node).goesDownWithin(60, TimeUnit.SECONDS);
+    waitUntilPoolsAreRemoved(cluster, host);
+  }
+
+  private void waitUntilPoolsAreRemoved(final Cluster cluster, final Host host) {
+    if (host == null) return;
+
+    check()
+        .before(60, TimeUnit.SECONDS)
+        .that(
+            new Callable<Boolean>() {
+              @Override
+              public Boolean call() {
+                for (SessionManager session : cluster.manager.sessions) {
+                  if (session.pools.containsKey(host)) return false;
+                }
+                return true;
+              }
+            })
+        .becomesTrue();
   }
 
   /**
