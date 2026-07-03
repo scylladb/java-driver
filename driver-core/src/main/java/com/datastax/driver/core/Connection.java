@@ -34,6 +34,7 @@ import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.exceptions.FrameTooLongException;
 import com.datastax.driver.core.exceptions.OperationTimedOutException;
+import com.datastax.driver.core.exceptions.QueryValidationException;
 import com.datastax.driver.core.exceptions.TransportException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
@@ -845,17 +846,15 @@ class Connection {
 
     try {
       Uninterruptibles.getUninterruptibly(setKeyspaceAsync(keyspace));
-    } catch (ConnectionException e) {
-      throw defunct(e);
-    } catch (BusyConnectionException e) {
-      logger.warn(
-          "Tried to set the keyspace on busy {}. "
-              + "This should not happen but is not critical (it will be retried)",
-          this);
-      throw new ConnectionException(endPoint, "Tried to set the keyspace on busy connection");
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof OperationTimedOutException) {
+      if (cause instanceof BusyConnectionException) {
+        throw keyspaceBusyException();
+      } else if (cause instanceof QueryValidationException) {
+        throw (QueryValidationException) cause;
+      } else if (cause instanceof ConnectionException) {
+        throw defunct((ConnectionException) cause);
+      } else if (cause instanceof OperationTimedOutException) {
         // Rethrow so that the caller doesn't try to use the connection, but do not defunct as we
         // don't want to mark down
         logger.warn(
@@ -869,8 +868,15 @@ class Connection {
     }
   }
 
-  ListenableFuture<Connection> setKeyspaceAsync(final String keyspace)
-      throws ConnectionException, BusyConnectionException {
+  private ConnectionException keyspaceBusyException() {
+    logger.warn(
+        "Tried to set the keyspace on busy {}. "
+            + "This should not happen but is not critical (it will be retried)",
+        this);
+    return new ConnectionException(endPoint, "Tried to set the keyspace on busy connection");
+  }
+
+  ListenableFuture<Connection> setKeyspaceAsync(final String keyspace) {
     SetKeyspaceAttempt existingAttempt = targetKeyspace.get();
     if (MoreObjects.equal(existingAttempt.keyspace, keyspace)) return existingAttempt.future;
 
@@ -900,7 +906,18 @@ class Connection {
         logger.debug("{} Setting keyspace {}", this, keyspace);
         // Note: we quote the keyspace below, because the name is the one coming from Cassandra, so
         // it's in the right case already
-        Future future = write(new Requests.Query("USE \"" + keyspace + '"'));
+        Future future;
+        try {
+          future = write(new Requests.Query("USE \"" + keyspace + '"'));
+        } catch (ConnectionException | BusyConnectionException e) {
+          targetKeyspace.compareAndSet(attempt, defaultKeyspaceAttempt);
+          ksFuture.setException(e);
+          return ksFuture;
+        } catch (RuntimeException e) {
+          targetKeyspace.compareAndSet(attempt, defaultKeyspaceAttempt);
+          ksFuture.setException(e);
+          return ksFuture;
+        }
         Futures.addCallback(
             future,
             new FutureCallback<Message.Response>() {
@@ -915,7 +932,12 @@ class Connection {
                   targetKeyspace.compareAndSet(attempt, defaultKeyspaceAttempt);
                   if (response.type == ERROR) {
                     Responses.Error error = (Responses.Error) response;
-                    ksFuture.setException(defunct(error.asException(endPoint)));
+                    DriverException exception = error.asException(endPoint);
+                    if (exception instanceof QueryValidationException) {
+                      ksFuture.setException(exception);
+                    } else {
+                      ksFuture.setException(defunct(exception));
+                    }
                   } else {
                     ksFuture.setException(
                         defunct(

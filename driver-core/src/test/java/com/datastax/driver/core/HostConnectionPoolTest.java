@@ -27,10 +27,12 @@ import static com.datastax.driver.core.PoolingOptions.NEW_CONNECTION_THRESHOLD_L
 import static com.google.common.collect.Lists.newArrayList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mockito.Matchers.anyBoolean;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -50,8 +52,14 @@ import com.datastax.driver.core.exceptions.BusyConnectionException;
 import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.DriverException;
+import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.exceptions.OperationTimedOutException;
+import com.datastax.driver.core.exceptions.ReadTimeoutException;
+import com.datastax.driver.core.exceptions.ServerError;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
+import com.datastax.driver.core.policies.DefaultRetryPolicy;
+import com.datastax.driver.core.policies.RetryPolicy;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
@@ -62,6 +70,9 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.util.CharsetUtil;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -78,6 +89,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import org.scassandra.Scassandra;
 import org.scassandra.cql.PrimitiveType;
 import org.scassandra.http.client.PrimingRequest;
 import org.testng.annotations.BeforeClass;
@@ -132,6 +144,48 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
   private void assertBorrowedConnection(
       Iterable<MockRequest> requests, Connection expectedConnection) {
     assertBorrowedConnections(requests, Collections.singletonList(expectedConnection));
+  }
+
+  private static Responses.Error errorResponse(ExceptionCode code, String message) {
+    ByteBuf body = Unpooled.buffer();
+    try {
+      body.writeInt(code.value);
+      byte[] messageBytes = message.getBytes(CharsetUtil.UTF_8);
+      body.writeShort(messageBytes.length);
+      body.writeBytes(messageBytes);
+      return Responses.Error.decoder.decode(
+          body, ProtocolVersion.V4, CodecRegistry.DEFAULT_INSTANCE, ProtocolFeatureStore.EMPTY);
+    } finally {
+      body.release();
+    }
+  }
+
+  private static void assertRetryPolicyNotCalled(RetryPolicy retryPolicy) {
+    verify(retryPolicy, never())
+        .onRequestError(
+            any(Statement.class),
+            any(ConsistencyLevel.class),
+            any(DriverException.class),
+            anyInt());
+    verify(retryPolicy, never())
+        .onReadTimeout(
+            any(Statement.class),
+            any(ConsistencyLevel.class),
+            anyInt(),
+            anyInt(),
+            anyBoolean(),
+            anyInt());
+    verify(retryPolicy, never())
+        .onWriteTimeout(
+            any(Statement.class),
+            any(ConsistencyLevel.class),
+            any(WriteType.class),
+            anyInt(),
+            anyInt(),
+            anyInt());
+    verify(retryPolicy, never())
+        .onUnavailable(
+            any(Statement.class), any(ConsistencyLevel.class), anyInt(), anyInt(), anyInt());
   }
 
   /**
@@ -394,6 +448,645 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
   }
 
   /**
+   * Ensures that if keyspace setup fails while borrowing a connection, the borrow future fails and
+   * pool accounting is restored.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_restore_pool_accounting_when_keyspace_setup_fails_on_borrow()
+      throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+
+      pool.manager.poolsState.setKeyspace("newkeyspace");
+      ConnectionException failure =
+          new ConnectionException(pool.host.getEndPoint(), "Write attempt on defunct connection");
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection)
+          .setKeyspaceAsync("newkeyspace");
+
+      MockRequest request = MockRequest.send(pool);
+
+      try {
+        Uninterruptibles.getUninterruptibly(request.connectionFuture, 5, TimeUnit.SECONDS);
+        fail("Should have failed to borrow connection");
+      } catch (ExecutionException e) {
+        assertThat(e.getCause()).isSameAs(failure);
+      }
+      assertThat(connection.inFlight.get()).isEqualTo(0);
+      assertThat(pool.totalInFlight.get()).isEqualTo(0);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that an unexpected synchronous failure while starting keyspace setup is reported
+   * through the borrow future and does not leak pool accounting.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_restore_pool_accounting_when_keyspace_setup_throws_on_borrow()
+      throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+
+      pool.manager.poolsState.setKeyspace("newkeyspace");
+      RuntimeException failure = new RuntimeException("Unexpected keyspace setup failure");
+      doThrow(failure).when(connection).write(any(Message.Request.class));
+
+      MockRequest request = MockRequest.send(pool);
+
+      try {
+        Uninterruptibles.getUninterruptibly(request.connectionFuture, 5, TimeUnit.SECONDS);
+        fail("Should have failed to borrow connection");
+      } catch (ExecutionException e) {
+        assertThat(e.getCause()).isSameAs(failure);
+      }
+      verify(connection).write(any(Message.Request.class));
+      assertThat(connection.inFlight.get()).isEqualTo(0);
+      assertThat(pool.totalInFlight.get()).isEqualTo(0);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that a synchronous write failure while setting the keyspace is reported through the
+   * returned future and does not leave the failed keyspace attempt in-flight.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_fail_keyspace_future_and_clear_attempt_when_connection_is_defunct()
+      throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = pool.connections[0].get(0);
+
+      connection.defunct(
+          new ConnectionException(pool.host.getEndPoint(), "Test defunct connection"));
+
+      ListenableFuture<Connection> firstAttempt = connection.setKeyspaceAsync("newkeyspace");
+      ListenableFuture<Connection> secondAttempt = connection.setKeyspaceAsync("newkeyspace");
+
+      assertThat(firstAttempt).isNotSameAs(secondAttempt);
+      try {
+        Uninterruptibles.getUninterruptibly(firstAttempt, 5, TimeUnit.SECONDS);
+        fail("Should have failed keyspace attempt");
+      } catch (ExecutionException e) {
+        assertThat(e.getCause())
+            .isInstanceOf(ConnectionException.class)
+            .hasMessageContaining("Write attempt on defunct connection");
+      }
+      try {
+        Uninterruptibles.getUninterruptibly(secondAttempt, 5, TimeUnit.SECONDS);
+        fail("Should have failed keyspace attempt");
+      } catch (ExecutionException e) {
+        assertThat(e.getCause())
+            .isInstanceOf(ConnectionException.class)
+            .hasMessageContaining("Write attempt on defunct connection");
+      }
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that keyspace validation errors are surfaced as query errors and do not defunct the
+   * connection.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_not_defunct_connection_when_keyspace_setup_fails_with_validation_error()
+      throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      SettableConnectionFuture useFuture =
+          new SettableConnectionFuture(new Requests.Query("USE \"missingkeyspace\""));
+
+      doReturn(useFuture).when(connection).write(any(Message.Request.class));
+      ListenableFuture<Connection> keyspaceFuture = connection.setKeyspaceAsync("missingkeyspace");
+      useFuture.setResponse(
+          errorResponse(ExceptionCode.INVALID, "Keyspace missingkeyspace does not exist"));
+
+      try {
+        Uninterruptibles.getUninterruptibly(keyspaceFuture, 5, TimeUnit.SECONDS);
+        fail("Should have failed keyspace attempt");
+      } catch (ExecutionException e) {
+        assertThat(e.getCause()).isInstanceOf(InvalidQueryException.class);
+      }
+      assertThat(connection.isDefunct()).isFalse();
+      assertThat(pool.opened()).isEqualTo(1);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that the synchronous keyspace setup wrapper preserves validation errors and does not
+   * defunct the connection.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_not_defunct_connection_when_synchronous_keyspace_setup_gets_validation_error()
+      throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      InvalidQueryException failure =
+          new InvalidQueryException(
+              pool.host.getEndPoint(), "Keyspace missingkeyspace does not exist");
+
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection)
+          .setKeyspaceAsync("missingkeyspace");
+
+      try {
+        connection.setKeyspace("missingkeyspace");
+        fail("Should have failed keyspace attempt");
+      } catch (InvalidQueryException e) {
+        assertThat(e).isSameAs(failure);
+      }
+      assertThat(connection.isDefunct()).isFalse();
+      assertThat(pool.opened()).isEqualTo(1);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that transient server errors during keyspace setup fail the attempt and defunct the
+   * connection.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_defunct_connection_when_keyspace_setup_fails_with_server_error()
+      throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      SettableConnectionFuture useFuture =
+          new SettableConnectionFuture(new Requests.Query("USE \"newkeyspace\""));
+
+      doReturn(useFuture).when(connection).write(any(Message.Request.class));
+      ListenableFuture<Connection> keyspaceFuture = connection.setKeyspaceAsync("newkeyspace");
+      useFuture.setResponse(errorResponse(ExceptionCode.SERVER_ERROR, "Server Error"));
+
+      try {
+        Uninterruptibles.getUninterruptibly(keyspaceFuture, 5, TimeUnit.SECONDS);
+        fail("Should have failed keyspace attempt");
+      } catch (ExecutionException e) {
+        assertThat(e.getCause()).isInstanceOf(ServerError.class);
+      }
+      assertThat(connection.isDefunct()).isTrue();
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that the synchronous keyspace setup wrapper preserves busy connection handling when the
+   * async implementation reports write failures through the returned future.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_not_defunct_connection_when_synchronous_keyspace_setup_gets_busy_connection()
+      throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 1);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+
+      doThrow(new BusyConnectionException(pool.host.getEndPoint()))
+          .when(connection)
+          .write(any(Message.Request.class));
+
+      try {
+        connection.setKeyspace("newkeyspace");
+        fail("Should have failed keyspace attempt");
+      } catch (ConnectionException e) {
+        assertThat(e.getMessage()).contains("Tried to set the keyspace on busy connection");
+      }
+      assertThat(connection.isDefunct()).isFalse();
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that permanent keyspace setup failures fail the request directly instead of being
+   * retried across hosts as connection failures.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_fail_fast_when_keyspace_setup_fails_with_validation_error() throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    Cluster cluster = createClusterBuilder().withRetryPolicy(retryPolicy).build();
+    try {
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      HostConnectionPool pool = session.pools.get(host);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      InvalidQueryException failure =
+          new InvalidQueryException(
+              pool.host.getEndPoint(), "Keyspace missingkeyspace does not exist");
+      session.poolsState.setKeyspace("missingkeyspace");
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection)
+          .setKeyspaceAsync("missingkeyspace");
+      activityClient.clearAllRecordedActivity();
+
+      try {
+        session.execute(new SimpleStatement("select * from tbl").setIdempotent(true));
+        fail("Should have failed the request with the keyspace validation error");
+      } catch (InvalidQueryException e) {
+        // expected
+      }
+      assertRetryPolicyNotCalled(retryPolicy);
+      assertThat(connection.isDefunct()).isFalse();
+      assertThat(pool.opened()).isEqualTo(1);
+      assertThat(activityClient.retrieveQueries()).extractingResultOf("getQuery").isEmpty();
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that a 0x2200 INVALID response while setting the keyspace is treated as a final query
+   * validation error and does not retry the user query.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_fail_fast_when_keyspace_setup_receives_invalid_error_response()
+      throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    Cluster cluster = createClusterBuilder().withRetryPolicy(retryPolicy).build();
+    try {
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      HostConnectionPool pool = session.pools.get(host);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      SettableConnectionFuture useFuture =
+          new SettableConnectionFuture(new Requests.Query("USE \"missingkeyspace\""));
+      session.poolsState.setKeyspace("missingkeyspace");
+      doReturn(useFuture).when(connection).write(any(Message.Request.class));
+      activityClient.clearAllRecordedActivity();
+
+      ResultSetFuture queryFuture =
+          session.executeAsync(new SimpleStatement("select * from tbl").setIdempotent(true));
+      useFuture.setResponse(
+          errorResponse(ExceptionCode.INVALID, "Keyspace missingkeyspace does not exist"));
+
+      try {
+        queryFuture.getUninterruptibly(5, TimeUnit.SECONDS);
+        fail("Should have failed the request with the keyspace validation error");
+      } catch (InvalidQueryException e) {
+        assertThat(e.getMessage()).contains("Keyspace missingkeyspace does not exist");
+      }
+      assertRetryPolicyNotCalled(retryPolicy);
+      assertThat(connection.isDefunct()).isFalse();
+      assertThat(pool.opened()).isEqualTo(1);
+      verify(connection, times(1)).write(any(Message.Request.class));
+      assertThat(activityClient.retrieveQueries()).extractingResultOf("getQuery").isEmpty();
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that a 0x2200 INVALID response while setting the keyspace does not move the user query
+   * to the next host.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_not_try_next_host_when_keyspace_setup_receives_invalid_error_response()
+      throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    ScassandraCluster scassandras = ScassandraCluster.builder().withNodes(2).build();
+    Cluster cluster = null;
+    try {
+      scassandras.init();
+      scassandras
+          .node(2)
+          .primingClient()
+          .prime(
+              queryBuilder()
+                  .withQuery("select * from tbl")
+                  .withThen(then().withRows(Collections.singletonMap("result", "result2")))
+                  .build());
+      cluster =
+          Cluster.builder()
+              .addContactPoints(scassandras.address(1).getAddress())
+              .withPort(scassandras.getBinaryPort())
+              .withLoadBalancingPolicy(new SortingLoadBalancingPolicy())
+              .withPoolingOptions(
+                  new PoolingOptions()
+                      .setCoreConnectionsPerHost(HostDistance.LOCAL, 1)
+                      .setMaxConnectionsPerHost(HostDistance.LOCAL, 1)
+                      .setHeartbeatIntervalSeconds(0))
+              .withRetryPolicy(retryPolicy)
+              .build();
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host1 = TestUtils.findHost(cluster, 1);
+      Host host2 = TestUtils.findHost(cluster, 2);
+      HostConnectionPool pool1 = session.pools.get(host1);
+      HostConnectionPool pool2 = session.pools.get(host2);
+      Connection connection1 = spy(pool1.connections[0].get(0));
+      Connection connection2 = spy(pool2.connections[0].get(0));
+      pool1.connections[0].set(0, connection1);
+      pool2.connections[0].set(0, connection2);
+      SettableConnectionFuture useFuture =
+          new SettableConnectionFuture(new Requests.Query("USE \"missingkeyspace\""));
+      session.poolsState.setKeyspace("missingkeyspace");
+      doReturn(useFuture).when(connection1).write(any(Message.Request.class));
+      doReturn(Futures.immediateFuture(connection2))
+          .when(connection2)
+          .setKeyspaceAsync("missingkeyspace");
+
+      for (Scassandra node : scassandras.nodes()) {
+        node.activityClient().clearAllRecordedActivity();
+      }
+
+      ResultSetFuture queryFuture =
+          session.executeAsync(new SimpleStatement("select * from tbl").setIdempotent(true));
+      useFuture.setResponse(
+          errorResponse(ExceptionCode.INVALID, "Keyspace missingkeyspace does not exist"));
+
+      try {
+        queryFuture.getUninterruptibly(5, TimeUnit.SECONDS);
+        fail("Should have failed the request with the keyspace validation error");
+      } catch (InvalidQueryException e) {
+        assertThat(e.getMessage()).contains("Keyspace missingkeyspace does not exist");
+      }
+      assertRetryPolicyNotCalled(retryPolicy);
+      assertThat(connection1.isDefunct()).isFalse();
+      verify(connection1, times(1)).write(any(Message.Request.class));
+      verify(connection2, never()).setKeyspaceAsync("missingkeyspace");
+      assertThat(scassandras.node(1).activityClient().retrieveQueries())
+          .extractingResultOf("getQuery")
+          .isEmpty();
+      assertThat(scassandras.node(2).activityClient().retrieveQueries())
+          .extractingResultOf("getQuery")
+          .isEmpty();
+    } finally {
+      if (cluster != null) {
+        cluster.close();
+      }
+      scassandras.stop();
+    }
+  }
+
+  /**
+   * Ensures that transient server-side keyspace setup failures that happen before the user query is
+   * written do not consume retry policy attempts.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void
+      should_not_call_retry_policy_when_keyspace_setup_fails_with_server_error_before_query_write()
+          throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    Cluster cluster = createClusterBuilder().withRetryPolicy(retryPolicy).build();
+    try {
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      HostConnectionPool pool = session.pools.get(host);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      ServerError failure = new ServerError(pool.host.getEndPoint(), "Server Error");
+      session.poolsState.setKeyspace("newkeyspace");
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection)
+          .setKeyspaceAsync("newkeyspace");
+
+      try {
+        session.execute(new SimpleStatement("select * from tbl").setIdempotent(true));
+        fail("Should have failed after exhausting query plan");
+      } catch (NoHostAvailableException e) {
+        assertThat(e.getErrors().values()).containsOnly(failure);
+      }
+      assertRetryPolicyNotCalled(retryPolicy);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that server-side timeout errors during keyspace setup that happen before the user query
+   * is written do not consume retry policy attempts or send the user query.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void
+      should_not_call_retry_policy_or_send_query_when_keyspace_setup_fails_with_server_side_timeout()
+          throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    Cluster cluster = createClusterBuilder().withRetryPolicy(retryPolicy).build();
+    try {
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      HostConnectionPool pool = session.pools.get(host);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      ReadTimeoutException failure =
+          new ReadTimeoutException(pool.host.getEndPoint(), ConsistencyLevel.ONE, 0, 1, false);
+      session.poolsState.setKeyspace("newkeyspace");
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection)
+          .setKeyspaceAsync("newkeyspace");
+      activityClient.clearAllRecordedActivity();
+
+      try {
+        session.execute(new SimpleStatement("select * from tbl").setIdempotent(true));
+        fail("Should have failed after exhausting query plan");
+      } catch (NoHostAvailableException e) {
+        assertThat(e.getErrors().values()).containsOnly(failure);
+      }
+      assertRetryPolicyNotCalled(retryPolicy);
+      assertThat(activityClient.retrieveQueries()).extractingResultOf("getQuery").isEmpty();
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that client-side timeouts during keyspace setup that happen before the user query is
+   * written do not consume retry policy attempts or send the user query.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void
+      should_not_call_retry_policy_or_send_query_when_keyspace_setup_fails_with_client_side_timeout()
+          throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    Cluster cluster = createClusterBuilder().withRetryPolicy(retryPolicy).build();
+    try {
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      HostConnectionPool pool = session.pools.get(host);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      OperationTimedOutException failure = new OperationTimedOutException(pool.host.getEndPoint());
+      session.poolsState.setKeyspace("newkeyspace");
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection)
+          .setKeyspaceAsync("newkeyspace");
+      activityClient.clearAllRecordedActivity();
+
+      try {
+        session.execute(new SimpleStatement("select * from tbl").setIdempotent(true));
+        fail("Should have failed after exhausting query plan");
+      } catch (NoHostAvailableException e) {
+        assertThat(e.getErrors().values()).containsOnly(failure);
+      }
+      assertRetryPolicyNotCalled(retryPolicy);
+      assertThat(activityClient.retrieveQueries()).extractingResultOf("getQuery").isEmpty();
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that internal driver keyspace setup failures that happen before the user query is
+   * written do not consume retry policy attempts.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_not_call_retry_policy_when_keyspace_setup_fails_before_query_write()
+      throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    Cluster cluster = createClusterBuilder().withRetryPolicy(retryPolicy).build();
+    try {
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host = TestUtils.findHost(cluster, 1);
+      HostConnectionPool pool = session.pools.get(host);
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+      ConnectionException failure =
+          new ConnectionException(pool.host.getEndPoint(), "Write attempt on defunct connection");
+      session.poolsState.setKeyspace("newkeyspace");
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection)
+          .setKeyspaceAsync("newkeyspace");
+
+      try {
+        session.execute(new SimpleStatement("select * from tbl").setIdempotent(true));
+        fail("Should have failed after exhausting query plan");
+      } catch (NoHostAvailableException e) {
+        assertThat(e.getErrors().values()).containsOnly(failure);
+      }
+      assertRetryPolicyNotCalled(retryPolicy);
+    } finally {
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that an internal keyspace setup failure on the only connection in a host pool moves the
+   * request to the next host.
+   *
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_try_next_host_when_single_connection_pool_fails_keyspace_setup()
+      throws Exception {
+    RetryPolicy retryPolicy = spy(DefaultRetryPolicy.INSTANCE);
+    ScassandraCluster scassandras = ScassandraCluster.builder().withNodes(2).build();
+    Cluster cluster = null;
+    try {
+      scassandras.init();
+      scassandras
+          .node(2)
+          .primingClient()
+          .prime(
+              queryBuilder()
+                  .withQuery("select * from tbl")
+                  .withThen(then().withRows(Collections.singletonMap("result", "result2")))
+                  .build());
+      cluster =
+          Cluster.builder()
+              .addContactPoints(scassandras.address(1).getAddress())
+              .withPort(scassandras.getBinaryPort())
+              .withLoadBalancingPolicy(new SortingLoadBalancingPolicy())
+              .withPoolingOptions(
+                  new PoolingOptions()
+                      .setCoreConnectionsPerHost(HostDistance.LOCAL, 1)
+                      .setMaxConnectionsPerHost(HostDistance.LOCAL, 1)
+                      .setHeartbeatIntervalSeconds(0))
+              .withRetryPolicy(retryPolicy)
+              .build();
+      SessionManager session = (SessionManager) cluster.connect();
+      Host host1 = TestUtils.findHost(cluster, 1);
+      Host host2 = TestUtils.findHost(cluster, 2);
+      HostConnectionPool pool1 = session.pools.get(host1);
+      HostConnectionPool pool2 = session.pools.get(host2);
+      Connection connection1 = spy(pool1.connections[0].get(0));
+      Connection connection2 = spy(pool2.connections[0].get(0));
+      pool1.connections[0].set(0, connection1);
+      pool2.connections[0].set(0, connection2);
+      ConnectionException failure =
+          new ConnectionException(pool1.host.getEndPoint(), "Write attempt on defunct connection");
+      session.poolsState.setKeyspace("newkeyspace");
+      doReturn(Futures.<Connection>immediateFailedFuture(failure))
+          .when(connection1)
+          .setKeyspaceAsync("newkeyspace");
+      doReturn(Futures.immediateFuture(connection2))
+          .when(connection2)
+          .setKeyspaceAsync("newkeyspace");
+
+      for (Scassandra node : scassandras.nodes()) {
+        node.activityClient().clearAllRecordedActivity();
+      }
+
+      session.execute(new SimpleStatement("select * from tbl").setIdempotent(true));
+
+      assertRetryPolicyNotCalled(retryPolicy);
+      assertThat(scassandras.node(1).activityClient().retrieveQueries())
+          .extractingResultOf("getQuery")
+          .isEmpty();
+      assertThat(scassandras.node(2).activityClient().retrieveQueries())
+          .extractingResultOf("getQuery")
+          .containsOnly("select * from tbl");
+    } finally {
+      if (cluster != null) {
+        cluster.close();
+      }
+      scassandras.stop();
+    }
+  }
+
+  /**
    * Ensures that on borrowConnection if a set keyspace attempt is in progress on that connection
    * for a different keyspace than the pool state that the borrowConnection future returned is
    * failed.
@@ -501,6 +1194,9 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
             .contains(
                 "Aborting attempt to set keyspace to 'newkeyspace' since there is already an in flight attempt to set keyspace to 'slowks'.");
       }
+      assertThat(connection.inFlight.get()).isEqualTo(0);
+      assertThat(pool.totalInFlight.get()).isEqualTo(0);
+      assertThat(pool.pendingBorrowCount.get()).isEqualTo(0);
     } finally {
       MockRequest.completeAll(requests);
       cluster.close();
@@ -1741,6 +2437,16 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
           },
           MoreExecutors.directExecutor());
       return future;
+    }
+  }
+
+  private static class SettableConnectionFuture extends Connection.Future {
+    SettableConnectionFuture(Message.Request request) {
+      super(request);
+    }
+
+    void setResponse(Message.Response response) {
+      super.set(response);
     }
   }
 }
