@@ -812,7 +812,21 @@ class RequestHandler {
                     toPrepare.getQueryKeyspace(),
                     connection.endPoint);
 
-                write(connection, prepareAndRetry(toPrepare.getQueryString()));
+                try {
+                  write(connection, prepareAndRetry(toPrepare.getQueryString()));
+                } catch (ConnectionException e) {
+                  if (metricsEnabled()) metrics().getErrorMetrics().getConnectionErrors().inc();
+                  connection.release();
+                  logError(connection.endPoint, e);
+                  retry(false, null);
+                } catch (BusyConnectionException e) {
+                  connection.release(true);
+                  logError(connection.endPoint, e);
+                  retry(false, null);
+                } catch (RuntimeException e) {
+                  connection.release();
+                  throw e;
+                }
                 // we're done for now, the prepareAndRetry callback will handle the rest
                 return;
               case READ_FAILURE:
