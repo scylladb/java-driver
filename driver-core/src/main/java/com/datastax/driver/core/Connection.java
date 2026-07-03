@@ -791,6 +791,11 @@ class Connection {
     return isDefunct.get();
   }
 
+  @VisibleForTesting
+  void markDefunctForTest() {
+    isDefunct.set(true);
+  }
+
   int maxAvailableStreams() {
     return dispatcher.streamIdHandler.maxAvailableStreams();
   }
