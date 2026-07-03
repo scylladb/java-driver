@@ -27,6 +27,7 @@ import static com.datastax.driver.core.Connection.State.RESURRECTING;
 import static com.datastax.driver.core.Connection.State.TRASHED;
 
 import com.datastax.driver.core.exceptions.AuthenticationException;
+import com.datastax.driver.core.exceptions.BusyConnectionException;
 import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
@@ -611,7 +612,22 @@ class HostConnectionPool implements Connection.Owner {
       if (totalInFlightCount > currentCapacity) maybeSpawnNewConnection(shardId);
     }
 
-    return leastBusy.setKeyspaceAsync(manager.poolsState.keyspace);
+    final Connection borrowedConnection = leastBusy;
+    ListenableFuture<Connection> setKeyspaceFuture =
+        borrowedConnection.setKeyspaceAsync(manager.poolsState.keyspace);
+    Futures.addCallback(
+        setKeyspaceFuture,
+        new FutureCallback<Connection>() {
+          @Override
+          public void onSuccess(Connection connection) {}
+
+          @Override
+          public void onFailure(Throwable t) {
+            borrowedConnection.release(t instanceof BusyConnectionException);
+          }
+        },
+        MoreExecutors.directExecutor());
+    return setKeyspaceFuture;
   }
 
   private ListenableFuture<Connection> enqueue(
