@@ -26,6 +26,7 @@ package com.datastax.oss.driver.internal.core.cql;
 import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
 
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
+import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
@@ -46,6 +47,7 @@ import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
+import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
@@ -142,7 +144,7 @@ public class CqlRequestHandler implements Throttled {
    */
   private final AtomicInteger startedSpeculativeExecutionsCount;
 
-  final Timeout scheduledTimeout;
+  volatile Timeout scheduledTimeout;
   final List<Timeout> scheduledExecutions;
   private final List<NodeResponseCallback> inFlightCallbacks;
   private final RequestThrottler throttler;
@@ -203,8 +205,7 @@ public class CqlRequestHandler implements Throttled {
 
     this.timer = context.getNettyOptions().getTimer();
     this.executionProfile = Conversions.resolveExecutionProfile(initialStatement, context);
-    Duration timeout = Conversions.resolveRequestTimeout(statement, executionProfile);
-    this.scheduledTimeout = scheduleTimeout(timeout);
+    this.scheduledTimeout = scheduleTimeout(statement);
 
     this.throttler = context.getRequestThrottler();
     this.throttler.register(this);
@@ -239,18 +240,18 @@ public class CqlRequestHandler implements Throttled {
     return result;
   }
 
-  private Timeout scheduleTimeout(Duration timeoutDuration) {
+  private Timeout scheduleTimeout(Statement<?> statement) {
+    Duration timeoutDuration = Conversions.resolveRequestTimeout(statement, executionProfile);
     if (timeoutDuration.toNanos() > 0) {
       try {
         return this.timer.newTimeout(
             (Timeout timeout1) -> {
-              NodeDiagnostics diagnostics = buildNodeDiagnostics();
-              setFinalError(
-                  initialStatement,
+              if (result.isDone()) {
+                return;
+              }
+              processRequestTimeout(
                   new DriverTimeoutException(
-                      "Query timed out after " + timeoutDuration, diagnostics),
-                  null,
-                  -1);
+                      "Query timed out after " + timeoutDuration, buildNodeDiagnostics()));
             },
             timeoutDuration.toNanos(),
             TimeUnit.NANOSECONDS);
@@ -264,6 +265,82 @@ public class CqlRequestHandler implements Throttled {
       }
     }
     return null;
+  }
+
+  private void processRequestTimeout(DriverTimeoutException error) {
+    NodeResponseCallback callback = firstInFlightCallback();
+    if (callback == null) {
+      setFinalError(initialStatement, error, null, -1);
+      return;
+    }
+
+    RetryVerdict verdict;
+    try {
+      RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(context, executionProfile);
+      verdict =
+          retryPolicy.onRequestTimeoutVerdict(
+              callback.statement,
+              resolveConsistency(callback.statement),
+              error,
+              Conversions.resolveIdempotence(callback.statement, executionProfile),
+              callback.retryCount);
+    } catch (Throwable cause) {
+      setFinalError(
+          callback.statement,
+          new IllegalStateException("Unexpected error while invoking the retry policy", cause),
+          callback.node,
+          callback.execution);
+      return;
+    }
+
+    if (verdict == null) {
+      setFinalError(
+          callback.statement,
+          new NullPointerException("Retry policy returned null verdict"),
+          callback.node,
+          callback.execution);
+      return;
+    }
+
+    if (verdict.getRetryDecision() == RetryDecision.RETRY_SAME
+        || verdict.getRetryDecision() == RetryDecision.RETRY_NEXT
+        || verdict.getRetryDecision() == RetryDecision.IGNORE) {
+      sessionMetricUpdater.incrementCounter(
+          DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, executionProfile.getName());
+    }
+
+    cancelTimedOutCallbacks(callback);
+    callback.processRetryVerdict(verdict, error, true);
+  }
+
+  @Nullable
+  private NodeResponseCallback firstInFlightCallback() {
+    List<NodeResponseCallback> callbacks = inFlightCallbacks;
+    return callbacks.isEmpty() ? null : callbacks.get(0);
+  }
+
+  private void cancelTimedOutCallbacks(NodeResponseCallback retryCallback) {
+    for (Timeout scheduledExecution : scheduledExecutions) {
+      scheduledExecution.cancel();
+    }
+    scheduledExecutions.clear();
+
+    for (NodeResponseCallback callback : inFlightCallbacks.toArray(new NodeResponseCallback[0])) {
+      inFlightCallbacks.remove(callback);
+      callback.cancel();
+      if (callback != retryCallback) {
+        activeExecutionsCount.decrementAndGet();
+      }
+    }
+  }
+
+  private ConsistencyLevel resolveConsistency(Statement<?> statement) {
+    ConsistencyLevel consistency = statement.getConsistencyLevel();
+    return consistency != null
+        ? consistency
+        : context
+            .getConsistencyLevelRegistry()
+            .nameToLevel(executionProfile.getString(DefaultDriverOption.REQUEST_CONSISTENCY));
   }
 
   @Nullable
@@ -1003,29 +1080,30 @@ public class CqlRequestHandler implements Throttled {
     }
 
     private void processRetryVerdict(RetryVerdict verdict, Throwable error) {
+      processRetryVerdict(verdict, error, false);
+    }
+
+    private void processRetryVerdict(
+        RetryVerdict verdict, Throwable error, boolean restartRequestTimeout) {
       LOG.trace("[{}] Processing retry decision {}", logPrefix, verdict);
       switch (verdict.getRetryDecision()) {
         case RETRY_SAME:
           recordError(node, error);
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
-          sendRequest(
-              verdict.getRetryRequest(statement),
-              node,
-              queryPlan,
-              execution,
-              retryCount + 1,
-              false);
+          Statement<?> retrySameRequest = verdict.getRetryRequest(statement);
+          if (restartRequestTimeout) {
+            scheduledTimeout = scheduleTimeout(retrySameRequest);
+          }
+          sendRequest(retrySameRequest, node, queryPlan, execution, retryCount + 1, false);
           break;
         case RETRY_NEXT:
           recordError(node, error);
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
-          sendRequest(
-              verdict.getRetryRequest(statement),
-              null,
-              queryPlan,
-              execution,
-              retryCount + 1,
-              false);
+          Statement<?> retryNextRequest = verdict.getRetryRequest(statement);
+          if (restartRequestTimeout) {
+            scheduledTimeout = scheduleTimeout(retryNextRequest);
+          }
+          sendRequest(retryNextRequest, null, queryPlan, execution, retryCount + 1, false);
           break;
         case RETHROW:
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);

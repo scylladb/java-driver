@@ -18,11 +18,13 @@
 package com.datastax.oss.driver.internal.core.retry;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
 import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
+import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.DefaultWriteType;
 import com.datastax.oss.driver.api.core.servererrors.ReadFailureException;
@@ -184,6 +186,22 @@ public class DefaultRetryPolicy implements RetryPolicy {
     }
 
     return decision;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>This implementation always rethrows the timeout. Client-side request timeouts do not prove
+   * that the coordinator failed to execute the request.
+   */
+  @Override
+  public RetryVerdict onRequestTimeoutVerdict(
+      @NonNull Request request,
+      @NonNull ConsistencyLevel cl,
+      @NonNull DriverTimeoutException error,
+      boolean requestIdempotent,
+      int retryCount) {
+    return RetryVerdict.RETHROW;
   }
 
   /**

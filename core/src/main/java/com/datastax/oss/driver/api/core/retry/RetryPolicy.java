@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.api.core.retry;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
 import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
@@ -214,6 +215,39 @@ public interface RetryPolicy extends AutoCloseable {
       int retryCount) {
     RetryDecision decision = onUnavailable(request, cl, required, alive, retryCount);
     return () -> decision;
+  }
+
+  /**
+   * Whether to retry when the driver did not receive a response before the client-side request
+   * timeout expired.
+   *
+   * <p>This is different from {@link #onReadTimeoutVerdict(Request, ConsistencyLevel, int, int,
+   * boolean, int)} and {@link #onWriteTimeoutVerdict(Request, ConsistencyLevel, WriteType, int,
+   * int, int)}: those methods handle server-side timeout responses returned by a coordinator, while
+   * this method handles a timeout raised by the driver itself.
+   *
+   * <p>Since a client-side timeout does not prove that the coordinator failed to execute the
+   * request, policies should only retry when {@code requestIdempotent} is {@code true}, unless
+   * duplicate execution is explicitly acceptable for the request.
+   *
+   * <p>If this method returns a retry verdict, the driver starts a new attempt and schedules the
+   * client-side request timeout again for the retried request.
+   *
+   * @param request the request that timed out.
+   * @param cl the requested consistency level.
+   * @param error the timeout raised by the driver.
+   * @param requestIdempotent the request idempotence, resolved from {@link Request#isIdempotent()}
+   *     and the configured default.
+   * @param retryCount how many times the retry policy has been invoked already for this request
+   *     (not counting the current invocation).
+   */
+  default RetryVerdict onRequestTimeoutVerdict(
+      @NonNull Request request,
+      @NonNull ConsistencyLevel cl,
+      @NonNull DriverTimeoutException error,
+      boolean requestIdempotent,
+      int retryCount) {
+    return RetryVerdict.RETHROW;
   }
 
   /**

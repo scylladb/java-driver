@@ -166,6 +166,24 @@ nodes will likely have been detected as dead, and the retry has a high chance of
 * For `BATCH_LOG` write type: the policy will retry the same node, for the reasons explained above.
 * For other write types: the policy will always rethrow.
 
+#### `onRequestTimeoutVerdict`
+
+The driver sent the request to a coordinator, but did not receive any response before the
+client-side request timeout (`basic.request.timeout`) expired. The driver raises a
+[DriverTimeoutException] and invokes this method so that the retry policy can decide whether to
+retry.
+
+This is different from `onReadTimeoutVerdict` and `onWriteTimeoutVerdict`: those methods handle
+server-side timeout responses, where the coordinator replied with `READ_TIMEOUT` or `WRITE_TIMEOUT`.
+With a driver-side timeout, the coordinator might still have executed the request and only the
+response was delayed or lost.
+
+This method is invoked with the resolved statement idempotence. Policies that retry this error should
+reject non-idempotent requests unless duplicate execution is acceptable.
+
+The default policy rethrows client-side request timeouts. `ConsistencyDowngradingRetryPolicy` retries
+them on the next node for idempotent requests only.
+
 #### `onRequestAbortedVerdict`
 
 The request was aborted before we could get a response from the coordinator. This can happen in two
