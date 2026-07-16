@@ -122,6 +122,13 @@ public class ConsistencyDowngradingRetryPolicyTest extends RetryPolicyTestBase {
   }
 
   @Test
+  public void should_process_request_timeout() {
+    assertOnRequestTimeout(QUORUM, true, 0).hasDecision(RETRY_NEXT);
+    assertOnRequestTimeout(QUORUM, true, 1).hasDecision(RETHROW);
+    assertOnRequestTimeout(QUORUM, false, 0).hasDecision(RETHROW);
+  }
+
+  @Test
   public void should_process_aborted_request() {
     assertOnRequestAborted(ClosedConnectionException.class, 0).hasDecision(RETRY_NEXT);
     assertOnRequestAborted(ClosedConnectionException.class, 1).hasDecision(RETRY_NEXT);

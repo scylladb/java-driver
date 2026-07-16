@@ -23,6 +23,7 @@ import static com.datastax.oss.driver.api.core.servererrors.WriteType.SIMPLE;
 import static com.datastax.oss.driver.api.core.servererrors.WriteType.UNLOGGED_BATCH;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
 import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -115,6 +116,10 @@ public class ConsistencyDowngradingRetryPolicy implements RetryPolicy {
   public static final String VERDICT_ON_UNAVAILABLE =
       "[{}] Verdict on unavailable exception (consistency: {}, "
           + "required replica: {}, alive replica: {}, retries: {}): {}";
+
+  @VisibleForTesting
+  public static final String VERDICT_ON_REQUEST_TIMEOUT =
+      "[{}] Verdict on request timeout (consistency: {}, idempotent: {}, retries: {}): {}";
 
   @VisibleForTesting
   public static final String VERDICT_ON_ABORTED =
@@ -265,6 +270,27 @@ public class ConsistencyDowngradingRetryPolicy implements RetryPolicy {
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace(VERDICT_ON_UNAVAILABLE, logPrefix, cl, required, alive, retryCount, verdict);
+    }
+    return verdict;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>This implementation retries client-side request timeouts on the next host for idempotent
+   * requests only.
+   */
+  @Override
+  public RetryVerdict onRequestTimeoutVerdict(
+      @NonNull Request request,
+      @NonNull ConsistencyLevel cl,
+      @NonNull DriverTimeoutException error,
+      boolean requestIdempotent,
+      int retryCount) {
+    RetryVerdict verdict =
+        requestIdempotent && retryCount == 0 ? RetryVerdict.RETRY_NEXT : RetryVerdict.RETHROW;
+    if (LOG.isTraceEnabled()) {
+      LOG.trace(VERDICT_ON_REQUEST_TIMEOUT, logPrefix, cl, requestIdempotent, retryCount, verdict);
     }
     return verdict;
   }

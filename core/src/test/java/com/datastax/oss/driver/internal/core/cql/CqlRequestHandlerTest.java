@@ -19,16 +19,20 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
@@ -37,6 +41,9 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.retry.RetryVerdict;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.protocol.internal.request.Prepare;
@@ -44,6 +51,7 @@ import com.datastax.oss.protocol.internal.response.error.Unprepared;
 import com.datastax.oss.protocol.internal.response.result.Prepared;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.util.Bytes;
+import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
@@ -55,6 +63,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
@@ -179,6 +188,166 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
       assertThatStage(resultSetFuture)
           .isFailed(t -> assertThat(t).isInstanceOf(DriverTimeoutException.class));
+    }
+  }
+
+  @Test
+  @UseDataProvider("idempotentConfig")
+  public void should_retry_request_timeout_if_policy_decides_so(
+      boolean defaultIdempotence, Statement<?> statement) throws Exception {
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withDefaultIdempotence(defaultIdempotence);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    node1Behavior.setWriteSuccess();
+    harnessBuilder.withResponse(node2, defaultFrameOf(singleRow()));
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness
+              .getContext()
+              .getRetryPolicy(DriverExecutionProfile.DEFAULT_NAME)
+              .onRequestTimeoutVerdict(
+                  any(Statement.class),
+                  eq(DefaultConsistencyLevel.LOCAL_ONE),
+                  any(DriverTimeoutException.class),
+                  eq(true),
+                  eq(0)))
+          .thenReturn(RetryVerdict.RETRY_NEXT);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(statement, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      CapturedTimeout requestTimeout = harness.nextScheduledTimeout();
+      requestTimeout.task().run(requestTimeout);
+
+      assertThatStage(resultSetFuture)
+          .isSuccess(
+              resultSet -> {
+                Iterator<Row> rows = resultSet.currentPage().iterator();
+                assertThat(rows.hasNext()).isTrue();
+                assertThat(rows.next().getString("message")).isEqualTo("hello, world");
+
+                ExecutionInfo executionInfo = resultSet.getExecutionInfo();
+                assertThat(executionInfo.getCoordinator()).isEqualTo(node2);
+                assertThat(executionInfo.getErrors()).hasSize(1);
+                assertThat(executionInfo.getErrors().get(0).getKey()).isEqualTo(node1);
+                assertThat(executionInfo.getErrors().get(0).getValue())
+                    .isInstanceOf(DriverTimeoutException.class);
+              });
+      node1Behavior.verifyCancellation();
+    }
+  }
+
+  @Test
+  public void should_retry_request_timeout_before_write_completes_if_policy_decides_so()
+      throws Exception {
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    harnessBuilder.withResponse(node2, defaultFrameOf(singleRow()));
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness
+              .getContext()
+              .getRetryPolicy(DriverExecutionProfile.DEFAULT_NAME)
+              .onRequestTimeoutVerdict(
+                  any(Statement.class),
+                  eq(DefaultConsistencyLevel.LOCAL_ONE),
+                  any(DriverTimeoutException.class),
+                  eq(true),
+                  eq(0)))
+          .thenReturn(RetryVerdict.RETRY_NEXT);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      CapturedTimeout requestTimeout = harness.nextScheduledTimeout();
+      requestTimeout.task().run(requestTimeout);
+
+      assertThatStage(resultSetFuture)
+          .isSuccess(
+              resultSet ->
+                  assertThat(resultSet.getExecutionInfo().getCoordinator()).isEqualTo(node2));
+
+      node1Behavior.verifyCancellation();
+      node1Behavior.setWriteSuccess();
+    }
+  }
+
+  @Test
+  public void should_retry_request_timeout_while_waiting_on_throttler_if_policy_decides_so()
+      throws Exception {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestThrottler(throttler);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    node1Behavior.setWriteSuccess();
+    node1Behavior.setResponseSuccess(defaultFrameOf(singleRow()));
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness
+              .getContext()
+              .getRetryPolicy(DriverExecutionProfile.DEFAULT_NAME)
+              .onRequestTimeoutVerdict(
+                  any(Statement.class),
+                  eq(DefaultConsistencyLevel.LOCAL_ONE),
+                  any(DriverTimeoutException.class),
+                  eq(true),
+                  eq(0)))
+          .thenReturn(RetryVerdict.RETRY_NEXT);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      ArgumentCaptor<Throttled> throttledCaptor = ArgumentCaptor.forClass(Throttled.class);
+      verify(throttler).register(throttledCaptor.capture());
+
+      CapturedTimeout requestTimeout = harness.nextScheduledTimeout();
+      requestTimeout.task().run(requestTimeout);
+
+      assertThat(resultSetFuture.toCompletableFuture()).isNotDone();
+      node1Behavior.verifyNoWrite();
+
+      throttledCaptor.getValue().onThrottleReady(true);
+
+      assertThatStage(resultSetFuture)
+          .isSuccess(
+              resultSet ->
+                  assertThat(resultSet.getExecutionInfo().getCoordinator()).isEqualTo(node1));
+      node1Behavior.verifyWrite();
+    }
+  }
+
+  @Test
+  @UseDataProvider("nonIdempotentConfig")
+  public void should_pass_resolved_non_idempotence_to_policy_on_request_timeout(
+      boolean defaultIdempotence, Statement<?> statement) throws Exception {
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withDefaultIdempotence(defaultIdempotence);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    node1Behavior.setWriteSuccess();
+    harnessBuilder.withResponse(node2, defaultFrameOf(singleRow()));
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(statement, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      CapturedTimeout requestTimeout = harness.nextScheduledTimeout();
+      requestTimeout.task().run(requestTimeout);
+
+      assertThatStage(resultSetFuture)
+          .isFailed(error -> assertThat(error).isInstanceOf(DriverTimeoutException.class));
+      verify(harness.getContext().getRetryPolicy(DriverExecutionProfile.DEFAULT_NAME))
+          .onRequestTimeoutVerdict(
+              any(Statement.class),
+              eq(DefaultConsistencyLevel.LOCAL_ONE),
+              any(DriverTimeoutException.class),
+              eq(false),
+              eq(0));
     }
   }
 

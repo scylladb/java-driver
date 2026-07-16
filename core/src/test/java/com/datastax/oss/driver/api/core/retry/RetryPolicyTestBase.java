@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.servererrors.CoordinatorException;
 import com.datastax.oss.driver.api.core.servererrors.WriteType;
 import com.datastax.oss.driver.api.core.session.Request;
@@ -56,6 +57,13 @@ public abstract class RetryPolicyTestBase {
       ConsistencyLevel cl, int required, int alive, int retryCount) {
     return new RetryVerdictAssert(
         policy.onUnavailableVerdict(request, cl, required, alive, retryCount));
+  }
+
+  protected RetryVerdictAssert assertOnRequestTimeout(
+      ConsistencyLevel cl, boolean requestIdempotent, int retryCount) {
+    return new RetryVerdictAssert(
+        policy.onRequestTimeoutVerdict(
+            request, cl, mock(DriverTimeoutException.class), requestIdempotent, retryCount));
   }
 
   protected RetryVerdictAssert assertOnRequestAborted(

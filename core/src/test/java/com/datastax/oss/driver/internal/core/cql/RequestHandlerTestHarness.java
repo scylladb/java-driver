@@ -24,14 +24,17 @@
 package com.datastax.oss.driver.internal.core.cql;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
+import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
@@ -40,8 +43,10 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.SessionMetric;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
+import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
 import com.datastax.oss.driver.api.core.time.TimestampGenerator;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
@@ -137,6 +142,13 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     when(context.getLoadBalancingPolicyWrapper()).thenReturn(loadBalancingPolicyWrapper);
 
     when(context.getRetryPolicy(anyString())).thenReturn(retryPolicy);
+    when(retryPolicy.onRequestTimeoutVerdict(
+            any(Request.class),
+            any(ConsistencyLevel.class),
+            any(DriverTimeoutException.class),
+            anyBoolean(),
+            anyInt()))
+        .thenReturn(RetryVerdict.RETHROW);
 
     // Disable speculative executions by default
     when(speculativeExecutionPolicy.nextExecution(
@@ -193,7 +205,11 @@ public class RequestHandlerTestHarness implements AutoCloseable {
 
     when(context.getWriteTypeRegistry()).thenReturn(new DefaultWriteTypeRegistry());
 
-    when(context.getRequestThrottler()).thenReturn(new PassThroughRequestThrottler(context));
+    when(context.getRequestThrottler())
+        .thenReturn(
+            builder.requestThrottler == null
+                ? new PassThroughRequestThrottler(context)
+                : builder.requestThrottler);
 
     when(context.getRequestTracker()).thenReturn(new NoopRequestTracker(context));
 
@@ -232,6 +248,7 @@ public class RequestHandlerTestHarness implements AutoCloseable {
     private boolean defaultIdempotence;
     private ProtocolVersion protocolVersion;
     private RequestIdGenerator requestIdGenerator;
+    private RequestThrottler requestThrottler;
 
     /**
      * Sets the given node as the next one in the query plan; an empty pool will be simulated when
@@ -289,6 +306,11 @@ public class RequestHandlerTestHarness implements AutoCloseable {
 
     public Builder withRequestIdGenerator(RequestIdGenerator requestIdGenerator) {
       this.requestIdGenerator = requestIdGenerator;
+      return this;
+    }
+
+    public Builder withRequestThrottler(RequestThrottler requestThrottler) {
+      this.requestThrottler = requestThrottler;
       return this;
     }
 
