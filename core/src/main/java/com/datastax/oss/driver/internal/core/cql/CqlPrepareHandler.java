@@ -229,14 +229,22 @@ public class CqlPrepareHandler implements Throttled {
     if (channel == null) {
       setFinalError(AllNodesFailedException.fromErrors(this.errors));
     } else {
-      InitialPrepareCallback initialPrepareCallback =
-          new InitialPrepareCallback(request, node, channel, retryCount);
+      boolean writeSubmitted = false;
+      try {
+        InitialPrepareCallback initialPrepareCallback =
+            new InitialPrepareCallback(request, node, channel, retryCount);
 
-      Prepare message = toPrepareMessage(request);
+        Prepare message = toPrepareMessage(request);
 
-      channel
-          .write(message, false, request.getCustomPayload(), initialPrepareCallback)
-          .addListener(initialPrepareCallback);
+        channel
+            .write(message, false, request.getCustomPayload(), initialPrepareCallback)
+            .addListener(initialPrepareCallback);
+        writeSubmitted = true;
+      } finally {
+        if (!writeSubmitted) {
+          channel.cancelPreAcquireId();
+        }
+      }
     }
   }
 
@@ -316,28 +324,38 @@ public class CqlPrepareHandler implements Throttled {
       LOG.trace("[{}] Could not get a channel to reprepare on {}, skipping", logPrefix, node);
       return CompletableFuture.completedFuture(null);
     } else {
-      ThrottledAdminRequestHandler<ByteBuffer> handler =
-          ThrottledAdminRequestHandler.prepare(
-              channel,
-              false,
-              toPrepareMessage(request),
-              request.getCustomPayload(),
-              Conversions.resolveRequestTimeout(request, executionProfile),
-              throttler,
-              session.getMetricUpdater(),
-              logPrefix);
-      return handler
-          .start()
-          .handle(
-              (result, error) -> {
-                if (error == null) {
-                  LOG.trace("[{}] Successfully reprepared on {}", logPrefix, node);
-                } else {
-                  Loggers.warnWithException(
-                      LOG, "[{}] Error while repreparing on {}", node, logPrefix, error);
-                }
-                return null;
-              });
+      boolean requestStarted = false;
+      try {
+        ThrottledAdminRequestHandler<ByteBuffer> handler =
+            ThrottledAdminRequestHandler.prepare(
+                channel,
+                false,
+                toPrepareMessage(request),
+                request.getCustomPayload(),
+                Conversions.resolveRequestTimeout(request, executionProfile),
+                throttler,
+                session.getMetricUpdater(),
+                logPrefix);
+        CompletionStage<Void> result =
+            handler
+                .start()
+                .handle(
+                    (preparedId, error) -> {
+                      if (error == null) {
+                        LOG.trace("[{}] Successfully reprepared on {}", logPrefix, node);
+                      } else {
+                        Loggers.warnWithException(
+                            LOG, "[{}] Error while repreparing on {}", node, logPrefix, error);
+                      }
+                      return null;
+                    });
+        requestStarted = true;
+        return result;
+      } finally {
+        if (!requestStarted) {
+          channel.cancelPreAcquireId();
+        }
+      }
     }
   }
 

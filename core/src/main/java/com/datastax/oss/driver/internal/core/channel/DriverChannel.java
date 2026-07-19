@@ -100,10 +100,16 @@ public class DriverChannel {
       Map<String, ByteBuffer> customPayload,
       ResponseCallback responseCallback) {
     if (closing.get()) {
+      inFlightHandler.cancelPreAcquireId();
       return channel.newFailedFuture(new IllegalStateException("Driver channel is closing"));
     }
     RequestMessage message = new RequestMessage(request, tracing, customPayload, responseCallback);
-    return writeCoalescer.writeAndFlush(channel, message);
+    try {
+      return writeCoalescer.writeAndFlush(channel, message);
+    } catch (Throwable t) {
+      inFlightHandler.cancelPreAcquireId();
+      return channel.newFailedFuture(t);
+    }
   }
 
   /**
@@ -218,6 +224,15 @@ public class DriverChannel {
    */
   public boolean preAcquireId() {
     return inFlightHandler.preAcquireId();
+  }
+
+  /**
+   * Cancels the reservation made by a successful {@link #preAcquireId()} call when the
+   * corresponding request cannot be submitted to {@link #write(Message, boolean, Map,
+   * ResponseCallback)}.
+   */
+  public void cancelPreAcquireId() {
+    inFlightHandler.cancelPreAcquireId();
   }
 
   /**

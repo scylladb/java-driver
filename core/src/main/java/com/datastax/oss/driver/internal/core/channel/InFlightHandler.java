@@ -396,6 +396,10 @@ public class InFlightHandler extends ChannelDuplexHandler {
     return streamIds.preAcquire();
   }
 
+  void cancelPreAcquireId() {
+    streamIds.cancelPreAcquire();
+  }
+
   int getInFlight() {
     return streamIds.getMaxAvailableIds() - streamIds.getAvailableIds();
   }

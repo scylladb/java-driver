@@ -409,30 +409,39 @@ public class CqlRequestHandler implements Throttled {
         setFinalError(statement, AllNodesFailedException.fromErrors(this.errors), null, -1);
       }
     } else {
-      Statement finalStatement = statement;
-      String nodeRequestId =
-          this.requestIdGenerator
-              .map((g) -> g.getNodeRequestId(finalStatement, sessionRequestId))
-              .orElse(Integer.toString(this.hashCode()));
-      statement =
-          this.requestIdGenerator
-              .map((g) -> g.getDecoratedStatement(finalStatement, nodeRequestId))
-              .orElse(finalStatement);
+      boolean writeSubmitted = false;
+      try {
+        Statement finalStatement = statement;
+        String nodeRequestId =
+            this.requestIdGenerator
+                .map((g) -> g.getNodeRequestId(finalStatement, sessionRequestId))
+                .orElse(Integer.toString(this.hashCode()));
+        statement =
+            this.requestIdGenerator
+                .map((g) -> g.getDecoratedStatement(finalStatement, nodeRequestId))
+                .orElse(finalStatement);
 
-      NodeResponseCallback nodeResponseCallback =
-          new NodeResponseCallback(
-              statement,
-              node,
-              queryPlan,
-              channel,
-              currentExecutionIndex,
-              retryCount,
-              scheduleNextExecution,
-              logPrefixJoiner.join(this.sessionName, nodeRequestId, currentExecutionIndex));
-      Message message = Conversions.toMessage(statement, executionProfile, context);
-      channel
-          .write(message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback)
-          .addListener(nodeResponseCallback);
+        NodeResponseCallback nodeResponseCallback =
+            new NodeResponseCallback(
+                statement,
+                node,
+                queryPlan,
+                channel,
+                currentExecutionIndex,
+                retryCount,
+                scheduleNextExecution,
+                logPrefixJoiner.join(this.sessionName, nodeRequestId, currentExecutionIndex));
+        Message message = Conversions.toMessage(statement, executionProfile, context);
+        channel
+            .write(
+                message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback)
+            .addListener(nodeResponseCallback);
+        writeSubmitted = true;
+      } finally {
+        if (!writeSubmitted) {
+          channel.cancelPreAcquireId();
+        }
+      }
     }
   }
 

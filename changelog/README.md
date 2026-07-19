@@ -23,6 +23,7 @@ under the License.
 
 ### 4.19.2
 
+- [bug] PR 947: Release pre-acquired stream IDs when requests fail before being written
 - [bug] CASSJAVA-116: Retry or Speculative Execution with RequestIdGenerator throws "Duplicate Key"
 
 ### 4.19.1

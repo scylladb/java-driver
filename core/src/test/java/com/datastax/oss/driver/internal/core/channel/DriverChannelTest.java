@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.internal.core.channel;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
@@ -141,6 +142,17 @@ public class DriverChannelTest extends ChannelHandlerTestBase {
     assertThat(responseCallback.getFailure())
         .isInstanceOf(ClosedConnectionException.class)
         .hasMessageContaining("Channel was force-closed");
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_when_write_is_rejected_before_submission() {
+    driverChannel.close();
+
+    Future<java.lang.Void> writeFuture =
+        driverChannel.write(new Query("test"), false, Frame.NO_PAYLOAD, new MockResponseCallback());
+
+    assertThat(writeFuture).isFailed();
+    verify(streamIds).cancelPreAcquire();
   }
 
   // Simple implementation that holds all the writes, and flushes them when it's explicitly

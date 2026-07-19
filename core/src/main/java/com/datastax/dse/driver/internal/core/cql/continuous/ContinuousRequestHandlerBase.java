@@ -367,23 +367,33 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
         abortGlobalRequestOrChosenCallback(AllNodesFailedException.fromErrors(errors));
       }
     } else if (!chosenCallback.isDone()) {
-      NodeResponseCallback nodeResponseCallback =
-          new NodeResponseCallback(
-              statement,
-              node,
-              channel,
-              currentExecutionIndex,
-              retryCount,
-              scheduleSpeculativeExecution,
-              logPrefix);
-      inFlightCallbacks.add(nodeResponseCallback);
-      channel
-          .write(
-              getMessage(statement),
-              isTracingEnabled(statement),
-              createPayload(statement),
-              nodeResponseCallback)
-          .addListener(nodeResponseCallback);
+      boolean writeSubmitted = false;
+      try {
+        NodeResponseCallback nodeResponseCallback =
+            new NodeResponseCallback(
+                statement,
+                node,
+                channel,
+                currentExecutionIndex,
+                retryCount,
+                scheduleSpeculativeExecution,
+                logPrefix);
+        inFlightCallbacks.add(nodeResponseCallback);
+        channel
+            .write(
+                getMessage(statement),
+                isTracingEnabled(statement),
+                createPayload(statement),
+                nodeResponseCallback)
+            .addListener(nodeResponseCallback);
+        writeSubmitted = true;
+      } finally {
+        if (!writeSubmitted) {
+          channel.cancelPreAcquireId();
+        }
+      }
+    } else {
+      channel.cancelPreAcquireId();
     }
   }
 
