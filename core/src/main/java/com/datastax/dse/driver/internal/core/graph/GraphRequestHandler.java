@@ -185,25 +185,29 @@ public class GraphRequestHandler implements Throttled {
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(initialStatement, context);
-    if (wasDelayed
-        // avoid call to nanoTime() if metric is disabled:
-        && sessionMetricUpdater.isEnabled(
-            DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
-      sessionMetricUpdater.updateTimer(
-          DefaultSessionMetric.THROTTLING_DELAY,
-          executionProfile.getName(),
-          System.nanoTime() - startTimeNanos,
-          TimeUnit.NANOSECONDS);
+    try {
+      DriverExecutionProfile executionProfile =
+          Conversions.resolveExecutionProfile(initialStatement, context);
+      if (wasDelayed
+          // avoid call to nanoTime() if metric is disabled:
+          && sessionMetricUpdater.isEnabled(
+              DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
+        sessionMetricUpdater.updateTimer(
+            DefaultSessionMetric.THROTTLING_DELAY,
+            executionProfile.getName(),
+            System.nanoTime() - startTimeNanos,
+            TimeUnit.NANOSECONDS);
+      }
+      Queue<Node> queryPlan =
+          initialStatement.getNode() != null
+              ? new SimpleQueryPlan(initialStatement.getNode())
+              : context
+                  .getLoadBalancingPolicyWrapper()
+                  .newQueryPlan(initialStatement, executionProfile.getName(), session);
+      sendRequest(initialStatement, null, queryPlan, 0, 0, true);
+    } catch (Throwable error) {
+      setFinalError(initialStatement, error, null, NO_SUCCESSFUL_EXECUTION);
     }
-    Queue<Node> queryPlan =
-        initialStatement.getNode() != null
-            ? new SimpleQueryPlan(initialStatement.getNode())
-            : context
-                .getLoadBalancingPolicyWrapper()
-                .newQueryPlan(initialStatement, executionProfile.getName(), session);
-    sendRequest(initialStatement, null, queryPlan, 0, 0, true);
   }
 
   public CompletionStage<AsyncGraphResultSet> handle() {

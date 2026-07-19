@@ -212,27 +212,31 @@ public class CqlRequestHandler implements Throttled {
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    if (wasDelayed
-        // avoid call to nanoTime() if metric is disabled:
-        && sessionMetricUpdater.isEnabled(
-            DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
-      sessionMetricUpdater.updateTimer(
-          DefaultSessionMetric.THROTTLING_DELAY,
-          executionProfile.getName(),
-          System.nanoTime() - startTimeNanos,
-          TimeUnit.NANOSECONDS);
-    }
-    Queue<Node> queryPlan;
-    if (this.initialStatement.getNode() != null) {
-      queryPlan = new SimpleQueryPlan(this.initialStatement.getNode());
-    } else {
-      queryPlan =
-          context
-              .getLoadBalancingPolicyWrapper()
-              .newQueryPlan(initialStatement, executionProfile.getName(), session);
-    }
+    try {
+      if (wasDelayed
+          // avoid call to nanoTime() if metric is disabled:
+          && sessionMetricUpdater.isEnabled(
+              DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
+        sessionMetricUpdater.updateTimer(
+            DefaultSessionMetric.THROTTLING_DELAY,
+            executionProfile.getName(),
+            System.nanoTime() - startTimeNanos,
+            TimeUnit.NANOSECONDS);
+      }
+      Queue<Node> queryPlan;
+      if (this.initialStatement.getNode() != null) {
+        queryPlan = new SimpleQueryPlan(this.initialStatement.getNode());
+      } else {
+        queryPlan =
+            context
+                .getLoadBalancingPolicyWrapper()
+                .newQueryPlan(initialStatement, executionProfile.getName(), session);
+      }
 
-    sendRequest(initialStatement, null, queryPlan, 0, 0, true);
+      sendRequest(initialStatement, null, queryPlan, 0, 0, true);
+    } catch (Throwable error) {
+      setFinalError(initialStatement, error, null, -1);
+    }
   }
 
   public CompletionStage<AsyncResultSet> handle() {

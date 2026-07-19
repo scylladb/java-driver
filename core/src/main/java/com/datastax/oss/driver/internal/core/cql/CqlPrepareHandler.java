@@ -148,18 +148,22 @@ public class CqlPrepareHandler implements Throttled {
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(initialRequest, context);
-    if (wasDelayed) {
-      session
-          .getMetricUpdater()
-          .updateTimer(
-              DefaultSessionMetric.THROTTLING_DELAY,
-              executionProfile.getName(),
-              System.nanoTime() - startTimeNanos,
-              TimeUnit.NANOSECONDS);
+    try {
+      DriverExecutionProfile executionProfile =
+          Conversions.resolveExecutionProfile(initialRequest, context);
+      if (wasDelayed) {
+        session
+            .getMetricUpdater()
+            .updateTimer(
+                DefaultSessionMetric.THROTTLING_DELAY,
+                executionProfile.getName(),
+                System.nanoTime() - startTimeNanos,
+                TimeUnit.NANOSECONDS);
+      }
+      sendRequest(initialRequest, null, 0);
+    } catch (Throwable error) {
+      setFinalError(error);
     }
-    sendRequest(initialRequest, null, 0);
   }
 
   public CompletableFuture<PreparedStatement> handle() {

@@ -19,6 +19,8 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +59,28 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
 public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_fail_future_if_throttled_request_setup_throws() {
+    RuntimeException expected = new RuntimeException("mock query plan failure");
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness
+              .getContext()
+              .getLoadBalancingPolicyWrapper()
+              .newQueryPlan(any(), anyString(), any()))
+          .thenThrow(expected);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(expected));
+    }
+  }
 
   @Test
   public void should_complete_result_if_first_node_replies_immediately() {

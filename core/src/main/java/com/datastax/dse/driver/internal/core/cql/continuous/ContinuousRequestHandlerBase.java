@@ -254,22 +254,27 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(initialStatement, context);
-    if (wasDelayed
-        // avoid call to nanoTime() if metric is disabled:
-        && sessionMetricUpdater.isEnabled(
-            DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
-      session
-          .getMetricUpdater()
-          .updateTimer(
-              DefaultSessionMetric.THROTTLING_DELAY,
-              executionProfile.getName(),
-              System.nanoTime() - startTimeNanos,
-              TimeUnit.NANOSECONDS);
+    try {
+      DriverExecutionProfile executionProfile =
+          Conversions.resolveExecutionProfile(initialStatement, context);
+      if (wasDelayed
+          // avoid call to nanoTime() if metric is disabled:
+          && sessionMetricUpdater.isEnabled(
+              DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
+        session
+            .getMetricUpdater()
+            .updateTimer(
+                DefaultSessionMetric.THROTTLING_DELAY,
+                executionProfile.getName(),
+                System.nanoTime() - startTimeNanos,
+                TimeUnit.NANOSECONDS);
+      }
+      activeExecutionsCount.incrementAndGet();
+      sendRequest(initialStatement, null, 0, 0, specExecEnabled);
+    } catch (Throwable error) {
+      abortGlobalRequestOrChosenCallback(error);
+      throttler.signalError(this, error);
     }
-    activeExecutionsCount.incrementAndGet();
-    sendRequest(initialStatement, null, 0, 0, specExecEnabled);
   }
 
   @Override
