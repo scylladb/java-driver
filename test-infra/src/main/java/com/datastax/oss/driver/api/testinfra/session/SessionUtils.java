@@ -19,6 +19,7 @@ package com.datastax.oss.driver.api.testinfra.session;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -31,6 +32,8 @@ import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.session.SessionBuilder;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.internal.core.loadbalancing.helper.NodeFilterToDistanceEvaluatorAdapter;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -69,6 +72,10 @@ public class SessionUtils {
   private static final Logger LOG = LoggerFactory.getLogger(SessionUtils.class);
   private static final AtomicInteger keyspaceId = new AtomicInteger();
   private static final String DEFAULT_SESSION_CLASS_NAME = CqlSession.class.getName();
+  private static final String DEFAULT_CCM_DATACENTER = "dc1";
+  private static final Version SCYLLA_ENTERPRISE_TABLETS_DEFAULT_VERSION =
+      Version.parse("2024.2.0");
+  private static final Version SCYLLA_OSS_TABLETS_DEFAULT_VERSION = Version.parse("6.1.0");
 
   private static String getSessionBuilderClass() {
     return System.getProperty(SESSION_BUILDER_CLASS_PROPERTY, DEFAULT_SESSION_CLASS_NAME);
@@ -195,14 +202,29 @@ public class SessionUtils {
   /** Creates a keyspace through the given session instance, with the given profile. */
   public static void createKeyspace(
       Session session, CqlIdentifier keyspace, DriverExecutionProfile profile) {
+    String keyspaceOptions =
+        shouldUseScyllaTabletsWorkaroundForTestKeyspaces()
+            ? String.format(
+                "WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', '%s' : 1 } "
+                    + "AND tablets = { 'enabled' : false }",
+                DEFAULT_CCM_DATACENTER)
+            : "WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 }";
     SimpleStatement createKeyspace =
         SimpleStatement.builder(
-                String.format(
-                    "CREATE KEYSPACE %s WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 1 };",
-                    keyspace.asCql(false)))
+                String.format("CREATE KEYSPACE %s %s;", keyspace.asCql(false), keyspaceOptions))
             .setExecutionProfile(profile)
             .build();
     session.execute(createKeyspace, Statement.SYNC);
+  }
+
+  private static boolean shouldUseScyllaTabletsWorkaroundForTestKeyspaces() {
+    if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      return false;
+    }
+    Version version = CcmBridge.getDistributionVersion();
+    return CcmBridge.SCYLLA_ENTERPRISE
+        ? version.compareTo(SCYLLA_ENTERPRISE_TABLETS_DEFAULT_VERSION) >= 0
+        : version.compareTo(SCYLLA_OSS_TABLETS_DEFAULT_VERSION) >= 0;
   }
 
   /**
