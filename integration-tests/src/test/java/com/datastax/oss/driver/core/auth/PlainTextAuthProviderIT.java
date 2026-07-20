@@ -44,16 +44,32 @@ import org.junit.Test;
 
 public class PlainTextAuthProviderIT {
 
+  private static final String USERNAME = "cassandra";
+  private static final String PASSWORD = "cassandra";
+  private static final Version SCYLLA_CUSTOM_SUPERUSER_VERSION = Version.parse("2026.2.0");
+  private static final String SCYLLA_SALTED_PASSWORD =
+      "$6$java-driver-test$2JXL/pXZTuamSsYNH/kE9UUSQETMmKIcdP8Xgdu/fiHsTHSN.EhjmLrMHPVuQ3.4w0h8CDsP/f1trG0kujylG0";
+
   @ClassRule public static final CustomCcmRule CCM_RULE = getCCMRule();
 
   private static CustomCcmRule getCCMRule() {
     CustomCcmRule.Builder builder =
         CustomCcmRule.builder()
             .withCassandraConfiguration("authenticator", "PasswordAuthenticator");
-    if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+    if (requiresExplicitScyllaSuperuser()) {
+      builder =
+          builder
+              .withCassandraConfiguration("auth_superuser_name", USERNAME)
+              .withCassandraConfiguration("auth_superuser_salted_password", SCYLLA_SALTED_PASSWORD);
+    } else if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
       builder = builder.withJvmArgs("-Dcassandra.superuser_setup_delay_ms=0");
     }
     return builder.build();
+  }
+
+  private static boolean requiresExplicitScyllaSuperuser() {
+    return CcmBridge.isDistributionOf(BackendType.SCYLLA)
+        && CcmBridge.getDistributionVersion().compareTo(SCYLLA_CUSTOM_SUPERUSER_VERSION) >= 0;
   }
 
   @BeforeClass
@@ -69,8 +85,8 @@ public class PlainTextAuthProviderIT {
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withClass(DefaultDriverOption.AUTH_PROVIDER_CLASS, PlainTextAuthProvider.class)
-            .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, "cassandra")
-            .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, "cassandra")
+            .withString(DefaultDriverOption.AUTH_PROVIDER_USER_NAME, USERNAME)
+            .withString(DefaultDriverOption.AUTH_PROVIDER_PASSWORD, PASSWORD)
             .build();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, loader)) {
       session.execute("select * from system.local where key='local'");
@@ -83,7 +99,7 @@ public class PlainTextAuthProviderIT {
     SessionBuilder<?, ?> builder =
         SessionUtils.baseBuilder()
             .addContactEndPoints(CCM_RULE.getContactPoints())
-            .withAuthCredentials("cassandra", "cassandra");
+            .withAuthCredentials(USERNAME, PASSWORD);
 
     try (CqlSession session = (CqlSession) builder.build()) {
       session.execute("select * from system.local where key='local'");
@@ -93,7 +109,7 @@ public class PlainTextAuthProviderIT {
   @Test
   public void should_connect_with_programmatic_provider() {
 
-    AuthProvider authProvider = new ProgrammaticPlainTextAuthProvider("cassandra", "cassandra");
+    AuthProvider authProvider = new ProgrammaticPlainTextAuthProvider(USERNAME, PASSWORD);
     SessionBuilder<?, ?> builder =
         SessionUtils.baseBuilder()
             .addContactEndPoints(CCM_RULE.getContactPoints())
