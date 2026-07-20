@@ -42,7 +42,9 @@ import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import io.netty.channel.DefaultEventLoopGroup;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -490,7 +492,153 @@ public class MetadataManagerTest {
         .hasMessageContaining("Cannot register node without hostId");
   }
 
+  @Test
+  public void should_return_empty_list_when_contact_points_not_yet_set() {
+    // contactPoints field is null until addContactPoints is called
+    assertThat(metadataManager.getResolvedContactPoints()).isEmpty();
+  }
+
+  @Test
+  public void should_return_already_resolved_contact_points_unchanged() {
+    // Given — a contact point with an already-resolved InetSocketAddress
+    metadataManager.addContactPoints(ImmutableSet.of(END_POINT2));
+
+    // When
+    List<Node> resolved = metadataManager.getResolvedContactPoints();
+
+    // Then — the single node is returned as-is (no expansion needed)
+    assertThat(resolved).hasSize(1);
+    assertThat(resolved.get(0).getEndPoint()).isEqualTo(END_POINT2);
+  }
+
+  @Test
+  public void should_expand_unresolved_hostname_to_all_ips() {
+    // Given — a contact point with an unresolved hostname (localhost → 127.0.0.1)
+    EndPoint unresolvedEndPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("localhost", 9042));
+    metadataManager.addContactPoints(ImmutableSet.of(unresolvedEndPoint));
+
+    // When
+    List<Node> resolved = metadataManager.getResolvedContactPoints();
+
+    // Then — at least one node is returned, each with a resolved address
+    assertThat(resolved).isNotEmpty();
+    for (Node node : resolved) {
+      InetSocketAddress addr = (InetSocketAddress) node.getEndPoint().resolve();
+      assertThat(addr.isUnresolved()).isFalse();
+      assertThat(addr.getPort()).isEqualTo(9042);
+    }
+  }
+
+  @Test
+  public void should_expand_multiple_contact_points_independently() {
+    // Given — two contact points: one already resolved, one unresolved
+    EndPoint resolvedEndPoint = END_POINT3;
+    EndPoint unresolvedEndPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("localhost", 9042));
+    metadataManager.addContactPoints(ImmutableSet.of(resolvedEndPoint, unresolvedEndPoint));
+
+    // When
+    List<Node> resolved = metadataManager.getResolvedContactPoints();
+
+    // Then — at least 2 nodes: 1 for the resolved + at least 1 for localhost expansion
+    assertThat(resolved.size()).isGreaterThanOrEqualTo(2);
+    // The resolved endpoint must appear
+    assertThat(resolved).anySatisfy(n -> assertThat(n.getEndPoint()).isEqualTo(resolvedEndPoint));
+    // All returned addresses must be resolved
+    for (Node node : resolved) {
+      InetSocketAddress addr = (InetSocketAddress) node.getEndPoint().resolve();
+      assertThat(addr.isUnresolved()).isFalse();
+    }
+  }
+
+  @Test
+  public void should_keep_unresolved_contact_point_when_hostname_cannot_be_resolved() {
+    // Given — a hostname that is guaranteed to fail DNS resolution
+    EndPoint badEndPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("nonexistent.invalid", 9042));
+    metadataManager.addContactPoints(ImmutableSet.of(badEndPoint));
+
+    // When
+    List<Node> resolved = metadataManager.getResolvedContactPoints();
+
+    // Then — resolution is best-effort: the unresolvable hostname is kept as-is (logged as WARN)
+    // instead of being dropped, so the query plan is never emptier than the configured contact
+    // points and the hostname can still be resolved later at connection time.
+    assertThat(resolved).hasSize(1);
+    assertThat(resolved.get(0).getEndPoint()).isEqualTo(badEndPoint);
+    InetSocketAddress addr = (InetSocketAddress) resolved.get(0).getEndPoint().resolve();
+    assertThat(addr.isUnresolved()).isTrue();
+  }
+
+  @Test
+  public void should_keep_unresolved_contact_point_when_resolution_times_out() {
+    // Given — a hostname whose resolution is artificially delayed well past the (test-shortened)
+    // resolution timeout
+    EndPoint slowEndPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("slow.invalid", 9042));
+    metadataManager.addContactPoints(ImmutableSet.of(slowEndPoint));
+    metadataManager.delayResolutionOf("slow.invalid");
+
+    // When
+    long startNanos = System.nanoTime();
+    List<Node> resolved = metadataManager.getResolvedContactPoints();
+    long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+
+    // Then — the call returns bounded by roughly the (test) timeout instead of hanging for the full
+    // simulated delay, and the timed-out hostname is kept unresolved (best-effort) like an
+    // unresolvable one, not dropped.
+    assertThat(resolved).hasSize(1);
+    assertThat(resolved.get(0).getEndPoint()).isEqualTo(slowEndPoint);
+    InetSocketAddress addr = (InetSocketAddress) resolved.get(0).getEndPoint().resolve();
+    assertThat(addr.isUnresolved()).isTrue();
+    assertThat(elapsedMillis).isLessThan(1500);
+  }
+
+  @Test
+  public void should_not_let_one_slow_hostname_starve_the_others() {
+    // Given — one hostname whose resolution hangs past the timeout, alongside a healthy one.
+    // Resolutions run concurrently, so the slow one must not prevent the healthy one from resolving
+    // (the poisoning a single shared resolver thread would cause).
+    EndPoint slowEndPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("slow.invalid", 9042));
+    EndPoint healthyEndPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("localhost", 9042));
+    metadataManager.addContactPoints(ImmutableSet.of(slowEndPoint, healthyEndPoint));
+    metadataManager.delayResolutionOf("slow.invalid");
+
+    // When
+    long startNanos = System.nanoTime();
+    List<Node> resolved = metadataManager.getResolvedContactPoints();
+    long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+
+    // Then — the whole call stays bounded by ~one timeout, the slow hostname is kept unresolved,
+    // and the healthy hostname still resolves to a concrete IP (it was not starved behind the slow
+    // one).
+    assertThat(elapsedMillis).isLessThan(1500);
+    assertThat(resolved)
+        .anySatisfy(
+            n -> {
+              InetSocketAddress a = (InetSocketAddress) n.getEndPoint().resolve();
+              assertThat(a.getHostString()).isEqualTo("slow.invalid");
+              assertThat(a.isUnresolved()).isTrue();
+            });
+    assertThat(resolved)
+        .anySatisfy(
+            n -> {
+              InetSocketAddress a = (InetSocketAddress) n.getEndPoint().resolve();
+              assertThat(a.isUnresolved()).isFalse();
+              assertThat(a.getPort()).isEqualTo(9042);
+            });
+  }
+
   private static class TestMetadataManager extends MetadataManager {
+
+    // Shortened so should_skip_contact_point_when_resolution_times_out() doesn't have to wait out
+    // the real (3s) production timeout.
+    private static final Duration TEST_RESOLUTION_TIMEOUT = Duration.ofMillis(200);
+
+    private volatile String delayedHostname;
 
     private List<MetadataRefresh> refreshes = new CopyOnWriteArrayList<>();
     private volatile int addNodeCount = 0;
@@ -498,6 +646,28 @@ public class MetadataManagerTest {
 
     public TestMetadataManager(InternalDriverContext context) {
       super(context);
+    }
+
+    void delayResolutionOf(String hostname) {
+      this.delayedHostname = hostname;
+    }
+
+    @Override
+    Duration getContactPointResolutionTimeout() {
+      return TEST_RESOLUTION_TIMEOUT;
+    }
+
+    @Override
+    InetAddress[] resolveContactPointHostname(String host) throws UnknownHostException {
+      if (host.equals(delayedHostname)) {
+        try {
+          // Sleep well past TEST_RESOLUTION_TIMEOUT so the caller's Future.get() times out first.
+          Thread.sleep(TEST_RESOLUTION_TIMEOUT.toMillis() * 10);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+      return super.resolveContactPointHostname(host);
     }
 
     @Override

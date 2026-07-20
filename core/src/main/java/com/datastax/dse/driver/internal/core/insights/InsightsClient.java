@@ -313,7 +313,7 @@ public class InsightsClient {
         .withDriverVersion(getDriverVersion(startupOptions))
         .withContactPoints(
             getResolvedContactPoints(
-                driverContext.getMetadataManager().getContactPoints().stream()
+                driverContext.getMetadataManager().getResolvedContactPoints().stream()
                     .map(n -> n.getEndPoint().resolve())
                     .filter(InetSocketAddress.class::isInstance)
                     .map(InetSocketAddress.class::cast)

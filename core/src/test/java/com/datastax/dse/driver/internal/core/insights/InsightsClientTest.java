@@ -487,7 +487,7 @@ public class InsightsClientTest {
     EndPoint contactEndPoint = mock(EndPoint.class);
     when(contactEndPoint.resolve()).thenReturn(new InetSocketAddress("127.0.0.1", 9999));
     when(contactPoint.getEndPoint()).thenReturn(contactEndPoint);
-    when(manager.getContactPoints()).thenReturn(ImmutableSet.of(contactPoint));
+    when(manager.getResolvedContactPoints()).thenReturn(ImmutableList.of(contactPoint));
 
     DriverConfig driverConfig = mock(DriverConfig.class);
     when(context.getConfig()).thenReturn(driverConfig);

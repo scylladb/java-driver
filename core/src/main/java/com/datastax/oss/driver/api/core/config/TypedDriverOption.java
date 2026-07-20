@@ -600,7 +600,7 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_AGREEMENT_WARN =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, GenericType.BOOLEAN);
-  /** Whether to forcibly try original contacts if no live nodes are available */
+  /** Whether to append the original contact points to the reconnection plan (defaults to true) */
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, GenericType.BOOLEAN);
@@ -664,7 +664,13 @@ public class TypedDriverOption<ValueT> {
   /** The coalescer reschedule interval. */
   public static final TypedDriverOption<Duration> COALESCER_INTERVAL =
       new TypedDriverOption<>(DefaultDriverOption.COALESCER_INTERVAL, GenericType.DURATION);
-  /** Whether to resolve the addresses passed to `basic.contact-points`. */
+  /**
+   * Whether to resolve the addresses passed to `basic.contact-points`.
+   *
+   * @deprecated Contact points are now always kept as unresolved hostnames and expanded to all
+   *     their DNS-mapped IPs lazily at connection time. Setting this option has no effect.
+   */
+  @Deprecated
   public static final TypedDriverOption<Boolean> RESOLVE_CONTACT_POINTS =
       new TypedDriverOption<>(DefaultDriverOption.RESOLVE_CONTACT_POINTS, GenericType.BOOLEAN);
   /**

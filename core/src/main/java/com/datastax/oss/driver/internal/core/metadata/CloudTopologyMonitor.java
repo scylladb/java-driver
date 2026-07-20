@@ -44,4 +44,12 @@ public class CloudTopologyMonitor extends DefaultTopologyMonitor {
     UUID hostId = Objects.requireNonNull(row.getUuid("host_id"));
     return new SniEndPoint(cloudProxyAddress, hostId.toString());
   }
+
+  @Override
+  public boolean reresolvesNodeAddresses() {
+    // Nodes are reached through the cloud SNI proxy via SniEndPoint, which re-resolves the proxy
+    // hostname on every connection attempt. Appending the original contact points as a DNS
+    // re-resolution fallback is therefore unnecessary and could resurrect removed nodes.
+    return true;
+  }
 }

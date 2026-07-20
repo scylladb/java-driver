@@ -49,8 +49,12 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.util.concurrent.EventExecutor;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +63,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,12 +83,27 @@ public class MetadataManager implements AsyncAutoCloseable {
   static final EndPoint DEFAULT_CONTACT_POINT =
       new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042));
 
+  // Bounds how long a single contact-point hostname resolution may block the caller (typically the
+  // admin event loop, see getResolvedContactPoints()). Not configurable on purpose: this is an
+  // interim mitigation, see the note on getResolvedContactPoints() below.
+  private static final Duration CONTACT_POINT_RESOLUTION_TIMEOUT = Duration.ofSeconds(3);
+
   private final InternalDriverContext context;
   private final String logPrefix;
   private final EventExecutor adminExecutor;
   private final DriverExecutionProfile config;
   private final SingleThreaded singleThreaded;
   private final ControlConnection controlConnection;
+
+  // Contact-point hostname resolution (getResolvedContactPoints()) runs on the admin event loop,
+  // where nothing should block. InetAddress.getAllByName() blocks, so each resolution is offloaded
+  // here and bounded by CONTACT_POINT_RESOLUTION_TIMEOUT. A cached pool (rather than a single
+  // shared thread) resolves each hostname on its own thread: a slow or blackholed lookup that
+  // ignores its interrupt only ties up its own daemon thread until the OS resolver finally
+  // returns, instead of starving the sibling contact points -- or the next reconnect that would
+  // otherwise queue behind it. This is an interim mitigation, superseded by #890's non-blocking
+  // EndPoint.resolveAll().
+  private final ExecutorService contactPointResolverExecutor;
 
   private volatile DefaultMetadata metadata; // only updated from adminExecutor
   private volatile boolean schemaEnabledInConfig;
@@ -107,6 +134,19 @@ public class MetadataManager implements AsyncAutoCloseable {
             DefaultDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES, Collections.emptyList());
     this.keyspaceFilter = KeyspaceFilter.newInstance(logPrefix, refreshedKeyspaces);
     this.tokenMapEnabled = config.getBoolean(DefaultDriverOption.METADATA_TOKEN_MAP_ENABLED);
+    AtomicInteger resolverThreadCount = new AtomicInteger();
+    this.contactPointResolverExecutor =
+        Executors.newCachedThreadPool(
+            runnable -> {
+              Thread thread =
+                  new Thread(
+                      runnable,
+                      logPrefix
+                          + "-contact-point-resolver-"
+                          + resolverThreadCount.incrementAndGet());
+              thread.setDaemon(true);
+              return thread;
+            });
 
     context.getEventBus().register(ConfigChangeEvent.class, this::onConfigChanged);
   }
@@ -173,6 +213,167 @@ public class MetadataManager implements AsyncAutoCloseable {
     return contactPoints;
   }
 
+  /**
+   * Returns the contact points expanded to all their DNS-resolved IPs.
+   *
+   * <p>Contact points are stored with unresolved hostnames (the driver always uses deferred DNS
+   * resolution). For each contact point whose underlying address is an unresolved {@link
+   * InetSocketAddress}, this method calls {@link InetAddress#getAllByName(String)} to obtain every
+   * IP the hostname maps to and creates a synthetic contact-point {@link DefaultNode} for each IP.
+   * This lets the load balancing policy iterate over all candidate IPs rather than only the first
+   * one, so that a non-responsive IP does not block initial connection or control-connection
+   * reconnection.
+   *
+   * <p>The returned synthetic nodes are IP-backed <em>connection candidates</em>, not mere hostname
+   * wrappers: their endpoint resolves to a concrete IP. If such a node becomes the control node,
+   * its resolved endpoint is stored as-is in metadata (see {@link #registerNode(NodeInfo)}), so
+   * later reconnects keep using that IP unless they fall back to the original (unresolved) contact
+   * points, which re-enters this method and re-resolves DNS.
+   *
+   * <p><b>TLS note:</b> each synthetic endpoint is built from the {@link InetAddress} returned by
+   * resolving the original hostname, which retains that hostname. This means the TCP connection
+   * uses the selected IP while the SSL engine still receives the original contact-point hostname
+   * for peer host / SNI / hostname verification. This must be preserved: constructing the endpoint
+   * from a raw IP string instead would break hostname verification and implicit SNI.
+   *
+   * <p>Already-resolved addresses, and endpoints that are not a {@link DefaultEndPoint} (e.g. an
+   * SNI or client-routes endpoint), are returned as-is: those specialized endpoint types carry
+   * identity beyond a plain socket address (SNI server name, host_id) and must not be naively
+   * reconstructed from a resolved IP.
+   *
+   * <p>Resolution is best-effort: if a hostname cannot be resolved, or resolution exceeds {@link
+   * #getContactPointResolutionTimeout()}, the original <em>unresolved</em> contact-point node is
+   * kept as-is instead of being dropped. The query plan is therefore never emptier than the
+   * configured contact points, and the hostname can still be resolved later at connection time (as
+   * it was before DNS expansion existed).
+   */
+  public List<Node> getResolvedContactPoints() {
+    Set<DefaultNode> nodes = contactPoints;
+    if (nodes == null) {
+      return new ArrayList<>();
+    }
+    List<Node> result = new ArrayList<>();
+    // NOTE (interim mitigation, superseded in #890): this method is called from the
+    // control-connection query-plan path, i.e. the admin event loop (ControlConnection asserts
+    // inEventLoop()), where nothing should ever block. InetAddress.getAllByName() is a blocking
+    // call, so each unresolved hostname is submitted to contactPointResolverExecutor (pass 1) and
+    // then collected against a single shared deadline (pass 2). Resolving concurrently rather than
+    // one-at-a-time keeps the total wait bounded by roughly one CONTACT_POINT_RESOLUTION_TIMEOUT
+    // regardless of the number of contact points, and keeps one slow/blackholed hostname from
+    // starving the others. The calling thread still waits for the result, so this is a bound, not a
+    // true fix -- #890 moves multi-address resolution into the EndPoint API / ChannelFactory
+    // (EndPoint.resolveAll()) for proper non-blocking resolution; revisit when that lands.
+    List<PendingResolution> pending = new ArrayList<>();
+    for (DefaultNode node : nodes) {
+      EndPoint endPoint = node.getEndPoint();
+      if (endPoint instanceof DefaultEndPoint) {
+        InetSocketAddress address = ((DefaultEndPoint) endPoint).resolve();
+        if (address.isUnresolved()) {
+          // Expand hostname to all IPs so callers can try each one in turn.
+          try {
+            Future<InetAddress[]> future =
+                contactPointResolverExecutor.submit(
+                    () -> resolveContactPointHostname(address.getHostString()));
+            pending.add(new PendingResolution(node, address, future));
+          } catch (RejectedExecutionException e) {
+            // Executor already shut down (session closing): keep the unresolved node as a
+            // best-effort fallback rather than dropping it.
+            result.add(node);
+          }
+          continue;
+        }
+      }
+      // Already resolved or non-DefaultEndPoint endpoint — use as-is.
+      result.add(node);
+    }
+
+    // Collect the concurrent resolutions against one shared deadline so the total wait is bounded
+    // by roughly a single timeout, no matter how many hostnames are pending.
+    long deadlineNanos = System.nanoTime() + getContactPointResolutionTimeout().toNanos();
+    for (int i = 0; i < pending.size(); i++) {
+      PendingResolution p = pending.get(i);
+      InetAddress[] all;
+      try {
+        long remainingNanos = deadlineNanos - System.nanoTime();
+        all = p.future.get(Math.max(0, remainingNanos), TimeUnit.NANOSECONDS);
+      } catch (TimeoutException e) {
+        p.future.cancel(true);
+        LOG.warn(
+            "[{}] Timed out resolving contact point hostname {} after {}, keeping it unresolved",
+            logPrefix,
+            p.address.getHostString(),
+            getContactPointResolutionTimeout());
+        result.add(p.node);
+        continue;
+      } catch (ExecutionException e) {
+        LOG.warn(
+            "[{}] Could not resolve contact point hostname {}, keeping it unresolved",
+            logPrefix,
+            p.address.getHostString(),
+            e.getCause());
+        result.add(p.node);
+        continue;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        // Keep this and every remaining contact point unresolved (best-effort) and stop waiting.
+        for (int j = i; j < pending.size(); j++) {
+          pending.get(j).future.cancel(true);
+          result.add(pending.get(j).node);
+        }
+        break;
+      }
+      if (all.length > 1) {
+        LOG.debug(
+            "[{}] Contact point {} expands to {} addresses",
+            logPrefix,
+            p.address.getHostString(),
+            all.length);
+      }
+      for (InetAddress ip : all) {
+        // Build the endpoint from the resolved InetAddress (not a raw IP string) on
+        // purpose: the InetAddress keeps the original hostname, so the TCP connection
+        // uses this IP while the SSL engine still receives the hostname for peer host,
+        // SNI and hostname verification. Do not simplify this to a numeric IP address.
+        InetSocketAddress resolved = new InetSocketAddress(ip, p.address.getPort());
+        result.add(DefaultNode.newContactPoint(new DefaultEndPoint(resolved), context));
+      }
+    }
+    return result;
+  }
+
+  /** A contact-point hostname whose concurrent DNS resolution is in flight. */
+  private static final class PendingResolution {
+    final DefaultNode node;
+    final InetSocketAddress address;
+    final Future<InetAddress[]> future;
+
+    PendingResolution(DefaultNode node, InetSocketAddress address, Future<InetAddress[]> future) {
+      this.node = node;
+      this.address = address;
+      this.future = future;
+    }
+  }
+
+  /**
+   * The timeout applied to each contact-point hostname resolution triggered by {@link
+   * #getResolvedContactPoints()}. Extracted as a method (rather than referencing the constant
+   * directly) so tests can substitute a short timeout instead of waiting out the real one.
+   */
+  @VisibleForTesting
+  Duration getContactPointResolutionTimeout() {
+    return CONTACT_POINT_RESOLUTION_TIMEOUT;
+  }
+
+  /**
+   * Resolves a contact-point hostname to all its IPs. Extracted as a method (rather than calling
+   * {@link InetAddress#getAllByName(String)} directly) so tests can substitute a slow or failing
+   * resolution to exercise the timeout path in {@link #getResolvedContactPoints()}.
+   */
+  @VisibleForTesting
+  InetAddress[] resolveContactPointHostname(String host) throws UnknownHostException {
+    return InetAddress.getAllByName(host);
+  }
+
   /** Whether the default contact point was used (because none were provided explicitly). */
   public boolean wasImplicitContactPoint() {
     return wasImplicitContactPoint;
@@ -188,6 +389,13 @@ public class MetadataManager implements AsyncAutoCloseable {
    * they are never added to metadata and never exposed to user-facing APIs (events, {@link
    * com.datastax.oss.driver.api.core.metadata.Metadata#getNodes()}, or {@link
    * com.datastax.oss.driver.api.core.metadata.NodeStateListener} callbacks).
+   *
+   * <p>The metadata node stores {@code nodeInfo.getEndPoint()} as-is. When the control node was
+   * reached through a DNS-expanded synthetic contact point (see {@link
+   * #getResolvedContactPoints()}), that resolved IP endpoint is therefore persisted in metadata and
+   * is never re-resolved afterwards. Re-resolving the original hostname only happens through the
+   * original-contact-point reconnection fallback (see {@code
+   * advanced.control-connection.reconnection.fallback-to-original-contact-points}).
    */
   public CompletionStage<Node> registerNode(NodeInfo nodeInfo) {
     Preconditions.checkNotNull(nodeInfo.getHostId(), "Cannot register node without hostId");
@@ -585,6 +793,7 @@ public class MetadataManager implements AsyncAutoCloseable {
       if (queuedSchemaRefresh != null) {
         queuedSchemaRefresh.completeExceptionally(new IllegalStateException("Cluster is closed"));
       }
+      contactPointResolverExecutor.shutdownNow();
       closeFuture.complete(null);
     }
   }

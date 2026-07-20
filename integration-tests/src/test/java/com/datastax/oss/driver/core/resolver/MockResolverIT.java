@@ -25,7 +25,6 @@ package com.datastax.oss.driver.core.resolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -109,7 +108,46 @@ public class MockResolverIT {
         assertThat(filteredNodes).hasSize(1);
         InetSocketAddress address =
             (InetSocketAddress) filteredNodes.iterator().next().getEndPoint().resolve();
-        assertTrue(address.isUnresolved());
+        assertFalse(address.isUnresolved());
+      }
+    }
+  }
+
+  @Test
+  public void should_connect_when_first_dns_entry_is_non_responsive() {
+    final int numberOfNodes = 2;
+    DriverConfigLoader loader =
+        new DefaultProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
+            .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
+            .withStringList(
+                TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                Collections.singletonList("test.cluster.fake:9042"))
+            .build();
+
+    CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
+    try (CcmBridge ccmBridge =
+        CcmBridge.builder().withNodes(numberOfNodes).withIpPrefix("127.0.1.").build()) {
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      // Register the dead IP first so it's the first entry InetAddress.getAllByName() returns for
+      // this hostname (MultimapHostResolver preserves insertion order). Node 11 is never started,
+      // so nothing listens on 127.0.1.11 in this subnet.
+      MultimapHostResolverProvider.addResolverEntry("test.cluster.fake", "127.0.1.11");
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      ccmBridge.create();
+      ccmBridge.start();
+
+      try (CqlSession session = builder.build()) {
+        waitForAllNodesUp(session, numberOfNodes);
+        ResultSet rs = session.execute("select * from system.local where key='local'");
+        assertThat(rs).isNotNull();
+        List<Row> rows = rs.all();
+        assertThat(rows).hasSize(1);
+        Collection<Node> nodes = session.getMetadata().getNodes().values();
+        assertThat(nodes).hasSize(numberOfNodes);
       }
     }
   }

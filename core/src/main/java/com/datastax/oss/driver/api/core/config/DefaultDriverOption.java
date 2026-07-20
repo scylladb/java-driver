@@ -701,8 +701,13 @@ public enum DefaultDriverOption implements DriverOption {
   CONTROL_CONNECTION_AGREEMENT_WARN("advanced.control-connection.schema-agreement.warn-on-failure"),
 
   /**
-   * Whether to forcibly add original contact points held by MetadataManager to the reconnection
-   * plan, in case there is no live nodes available according to LBP. Experimental.
+   * Whether to append the original contact points held by MetadataManager to the reconnection plan,
+   * after the live nodes reported by the load balancing policy. Defaults to {@code true}.
+   *
+   * <p>This is also the driver's DNS re-resolution path: contact points are expanded to their
+   * current DNS IPs at query-plan time, whereas metadata nodes hold an already-resolved endpoint
+   * that is never re-resolved. Keeping this enabled lets control-connection reconnects re-resolve
+   * the original hostnames and pick up new IPs once the live-node plan is exhausted.
    *
    * <p>Value-type: boolean
    */
@@ -837,7 +842,11 @@ public enum DefaultDriverOption implements DriverOption {
    * Whether to resolve the addresses passed to `basic.contact-points`.
    *
    * <p>Value-type: boolean
+   *
+   * @deprecated Contact points are now always kept as unresolved hostnames and expanded to all
+   *     their DNS-mapped IPs lazily at connection time. Setting this option has no effect.
    */
+  @Deprecated
   RESOLVE_CONTACT_POINTS("advanced.resolve-contact-points"),
 
   /**

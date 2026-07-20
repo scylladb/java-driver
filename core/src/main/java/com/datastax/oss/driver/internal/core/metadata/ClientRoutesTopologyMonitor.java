@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.config.ClientRouteProxy;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRequestHandler;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
@@ -478,6 +479,22 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       broadcastInetAddress = row.getInetAddress("peer");
     }
     return new ClientRoutesEndPoint(this, hostId, broadcastInetAddress, fallback);
+  }
+
+  @Override
+  public boolean reresolvesNodeAddresses() {
+    // ClientRoutesEndPoint re-resolves via the client route hostname on every connection attempt,
+    // but only when a route exists for that host_id (see ClientRoutesEndPoint#resolve()) -- for
+    // mixed/incomplete route sets it falls back to a static, non-re-resolving endpoint instead.
+    // Only report true when every currently-known node actually has a live route; otherwise the
+    // contact-point reconnection fallback must stay available for the nodes stuck on the fallback.
+    Map<UUID, ClientRouteRecord> routes = resolvedRoutesCache.get();
+    for (Node node : context.getMetadataManager().getMetadata().getNodes().values()) {
+      if (!routes.containsKey(node.getHostId())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

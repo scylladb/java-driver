@@ -166,11 +166,15 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * <p>Contact points can also be provided statically in the configuration. If both are specified,
    * they will be merged. If both are absent, the driver will default to 127.0.0.1:9042.
    *
-   * <p>Contrary to the configuration, DNS names with multiple A-records will not be handled here.
-   * If you need that, extract them manually with {@link java.net.InetAddress#getAllByName(String)}
-   * before calling this method. Similarly, if you need connect addresses to stay unresolved, make
-   * sure you pass unresolved instances here (see {@code advanced.resolve-contact-points} in the
-   * configuration for more explanations).
+   * <p>The driver automatically expands any contact point backed by an unresolved hostname to all
+   * its DNS-mapped IPs at query plan time (via {@code MetadataManager.getResolvedContactPoints()}),
+   * so passing a single hostname is sufficient to try all its IPs on initial connect. This applies
+   * equally to hostnames provided here programmatically (build an unresolved {@link
+   * InetSocketAddress} with {@link InetSocketAddress#createUnresolved(String, int)} to opt in) and
+   * to hostnames specified in the configuration. An already-resolved address passed here (the
+   * common case when constructing an {@code InetSocketAddress} directly from a hostname, which
+   * resolves eagerly) is used as provided, with no further expansion. The {@code
+   * advanced.resolve-contact-points} option is deprecated and has no effect.
    */
   @NonNull
   public SelfT addContactPoints(@NonNull Collection<InetSocketAddress> contactPoints) {
@@ -957,11 +961,11 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
         programmaticArguments = programmaticArgumentsBuilder.build();
       }
 
-      boolean resolveAddresses =
-          defaultConfig.getBoolean(DefaultDriverOption.RESOLVE_CONTACT_POINTS, false);
-
+      // RESOLVE_CONTACT_POINTS is deprecated: contact points are always kept as unresolved
+      // hostnames and expanded to all their DNS IPs at query plan time (before the first
+      // connection attempt) via MetadataManager.getResolvedContactPoints().
       Set<EndPoint> contactPoints =
-          ContactPoints.merge(programmaticContactPoints, configContactPoints, resolveAddresses);
+          ContactPoints.merge(programmaticContactPoints, configContactPoints, false);
 
       if (keyspace == null && defaultConfig.isDefined(DefaultDriverOption.SESSION_KEYSPACE)) {
         keyspace =

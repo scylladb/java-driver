@@ -147,8 +147,7 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
     switch (stateRef.get()) {
       case BEFORE_INIT:
       case DURING_INIT:
-        // The contact points are not stored in the metadata yet:
-        List<Node> nodes = new ArrayList<>(context.getMetadataManager().getContactPoints());
+        List<Node> nodes = new ArrayList<>(context.getMetadataManager().getResolvedContactPoints());
         Collections.shuffle(nodes);
         return new ConcurrentLinkedQueue<>(nodes);
       case RUNNING:
@@ -164,15 +163,33 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
 
   @NonNull
   public Queue<Node> newControlReconnectionQueryPlan() {
+    // Read the state once, before building the regular plan. State transitions are monotonic
+    // (BEFORE_INIT -> DURING_INIT -> RUNNING -> ...), so this captured value is <= the value
+    // newQueryPlan() reads internally; that guarantees we never both build the plan from resolved
+    // contact points (pre-RUNNING branch of newQueryPlan) and append them again below.
+    State state = stateRef.get();
     Queue<Node> regularQueryPlan = newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
 
-    if (context
-        .getConfig()
-        .getDefaultProfile()
-        .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)) {
-      Set<DefaultNode> originalNodes = context.getMetadataManager().getContactPoints();
+    // Only append resolved contact points as an explicit fallback once the LBP is RUNNING: before
+    // that (BEFORE_INIT/DURING_INIT), newQueryPlan() above already built regularQueryPlan directly
+    // from getResolvedContactPoints(), so appending them again here would just duplicate every
+    // entry and re-trigger DNS resolution for no benefit.
+    if (state == State.RUNNING
+        && context
+            .getConfig()
+            .getDefaultProfile()
+            .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)
+        && !context.getTopologyMonitor().reresolvesNodeAddresses()) {
+      // Use DNS-expanded contact points so every resolved IP is tried as a fallback, not just
+      // the first IP the JVM happens to return for the hostname.
+      //
+      // Skipped when the topology monitor re-resolves node addresses on its own (e.g. proxy-based
+      // monitors such as client routes or the cloud SNI proxy): those keep addresses fresh without
+      // this fallback, and appending raw contact points could resurrect nodes the monitor has
+      // authoritatively removed.
+      List<Node> resolvedNodes = context.getMetadataManager().getResolvedContactPoints();
       List<Node> contactNodes = new ArrayList<>();
-      for (DefaultNode node : originalNodes) {
+      for (Node node : resolvedNodes) {
         contactNodes.add(DefaultNode.newContactPoint(node.getEndPoint(), context));
       }
       Collections.shuffle(contactNodes);

@@ -235,6 +235,10 @@ public class HeartbeatIT {
             .withDuration(DefaultDriverOption.HEARTBEAT_TIMEOUT, Duration.ofMillis(500))
             .withDuration(DefaultDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, Duration.ofSeconds(2))
             .withDuration(DefaultDriverOption.RECONNECTION_MAX_DELAY, Duration.ofSeconds(1))
+            // These tests exercise heartbeat behavior only. Disable the contact-point
+            // reconnection fallback, which would otherwise send an extra OPTIONS message on
+            // init/reconnect and skew the heartbeat counts.
+            .withBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, false)
             .build();
     return SessionUtils.newSession(SIMULACRON_RULE, loader);
   }

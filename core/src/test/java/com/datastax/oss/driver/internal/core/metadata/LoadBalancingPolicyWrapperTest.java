@@ -44,6 +44,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
@@ -79,6 +80,7 @@ public class LoadBalancingPolicyWrapperTest {
   private EventBus eventBus;
   @Mock private MetadataManager metadataManager;
   @Mock private Metadata metadata;
+  @Mock private TopologyMonitor topologyMonitor;
   @Mock protected MetricsFactory metricsFactory;
   @Captor private ArgumentCaptor<Map<UUID, Node>> initNodesCaptor;
 
@@ -100,8 +102,9 @@ public class LoadBalancingPolicyWrapperTest {
             Objects.requireNonNull(node3.getHostId()), node3);
     when(metadataManager.getMetadata()).thenReturn(metadata);
     when(metadata.getNodes()).thenReturn(allNodes);
-    when(metadataManager.getContactPoints()).thenReturn(contactPoints);
+    when(metadataManager.getResolvedContactPoints()).thenReturn(new ArrayList<>(contactPoints));
     when(context.getMetadataManager()).thenReturn(metadataManager);
+    when(context.getTopologyMonitor()).thenReturn(topologyMonitor);
 
     when(context.getConfig()).thenReturn(config);
     when(config.getDefaultProfile()).thenReturn(defaultProfile);
@@ -130,26 +133,36 @@ public class LoadBalancingPolicyWrapperTest {
 
   @Test
   public void should_build_control_connection_query_plan_from_contact_points_before_init() {
+    // Given — simulate DNS expansion: node1's hostname resolves to two IPs (node1 + node4)
+    DefaultNode node4 = TestNodeFactory.newNode(4, context);
+    when(metadataManager.getResolvedContactPoints())
+        .thenReturn(ImmutableList.of(node1, node2, node4));
+
     // When
     Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
 
-    // Then
+    // Then — query plan contains all DNS-expanded nodes, not just the original 2 contact points
     for (LoadBalancingPolicy policy : ImmutableList.of(policy1, policy2, policy3)) {
       verify(policy, never()).newQueryPlan(null, null);
     }
-    assertThat(queryPlan).hasSameElementsAs(contactPoints);
+    assertThat(queryPlan).containsExactlyInAnyOrder(node1, node2, node4);
   }
 
   @Test
   public void should_build_query_plan_from_contact_points_before_init() {
+    // Given — simulate DNS expansion: node1's hostname resolves to two IPs (node1 + node4)
+    DefaultNode node4 = TestNodeFactory.newNode(4, context);
+    when(metadataManager.getResolvedContactPoints())
+        .thenReturn(ImmutableList.of(node1, node2, node4));
+
     // When
     Queue<Node> queryPlan = wrapper.newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
 
-    // Then
+    // Then — query plan contains all DNS-expanded nodes, not just the original 2 contact points
     for (LoadBalancingPolicy policy : ImmutableList.of(policy1, policy2, policy3)) {
       verify(policy, never()).newQueryPlan(null, null);
     }
-    assertThat(queryPlan).hasSameElementsAs(contactPoints);
+    assertThat(queryPlan).containsExactlyInAnyOrder(node1, node2, node4);
   }
 
   @Test
@@ -204,8 +217,7 @@ public class LoadBalancingPolicyWrapperTest {
     assertThat(queryPlan.poll()).isEqualTo(node3);
     assertThat(queryPlan.poll()).isEqualTo(node2);
     assertThat(queryPlan.poll()).isEqualTo(node1);
-    // Remaining nodes are contact points appended at the end.
-    // They are new DefaultNode instances created via newContactPoint, so compare by endpoint.
+    // Remaining nodes are the DNS-expanded (resolved) contact points appended at the end.
     Set<EndPoint> remainingEndpoints = new java.util.HashSet<>();
     for (Node n : queryPlan) {
       remainingEndpoints.add(n.getEndPoint());
@@ -215,6 +227,56 @@ public class LoadBalancingPolicyWrapperTest {
       contactEndpoints.add(n.getEndPoint());
     }
     assertThat(remainingEndpoints).isEqualTo(contactEndpoints);
+  }
+
+  @Test
+  public void should_not_double_resolve_contact_points_before_init() {
+    // Given — the wrapper hasn't been init()-ed yet (state=BEFORE_INIT), so newQueryPlan() already
+    // builds the regular plan directly from resolved contact points. The reconnect-contact-points
+    // flag doesn't matter here: newControlReconnectionQueryPlan() short-circuits on state before
+    // even reading it, since appending contact points again pre-init would just duplicate every
+    // entry in the plan and re-trigger DNS resolution for no benefit.
+
+    // When
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then — getResolvedContactPoints() is resolved only once (not once for the regular plan and
+    // again for a redundant "fallback" append), and the plan has no duplicate entries.
+    verify(metadataManager, times(1)).getResolvedContactPoints();
+    assertThat(queryPlan).containsExactlyInAnyOrder(node1, node2);
+  }
+
+  @Test
+  public void
+      should_not_append_contact_points_to_query_plan_when_reconnect_contact_points_is_disabled() {
+    // Given — the flag defaults to false in the test setup (see @Before)
+    wrapper.init();
+
+    // When
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then
+    // Only the policy query plan is returned; no contact points are appended.
+    assertThat(queryPlan).isEqualTo(defaultPolicyQueryPlan);
+  }
+
+  @Test
+  public void
+      should_not_append_contact_points_to_query_plan_when_topology_monitor_reresolves_addresses() {
+    // Given — the flag is enabled, but the topology monitor re-resolves node addresses on its own
+    // (e.g. a proxy-based monitor such as client routes or the cloud SNI proxy).
+    when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
+        .thenReturn(true);
+    when(topologyMonitor.reresolvesNodeAddresses()).thenReturn(true);
+    wrapper.init();
+
+    // When
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then
+    // Contact points must not be appended: the monitor keeps addresses fresh, and appending raw
+    // contact points could resurrect nodes it has authoritatively removed.
+    assertThat(queryPlan).isEqualTo(defaultPolicyQueryPlan);
   }
 
   @Test

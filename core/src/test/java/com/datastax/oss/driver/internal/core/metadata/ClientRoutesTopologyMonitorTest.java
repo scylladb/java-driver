@@ -28,6 +28,8 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
@@ -66,6 +68,8 @@ public class ClientRoutesTopologyMonitorTest {
   @Mock private ControlConnection controlConnection;
   @Mock private DriverConfig driverConfig;
   @Mock private DriverExecutionProfile defaultProfile;
+  @Mock private MetadataManager metadataManager;
+  @Mock private Metadata metadata;
 
   private TestableClientRoutesTopologyMonitor handler;
 
@@ -218,6 +222,57 @@ public class ClientRoutesTopologyMonitorTest {
 
     assertThat(handler.resolve(hostId1)).isNull();
     assertThat(handler.resolve(hostId2)).isNotNull();
+  }
+
+  // ---- reresolvesNodeAddresses() -------------------------------------------
+
+  @Test
+  public void should_reresolve_when_all_known_nodes_have_client_routes() {
+    UUID hostId1 = UUID.randomUUID();
+    UUID hostId2 = UUID.randomUUID();
+    Node node1 = Mockito.mock(Node.class);
+    when(node1.getHostId()).thenReturn(hostId1);
+    Node node2 = Mockito.mock(Node.class);
+    when(node2.getHostId()).thenReturn(hostId2);
+
+    when(context.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getMetadata()).thenReturn(metadata);
+    when(metadata.getNodes()).thenReturn(ImmutableMap.of(hostId1, node1, hostId2, node2));
+
+    handler.setRoutes(
+        ImmutableMap.of(
+            hostId1, new ClientRouteRecord(hostId1, "127.0.0.1", 9042),
+            hostId2, new ClientRouteRecord(hostId2, "127.0.0.2", 9042)));
+
+    assertThat(handler.reresolvesNodeAddresses()).isTrue();
+  }
+
+  @Test
+  public void should_not_reresolve_when_a_known_node_has_no_client_route() {
+    UUID hostId1 = UUID.randomUUID();
+    UUID hostId2 = UUID.randomUUID();
+    Node node1 = Mockito.mock(Node.class);
+    when(node1.getHostId()).thenReturn(hostId1);
+    Node node2 = Mockito.mock(Node.class);
+    when(node2.getHostId()).thenReturn(hostId2);
+
+    when(context.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getMetadata()).thenReturn(metadata);
+    when(metadata.getNodes()).thenReturn(ImmutableMap.of(hostId1, node1, hostId2, node2));
+
+    // Only node1 has a live client route; node2 would fall back to a static endpoint.
+    handler.setRoutes(ImmutableMap.of(hostId1, new ClientRouteRecord(hostId1, "127.0.0.1", 9042)));
+
+    assertThat(handler.reresolvesNodeAddresses()).isFalse();
+  }
+
+  @Test
+  public void should_reresolve_when_no_nodes_known_yet() {
+    when(context.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getMetadata()).thenReturn(metadata);
+    when(metadata.getNodes()).thenReturn(Collections.emptyMap());
+
+    assertThat(handler.reresolvesNodeAddresses()).isTrue();
   }
 
   // ---- Merge behavior tests -----------------------------------------------

@@ -141,4 +141,24 @@ public interface TopologyMonitor extends AsyncAutoCloseable {
    * {@link DefaultTopologyMonitor}) should override this method.
    */
   default void resetColumnCaches() {}
+
+  /**
+   * Whether this monitor re-resolves node addresses dynamically on every connection attempt (for
+   * example by re-resolving a proxy hostname each time), rather than relying on an endpoint address
+   * captured once at node-registration time.
+   *
+   * <p>When this returns {@code true}, the control connection's reconnection query plan must not
+   * append the original contact points as a DNS re-resolution fallback (see {@code
+   * advanced.control-connection.reconnection.fallback-to-original-contact-points}): the monitor
+   * already keeps addresses fresh, and appending raw contact points could resurrect nodes that the
+   * monitor has authoritatively removed.
+   *
+   * <p>The default implementation returns {@code false}, which is correct for {@link
+   * DefaultTopologyMonitor}, whose {@code DefaultEndPoint}s cache their resolved address and never
+   * re-resolve. Proxy-based monitors that re-resolve per call should override this to return {@code
+   * true}.
+   */
+  default boolean reresolvesNodeAddresses() {
+    return false;
+  }
 }
