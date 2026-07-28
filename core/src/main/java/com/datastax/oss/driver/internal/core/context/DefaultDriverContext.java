@@ -232,6 +232,8 @@ public class DefaultDriverContext implements InternalDriverContext {
       new LazyReference<>("requestThrottler", this::buildRequestThrottler, cycleDetector);
   private final LazyReference<Map<String, String>> startupOptionsRef =
       new LazyReference<>("startupOptions", this::buildStartupOptions, cycleDetector);
+  private final LazyReference<DriverConfigReporter> driverConfigReporterRef =
+      new LazyReference<>("driverConfigReporter", this::buildDriverConfigReporter, cycleDetector);
   private final LazyReference<NodeStateListener> nodeStateListenerRef;
   private final LazyReference<SchemaChangeListener> schemaChangeListenerRef;
   private final LazyReference<RequestTracker> requestTrackerRef;
@@ -367,6 +369,10 @@ public class DefaultDriverContext implements InternalDriverContext {
         .withApplicationName(startupApplicationName)
         .withApplicationVersion(startupApplicationVersion)
         .build();
+  }
+
+  protected DriverConfigReporter buildDriverConfigReporter() {
+    return new DefaultDriverConfigReporter(this);
   }
 
   protected Map<String, LoadBalancingPolicy> buildLoadBalancingPolicies() {
@@ -1224,6 +1230,12 @@ public class DefaultDriverContext implements InternalDriverContext {
   @Override
   public Map<String, String> getStartupOptions() {
     return startupOptionsRef.get();
+  }
+
+  @NonNull
+  @Override
+  public DriverConfigReporter getDriverConfigReporter() {
+    return driverConfigReporterRef.get();
   }
 
   protected RequestLogFormatter buildRequestLogFormatter() {

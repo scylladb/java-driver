@@ -41,6 +41,7 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.DefaultProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.TestResponses;
+import com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -102,6 +103,9 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     when(defaultProfile.getDuration(DefaultDriverOption.HEARTBEAT_INTERVAL))
         .thenReturn(Duration.ofSeconds(30));
     when(internalDriverContext.getProtocolVersionRegistry()).thenReturn(protocolVersionRegistry);
+    // The init handler consults the config reporter for every connection; default to a no-op.
+    when(internalDriverContext.getDriverConfigReporter())
+        .thenReturn((startupOptions, reportDriverConfig) -> {});
 
     channel
         .pipeline()
@@ -151,6 +155,70 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
 
     // Init should complete
     assertThat(connectFuture).isSuccess();
+  }
+
+  // Mirrors the real reporter: SESSION_ID on every connection, DRIVER_CONFIG only when asked.
+  private void stubConfigReporter() {
+    when(internalDriverContext.getDriverConfigReporter())
+        .thenReturn(
+            (startupOptions, reportDriverConfig) -> {
+              startupOptions.put(DefaultDriverConfigReporter.SESSION_ID_KEY, "test-session-id");
+              if (reportDriverConfig) {
+                startupOptions.put(
+                    DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}");
+              }
+            });
+  }
+
+  @Test
+  public void should_report_session_id_and_driver_config_on_control_connection() {
+    stubConfigReporter();
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                DriverChannelOptions.builder().reportConfig(true).build(),
+                heartbeatHandler,
+                false));
+
+    channel.connect(new InetSocketAddress("localhost", 9042));
+
+    Frame requestFrame = readOutboundFrame();
+    assertThat(requestFrame.message).isInstanceOf(Startup.class);
+    Startup startup = (Startup) requestFrame.message;
+    assertThat(startup.options).containsKey(DefaultDriverConfigReporter.SESSION_ID_KEY);
+    assertThat(startup.options).containsKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
+  }
+
+  @Test
+  public void should_report_session_id_but_not_driver_config_on_pool_connection() {
+    stubConfigReporter();
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                // DriverChannelOptions.DEFAULT has reportConfig = false (a pool connection).
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
+
+    channel.connect(new InetSocketAddress("localhost", 9042));
+
+    Frame requestFrame = readOutboundFrame();
+    assertThat(requestFrame.message).isInstanceOf(Startup.class);
+    Startup startup = (Startup) requestFrame.message;
+    assertThat(startup.options).containsKey(DefaultDriverConfigReporter.SESSION_ID_KEY);
+    assertThat(startup.options).doesNotContainKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
   }
 
   @Test

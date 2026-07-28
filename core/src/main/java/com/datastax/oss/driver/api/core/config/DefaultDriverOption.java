@@ -1173,7 +1173,22 @@ public enum DefaultDriverOption implements DriverOption {
    *
    * <p>Value-Type: boolean
    */
-  ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES("advanced.address-translator.resolve-addresses");
+  ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES("advanced.address-translator.resolve-addresses"),
+  /**
+   * Whether the driver reports its effective configuration to ScyllaDB at connection time.
+   *
+   * <p>When {@code true}, the driver adds two entries to the CQL {@code STARTUP} options, which
+   * ScyllaDB stores in {@code system.clients.client_options} so operators can inspect driver
+   * settings while investigating incidents: a {@code SESSION_ID} on every connection (so the server
+   * can group a session's connections) and a compact JSON payload under the {@code DRIVER_CONFIG}
+   * key on the control connection only. At this stage the {@code DRIVER_CONFIG} payload carries
+   * only schema-version metadata (<code>{"version":1}</code>); reporting of the effective
+   * configuration fields is planned for a later stage. When {@code false}, neither entry is sent
+   * and there is no change on the wire.
+   *
+   * <p>Value type: boolean
+   */
+  DRIVER_CONFIG_REPORTING_ENABLED("advanced.driver-config-reporting.enabled");
 
   private final String path;
 
