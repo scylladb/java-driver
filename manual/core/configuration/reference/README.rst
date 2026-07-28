@@ -24,7 +24,7 @@ It is packaged in the ``java-driver-core`` JAR artifact, and used at runtime to 
 values for all configuration options (in the sources, it can be found under
 ``core/src/main/resources``).
 
-See the `configuration page <../>`_ for more explanations.
+See the :doc:`configuration page </manual/core/configuration/index>` for more explanations.
 
 .. raw:: html
 
