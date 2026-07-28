@@ -194,6 +194,11 @@ class ProtocolInitHandler extends ConnectInitHandler {
           if (featureStore != null) {
             featureStore.populateStartupOptions(startupOptions);
           }
+          // Adds SESSION_ID on every connection and DRIVER_CONFIG on the control connection
+          // (options.reportConfig); no-op when driver config reporting is disabled.
+          context
+              .getDriverConfigReporter()
+              .populateStartupOptions(startupOptions, options.reportConfig);
           return request = new Startup(startupOptions);
         case GET_CLUSTER_NAME:
           return request = CLUSTER_NAME_QUERY;

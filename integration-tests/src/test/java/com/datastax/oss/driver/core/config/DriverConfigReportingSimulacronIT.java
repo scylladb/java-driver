@@ -1,0 +1,204 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.datastax.oss.driver.core.config;
+
+import static com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter.DRIVER_CONFIG_KEY;
+import static com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter.SESSION_ID_KEY;
+import static com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder.CLIENT_ID_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
+import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
+import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
+import com.datastax.oss.driver.categories.ParallelizableTests;
+import com.datastax.oss.protocol.internal.request.Register;
+import com.datastax.oss.protocol.internal.request.Startup;
+import com.datastax.oss.simulacron.common.cluster.ClusterSpec;
+import com.datastax.oss.simulacron.common.cluster.QueryLog;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.SocketAddress;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import org.junit.Before;
+import org.junit.ClassRule;
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
+
+/**
+ * End-to-end check of driver-configuration reporting against a mock server, asserting on the actual
+ * CQL {@code STARTUP} frames the driver sends.
+ *
+ * <p>Simulacron records every inbound frame with its originating client connection, so we can
+ * verify that when {@code advanced.driver-config-reporting.enabled} is:
+ *
+ * <ul>
+ *   <li><b>true</b> — {@code SESSION_ID} is present (and identical) on <em>every</em> session
+ *       connection, while {@code DRIVER_CONFIG} is present only on the control connection;
+ *   <li><b>false</b> — neither option is present on any session connection.
+ * </ul>
+ *
+ * <p>The control connection is identified independently of the reported options: it is the only
+ * connection that issues a {@code REGISTER} frame (to subscribe to cluster events).
+ *
+ * <p>Assertions are scoped to the session's real connections, identified by the {@code CLIENT_ID}
+ * startup option that the driver always sends (independently of config reporting). This excludes
+ * the short-lived connections opened by protocol-version negotiation: when the protocol version is
+ * not pinned (the default), the driver first tries higher versions (DSE_V2, DSE_V1, V5) that
+ * ScyllaDB rejects before the handshake completes, and Simulacron records each such rejected
+ * attempt as a bare {@code STARTUP} ({@code CQL_VERSION} only) that carries no driver identity.
+ */
+@Category(ParallelizableTests.class)
+public class DriverConfigReportingSimulacronIT {
+
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  // A single node yields one dedicated control connection plus a pool connection (local.size
+  // defaults to 1), i.e. at least two distinct session connections of which only the control one
+  // registers for events.
+  @ClassRule
+  public static final SimulacronRule SIMULACRON_RULE =
+      new SimulacronRule(ClusterSpec.builder().withNodes(1));
+
+  @Before
+  public void clearLogs() {
+    SIMULACRON_RULE.cluster().clearLogs();
+  }
+
+  @Test
+  public void should_report_session_id_on_all_connections_and_driver_config_only_on_control() {
+    DriverConfigLoader loader =
+        SessionUtils.configLoaderBuilder()
+            .withBoolean(DefaultDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, true)
+            .build();
+    try (CqlSession session = SessionUtils.newSession(SIMULACRON_RULE, loader)) {
+      awaitControlAndPoolConnected();
+
+      SocketAddress controlConnection = controlConnection().orElseThrow(AssertionError::new);
+      List<QueryLog> startups = sessionStartups();
+
+      // Sanity: we are actually observing more than one connection (control + at least one pool),
+      // otherwise the "only on the control connection" assertion below would be vacuous.
+      assertThat(distinctConnections(startups)).isGreaterThanOrEqualTo(2);
+
+      // SESSION_ID is present on every session connection and has the same value everywhere.
+      assertThat(startups).allSatisfy(log -> assertThat(options(log)).containsKey(SESSION_ID_KEY));
+      assertThat(startups.stream().map(log -> options(log).get(SESSION_ID_KEY)).distinct())
+          .hasSize(1);
+
+      // DRIVER_CONFIG is present on exactly one connection, and that connection is the control one.
+      List<QueryLog> withDriverConfig =
+          startups.stream()
+              .filter(log -> options(log).containsKey(DRIVER_CONFIG_KEY))
+              .collect(Collectors.toList());
+      assertThat(withDriverConfig).hasSize(1);
+      assertThat(withDriverConfig.get(0).getConnection()).isEqualTo(controlConnection);
+
+      // The payload is the stage-1 report: valid JSON carrying exactly the schema version.
+      assertStageOnePayload(options(withDriverConfig.get(0)).get(DRIVER_CONFIG_KEY));
+    }
+  }
+
+  /**
+   * Asserts that a {@code DRIVER_CONFIG} value is the stage-1 payload: well-formed JSON whose
+   * {@code version} is the integer {@code 1}. Guards against an incorrect schema version or a
+   * malformed blob slipping through a mere key-presence check.
+   */
+  private static void assertStageOnePayload(String driverConfig) {
+    JsonNode root;
+    try {
+      root = OBJECT_MAPPER.readTree(driverConfig);
+    } catch (JsonProcessingException e) {
+      throw new AssertionError("DRIVER_CONFIG is not valid JSON: " + driverConfig, e);
+    }
+    assertThat(root.path("version").isInt())
+        .as("version is an integer in %s", driverConfig)
+        .isTrue();
+    assertThat(root.path("version").intValue()).isEqualTo(1);
+  }
+
+  @Test
+  public void should_report_nothing_when_disabled() {
+    DriverConfigLoader loader =
+        SessionUtils.configLoaderBuilder()
+            .withBoolean(DefaultDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, false)
+            .build();
+    try (CqlSession session = SessionUtils.newSession(SIMULACRON_RULE, loader)) {
+      awaitControlAndPoolConnected();
+
+      List<QueryLog> startups = sessionStartups();
+      assertThat(distinctConnections(startups)).isGreaterThanOrEqualTo(2);
+
+      // Neither option is sent on any session connection: zero change on the wire when disabled.
+      assertThat(startups)
+          .allSatisfy(
+              log ->
+                  assertThat(options(log))
+                      .doesNotContainKey(SESSION_ID_KEY)
+                      .doesNotContainKey(DRIVER_CONFIG_KEY));
+    }
+  }
+
+  /**
+   * The {@code STARTUP} frames of the session's real connections (control + pool), identified by
+   * the always-present {@code CLIENT_ID} option; excludes protocol-version negotiation attempts.
+   */
+  private List<QueryLog> sessionStartups() {
+    return SIMULACRON_RULE.cluster().getLogs().getQueryLogs().stream()
+        .filter(log -> log.getFrame().message instanceof Startup)
+        .filter(log -> options(log).containsKey(CLIENT_ID_KEY))
+        .collect(Collectors.toList());
+  }
+
+  /** The {@code STARTUP} options carried by a recorded frame. */
+  private Map<String, String> options(QueryLog log) {
+    return ((Startup) log.getFrame().message).options;
+  }
+
+  /** The connection that issued a {@code REGISTER} frame, i.e. the control connection. */
+  private Optional<SocketAddress> controlConnection() {
+    return SIMULACRON_RULE.cluster().getLogs().getQueryLogs().stream()
+        .filter(log -> log.getFrame().message instanceof Register)
+        .map(QueryLog::getConnection)
+        .findFirst();
+  }
+
+  private long distinctConnections(List<QueryLog> logs) {
+    return logs.stream().map(QueryLog::getConnection).distinct().count();
+  }
+
+  /**
+   * Waits until both the control connection (identified by its {@code REGISTER}) and at least one
+   * pool connection have sent their {@code STARTUP}, since pool connections may finish initializing
+   * slightly after the session builder returns.
+   */
+  private void awaitControlAndPoolConnected() {
+    await()
+        .pollInterval(100, TimeUnit.MILLISECONDS)
+        .atMost(30, TimeUnit.SECONDS)
+        .until(
+            () -> controlConnection().isPresent() && distinctConnections(sessionStartups()) >= 2);
+  }
+}

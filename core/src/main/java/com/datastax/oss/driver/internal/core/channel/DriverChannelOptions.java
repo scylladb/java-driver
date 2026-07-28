@@ -47,15 +47,24 @@ public class DriverChannelOptions {
 
   public final String ownerLogPrefix;
 
+  /**
+   * Whether the channel should report the driver configuration ({@code DRIVER_CONFIG}) in its
+   * {@code STARTUP} options. Set only for the control connection, so the (potentially large) config
+   * blob is sent once per session rather than on every pooled connection.
+   */
+  public final boolean reportConfig;
+
   private DriverChannelOptions(
       CqlIdentifier keyspace,
       List<String> eventTypes,
       EventCallback eventCallback,
-      String ownerLogPrefix) {
+      String ownerLogPrefix,
+      boolean reportConfig) {
     this.keyspace = keyspace;
     this.eventTypes = eventTypes;
     this.eventCallback = eventCallback;
     this.ownerLogPrefix = ownerLogPrefix;
+    this.reportConfig = reportConfig;
   }
 
   public static class Builder {
@@ -63,6 +72,7 @@ public class DriverChannelOptions {
     private List<String> eventTypes = Collections.emptyList();
     private EventCallback eventCallback = null;
     private String ownerLogPrefix = null;
+    private boolean reportConfig = false;
 
     public Builder withKeyspace(CqlIdentifier keyspace) {
       this.keyspace = keyspace;
@@ -82,8 +92,17 @@ public class DriverChannelOptions {
       return this;
     }
 
+    /**
+     * Marks this channel as the one that reports {@code DRIVER_CONFIG} (the control connection).
+     */
+    public Builder reportConfig(boolean reportConfig) {
+      this.reportConfig = reportConfig;
+      return this;
+    }
+
     public DriverChannelOptions build() {
-      return new DriverChannelOptions(keyspace, eventTypes, eventCallback, ownerLogPrefix);
+      return new DriverChannelOptions(
+          keyspace, eventTypes, eventCallback, ownerLogPrefix, reportConfig);
     }
   }
 }

@@ -327,6 +327,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             DriverChannelOptions.builder()
                 .withEvents(eventTypes, ControlConnection.this)
                 .withOwnerLogPrefix(logPrefix + "|control")
+                .reportConfig(true)
                 .build();
 
         Queue<Node> nodes =

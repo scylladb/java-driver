@@ -177,6 +177,13 @@ public interface InternalDriverContext extends DriverContext {
   Map<String, String> getStartupOptions();
 
   /**
+   * The component that builds the driver-configuration report ({@code DRIVER_CONFIG}) sent on the
+   * control connection's Startup message.
+   */
+  @NonNull
+  DriverConfigReporter getDriverConfigReporter();
+
+  /**
    * A list of additional components to notify of session lifecycle events.
    *
    * <p>For historical reasons, this method has a default implementation that returns an empty list.
