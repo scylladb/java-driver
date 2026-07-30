@@ -1444,6 +1444,26 @@ public class Cluster implements Closeable {
     }
 
     /**
+     * Enables or disables driver configuration reporting, i.e. whether the control connection sends
+     * a {@code DRIVER_CONFIG} JSON blob describing the effective driver configuration in its
+     * startup options. <b>Enabled by default.</b>
+     *
+     * <p>The server stores it in {@code system.clients.client_options} — a per-node table, so only
+     * the node holding the control connection stores {@code DRIVER_CONFIG}; consumers must query
+     * and aggregate across all nodes.
+     *
+     * <p>This does not govern the {@code SESSION_ID} startup option, which every connection always
+     * sends (so the server can group every connection opened from this {@link Cluster}, across all
+     * of its {@link Session}s), regardless of this setting.
+     *
+     * @param enabled whether driver configuration reporting is enabled.
+     */
+    public Builder withDriverConfigReporting(boolean enabled) {
+      configurationBuilder.withDriverConfigReporting(enabled);
+      return this;
+    }
+
+    /**
      * The configuration that will be used for the new cluster.
      *
      * <p>You <b>should not</b> modify this object directly because changes made to the returned
@@ -1598,6 +1618,7 @@ public class Cluster implements Closeable {
                 .withNettyOptions(configuration.getNettyOptions())
                 .withCodecRegistry(configuration.getCodecRegistry())
                 .withApplicationInfo(configuration.getApplicationInfo())
+                .withDriverConfigReporting(configuration.isDriverConfigReportingEnabled())
                 .build();
       } else {
         this.configuration = configuration;

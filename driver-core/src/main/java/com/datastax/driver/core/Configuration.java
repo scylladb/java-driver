@@ -60,6 +60,7 @@ public class Configuration {
   private final CodecRegistry codecRegistry;
   private final String defaultKeyspace;
   private final ApplicationInfo applicationInfo;
+  private final boolean driverConfigReportingEnabled;
 
   private Configuration(
       Policies policies,
@@ -72,7 +73,8 @@ public class Configuration {
       NettyOptions nettyOptions,
       CodecRegistry codecRegistry,
       String defaultKeyspace,
-      ApplicationInfo applicationInfo) {
+      ApplicationInfo applicationInfo,
+      boolean driverConfigReportingEnabled) {
     this.policies = policies;
     this.protocolOptions = protocolOptions;
     this.poolingOptions = poolingOptions;
@@ -84,6 +86,7 @@ public class Configuration {
     this.codecRegistry = codecRegistry;
     this.defaultKeyspace = defaultKeyspace;
     this.applicationInfo = applicationInfo;
+    this.driverConfigReportingEnabled = driverConfigReportingEnabled;
   }
 
   /**
@@ -103,7 +106,8 @@ public class Configuration {
         toCopy.getNettyOptions(),
         toCopy.getCodecRegistry(),
         toCopy.getDefaultKeyspace(),
-        toCopy.getApplicationInfo());
+        toCopy.getApplicationInfo(),
+        toCopy.isDriverConfigReportingEnabled());
   }
 
   void register(Cluster.Manager manager) {
@@ -223,6 +227,20 @@ public class Configuration {
   }
 
   /**
+   * Whether driver configuration reporting is enabled, i.e. whether the control connection sends a
+   * {@code DRIVER_CONFIG} JSON blob describing the effective driver configuration in its startup
+   * options. Enabled by default.
+   *
+   * <p>This does not govern the {@code SESSION_ID} startup option, which every connection always
+   * sends regardless of this setting.
+   *
+   * @return {@code true} if driver configuration reporting is enabled.
+   */
+  public boolean isDriverConfigReportingEnabled() {
+    return driverConfigReportingEnabled;
+  }
+
+  /**
    * Returns the {@link CodecRegistry} instance for this configuration.
    *
    * <p>Note that this method could return {@link CodecRegistry#DEFAULT_INSTANCE} if no specific
@@ -247,6 +265,7 @@ public class Configuration {
     private ThreadingOptions threadingOptions;
     private NettyOptions nettyOptions;
     private ApplicationInfo applicationInfo;
+    private boolean driverConfigReportingEnabled = true;
     private CodecRegistry codecRegistry;
     private String defaultKeyspace;
 
@@ -258,6 +277,19 @@ public class Configuration {
      */
     public Builder withApplicationInfo(ApplicationInfo applicationInfo) {
       this.applicationInfo = applicationInfo;
+      return this;
+    }
+
+    /**
+     * Enables or disables driver configuration reporting (the {@code DRIVER_CONFIG} startup option
+     * sent by the control connection). Enabled by default; see {@link
+     * Configuration#isDriverConfigReportingEnabled()}.
+     *
+     * @param driverConfigReportingEnabled whether driver configuration reporting is enabled.
+     * @return this builder.
+     */
+    public Builder withDriverConfigReporting(boolean driverConfigReportingEnabled) {
+      this.driverConfigReportingEnabled = driverConfigReportingEnabled;
       return this;
     }
 
@@ -392,7 +424,8 @@ public class Configuration {
           nettyOptions != null ? nettyOptions : NettyOptions.DEFAULT_INSTANCE,
           codecRegistry != null ? codecRegistry : CodecRegistry.DEFAULT_INSTANCE,
           defaultKeyspace,
-          applicationInfo);
+          applicationInfo,
+          driverConfigReportingEnabled);
     }
   }
 }
