@@ -733,24 +733,38 @@ public class CCMBridge implements CCMAccess {
   public void add(int dc, int n) {
     logger.debug(
         String.format("Adding: node %s (%s%s:%s) to %s", n, ipPrefix, n, binaryPort, this));
-    String thriftItf = ipOfNode(n) + ":" + thriftPort;
     String storageItf = ipOfNode(n) + ":" + storagePort;
     String binaryItf = ipOfNode(n) + ":" + binaryPort;
     String remoteLogItf = ipOfNode(n) + ":" + TestUtils.findAvailablePort();
-    execute(
-        CCM_COMMAND
-            + " add node%d -d dc%s -i %s%d -t %s -l %s --binary-itf %s -j %d -r %s -s -b"
-            + (isDSE ? " --dse" : "")
-            + (isScylla ? " --scylla" : ""),
-        n,
-        dc,
-        ipPrefix,
-        n,
-        thriftItf,
-        storageItf,
-        binaryItf,
-        TestUtils.findAvailablePort(),
-        remoteLogItf);
+    if (isScylla) {
+      // scylla-ccm's `add` command has no thrift option: Scylla never had a Thrift interface.
+      execute(
+          CCM_COMMAND
+              + " add node%d -d dc%s -i %s%d -l %s --binary-itf %s -j %d -r %s -s -b --scylla",
+          n,
+          dc,
+          ipPrefix,
+          n,
+          storageItf,
+          binaryItf,
+          TestUtils.findAvailablePort(),
+          remoteLogItf);
+    } else {
+      String thriftItf = ipOfNode(n) + ":" + thriftPort;
+      execute(
+          CCM_COMMAND
+              + " add node%d -d dc%s -i %s%d -t %s -l %s --binary-itf %s -j %d -r %s -s -b"
+              + (isDSE ? " --dse" : ""),
+          n,
+          dc,
+          ipPrefix,
+          n,
+          thriftItf,
+          storageItf,
+          binaryItf,
+          TestUtils.findAvailablePort(),
+          remoteLogItf);
+    }
   }
 
   @Override
