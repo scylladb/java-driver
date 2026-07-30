@@ -322,7 +322,9 @@ class ControlConnection implements Connection.Owner {
   private Connection tryConnect(Host host, boolean isInitialConnection)
       throws ConnectionException, ExecutionException, InterruptedException,
           UnsupportedProtocolVersionException, ClusterNameMismatchException {
-    Connection connection = cluster.connectionFactory.open(host);
+    // Mark the control connection so it reports the full DRIVER_CONFIG blob (other connections send
+    // only SESSION_ID). No-op unless driver config reporting is enabled.
+    Connection connection = cluster.connectionFactory.open(host, true);
     String productType = connection.optionsQuery().get();
     // If no protocol version was specified, set the default as soon as a connection succeeds (it's
     // needed to parse UDTs in refreshSchema)

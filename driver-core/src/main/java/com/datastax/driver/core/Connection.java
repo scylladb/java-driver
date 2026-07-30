@@ -87,6 +87,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -117,6 +118,12 @@ class Connection {
   private static final long ADV_SHARD_AWARENESS_BLOCK_ON_NAT = 1000000L * 60L * 1000L;
 
   private static final long ADV_SHARD_AWARENESS_BLOCK_ON_ERROR = 5 * 60 * 1000;
+
+  /**
+   * STARTUP option key under which the Cluster-scoped connection-grouping identifier is sent, on
+   * every connection (see {@link Factory#sessionId}).
+   */
+  static final String SESSION_ID_KEY = "SESSION_ID";
 
   enum State {
     OPEN,
@@ -159,6 +166,11 @@ class Connection {
   private final ApplicationInfo applicationInfo;
   private ProtocolFeatureStore protocolFeatureStore;
 
+  // The DRIVER_CONFIG blob this connection reports in its STARTUP options, or null to report none.
+  // Set only for the control connection, so the (potentially large) config blob is sent once per
+  // Cluster rather than on every connection. SESSION_ID is still sent on every connection.
+  private final String driverConfig;
+
   /**
    * Create a new connection to a Cassandra node and associate it with the given pool.
    *
@@ -169,6 +181,11 @@ class Connection {
    *     connection can also be associated to an owner later with {@link #setOwner(Owner)}.
    */
   protected Connection(String name, EndPoint endPoint, Factory factory, Owner owner) {
+    this(name, endPoint, factory, owner, null);
+  }
+
+  private Connection(
+      String name, EndPoint endPoint, Factory factory, Owner owner, String driverConfig) {
     this.endPoint = endPoint;
     this.factory = factory;
     this.dispatcher = new Dispatcher();
@@ -178,6 +195,7 @@ class Connection {
     this.defaultKeyspaceAttempt = new SetKeyspaceAttempt(null, thisFuture);
     this.targetKeyspace = new AtomicReference<SetKeyspaceAttempt>(defaultKeyspaceAttempt);
     this.applicationInfo = factory.configuration.getApplicationInfo();
+    this.driverConfig = driverConfig;
   }
 
   /** Create a new connection to a Cassandra node. */
@@ -510,6 +528,16 @@ class Connection {
         Map<String, String> extraOptions = new HashMap<>();
         if (applicationInfo != null) {
           applicationInfo.addOption(extraOptions);
+        }
+
+        // Sent on every connection, unconditionally (like DRIVER_NAME / DRIVER_VERSION), so the
+        // server can group all the connections opened from this Cluster.
+        extraOptions.put(SESSION_ID_KEY, factory.sessionId.toString());
+
+        // Built once when the Cluster initialized; non-null only on the control connection, and
+        // only when driver config reporting is enabled.
+        if (driverConfig != null) {
+          extraOptions.put(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, driverConfig);
         }
 
         if (protocolFeatureStore != null) {
@@ -1283,11 +1311,28 @@ class Connection {
     volatile ProtocolVersion protocolVersion;
     private final NettyOptions nettyOptions;
 
+    // Dedicated, driver-generated identifier sent as SESSION_ID on every connection, so the server
+    // can group them. Not derived from the (user-settable) CLIENT_ID, so that it is guaranteed
+    // unique as the grouping key requires. There is one Factory per Cluster, so this is stable and
+    // shared by every Session obtained from that Cluster (the control connection has no Session
+    // affiliation, so Cluster-wide is the finest granularity available here).
+    final UUID sessionId = UUID.randomUUID();
+
+    // The DRIVER_CONFIG blob sent on the control connection, or null when driver config reporting
+    // is disabled (or the report could not be built). Built once here, as the Cluster initializes,
+    // and reused for every control connection this factory opens: it is never rebuilt while the
+    // session is in flight.
+    final String driverConfig;
+
     Factory(Cluster.Manager manager, Configuration configuration) {
       this.defaultHandler = manager;
       this.manager = manager;
       this.reaper = manager.reaper;
       this.configuration = configuration;
+      this.driverConfig =
+          configuration.isDriverConfigReportingEnabled()
+              ? new DefaultDriverConfigReporter(configuration).buildReport()
+              : null;
       this.authProvider = configuration.getProtocolOptions().getAuthProvider();
       this.protocolVersion = configuration.getProtocolOptions().initialProtocolVersion;
       this.nettyOptions = configuration.getNettyOptions();
@@ -1319,12 +1364,25 @@ class Connection {
     Connection open(Host host)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
+      return open(host, false);
+    }
+
+    /**
+     * Same as {@link #open(Host)}, but when {@code reportConfig} is true, hands the connection the
+     * {@code DRIVER_CONFIG} blob to report, marking it as the control connection (a no-op when
+     * driver config reporting is disabled, since there is then no blob to report).
+     */
+    Connection open(Host host, boolean reportConfig)
+        throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
+            ClusterNameMismatchException {
       EndPoint endPoint = host.getEndPoint();
 
       if (isShutdown) throw new ConnectionException(endPoint, "Connection factory is shut down");
 
       host.convictionPolicy.signalConnectionsOpening(1);
-      Connection connection = new Connection(buildConnectionName(host), endPoint, this);
+      Connection connection =
+          new Connection(
+              buildConnectionName(host), endPoint, this, null, reportConfig ? driverConfig : null);
       // This method opens the connection synchronously, so wait until it's initialized
       try {
         connection.initAsync().get();

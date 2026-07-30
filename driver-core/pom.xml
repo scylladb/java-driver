@@ -164,6 +164,7 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <!-- Used by DefaultDriverConfigReporter to build the DRIVER_CONFIG JSON blob -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
@@ -171,10 +172,6 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
         </dependency>
 
         <!-- added for easier DNS hostname resolution mocking -->
