@@ -24,8 +24,8 @@ import org.testng.annotations.Test;
     })
 @ScyllaOnly
 @ScyllaVersion(minOSS = "6.0.0", minEnterprise = "2024.2", description = "Needs to support tablets")
-public class TabletsIT extends CCMTestsSupport {
-  private static final Logger LOG = LoggerFactory.getLogger(TabletsIT.class);
+public class TabletsTest extends CCMTestsSupport {
+  private static final Logger LOG = LoggerFactory.getLogger(TabletsTest.class);
   private static final int INITIAL_TABLETS = 32;
   private static final int QUERIES = 1600;
   private static final int REPLICATION_FACTOR = 2;
