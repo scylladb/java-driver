@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-public class ZeroTokenNodesIT {
+public class ZeroTokenNodesTest {
 
   @DataProvider(name = "loadBalancingPolicies")
   public static Object[][] loadBalancingPolicies() {

@@ -39,7 +39,7 @@ import org.testng.annotations.Test;
  * through the LWT load-balancing path (PRESERVE_REPLICA_ORDER).
  */
 @CCMConfig(numberOfNodes = 3)
-public class LWTLoadBalancingIT extends CCMTestsSupport {
+public class LWTLoadBalancingTest extends CCMTestsSupport {
 
   @Override
   public Cluster.Builder createClusterBuilder() {
@@ -61,7 +61,7 @@ public class LWTLoadBalancingIT extends CCMTestsSupport {
     Session session = session();
 
     SimpleStatement simpleSelect =
-        new SimpleStatement("SELECT * FROM test_lwt WHERE pk = ? AND ck = ?", 1, 0);
+        new SimpleStatement("SELECT * FROM test_lwt WHERE pk = ? AND ck = ?");
     simpleSelect.setConsistencyLevel(ConsistencyLevel.LOCAL_SERIAL);
 
     PreparedStatement preparedSelect = session.prepare(simpleSelect);
@@ -91,7 +91,7 @@ public class LWTLoadBalancingIT extends CCMTestsSupport {
     Session session = session();
 
     SimpleStatement simpleSelect =
-        new SimpleStatement("SELECT * FROM test_lwt WHERE pk = ? AND ck = ?", 2, 0);
+        new SimpleStatement("SELECT * FROM test_lwt WHERE pk = ? AND ck = ?");
     simpleSelect.setConsistencyLevel(ConsistencyLevel.SERIAL);
 
     PreparedStatement preparedSelect = session.prepare(simpleSelect);

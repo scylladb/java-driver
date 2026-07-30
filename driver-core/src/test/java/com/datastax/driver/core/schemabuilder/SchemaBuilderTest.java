@@ -37,7 +37,7 @@ import com.datastax.driver.core.utils.CassandraVersion;
 import java.util.Iterator;
 import org.testng.annotations.Test;
 
-public class SchemaBuilderIT extends CCMTestsSupport {
+public class SchemaBuilderTest extends CCMTestsSupport {
 
   // Test relies on existence of 'ks' keyspace,
   // but no such keyspace is created. If (fixed) created,
