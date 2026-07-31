@@ -3,12 +3,13 @@ package com.datastax.driver.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.driver.core.CCMBridge.Builder.ResolvedVersions;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 /**
  * Unit tests for the part of {@link CCMBridge.Builder} that decides which server flavor and version
- * to install, i.e. the {@code ccm create} command and the environment it runs in. No CCM cluster is
- * created.
+ * to install, i.e. the {@code ccm create} command, the environment it runs in and the
+ * flavor-specific yaml it writes. No CCM cluster is created.
  *
  * <p>Each test configures the flavor explicitly, so that it doesn't depend on the {@code
  * scylla.version} / {@code dse} system properties of the surrounding run.
@@ -90,6 +91,89 @@ public class CCMBridgeCreateCommandTest {
         .isSameAs(
             CCMBridge.Builder.buildEnvironmentMap(
                 new ResolvedVersions(false, cassandra, null, null)));
+  }
+
+  /**
+   * Scylla reads a PEM certificate and key, not the JKS keystore Cassandra reads, so an explicitly
+   * configured Scylla cluster must not be given the Cassandra settings just because the surrounding
+   * run has no {@code scylla.version}.
+   */
+  @Test(groups = "unit")
+  public void should_use_pem_client_encryption_for_configured_scylla_version() {
+    CCMBridge.Builder builder =
+        CCMBridge.builder()
+            .withDSE(false)
+            .withScylla(true)
+            .withVersion(VersionNumber.parse("2026.1.0"))
+            .withAuth();
+
+    Map<String, Object> options = builder.buildClientEncryptionOptions(builder.resolveVersions());
+
+    assertThat(options)
+        .containsEntry("client_encryption_options.enabled", "true")
+        .containsEntry("client_encryption_options.require_client_auth", "true")
+        .containsKey("client_encryption_options.certificate")
+        .containsKey("client_encryption_options.keyfile")
+        .containsKey("client_encryption_options.truststore");
+    assertThat(options)
+        .doesNotContainKey("client_encryption_options.keystore")
+        .doesNotContainKey("client_encryption_options.keystore_password")
+        .doesNotContainKey("client_encryption_options.truststore_password");
+  }
+
+  /** The mirror image: an explicit Cassandra version under a global Scylla run. */
+  @Test(groups = "unit")
+  public void should_use_keystore_client_encryption_for_configured_cassandra_version() {
+    CCMBridge.Builder builder =
+        CCMBridge.builder()
+            .withDSE(false)
+            .withScylla(false)
+            .withVersion(VersionNumber.parse("4.1.3"))
+            .withAuth();
+
+    Map<String, Object> options = builder.buildClientEncryptionOptions(builder.resolveVersions());
+
+    assertThat(options)
+        .containsEntry("client_encryption_options.enabled", "true")
+        .containsEntry("client_encryption_options.require_client_auth", "true")
+        .containsKey("client_encryption_options.keystore")
+        .containsKey("client_encryption_options.keystore_password")
+        .containsKey("client_encryption_options.truststore")
+        .containsKey("client_encryption_options.truststore_password");
+    assertThat(options)
+        .doesNotContainKey("client_encryption_options.certificate")
+        .doesNotContainKey("client_encryption_options.keyfile");
+  }
+
+  /** {@code withSSL()} alone must not enable client certificate authentication. */
+  @Test(groups = "unit")
+  public void should_not_require_client_auth_without_with_auth() {
+    CCMBridge.Builder sslOnly = CCMBridge.builder().withDSE(false).withScylla(true).withSSL();
+    assertThat(sslOnly.buildClientEncryptionOptions(sslOnly.resolveVersions()))
+        .containsEntry("client_encryption_options.enabled", "true")
+        .doesNotContainKey("client_encryption_options.require_client_auth");
+
+    CCMBridge.Builder plaintext = CCMBridge.builder().withDSE(false).withScylla(true);
+    assertThat(plaintext.buildClientEncryptionOptions(plaintext.resolveVersions())).isEmpty();
+  }
+
+  /**
+   * {@code ssl}/{@code auth} are no longer reflected in {@code cassandraConfiguration} at
+   * configuration time, so {@link CCMBridge.Builder} has to compare them itself: {@link CCMCache}
+   * keys cached clusters on the builder, and would otherwise hand an encrypted cluster to a test
+   * that asked for a plaintext one.
+   */
+  @Test(groups = "unit")
+  public void should_not_consider_encrypted_and_plaintext_clusters_equal() {
+    CCMBridge.Builder plaintext = CCMBridge.builder().withNodes(1);
+    CCMBridge.Builder encrypted = CCMBridge.builder().withNodes(1).withSSL();
+    CCMBridge.Builder authenticated = CCMBridge.builder().withNodes(1).withAuth();
+
+    assertThat(plaintext).isNotEqualTo(encrypted).isNotEqualTo(authenticated);
+    assertThat(encrypted).isNotEqualTo(authenticated);
+    assertThat(encrypted).isEqualTo(CCMBridge.builder().withNodes(1).withSSL());
+    assertThat(encrypted.hashCode())
+        .isEqualTo(CCMBridge.builder().withNodes(1).withSSL().hashCode());
   }
 
   @Test(groups = "unit")

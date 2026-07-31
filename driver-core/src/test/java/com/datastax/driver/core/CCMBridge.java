@@ -134,7 +134,9 @@ public class CCMBridge implements CCMAccess {
 
   /**
    * {@link #ENVIRONMENT_MAP} without the variables that depend on which server flavor and version
-   * is installed, i.e. everything a cluster configuring its own version can reuse.
+   * is installed, i.e. everything a cluster configuring its own version can reuse. {@code
+   * SCYLLA_PRODUCT} is stripped even if the surrounding process defined it, so that it can only
+   * ever be re-added for a version that was actually resolved as Enterprise.
    */
   private static final Map<String, String> BASE_ENVIRONMENT_MAP;
 
@@ -255,9 +257,16 @@ public class CCMBridge implements CCMAccess {
     if (ccmJavaHome != null) {
       envMap.put("JAVA_HOME", ccmJavaHome);
     }
+    // The global environment keeps an inherited SCYLLA_PRODUCT: a non-numeric scylla.version (a
+    // branch spec) can't be recognized as Enterprise here, and exporting the variable is the only
+    // way to select the repository in that case.
+    Map<String, String> globalEnvMap = ImmutableMap.copyOf(envMap);
+    ENVIRONMENT_MAP = globalScyllaEnterprise ? withScyllaEnterprise(globalEnvMap) : globalEnvMap;
+    // A cluster that configures its own version derives SCYLLA_PRODUCT from that version instead,
+    // so an inherited value must not reach it: it would install an explicitly configured OSS
+    // version from the Enterprise repository.
+    envMap.remove("SCYLLA_PRODUCT");
     BASE_ENVIRONMENT_MAP = ImmutableMap.copyOf(envMap);
-    ENVIRONMENT_MAP =
-        globalScyllaEnterprise ? withScyllaEnterprise(BASE_ENVIRONMENT_MAP) : BASE_ENVIRONMENT_MAP;
 
     if (isDse()) {
       GLOBAL_DSE_VERSION_NUMBER = VersionNumber.parse(inputCassandraVersion);
@@ -1062,6 +1071,8 @@ public class CCMBridge implements CCMAccess {
     private boolean start = true;
     private boolean dse = isDse();
     private boolean scylla = GLOBAL_SCYLLA_VERSION_NUMBER != null;
+    private boolean ssl = false;
+    private boolean auth = false;
     private VersionNumber version = null;
     private final Set<String> createOptions = new LinkedHashSet<String>();
     private final Set<String> jvmArgs = new LinkedHashSet<String>();
@@ -1103,40 +1114,22 @@ public class CCMBridge implements CCMAccess {
       return this;
     }
 
-    /** Enables SSL encryption. */
+    /**
+     * Enables SSL encryption.
+     *
+     * <p>Only records the request: which keys and certificates to point the server at depends on
+     * the server flavor, which isn't resolved until {@link #build()}, see {@link
+     * #buildClientEncryptionOptions(ResolvedVersions)}.
+     */
     public Builder withSSL() {
-      cassandraConfiguration.put("client_encryption_options.enabled", "true");
-      if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
-        cassandraConfiguration.put(
-            "client_encryption_options.certificate",
-            DEFAULT_SERVER_CERT_CHAIN_FILE.getAbsolutePath());
-        cassandraConfiguration.put(
-            "client_encryption_options.keyfile", DEFAULT_SERVER_PRIVATE_KEY_FILE.getAbsolutePath());
-      } else {
-        cassandraConfiguration.put("client_encryption_options.optional", "false");
-        cassandraConfiguration.put(
-            "client_encryption_options.keystore", DEFAULT_SERVER_KEYSTORE_FILE.getAbsolutePath());
-        cassandraConfiguration.put(
-            "client_encryption_options.keystore_password", DEFAULT_SERVER_KEYSTORE_PASSWORD);
-      }
+      this.ssl = true;
       return this;
     }
 
     /** Enables client authentication. This also enables encryption ({@link #withSSL()}. */
     public Builder withAuth() {
       withSSL();
-      cassandraConfiguration.put("client_encryption_options.require_client_auth", "true");
-      if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
-        cassandraConfiguration.put(
-            "client_encryption_options.truststore",
-            DEFAULT_SERVER_TRUSTSTORE_PEM_FILE.getAbsolutePath());
-      } else {
-        cassandraConfiguration.put(
-            "client_encryption_options.truststore",
-            DEFAULT_SERVER_TRUSTSTORE_FILE.getAbsolutePath());
-        cassandraConfiguration.put(
-            "client_encryption_options.truststore_password", DEFAULT_SERVER_TRUSTSTORE_PASSWORD);
-      }
+      this.auth = true;
       return this;
     }
 
@@ -1327,6 +1320,13 @@ public class CCMBridge implements CCMAccess {
         cassandraConfiguration.put("native_shard_aware_transport_port", RANDOM_PORT);
         cassandraConfiguration = randomizePorts(cassandraConfiguration);
       }
+      // Explicitly configured entries keep winning over these defaults, as they did when withSSL()
+      // wrote them at builder-configuration time and withCassandraConfiguration() ran after it.
+      for (Map.Entry<String, Object> option : buildClientEncryptionOptions(versions).entrySet()) {
+        if (!cassandraConfiguration.containsKey(option.getKey())) {
+          cassandraConfiguration.put(option.getKey(), option.getValue());
+        }
+      }
       final CCMBridge ccm =
           new CCMBridge(
               clusterName,
@@ -1453,6 +1453,51 @@ public class CCMBridge implements CCMAccess {
     }
 
     /**
+     * The client encryption yaml for a cluster with these versions, empty unless {@link #withSSL()}
+     * or {@link #withAuth()} was called.
+     *
+     * <p>Cassandra and DSE read a JKS keystore and truststore, Scylla reads a PEM certificate, key
+     * and truststore, so the flavor has to be resolved first — which is why this can't be decided
+     * in {@code withSSL()} itself.
+     */
+    Map<String, Object> buildClientEncryptionOptions(ResolvedVersions versions) {
+      if (!ssl) {
+        return ImmutableMap.of();
+      }
+      boolean isScylla = versions.scylla != null;
+      Map<String, Object> options = Maps.newLinkedHashMap();
+      options.put("client_encryption_options.enabled", "true");
+      if (isScylla) {
+        options.put(
+            "client_encryption_options.certificate",
+            DEFAULT_SERVER_CERT_CHAIN_FILE.getAbsolutePath());
+        options.put(
+            "client_encryption_options.keyfile", DEFAULT_SERVER_PRIVATE_KEY_FILE.getAbsolutePath());
+      } else {
+        options.put("client_encryption_options.optional", "false");
+        options.put(
+            "client_encryption_options.keystore", DEFAULT_SERVER_KEYSTORE_FILE.getAbsolutePath());
+        options.put(
+            "client_encryption_options.keystore_password", DEFAULT_SERVER_KEYSTORE_PASSWORD);
+      }
+      if (auth) {
+        options.put("client_encryption_options.require_client_auth", "true");
+        if (isScylla) {
+          options.put(
+              "client_encryption_options.truststore",
+              DEFAULT_SERVER_TRUSTSTORE_PEM_FILE.getAbsolutePath());
+        } else {
+          options.put(
+              "client_encryption_options.truststore",
+              DEFAULT_SERVER_TRUSTSTORE_FILE.getAbsolutePath());
+          options.put(
+              "client_encryption_options.truststore_password", DEFAULT_SERVER_TRUSTSTORE_PASSWORD);
+        }
+      }
+      return options;
+    }
+
+    /**
      * The environment for the CCM commands of a cluster with these versions.
      *
      * <p>{@code SCYLLA_PRODUCT} has to follow the version this particular cluster installs, not the
@@ -1565,6 +1610,10 @@ public class CCMBridge implements CCMAccess {
       if (ipPrefix != builder.ipPrefix) return false;
       if (dse != builder.dse) return false;
       if (scylla != builder.scylla) return false;
+      // Not reflected in cassandraConfiguration until build(), so they have to be compared here —
+      // otherwise an encrypted cluster could be reused for a test that expects a plaintext one.
+      if (ssl != builder.ssl) return false;
+      if (auth != builder.auth) return false;
       if (!Arrays.equals(nodes, builder.nodes)) return false;
       if (version != null ? !version.equals(builder.version) : builder.version != null)
         return false;
@@ -1580,6 +1629,9 @@ public class CCMBridge implements CCMAccess {
       // do not include start as it is not relevant to the settings of the cluster.
       int result = Arrays.hashCode(nodes);
       result = 31 * result + (dse ? 1 : 0);
+      result = 31 * result + (scylla ? 1 : 0);
+      result = 31 * result + (ssl ? 1 : 0);
+      result = 31 * result + (auth ? 1 : 0);
       result = 31 * result + ipPrefix.hashCode();
       result = 31 * result + (version != null ? version.hashCode() : 0);
       result = 31 * result + createOptions.hashCode();
