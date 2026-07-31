@@ -480,7 +480,7 @@ public class CCMBridge implements CCMAccess {
 
   @Override
   public InetSocketAddress jmxAddressOfNode(int n) {
-    if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
+    if (isScylla) {
       return new InetSocketAddress(ipOfNode(n), jmxPorts[n - 1]);
     } else {
       return new InetSocketAddress("localhost", jmxPorts[n - 1]);
@@ -1186,37 +1186,60 @@ public class CCMBridge implements CCMAccess {
       return this;
     }
 
+    /** The server versions this builder's configuration resolves to. */
+    static class ResolvedVersions {
+      final boolean versionConfigured;
+      final VersionNumber cassandra;
+      final VersionNumber dse;
+      final VersionNumber scylla;
+
+      ResolvedVersions(
+          boolean versionConfigured,
+          VersionNumber cassandra,
+          VersionNumber dse,
+          VersionNumber scylla) {
+        this.versionConfigured = versionConfigured;
+        this.cassandra = cassandra;
+        this.dse = dse;
+        this.scylla = scylla;
+      }
+    }
+
+    /**
+     * Resolves which flavor and version this builder will create, from the explicitly configured
+     * version (if any) and the globally configured defaults.
+     */
+    ResolvedVersions resolveVersions() {
+      boolean versionConfigured = this.version != null;
+      // No version was explicitly provided, fallback on global config.
+      if (!versionConfigured) {
+        return new ResolvedVersions(
+            false,
+            GLOBAL_CASSANDRA_VERSION_NUMBER,
+            GLOBAL_DSE_VERSION_NUMBER,
+            GLOBAL_SCYLLA_VERSION_NUMBER);
+      } else if (dse) {
+        // given version is the DSE version, base cassandra version on DSE version.
+        return new ResolvedVersions(true, getCassandraVersion(this.version), this.version, null);
+      } else if (scylla) {
+        // Versions from 5.1 to 6.2.0 seem to report release_version 3.0.8 in system_local
+        return new ResolvedVersions(true, VersionNumber.parse("3.0.8"), null, this.version);
+      } else {
+        // given version is cassandra version.
+        return new ResolvedVersions(true, this.version, null, null);
+      }
+    }
+
     public CCMBridge build() {
       // be careful NOT to alter internal state (hashCode/equals) during build!
       String clusterName = TestUtils.generateIdentifier("ccm_");
 
       if (providedClusterName != null) clusterName = providedClusterName;
 
-      VersionNumber dseVersion;
-      VersionNumber cassandraVersion;
-      VersionNumber scyllaVersion;
-      boolean versionConfigured = this.version != null;
-      // No version was explicitly provided, fallback on global config.
-      if (!versionConfigured) {
-        scyllaVersion = GLOBAL_SCYLLA_VERSION_NUMBER;
-        dseVersion = GLOBAL_DSE_VERSION_NUMBER;
-        cassandraVersion = GLOBAL_CASSANDRA_VERSION_NUMBER;
-      } else if (dse) {
-        // given version is the DSE version, base cassandra version on DSE version.
-        scyllaVersion = null;
-        dseVersion = this.version;
-        cassandraVersion = getCassandraVersion(dseVersion);
-      } else if (scylla) {
-        scyllaVersion = this.version;
-        dseVersion = null;
-        // Versions from 5.1 to 6.2.0 seem to report release_version 3.0.8 in system_local
-        cassandraVersion = VersionNumber.parse("3.0.8");
-      } else {
-        // given version is cassandra version.
-        scyllaVersion = null;
-        dseVersion = null;
-        cassandraVersion = this.version;
-      }
+      ResolvedVersions versions = resolveVersions();
+      VersionNumber dseVersion = versions.dse;
+      VersionNumber cassandraVersion = versions.cassandra;
+      VersionNumber scyllaVersion = versions.scylla;
 
       Map<String, Object> cassandraConfiguration = randomizePorts(this.cassandraConfiguration);
       int storagePort = Integer.parseInt(cassandraConfiguration.get("storage_port").toString());
@@ -1255,7 +1278,7 @@ public class CCMBridge implements CCMAccess {
           cassandraConfiguration.put("enable_sasi_indexes", true);
         }
       }
-      if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
+      if (scyllaVersion != null) {
         cassandraConfiguration.put("prometheus_port", RANDOM_PORT);
         cassandraConfiguration.put("api_port", RANDOM_PORT);
         cassandraConfiguration.put("native_shard_aware_transport_port", RANDOM_PORT);
@@ -1283,7 +1306,7 @@ public class CCMBridge implements CCMAccess {
                   ccm.close();
                 }
               });
-      ccm.execute(buildCreateCommand(clusterName, versionConfigured, cassandraVersion, dseVersion));
+      ccm.execute(buildCreateCommand(clusterName, versions));
       updateNodeConf(ccm);
       ccm.updateConfig(cassandraConfiguration);
       if (dseVersion != null) {
@@ -1347,11 +1370,7 @@ public class CCMBridge implements CCMAccess {
       return allJvmArgs.toString();
     }
 
-    private String buildCreateCommand(
-        String clusterName,
-        boolean versionConfigured,
-        VersionNumber cassandraVersion,
-        VersionNumber dseVersion) {
+    String buildCreateCommand(String clusterName, ResolvedVersions versions) {
       StringBuilder result = new StringBuilder(CCM_COMMAND + " create");
       result.append(" ").append(clusterName);
       result.append(" -i ").append(ipPrefix);
@@ -1366,17 +1385,25 @@ public class CCMBridge implements CCMAccess {
       }
 
       Set<String> lCreateOptions = new LinkedHashSet<String>(createOptions);
-      if (!versionConfigured) {
+      if (!versions.versionConfigured) {
         // If no version was provided, use the default install ags.
         lCreateOptions.addAll(CASSANDRA_INSTALL_ARGS);
       } else {
-        if (dseVersion != null) {
+        if (versions.dse != null) {
           lCreateOptions.add("--dse");
           lCreateOptions.add("-v");
-          lCreateOptions.add(dseVersion.toString());
+          lCreateOptions.add(versions.dse.toString());
+        } else if (versions.scylla != null) {
+          // Same shape as the Scylla entries of CASSANDRA_INSTALL_ARGS. Note that
+          // SCYLLA_PRODUCT is only derived from the globally configured version: the
+          // environment is a static map shared by every cluster, so an explicitly
+          // configured enterprise version still installs from the OSS repository.
+          lCreateOptions.add("--scylla");
+          lCreateOptions.add("-v");
+          lCreateOptions.add("release:" + versions.scylla);
         } else {
           lCreateOptions.add("-v");
-          lCreateOptions.add(cassandraVersion.toString());
+          lCreateOptions.add(versions.cassandra.toString());
         }
       }
       result.append(" ").append(Joiner.on(" ").join(randomizePorts(lCreateOptions)));
