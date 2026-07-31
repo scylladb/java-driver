@@ -190,8 +190,13 @@ public class TabletsTest extends CCMTestsSupport {
           continue;
         }
         Session session = sessionEntry.getValue().get();
-        // Empty out tablets information
-        session.getCluster().getMetadata().getTabletMap().removeTableMappings(KEYSPACE_NAME);
+        // Empty out tablets information. The mapping is keyed by the lowercased keyspace name, as
+        // reported by the server, so the key has to be lowercased here too or this is a no-op.
+        session
+            .getCluster()
+            .getMetadata()
+            .getTabletMap()
+            .removeTableMappings(KEYSPACE_NAME.toLowerCase());
         Statement stmt;
         try {
           stmt = stmtEntry.getValue().apply(session);
@@ -226,6 +231,10 @@ public class TabletsTest extends CCMTestsSupport {
                   stmtEntry.getKey(), sessionEntry.getKey()));
           continue;
         }
+        // executeOnAllHostsAndReturnIfResultHasTabletsInfo pins the statement to a specific host
+        // while hunting for tablet info. Clear that pin, otherwise the routing check below always
+        // observes the pinned host and can never detect misrouting.
+        stmt.setHost(null);
         if (!checkIfRoutedProperly(session, stmt)) {
           testErrors.add(
               String.format(
@@ -343,6 +352,11 @@ public class TabletsTest extends CCMTestsSupport {
     int expectedNodesCount = stmt.isLWT() ? 1 : REPLICATION_FACTOR;
     Set<Host> nodes = new HashSet<>();
     for (int i = 0; i < REPLICATION_FACTOR * 3; i++) {
+      // PagingOptimizingLoadBalancingPolicy returns Statement.getLastHost() ahead of the real query
+      // plan, and that field is set after every successful BoundStatement execution. Clearing it
+      // keeps the loop from being pinned to the first coordinator, which would let any routing
+      // behaviour satisfy the check below.
+      stmt.setLastHost(null);
       nodes.add(session.execute(stmt).getExecutionInfo().getQueriedHost());
     }
     return nodes.size() <= expectedNodesCount;

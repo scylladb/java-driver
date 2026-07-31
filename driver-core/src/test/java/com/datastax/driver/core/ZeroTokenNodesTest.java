@@ -173,12 +173,17 @@ public class ZeroTokenNodesTest {
         queriedNodes.add(rs.getExecutionInfo().getQueriedHost().getEndPoint().resolve());
       }
 
+      // containsOnly, not containsExactly: queriedNodes is a HashSet, whose iteration order is
+      // hash-derived rather than insertion order, so an order-sensitive assertion is a latent
+      // flake.
+      // AssertJ 1.7.1, pinned by this module, has no containsExactlyInAnyOrder; for a Set,
+      // containsOnly is equivalent to it.
       if (isDcAware) {
         assertThat(queriedNodes)
-            .containsExactly(ccmBridge.addressOfNode(1), ccmBridge.addressOfNode(2));
+            .containsOnly(ccmBridge.addressOfNode(1), ccmBridge.addressOfNode(2));
       } else {
         assertThat(queriedNodes)
-            .containsExactly(
+            .containsOnly(
                 ccmBridge.addressOfNode(1),
                 ccmBridge.addressOfNode(2),
                 ccmBridge.addressOfNode(3),

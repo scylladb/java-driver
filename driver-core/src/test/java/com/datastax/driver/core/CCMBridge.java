@@ -430,7 +430,7 @@ public class CCMBridge implements CCMAccess {
     this.thriftPort = thriftPort;
     this.binaryPort = binaryPort;
     this.isDSE = dseVersion != null;
-    this.isScylla = (getGlobalScyllaVersion() != null);
+    this.isScylla = (scyllaVersion != null);
     this.jvmArgs = jvmArgs;
     this.nodes = nodes;
     this.ccmDir = Files.createTempDir();
