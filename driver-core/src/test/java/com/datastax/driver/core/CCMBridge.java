@@ -126,9 +126,10 @@ public class CCMBridge implements CCMAccess {
    * running tests. For example, if you want to run tests with JDK 6 but against Cassandra 2.0,
    * which requires JDK 7.
    *
-   * <p>This is the environment for the globally configured server version; a cluster that
-   * configures its own version gets one derived from {@link #BASE_ENVIRONMENT_MAP} instead, see
-   * {@link Builder#buildEnvironmentMap(Builder.ResolvedVersions)}.
+   * <p>This is the environment for the globally configured server version, assembled by {@link
+   * #buildGlobalEnvironmentMap}; a cluster that configures its own version gets one derived from
+   * {@link #BASE_ENVIRONMENT_MAP} instead, see {@link
+   * Builder#buildEnvironmentMap(Builder.ResolvedVersions)}.
    */
   private static final Map<String, String> ENVIRONMENT_MAP;
 
@@ -213,6 +214,7 @@ public class CCMBridge implements CCMAccess {
     // Inherit the current environment.
     Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
     boolean globalScyllaEnterprise = false;
+    boolean globalScyllaBranchSpec = false;
     ImmutableSet.Builder<String> installArgs = ImmutableSet.builder();
     if (installDirectory != null && !installDirectory.trim().isEmpty()) {
       installArgs.add("--install-dir=" + new File(installDirectory).getAbsolutePath());
@@ -224,6 +226,7 @@ public class CCMBridge implements CCMAccess {
         installArgs.add("-v release:" + inputScyllaVersion);
       } else {
         installArgs.add("-v " + inputScyllaVersion);
+        globalScyllaBranchSpec = true;
       }
       globalScyllaEnterprise = isScyllaEnterpriseVersion(inputScyllaVersion);
     } else if (inputCassandraVersion != null && !inputCassandraVersion.trim().isEmpty()) {
@@ -257,11 +260,8 @@ public class CCMBridge implements CCMAccess {
     if (ccmJavaHome != null) {
       envMap.put("JAVA_HOME", ccmJavaHome);
     }
-    // The global environment keeps an inherited SCYLLA_PRODUCT: a non-numeric scylla.version (a
-    // branch spec) can't be recognized as Enterprise here, and exporting the variable is the only
-    // way to select the repository in that case.
-    Map<String, String> globalEnvMap = ImmutableMap.copyOf(envMap);
-    ENVIRONMENT_MAP = globalScyllaEnterprise ? withScyllaEnterprise(globalEnvMap) : globalEnvMap;
+    ENVIRONMENT_MAP =
+        buildGlobalEnvironmentMap(envMap, globalScyllaEnterprise, globalScyllaBranchSpec);
     // A cluster that configures its own version derives SCYLLA_PRODUCT from that version instead,
     // so an inherited value must not reach it: it would install an explicitly configured OSS
     // version from the Enterprise repository.
@@ -372,6 +372,36 @@ public class CCMBridge implements CCMAccess {
    */
   private static boolean isScyllaEnterpriseVersion(String versionString) {
     return versionString != null && versionString.matches("\\d{4}\\..*");
+  }
+
+  /**
+   * Builds {@link #ENVIRONMENT_MAP}, the environment for the globally configured server version,
+   * from an inherited process environment.
+   *
+   * <p>Package-private and free of static state so that the {@code SCYLLA_PRODUCT} decision is
+   * assertable without a live process environment -- it is otherwise only reachable through a
+   * static initializer.
+   *
+   * <p>An inherited {@code SCYLLA_PRODUCT} is honoured only for a branch spec, where {@link
+   * #isScyllaEnterpriseVersion} cannot classify the string and exporting the variable is the only
+   * way to select the repository. For a version number, a pure Cassandra run, or no configured
+   * version, the resolved flavor wins and an inherited value is dropped: otherwise a stale {@code
+   * SCYLLA_PRODUCT=enterprise} in the surrounding shell would install an OSS version from the
+   * Enterprise repository.
+   */
+  static Map<String, String> buildGlobalEnvironmentMap(
+      Map<String, String> inheritedEnvironment,
+      boolean scyllaEnterprise,
+      boolean scyllaBranchSpec) {
+    if (scyllaEnterprise) {
+      return withScyllaEnterprise(inheritedEnvironment);
+    }
+    if (scyllaBranchSpec) {
+      return ImmutableMap.copyOf(inheritedEnvironment);
+    }
+    Map<String, String> envMap = Maps.newHashMap(inheritedEnvironment);
+    envMap.remove("SCYLLA_PRODUCT");
+    return ImmutableMap.copyOf(envMap);
   }
 
   /** Adds the CCM variable that makes Scylla install from the Enterprise repository. */
@@ -1142,6 +1172,12 @@ public class CCMBridge implements CCMAccess {
     /**
      * The Cassandra or DSE or Scylla version to use. If not specified the globally configured
      * version is used instead.
+     *
+     * <p>Which of the three this version names is decided by {@link #withDSE(boolean)} and {@link
+     * #withScylla(boolean)}, which default to the flavor of the surrounding run rather than to
+     * anything about this version. Call the matching one alongside this method, or a Cassandra
+     * version passed under {@code -Dscylla.version=...} is resolved as a Scylla release (and vice
+     * versa).
      */
     public Builder withVersion(VersionNumber version) {
       this.version = version;

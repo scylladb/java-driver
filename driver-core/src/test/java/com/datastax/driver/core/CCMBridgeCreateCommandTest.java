@@ -3,6 +3,7 @@ package com.datastax.driver.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.driver.core.CCMBridge.Builder.ResolvedVersions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.testng.annotations.Test;
 
@@ -192,5 +193,64 @@ public class CCMBridgeCreateCommandTest {
     String command = builder.buildCreateCommand("test_cluster", versions);
     assertThat(command).contains("--dse").contains("-v 6.8.0");
     assertThat(command).doesNotContain("--scylla");
+  }
+
+  /**
+   * An environment as inherited from a shell that exported {@code SCYLLA_PRODUCT}, e.g. left over
+   * from an earlier step of the same CI job.
+   */
+  private static Map<String, String> inheritedEnterpriseEnvironment() {
+    return ImmutableMap.of("PATH", "/usr/bin", "SCYLLA_PRODUCT", "enterprise");
+  }
+
+  @Test(groups = "unit")
+  public void should_use_enterprise_repository_for_global_enterprise_version() {
+    Map<String, String> environment =
+        CCMBridge.buildGlobalEnvironmentMap(inheritedEnterpriseEnvironment(), true, false);
+
+    assertThat(environment).containsEntry("SCYLLA_PRODUCT", "enterprise");
+    assertThat(environment).containsEntry("PATH", "/usr/bin");
+  }
+
+  /**
+   * The global version is a number that isn't Enterprise, so the repository is known: an inherited
+   * value must not override it, or an OSS version is looked up in the Enterprise repository.
+   */
+  @Test(groups = "unit")
+  public void should_drop_inherited_product_for_global_open_source_version() {
+    Map<String, String> environment =
+        CCMBridge.buildGlobalEnvironmentMap(inheritedEnterpriseEnvironment(), false, false);
+
+    assertThat(environment).doesNotContainKey("SCYLLA_PRODUCT");
+    assertThat(environment).containsEntry("PATH", "/usr/bin");
+  }
+
+  /**
+   * A branch spec can't be classified as Enterprise or OSS by its version string, so exporting
+   * {@code SCYLLA_PRODUCT} is the only way to select the repository: that one inherited value has
+   * to survive.
+   */
+  @Test(groups = "unit")
+  public void should_keep_inherited_product_for_global_branch_spec() {
+    Map<String, String> environment =
+        CCMBridge.buildGlobalEnvironmentMap(inheritedEnterpriseEnvironment(), false, true);
+
+    assertThat(environment).containsEntry("SCYLLA_PRODUCT", "enterprise");
+  }
+
+  /**
+   * A pure Cassandra run, or no configured version at all: nothing about the run asks for the
+   * Enterprise repository, so a stale inherited value must not reach ccm.
+   */
+  @Test(groups = "unit")
+  public void should_drop_inherited_product_when_no_scylla_version_configured() {
+    Map<String, String> environment =
+        CCMBridge.buildGlobalEnvironmentMap(
+            ImmutableMap.of("JAVA_HOME", "/opt/java", "SCYLLA_PRODUCT", "enterprise"),
+            false,
+            false);
+
+    assertThat(environment).doesNotContainKey("SCYLLA_PRODUCT");
+    assertThat(environment).containsEntry("JAVA_HOME", "/opt/java");
   }
 }
