@@ -70,8 +70,7 @@
     <!-- when changing version also update version in LICENSE_binary  -->
     <reactive-streams.version>1.0.4</reactive-streams.version>
     <json.version>20250517</json.version>
-    <jackson.version>2.21.4</jackson.version>
-    <jackson-databind.version>2.22.1</jackson-databind.version>
+    <jackson.version>2.22.1</jackson.version>
     <legacy-jackson.version>1.9.12</legacy-jackson.version>
     <!-- optional dependencies -->
     <snappy.version>1.1.10.8</snappy.version>
@@ -105,6 +104,13 @@
   </properties>
   <dependencyManagement>
     <dependencies>
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>${jackson.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <!-- define version for child packages -->
       <dependency>
         <groupId>com.scylladb</groupId>
@@ -418,16 +424,6 @@
         <groupId>javax.annotation</groupId>
         <artifactId>javax.annotation-api</artifactId>
         <version>1.3.2</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-core</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>${jackson-databind.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.testing.compile</groupId>
