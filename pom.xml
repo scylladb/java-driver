@@ -56,12 +56,12 @@
         <slf4j.version>1.7.36</slf4j.version>
         <slf4j-log4j12.version>1.7.36</slf4j-log4j12.version>
         <guava.version>33.3.1-jre</guava.version>
-        <netty.version>4.1.135.Final</netty.version>
+        <netty.version>4.1.136.Final</netty.version>
         <netty-tcnative.artifact>netty-tcnative-boringssl-static</netty-tcnative.artifact>
         <netty-tcnative.version>2.0.70.Final</netty-tcnative.version>
         <metrics.version>3.2.6</metrics.version>
         <snappy.version>1.1.10.7</snappy.version>
-        <lz4.version>1.10.1</lz4.version>
+        <lz4.version>1.11.1</lz4.version>
         <hdr.version>2.2.2</hdr.version>
         <jackson.version>2.18.9</jackson.version>
         <joda.version>2.12.7</joda.version>
