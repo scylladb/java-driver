@@ -53,6 +53,11 @@ jobs:
 
       - name: Build docs
         run: make -C docs multiversion
+        env:
+          # Old release branches (e.g. scylla-4.15.0.x) have javadoc
+          # comments that only pass doclint on JDK 8.
+          # Don't fail their multiversion javadoc builds on JDK 11.
+          MAVEN_OPTS: -Dmaven.javadoc.failOnError=false
 
       - name: Deploy docs to GitHub Pages
         run: ./docs/_utils/deploy.sh
