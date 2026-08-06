@@ -186,12 +186,12 @@ public class ClientRoutesIT {
   }
 
   private InetSocketAddress tryResolve(ClientRoutesTopologyMonitor handler, UUID hostId) {
+    // resolve() is an in-memory cache lookup that hands the route hostname over unresolved -- the
+    // connection layer resolves it -- so the only failure left is the monitor being closed.
     try {
       return handler.resolve(hostId);
     } catch (IllegalStateException e) {
       return null;
-    } catch (UnknownHostException e) {
-      throw new RuntimeException("DNS resolution failed for host_id=" + hostId, e);
     }
   }
 
@@ -206,7 +206,9 @@ public class ClientRoutesIT {
     NodeClassification result = new NodeClassification();
     for (Node node : session.getMetadata().getNodes().values()) {
       InetSocketAddress addr = (InetSocketAddress) node.getEndPoint().resolve();
-      String ip = addr.getAddress().getHostAddress();
+      // getHostString() rather than getAddress().getHostAddress(): a client route is handed over
+      // unresolved (the connection layer resolves it), so getAddress() is null for proxied nodes.
+      String ip = addr.getHostString();
       UUID hostId = node.getHostId();
       boolean connected = node.getOpenConnections() > 0;
       LOG.info(
@@ -319,7 +321,8 @@ public class ClientRoutesIT {
                 .build()) {
       for (Node node : adminSession.getMetadata().getNodes().values()) {
         InetSocketAddress addr = (InetSocketAddress) node.getEndPoint().resolve();
-        String ip = addr.getAddress().getHostAddress();
+        // See classifyNodes(): a client route is unresolved, so getAddress() would be null.
+        String ip = addr.getHostString();
         Integer nodeId = ipToNodeId.get(ip);
         if (nodeId != null && node.getHostId() != null) {
           hostIds.put(nodeId, node.getHostId());
@@ -540,7 +543,10 @@ public class ClientRoutesIT {
               () -> {
                 InetSocketAddress resolved = handler.resolve(hostId);
                 assertThat(resolved).isNotNull();
-                assertThat(resolved.getAddress().getHostAddress()).isEqualTo(nodeAddr);
+                // The route is returned unresolved on purpose -- ChannelFactory resolves it through
+                // Netty's AddressResolverGroup -- so assert on the host string, not getAddress().
+                assertThat(resolved.isUnresolved()).isTrue();
+                assertThat(resolved.getHostString()).isEqualTo(nodeAddr);
                 assertThat(resolved.getPort()).isEqualTo(9042);
               });
     }

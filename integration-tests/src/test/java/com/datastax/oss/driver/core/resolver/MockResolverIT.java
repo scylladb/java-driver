@@ -25,9 +25,11 @@ package com.datastax.oss.driver.core.resolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -37,16 +39,21 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.categories.IsolatedTests;
+import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultProgrammaticDriverConfigLoaderBuilder;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
@@ -59,6 +66,47 @@ public class MockResolverIT {
 
   private static final int CLUSTER_WAIT_SECONDS =
       20; // Maximal wait time for cluster nodes to get up
+
+  /**
+   * A loopback address no node is ever started on, outside the {@code 127.0.1.} prefix CCM hands
+   * its nodes: a connection attempt that dials it is refused immediately.
+   */
+  private static final String DEAD_ADDRESS = "127.0.0.11";
+
+  private static final ch.qos.logback.classic.Logger CHANNEL_FACTORY_LOGGER =
+      (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ChannelFactory.class);
+
+  private ListAppender<ILoggingEvent> channelFactoryAppender;
+  private Level originalChannelFactoryLevel;
+
+  @Before
+  public void startCapturingChannelFactoryLogs() {
+    // ChannelFactory reports a candidate it gave up on at DEBUG, which is the only externally
+    // visible evidence that the multi-address fallback did any work.
+    originalChannelFactoryLevel = CHANNEL_FACTORY_LOGGER.getLevel();
+    CHANNEL_FACTORY_LOGGER.setLevel(Level.DEBUG);
+    channelFactoryAppender = new ListAppender<>();
+    // ChannelFactory logs from every I/O thread of the session under test, and the assertions read
+    // the list while those threads are still winding down; ListAppender's own ArrayList is not safe
+    // for that (appends are unsynchronized, and iterating one would throw).
+    channelFactoryAppender.list = new CopyOnWriteArrayList<>();
+    channelFactoryAppender.start();
+    CHANNEL_FACTORY_LOGGER.addAppender(channelFactoryAppender);
+  }
+
+  @After
+  public void stopCapturingChannelFactoryLogs() {
+    CHANNEL_FACTORY_LOGGER.detachAppender(channelFactoryAppender);
+    channelFactoryAppender.stop();
+    CHANNEL_FACTORY_LOGGER.setLevel(originalChannelFactoryLevel);
+  }
+
+  /** The formatted messages {@code ChannelFactory} logged during the current test. */
+  private List<String> channelFactoryLogMessages() {
+    return channelFactoryAppender.list.stream()
+        .map(ILoggingEvent::getFormattedMessage)
+        .collect(Collectors.toList());
+  }
 
   private static void waitForAllNodesUp(CqlSession session, int expectedNodes) {
     Awaitility.await()
@@ -84,7 +132,6 @@ public class MockResolverIT {
 
       DriverConfigLoader loader =
           new DefaultProgrammaticDriverConfigLoaderBuilder()
-              .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
               .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
               .withStringList(
                   TypedDriverOption.CONTACT_POINTS.getRawOption(),
@@ -101,16 +148,95 @@ public class MockResolverIT {
         for (Node node : nodes) {
           LOG.trace("Found metadata node: {}", node);
         }
-        Set<Node> filteredNodes;
-        filteredNodes =
+        // Selected by the address the connection reached, not by the contact-point name: the node
+        // is
+        // identified by its own address (see below), so the name no longer appears in toString().
+        String nodeIp = ccmBridge.getNodeIpAddress(1);
+        Set<Node> filteredNodes =
             nodes.stream()
-                .filter(x -> x.toString().contains("test.cluster.fake"))
+                .filter(
+                    x -> {
+                      InetSocketAddress resolved = (InetSocketAddress) x.getEndPoint().resolve();
+                      return !resolved.isUnresolved()
+                          && nodeIp.equals(resolved.getAddress().getHostAddress());
+                    })
                 .collect(Collectors.toSet());
         assertThat(filteredNodes).hasSize(1);
-        InetSocketAddress address =
-            (InetSocketAddress) filteredNodes.iterator().next().getEndPoint().resolve();
-        assertTrue(address.isUnresolved());
+        Node node = filteredNodes.iterator().next();
+        InetSocketAddress address = (InetSocketAddress) node.getEndPoint().resolve();
+        // ChannelFactory pins the control connection's endpoint to the address it actually reached,
+        // and DefaultTopologyMonitor#buildNodeEndPoint keeps that address for the control node, so
+        // resolution yields that concrete IP rather than the hostname.
+        assertFalse(address.isUnresolved());
+        assertThat(address.getAddress().getHostAddress()).isEqualTo(nodeIp);
+        // ... while still carrying the configured name as its label, so the TLS peer host and the
+        // Kerberos service name are what the operator wrote, with no reverse lookup.
+        assertThat(address.getHostString()).isEqualTo("test.cluster.fake");
+        assertThat(address.getAddress().getHostName()).isEqualTo("test.cluster.fake");
+        // The node's *identity*, though, is its own address rather than the contact point's. The
+        // reconnection fallback re-offers the contact points every round, so a name-derived prefix
+        // would be acquired by each successive control node in turn, and two live nodes sharing one
+        // prefix means the older one's clearMetrics() deletes the newcomer's series.
+        assertThat(node.getEndPoint().asMetricPrefix())
+            .isEqualTo(nodeIp.replace('.', '_') + ":9042");
       }
+    }
+  }
+
+  @Test
+  public void should_connect_when_first_dns_entry_is_non_responsive() {
+    final int numberOfNodes = 2;
+    DriverConfigLoader loader =
+        new DefaultProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
+            .withStringList(
+                TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                Collections.singletonList("test.cluster.fake:9042"))
+            .build();
+
+    CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
+    try (CcmBridge ccmBridge =
+        CcmBridge.builder().withNodes(numberOfNodes).withIpPrefix("127.0.1.").build()) {
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      // Nothing is ever started on DEAD_ADDRESS, so it is the dead record.
+      MultimapHostResolverProvider.addResolverEntry("test.cluster.fake", DEAD_ADDRESS);
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      ccmBridge.create();
+      ccmBridge.start();
+
+      // ChannelFactory shuffles a name's expanded addresses per connection attempt, so whether the
+      // dead record is dialed first is a coin toss (about 1 in 3 here). Every session must connect
+      // either way; the loop hunts for an iteration that demonstrably dialed the dead record first
+      // and fell through to a live one, which is the behavior this test exists to pin down.
+      // Twenty misses in a row would have probability (2/3)^20, about 0.03%.
+      boolean sawFallback = false;
+      for (int attempt = 0; attempt < 20 && !sawFallback; attempt++) {
+        try (CqlSession session = builder.build()) {
+          waitForAllNodesUp(session, numberOfNodes);
+          ResultSet rs = session.execute("select * from system.local where key='local'");
+          assertThat(rs).isNotNull();
+          List<Row> rows = rs.all();
+          assertThat(rows).hasSize(1);
+          Collection<Node> nodes = session.getMetadata().getNodes().values();
+          assertThat(nodes).hasSize(numberOfNodes);
+        }
+        sawFallback =
+            channelFactoryLogMessages().stream()
+                .anyMatch(
+                    message ->
+                        message.contains(DEAD_ADDRESS) && message.contains("trying next address"));
+      }
+
+      // The connections above only survived a dead-first ordering because the candidate loop moved
+      // past the dead record.
+      assertThat(sawFallback)
+          .as(
+              "expected at least one connection attempt to dial %s first and fall through",
+              DEAD_ADDRESS)
+          .isTrue();
     }
   }
 
@@ -119,7 +245,6 @@ public class MockResolverIT {
     final int numberOfNodes = 3;
     DriverConfigLoader loader =
         new DefaultProgrammaticDriverConfigLoaderBuilder()
-            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
             .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
             .withStringList(
                 TypedDriverOption.CONTACT_POINTS.getRawOption(),
@@ -152,12 +277,14 @@ public class MockResolverIT {
       while (iterator.hasNext()) {
         LOG.trace("Metadata node: " + iterator.next().toString());
       }
-      Set<Node> filteredNodes;
-      filteredNodes =
-          nodes.stream()
-              .filter(x -> x.toString().contains("test.cluster.fake"))
-              .collect(Collectors.toSet());
-      assertThat(filteredNodes).hasSize(1);
+      // Exactly one node -- the one the control connection came up on -- still names the contact
+      // point. It is the endpoint's *label* rather than its identity: the node is identified by the
+      // address the connection reached (see should_connect_with_mocked_hostname), while the label
+      // is
+      // what TLS and Kerberos read. Re-resolution itself no longer depends on any node holding the
+      // name: MetadataManager retains the contact points, and the control-connection reconnection
+      // fallback re-offers them.
+      assertThat(nodesNamingTheContactPoint(nodes)).hasSize(1);
     }
     try (CcmBridge ccmBridge =
         CcmBridge.builder().withNodes(numberOfNodes).withIpPrefix("127.0.1.").build()) {
@@ -175,21 +302,35 @@ public class MockResolverIT {
       while (iterator.hasNext()) {
         LOG.trace("Metadata node: " + iterator.next().toString());
       }
-      Set<Node> filteredNodes;
-      filteredNodes =
-          nodes.stream()
-              .filter(x -> x.toString().contains("test.cluster.fake"))
-              .collect(Collectors.toSet());
-      if (filteredNodes.size() == 0) {
+      Set<Node> filteredNodes = nodesNamingTheContactPoint(nodes);
+      if (filteredNodes.isEmpty()) {
         LOG.error(
-            "No metadata node with \"test.cluster.fake\" substring. The unresolved endpoint socket was likely "
-                + "replaced with resolved one.");
+            "No metadata node whose endpoint is labelled \"test.cluster.fake\". The label was likely "
+                + "dropped when the endpoint was rebuilt.");
       } else if (filteredNodes.size() > 1) {
         fail(
-            "Somehow there is more than 1 node in metadata with unresolved hostname. This should not ever happen.");
+            "Somehow there is more than 1 node in metadata labelled with the contact point. This should not ever happen.");
       }
     }
     session.close();
+  }
+
+  /**
+   * The nodes whose endpoint carries the contact-point name as its host string.
+   *
+   * <p>Deliberately not {@code toString().contains(...)}: a node is identified by the address the
+   * connection reached, so the name lives on as the endpoint's <i>label</i> -- what the SSL engine
+   * and the Kerberos service name read -- rather than in its identity.
+   */
+  private static Set<Node> nodesNamingTheContactPoint(Collection<Node> nodes) {
+    return nodes.stream()
+        .filter(
+            node -> {
+              SocketAddress resolved = node.getEndPoint().resolve();
+              return resolved instanceof InetSocketAddress
+                  && "test.cluster.fake".equals(((InetSocketAddress) resolved).getHostString());
+            })
+        .collect(Collectors.toSet());
   }
 
   @SuppressWarnings("unused")
@@ -206,7 +347,6 @@ public class MockResolverIT {
   public void cannot_reconnect_with_resolved_socket() {
     DriverConfigLoader loader =
         new DefaultProgrammaticDriverConfigLoaderBuilder()
-            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
             .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
             .withStringList(
                 TypedDriverOption.CONTACT_POINTS.getRawOption(),
@@ -239,10 +379,7 @@ public class MockResolverIT {
       while (iterator.hasNext()) {
         LOG.trace("Metadata node: " + iterator.next().toString());
       }
-      filteredNodes =
-          nodes.stream()
-              .filter(x -> x.toString().contains("test.cluster.fake"))
-              .collect(Collectors.toSet());
+      filteredNodes = nodesNamingTheContactPoint(nodes);
       assertThat(filteredNodes).hasSize(1);
     }
     int counter = 0;
@@ -272,10 +409,7 @@ public class MockResolverIT {
         while (iterator.hasNext()) {
           LOG.trace("Metadata node: " + iterator.next().toString());
         }
-        filteredNodes =
-            nodes.stream()
-                .filter(x -> x.toString().contains("test.cluster.fake"))
-                .collect(Collectors.toSet());
+        filteredNodes = nodesNamingTheContactPoint(nodes);
         if (filteredNodes.size() > 1) {
           fail(
               "Somehow there is more than 1 node in metadata with unresolved hostname. This should not ever happen.");
