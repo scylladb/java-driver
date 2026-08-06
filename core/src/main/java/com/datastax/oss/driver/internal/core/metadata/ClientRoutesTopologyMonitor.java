@@ -35,6 +35,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -313,6 +314,19 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                   }
                   UUID hostId = Objects.requireNonNull(row.getUuid("host_id"));
                   String address = Objects.requireNonNull(row.getString("address"));
+                  // Emptiness is checked separately from nullity, because isNull() above is
+                  // false for an empty string while ClientRouteRecord's constructor rejects one.
+                  // Like the port range check further down, this is about the diagnostic rather
+                  // than about containment -- the catch around the construction is what keeps one
+                  // bad row from costing the whole refresh -- and it names the column, which the
+                  // constructor's message cannot.
+                  if (address.isEmpty()) {
+                    LOG.error(
+                        "[{}] Skipping client route for host_id={}: address column is empty",
+                        logPrefix,
+                        hostId);
+                    continue;
+                  }
 
                   // Select port based on SSL configuration at record creation time.
                   // Skip the record if the required port column is absent.
@@ -332,6 +346,26 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                         useSSL ? "tls_port" : "port");
                     continue;
                   }
+                  // Range-checked here so that the row is skipped with a diagnostic rather
+                  // than thrown out of this loop: ClientRouteRecord's constructor rejects the same
+                  // range, and its IllegalArgumentException would escape the enclosing
+                  // thenAccept() -- see the catch around the construction below for what that
+                  // costs. The check earns its place by naming the offending column, which the
+                  // constructor cannot.
+                  //
+                  // Zero is rejected here as it is there: it is the "any port" sentinel, never
+                  // something a node can be reached on.
+                  if (effectivePort <= 0 || effectivePort > 65535) {
+                    LOG.error(
+                        "[{}] Skipping client route for host_id={} ({}): "
+                            + "port column ({}) is out of range: {}",
+                        logPrefix,
+                        hostId,
+                        address,
+                        useSSL ? "tls_port" : "port",
+                        effectivePort);
+                    continue;
+                  }
 
                   // Apply connectionAddr override if configured for this connection_id
                   String connId =
@@ -340,12 +374,34 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                           : null;
                   if (connId != null) {
                     String override = connectionAddrOverrides.get(connId);
+                    // Not re-validated: ClientRouteProxy's constructor already rejects an empty or
+                    // blank override, one carrying a port, and one with characters no hostname or
+                    // IP address has, so anything in this map is at least as usable as the column
+                    // it replaces.
                     if (override != null) {
                       address = override;
                     }
                   }
 
-                  newRoutes.put(hostId, new ClientRouteRecord(hostId, address, effectivePort));
+                  // Guarded even though every argument has just been validated: this loop runs
+                  // inside thenAccept(), so an IllegalArgumentException escaping it skips the
+                  // resolvedRoutesCache.set() below and discards every route parsed in this pass --
+                  // not just this row. The cache then keeps its previous contents (empty, before
+                  // the first successful refresh) while the offending row stays in the table, so
+                  // every later refresh fails the same way and client routing is off for the whole
+                  // cluster. A backstop for whatever ClientRouteRecord validates next, so that the
+                  // blast radius of one bad row stays one row.
+                  try {
+                    newRoutes.put(hostId, new ClientRouteRecord(hostId, address, effectivePort));
+                  } catch (IllegalArgumentException e) {
+                    LOG.error(
+                        "[{}] Skipping unusable client route for host_id={} ({}:{}): {}",
+                        logPrefix,
+                        hostId,
+                        address,
+                        effectivePort,
+                        e.getMessage());
+                  }
                 }
 
                 if (isTargetedRefresh) {
@@ -465,6 +521,22 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       @NonNull AdminRow row,
       @Nullable InetSocketAddress broadcastRpcAddress,
       @NonNull EndPoint localEndPoint) {
+    EndPoint fallback = super.buildNodeEndPoint(row, broadcastRpcAddress, localEndPoint);
+    if (fallback instanceof ClientRoutesEndPoint) {
+      // The system.local row: the superclass hands back the control channel's own endpoint, which
+      // here is already one of these -- and a pinned one, since ChannelFactory binds the channel's
+      // endpoint to the address it reached. Nesting it would make this endpoint's route-less
+      // fallback a frozen proxy IP instead of a static address, and would add one level per control
+      // reconnect, each retaining a topology monitor and an O(depth) walk in resolve(). Take that
+      // instance's own fallback, which is the static endpoint the chain is supposed to bottom out
+      // at.
+      fallback = ((ClientRoutesEndPoint) fallback).getFallbackEndPoint();
+    }
+    // Unwrapped before the host-id check below, not after it. Returning the superclass's answer
+    // raw would hand back that same pinned ClientRoutesEndPoint, whose equals/hashCode, metric
+    // prefix and toString all name the control node -- so a row the driver could not identify
+    // would come back wearing another node's identity, and resolve() would be frozen on the proxy
+    // IP that connection reached.
     UUID hostId = row.getUuid("host_id");
     if (hostId == null) {
       LOG.warn(
@@ -473,9 +545,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
               + "Falling back to default endpoint resolution.",
           logPrefix,
           broadcastRpcAddress);
-      return super.buildNodeEndPoint(row, broadcastRpcAddress, localEndPoint);
+      return fallback;
     }
-    EndPoint fallback = super.buildNodeEndPoint(row, broadcastRpcAddress, localEndPoint);
     InetAddress broadcastInetAddress = null;
     if (broadcastRpcAddress != null) {
       broadcastInetAddress = broadcastRpcAddress.getAddress();
@@ -497,8 +568,32 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     // static, already-resolved fallback endpoint instead. Only report true when every
     // currently-known node actually has a live route; otherwise the contact-point reconnection
     // fallback must stay available for the nodes stuck on that fallback.
+    //
+    // "Every known node" has to mean at least one: with an empty node set the loop below would
+    // report true vacuously, suppressing the contact-point fallback at the one moment it is the
+    // only
+    // way back -- before the first node refresh, or after the monitor has removed everything. (The
+    // caller happens to exempt an empty query plan as well, but that is a separate safety net and
+    // this must not depend on it.)
+    //
+    // The answer legitimately changes as route coverage does, so successive reconnection rounds can
+    // see different values: that tracks reality rather than flapping. The scan is O(nodes) and runs
+    // once per reconnection attempt, against an in-memory map.
+    //
+    // A closed monitor re-resolves nothing at all: resolve() throws IllegalStateException from the
+    // `closed` guard above, and ClientRoutesEndPoint#resolve() catches that and silently returns
+    // the static fallback endpoint. Every cached route is therefore inert, so answering from the
+    // cache alone would keep reporting true and suppress the contact-point fallback for any
+    // reconnection racing session shutdown.
+    if (closed) {
+      return false;
+    }
+    Collection<Node> nodes = context.getMetadataManager().getMetadata().getNodes().values();
+    if (nodes.isEmpty()) {
+      return false;
+    }
     Map<UUID, ClientRouteRecord> routes = resolvedRoutesCache.get();
-    for (Node node : context.getMetadataManager().getMetadata().getNodes().values()) {
+    for (Node node : nodes) {
       if (!routes.containsKey(node.getHostId())) {
         return false;
       }

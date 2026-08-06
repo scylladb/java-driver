@@ -607,7 +607,15 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_AGREEMENT_WARN =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, GenericType.BOOLEAN);
-  /** Whether to forcibly try original contacts if no live nodes are available */
+  /**
+   * Whether to append the original contact points to the control-connection reconnection plan,
+   * after the live nodes reported by the load balancing policy (defaults to {@code true}).
+   *
+   * <p>Contact points are appended as-is (unresolved hostnames); each is expanded to all of its
+   * current DNS IPs at connection time, which is also the driver's DNS re-resolution mechanism. The
+   * append is skipped for topology monitors that re-resolve node addresses themselves (such as the
+   * cloud/proxy monitors).
+   */
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, GenericType.BOOLEAN);

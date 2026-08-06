@@ -708,8 +708,29 @@ public enum DefaultDriverOption implements DriverOption {
   CONTROL_CONNECTION_AGREEMENT_WARN("advanced.control-connection.schema-agreement.warn-on-failure"),
 
   /**
-   * Whether to forcibly add original contact points held by MetadataManager to the reconnection
-   * plan, in case there is no live nodes available according to LBP. Experimental.
+   * Whether to append the original contact points held by MetadataManager to the reconnection plan,
+   * after the live nodes reported by the load balancing policy. Defaults to {@code true}.
+   *
+   * <p>This is also the driver's DNS re-resolution path, for the ordinary case. Contact points are
+   * appended as-is, still unresolved hostnames, and each is expanded to its current DNS IPs at
+   * connection time through Netty's configured resolver. Metadata nodes, in contrast, hold an
+   * already-resolved endpoint that is never re-resolved. Keeping this enabled lets
+   * control-connection reconnects re-resolve the original hostnames and pick up new IPs once the
+   * live-node plan is exhausted.
+   *
+   * <p>Not the only path, though, and for two kinds of deployment it is barely a path at all: an
+   * {@code AddressTranslator} that returns a hostname keeps every node's endpoint unresolved, and a
+   * Cloud (SNI) session builds every endpoint as an {@code SniEndPoint}, which does the same. Both
+   * re-expand on every attempt whatever this is set to -- and for Cloud the append is skipped
+   * anyway unless the live-node plan is empty, since {@link
+   * com.datastax.oss.driver.internal.core.metadata.TopologyMonitor#reresolvesNodeAddresses()} is
+   * true there. Turning it off then removes only the empty-plan fallback.
+   *
+   * <p>A client-routes session is not a third case, though it looks like one. Its endpoints
+   * re-expand only for nodes that have a live route; a route-less node falls back to a static,
+   * already-resolved address, which is why {@code reresolvesNodeAddresses()} answers true there
+   * only while every known node has a route. Below full coverage the contact points are appended as
+   * usual and this option is the only re-resolution those nodes get.
    *
    * <p>Value-type: boolean
    */

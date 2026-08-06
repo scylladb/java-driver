@@ -188,6 +188,12 @@ public class MetadataManager implements AsyncAutoCloseable {
    * they are never added to metadata and never exposed to user-facing APIs (events, {@link
    * com.datastax.oss.driver.api.core.metadata.Metadata#getNodes()}, or {@link
    * com.datastax.oss.driver.api.core.metadata.NodeStateListener} callbacks).
+   *
+   * <p>The metadata node stores {@code nodeInfo.getEndPoint()} as-is and never re-resolves it on
+   * its own. Re-resolving the original contact-point hostname to pick up current DNS only happens
+   * through the original-contact-point reconnection fallback (see {@code
+   * advanced.control-connection.reconnection.fallback-to-original-contact-points}), which re-enters
+   * the contact points and lets {@code ChannelFactory} expand each hostname at connection time.
    */
   public CompletionStage<Node> registerNode(NodeInfo nodeInfo) {
     Preconditions.checkNotNull(nodeInfo.getHostId(), "Cannot register node without hostId");

@@ -117,6 +117,11 @@ public class ClientRoutesTopologyMonitorTest {
       return capturedQueries.get(capturedQueries.size() - 1);
     }
 
+    EndPoint buildNodeEndPointForTest(
+        AdminRow row, InetSocketAddress broadcastRpcAddress, EndPoint localEndPoint) {
+      return buildNodeEndPoint(row, broadcastRpcAddress, localEndPoint);
+    }
+
     @Override
     @NonNull
     protected CompletionStage<AdminResult> runAdminQuery(
@@ -172,6 +177,33 @@ public class ClientRoutesTopologyMonitorTest {
   @Test
   public void should_return_null_for_unknown_host_id() throws UnknownHostException {
     assertThat(handler.resolve(UUID.randomUUID())).isNull();
+  }
+
+  // ---- buildNodeEndPoint() ---------------------------------------------
+
+  @Test
+  public void should_not_nest_a_client_routes_endpoint_as_its_own_fallback() {
+    // For the system.local row the superclass hands back the control channel's own endpoint, which
+    // in a client-routes deployment is already a ClientRoutesEndPoint -- and a *pinned* one, since
+    // ChannelFactory binds the channel's endpoint to the address it reached. Nesting it would make
+    // this endpoint's route-less fallback a frozen proxy IP instead of the static address the chain
+    // is supposed to bottom out at, and would add a level per control reconnect, each retaining a
+    // topology monitor and an O(depth) walk in resolve().
+    UUID hostId = UUID.randomUUID();
+    EndPoint staticFallback = new DefaultEndPoint(new InetSocketAddress("10.0.0.1", 9042));
+    EndPoint channelEndPoint =
+        new ClientRoutesEndPoint(handler, hostId, null, staticFallback)
+            .pinTo(new InetSocketAddress("192.168.0.1", 9042));
+    AdminRow localRow = Mockito.mock(AdminRow.class);
+    when(localRow.contains("peer")).thenReturn(false);
+    when(localRow.getUuid("host_id")).thenReturn(hostId);
+
+    EndPoint built = handler.buildNodeEndPointForTest(localRow, null, channelEndPoint);
+
+    assertThat(built).isInstanceOf(ClientRoutesEndPoint.class);
+    assertThat(((ClientRoutesEndPoint) built).getFallbackEndPoint())
+        .isNotInstanceOf(ClientRoutesEndPoint.class)
+        .isSameAs(staticFallback);
   }
 
   @Test
@@ -274,12 +306,40 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
-  public void should_reresolve_when_no_nodes_known_yet() {
+  public void should_not_reresolve_when_no_nodes_are_known_yet() {
+    // "Every known node has a route" is vacuously true of an empty set, and answering yes there
+    // suppresses the contact-point reconnection fallback at the one moment it is the only way back:
+    // before the first node refresh, or after this monitor has removed every node. There is nothing
+    // for the monitor to keep fresh, so it must not claim it is keeping anything fresh.
     when(context.getMetadataManager()).thenReturn(metadataManager);
     when(metadataManager.getMetadata()).thenReturn(metadata);
     when(metadata.getNodes()).thenReturn(Collections.emptyMap());
 
+    assertThat(handler.reresolvesNodeAddresses()).isFalse();
+  }
+
+  @Test
+  public void should_not_reresolve_once_closed() throws Exception {
+    // resolve() throws IllegalStateException once the monitor is closed, and
+    // ClientRoutesEndPoint#resolve() catches that and quietly returns the static fallback -- so a
+    // closed monitor re-resolves nothing, however complete its route cache still looks. Answering
+    // from the cache alone would keep saying "yes" and suppress the contact-point fallback for a
+    // reconnection racing session shutdown.
+    UUID hostId = UUID.randomUUID();
+    Node node = Mockito.mock(Node.class);
+    when(node.getHostId()).thenReturn(hostId);
+
+    when(context.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getMetadata()).thenReturn(metadata);
+    when(metadata.getNodes()).thenReturn(ImmutableMap.of(hostId, node));
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+
+    // Every known node has a route, so this is the case that would otherwise report true.
     assertThat(handler.reresolvesNodeAddresses()).isTrue();
+
+    handler.closeAsync().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.reresolvesNodeAddresses()).isFalse();
   }
 
   // ---- Merge behavior tests -----------------------------------------------
@@ -1028,6 +1088,88 @@ public class ClientRoutesTopologyMonitorTest {
     assertThat(handler.getRoutes()).doesNotContainKey(hostId);
   }
 
+  @Test
+  public void should_skip_a_zero_port_row_without_losing_the_rest_of_the_refresh()
+      throws Exception {
+    // Port 0 passes the isNull check and is legal for InetSocketAddress.createUnresolved, so a
+    // bare `< 0` range check lets it through -- and then ClientRouteRecord's own constructor
+    // throws IllegalArgumentException("port must be between 1 and 65535"). That throw happens
+    // inside the row loop, so it takes down the *whole* refresh: every other row in the batch is
+    // discarded and the cache is left as it was, for as long as the bad row stays in the table.
+    // Skipping the one row here, with the diagnostic that names it, is exactly what this guard
+    // exists for -- so the assertion that matters is that the good row survives.
+    UUID badHostId = UUID.randomUUID();
+    UUID goodHostId = UUID.randomUUID();
+
+    AdminRow badRow = Mockito.mock(AdminRow.class);
+    when(badRow.isNull("host_id")).thenReturn(false);
+    when(badRow.isNull("address")).thenReturn(false);
+    when(badRow.isNull("port")).thenReturn(false);
+    when(badRow.getUuid("host_id")).thenReturn(badHostId);
+    when(badRow.getString("address")).thenReturn("127.0.0.1");
+    when(badRow.getInteger("port")).thenReturn(0);
+
+    AdminRow goodRow = Mockito.mock(AdminRow.class);
+    when(goodRow.isNull("host_id")).thenReturn(false);
+    when(goodRow.isNull("address")).thenReturn(false);
+    when(goodRow.isNull("port")).thenReturn(false);
+    when(goodRow.getUuid("host_id")).thenReturn(goodHostId);
+    when(goodRow.getString("address")).thenReturn("127.0.0.2");
+    when(goodRow.getInteger("port")).thenReturn(9042);
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(badRow, goodRow));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getRoutes()).doesNotContainKey(badHostId);
+    assertThat(handler.getRoutes()).containsKey(goodHostId);
+    assertThat(handler.getRoutes().get(goodHostId).getPort()).isEqualTo(9042);
+  }
+
+  @Test
+  public void should_skip_an_empty_address_row_without_losing_the_rest_of_the_refresh()
+      throws Exception {
+    // The sibling of the zero-port case above, on the field the range check does not cover.
+    // isNull("address") is false for an empty string, so the incomplete-row guard passes it
+    // through, and ClientRouteRecord's constructor then throws
+    // IllegalArgumentException("hostname must not be empty") from inside the row loop -- taking
+    // the whole refresh with it, not just this row.
+    UUID badHostId = UUID.randomUUID();
+    UUID goodHostId = UUID.randomUUID();
+
+    // The port stubs are lenient, not absent, and that distinction is what makes this test bind.
+    // The address guard runs before the port is read, so under the fix these go unused and strict
+    // stubbing rejects them -- but dropping them makes an unstubbed getInteger("port") answer null,
+    // which the "required port column is not set" guard above catches. The row would then be
+    // skipped for the wrong reason in *both* versions and the test would pass against the pristine
+    // file, proving nothing. Stubbed and lenient, the pristine code reaches the constructor.
+    AdminRow badRow = Mockito.mock(AdminRow.class);
+    when(badRow.isNull("host_id")).thenReturn(false);
+    when(badRow.isNull("address")).thenReturn(false);
+    when(badRow.getUuid("host_id")).thenReturn(badHostId);
+    when(badRow.getString("address")).thenReturn("");
+    Mockito.lenient().when(badRow.isNull("port")).thenReturn(false);
+    Mockito.lenient().when(badRow.getInteger("port")).thenReturn(9042);
+
+    AdminRow goodRow = Mockito.mock(AdminRow.class);
+    when(goodRow.isNull("host_id")).thenReturn(false);
+    when(goodRow.isNull("address")).thenReturn(false);
+    when(goodRow.isNull("port")).thenReturn(false);
+    when(goodRow.getUuid("host_id")).thenReturn(goodHostId);
+    when(goodRow.getString("address")).thenReturn("127.0.0.2");
+    when(goodRow.getInteger("port")).thenReturn(9042);
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(badRow, goodRow));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getRoutes()).doesNotContainKey(badHostId);
+    assertThat(handler.getRoutes()).containsKey(goodHostId);
+    assertThat(handler.getRoutes().get(goodHostId).getPort()).isEqualTo(9042);
+  }
+
   // ---- Empty-result cache guard tests ------------------------------------
 
   @Test
@@ -1116,6 +1258,28 @@ public class ClientRoutesTopologyMonitorTest {
     // hostId == null branch → super.buildNodeEndPoint() is called → returns localEndPoint
     assertThat(result).isNotInstanceOf(ClientRoutesEndPoint.class);
     assertThat(result).isSameAs(localEndPoint);
+  }
+
+  @Test
+  public void should_not_give_an_unidentified_row_the_control_node_identity() {
+    // The same null host_id, but on the system.local row of a deployment whose control channel has
+    // already been pinned. The superclass hands back that channel's endpoint, which is a *pinned*
+    // ClientRoutesEndPoint: its equals/hashCode key off the host id alone, its metric prefix and
+    // toString name that node, and its resolve() is frozen on the proxy IP that connection
+    // reached. Returning it for a row the driver could not identify would hand back another node's
+    // identity, and the route cache would never be consulted for it again.
+    UUID controlNodeId = UUID.randomUUID();
+    EndPoint staticFallback = new DefaultEndPoint(new InetSocketAddress("10.0.0.1", 9042));
+    EndPoint channelEndPoint =
+        new ClientRoutesEndPoint(handler, controlNodeId, null, staticFallback)
+            .pinTo(new InetSocketAddress("192.168.0.1", 9042));
+    AdminRow localRow = Mockito.mock(AdminRow.class);
+    when(localRow.contains("peer")).thenReturn(false);
+    when(localRow.getUuid("host_id")).thenReturn(null);
+
+    EndPoint built = handler.buildNodeEndPointForTest(localRow, null, channelEndPoint);
+
+    assertThat(built).isNotInstanceOf(ClientRoutesEndPoint.class).isSameAs(staticFallback);
   }
 
   @Test
