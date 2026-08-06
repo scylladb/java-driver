@@ -61,6 +61,309 @@ Binary compatibility is unaffected — an already-compiled subclass keeps workin
 override either method, you have to widen your override to `public` in order to recompile: Java does
 not allow an override to reduce visibility.
 
+#### Contact points are expanded to all their DNS addresses at connection time
+
+Contact points backed by a hostname are now kept unresolved and expanded to **all** the IP
+addresses the hostname maps to, at connection time. Previously only the first address returned by
+DNS was tried, so a single non-responsive IP behind a multi-record hostname could fail the initial
+connection (or a control-connection reconnect) even when the other addresses were healthy. No
+configuration change is required to benefit from this.
+
+The expansion goes through Netty's configured `AddressResolverGroup`, which is the resolver an
+unresolved address already reached when it was handed to `Bootstrap.connect()`. A custom resolver
+installed through `NettyOptions.afterBootstrapInitialized()` therefore keeps working; note that the
+driver now calls `resolveAll()` on it, where previously `Bootstrap.connect()` called `resolve()`.
+Every resolver built on Netty's own base classes implements both. As before, with Netty's default
+(JDK) resolver the lookup blocks the I/O event loop it runs on — install `DnsAddressResolverGroup`
+for non-blocking resolution.
+
+`Bootstrap.disableResolver()` is still honored, in the sense that the driver resolves nothing and
+passes the address through as-is. That now requires the address to be usable as-is, which is a
+narrower contract than before: contact-point hostnames are always kept unresolved, and the Cloud/SNI
+proxy address and client-route hostnames no longer resolve themselves either, so with resolution
+disabled none of them can connect. The driver fails such an attempt with a message naming the
+address and the reason, rather than the bare `UnresolvedAddressException` Netty would otherwise
+raise. If you disable the resolver, supply already-resolved addresses.
+
+The same now applies to the two other address sources that used to perform their own JVM DNS lookups:
+the Cloud/SNI proxy address and client-route hostnames are expanded by the connection layer too. A
+custom Netty resolver applies to them for the first time, and a proxy hostname with several A-records
+has all of them tried within a single connection attempt.
+
+There is **no public API change**: `EndPoint.resolve()` keeps its signature and is not deprecated.
+Third-party `EndPoint` implementations keep working unchanged, with one new expectation — an
+implementation should return its address as-is rather than looking names up itself, since resolution
+now happens in the connection layer and `resolve()` is called from an event loop.
+
+**If you call `node.getEndPoint().resolve()` yourself, check how you read the host.** Because
+resolution moved to the connection layer, that address is no longer always resolved:
+
+| Deployment | `resolve()` returns |
+| --- | --- |
+| Nodes discovered from `system.peers`, and the node the control connection is on | resolved, as before |
+| Nodes whose address came from an `AddressTranslator` that returns a name | that name, **unresolved** |
+| Cloud / SNI proxy | the configured proxy hostname, **unresolved** |
+| Cloud private-endpoint client routes (nodes that have a route) | the route hostname, **unresolved** |
+
+The second row catches more deployments than it looks: `SubnetAddressTranslator` returns names under
+its default `advanced.address-translator.resolve-addresses = false`, so peers reached through it are
+unresolved even though the first row says otherwise for peers in general.
+
+For every row marked **unresolved** — the last three — `InetSocketAddress.getAddress()` now returns
+`null`, so a call such as
+`((InetSocketAddress) node.getEndPoint().resolve()).getAddress().getHostAddress()` throws a
+`NullPointerException` where it previously worked. Use `getHostString()` instead: it returns
+whichever of a hostname or an IP literal the address carries, for both the resolved and the
+unresolved case, and never triggers a reverse lookup.
+
+Only part of the second row is new. `SubnetAddressTranslator` already returned an unresolved address
+before this release, so code that survived it is unaffected; `FixedHostNameAddressTranslator` and
+`Ec2MultiRegionAddressTranslator` used to return resolved addresses and no longer do, so that call
+worked on every prior release under those two and now throws.
+
+As part of this change:
+
+- `advanced.resolve-contact-points` is deprecated and now has **no effect**; setting it to `true`
+  logs a warning at startup. Contact points are always kept as unresolved hostnames and expanded at
+  connection time. An already-resolved `InetSocketAddress` passed programmatically is still used as
+  provided, with no further expansion.
+
+  If you had set it to `true`, note what that setting used to buy you, since the driver no longer
+  offers it: each address a contact-point hostname resolved to became its own `Node`, so each had
+  its own entry in `Metadata.getNodes()` and its own node-level metrics, and the load balancing
+  policy's query plan advanced address by address. A hostname is now a single `Node`, and its
+  addresses are tried inside one connection attempt. Resolution
+  also used to happen once, at startup; it now happens per connection attempt, through Netty's
+  configured resolver, which is what lets the driver pick up changed DNS records — but it means the
+  resolver is consulted far more often than before, so the JVM DNS cache settings
+  (`networkaddress.cache.ttl`) matter more than they used to.
+- **The node the control connection is on is identified by the address it is connected to, not by
+  the contact point it was reached through.** This shows up in node-level metrics: with a
+  hostname contact point, the node the control connection came up on used to report under a prefix
+  derived from that hostname (`nodes.cluster_example_com:9042.*`, and the `node` tag likewise) —
+  which was never really its own name, since any node can end up being the one a contact point
+  reaches. It now reports under its own address, like every other node
+  (`nodes.10_0_0_2:9042.*`). If you scraped a node series named after your contact-point hostname,
+  expect it to move once, to that node's address. Nothing to configure. With
+  `TaggingMetricIdGenerator` the `node` tag moves the same way, from `cluster.example.com:9042` to
+  `/10.0.0.2:9042` — the form the driver already uses for nodes discovered from `system.peers`.
+  What does **not** change is what the node connects to: its endpoint still resolves to that
+  address carrying the name you configured, so TLS hostname verification still sees
+  `cluster.example.com` without a reverse-DNS lookup. The Kerberos service name is the exception,
+  and behaves exactly as it did before this change rather than better: `DseGssApiAuthProvider`
+  builds the service principal from `InetAddress.getCanonicalHostName()`, which consults the name
+  service and ignores the label the address carries.
+- `advanced.control-connection.reconnection.fallback-to-original-contact-points` now defaults to
+  `true` (previously `false`). This is also the driver's DNS re-resolution path: a metadata node
+  normally holds an address decoded from the peers table, which is already resolved and so never
+  picks up a DNS change, and falling back to the original contact points on control-connection
+  reconnect is what re-reads the records once the live-node plan is exhausted. (The exception is an
+  `AddressTranslator` that returns a hostname — `SubnetAddressTranslator` does, unless you set
+  `advanced.address-translator.resolve-addresses = true`. Such an endpoint is re-expanded on every
+  connection attempt like any other name, so its node is not pinned to one address in the first
+  place. Its addresses are tried in the resolver's own order rather than shuffled — see below — so
+  its channels stay on one address in practice, but if that name maps to more than one host the
+  driver has no way to tell.) Setting it to `false` does **not** restore the previous behavior — it
+  leaves the session with no DNS re-resolution at all, which is less than either 4.19 or the
+  default here. Before this release the control connection's own node kept the contact point's
+  unresolved hostname, so every reconnect and every one of its pool connections re-read DNS with no
+  option involved; that node is now registered under the address it actually reached (see the
+  metric-prefix note above), so the contact-point fallback is the only path left. Set it to `false`
+  only when your contact points are IP literals, or when their records never change. (Two
+  deployments are exempt from all of this, because their endpoints are unresolved to begin with and
+  re-expand per attempt whatever the option says: an `AddressTranslator` that returns a hostname,
+  and a Cloud (SNI) session, whose `SniEndPoint`s keep the proxy name. For Cloud the append is
+  skipped unless the live-node plan is empty, so neither the benefit nor the cost below applies. A
+  **client-routes session is not exempt**: its endpoints re-expand only for nodes that currently
+  have a route, and a route-less node falls back to a static, already-resolved address, so the
+  driver treats such a session as self-re-resolving only while every known node has a route. Below
+  that, the contact points are appended as usual and this option is the only DNS re-resolution the
+  route-less nodes get — so `false` costs them more there than anywhere else.) Note the cost
+  of leaving it on: the contact points are appended without being compared against the live-node
+  plan (at plan time
+  they are still hostnames, while the live nodes are already-resolved IPs), so when DNS has not
+  changed a reconnection round that exhausts the live nodes retries them a second time. How much
+  that adds depends on how many addresses each contact point resolves to — a live node is one
+  address, a contact point is expanded to up to `advanced.connection.max-candidate-addresses` of
+  them — so three contact points can append up to 15 serial attempts to a round, not 3, with the
+  control connection down for the whole of it. Each of those attempts also carries an identity
+  read, because an appended contact point is an unidentified node: one `SELECT * FROM system.local`
+  per candidate address, bounded by `advanced.control-connection.timeout`, which additionally
+  discards the column projection learned from the previous control node.
+- **`FixedHostNameAddressTranslator` now returns the advertised hostname unresolved.** It used to
+  build `new InetSocketAddress(advertisedHostname, port)`, which resolves eagerly, and a resolved
+  address is passed straight through the connection layer — so every node in the cluster was pinned
+  to whichever single IP the JVM happened to return first, and no other address of the proxy was
+  ever tried. The name is now expanded per connection attempt like any other, so a proxy hostname
+  with several A-records fails over between them. The addresses are tried in the resolver's own
+  order rather than shuffled, since the translator makes no claim that they are interchangeable.
+  Two consequences worth knowing: `node.getEndPoint().resolve()` for these nodes now returns an
+  unresolved address (see the table above), and the DNS records are re-read on every connection
+  attempt instead of once at startup, so `networkaddress.cache.ttl` applies. A third, if you also
+  read schema metadata: with the peers unresolved and the control node's endpoint resolved,
+  `Metadata.findNode(EndPoint)` compares the two forms and resolves the unresolved side inline, so
+  a schema refresh costs one lookup per node. It logs a one-time warning naming
+  [#1006](https://github.com/scylladb/java-driver/issues/1006). One node is exempt from the
+  fail-over above: the node the control connection is on is registered under the address that
+  connection reached (see the metric-prefix note), so its own pool stays on that address until the
+  control connection moves and the node is re-derived from `system.peers`. Recovering an address
+  change for it is what the contact-point reconnection fallback is for.
+
+  And a fourth, if you use the **tagging** metric id generator: `TaggingMetricIdGenerator` tags node
+  metrics with `node.getEndPoint().toString()`, which for these nodes moves from
+  `advertised.host/10.0.0.1:9042` to `advertised.host:9042` — and to
+  `advertised.host/<unresolved>:9042` on JDK 14 and later, since
+  [JDK-8225499](https://bugs.openjdk.org/browse/JDK-8225499) changed how an unresolved
+  `InetSocketAddress` renders. So every Micrometer or MicroProfile node series is re-tagged on
+  upgrade, and the tag differs between a JDK 11 and a JDK 17 runtime of the same driver version.
+  The default `DefaultMetricIdGenerator` is not affected: `asMetricPrefix()` reduces the endpoint to
+  host string plus port, which is the same either way.
+- **`Ec2MultiRegionAddressTranslator` now returns the domain name unresolved**, for the same reason
+  and with the same consequences. The reverse (PTR) lookup that finds the name is unchanged, and the
+  translator still checks that the name resolves before handing it over — a PTR record whose target
+  has no A-record is answered with the node's original address, exactly as before. What moves into
+  the connection attempt is the choice of address, so a domain name with several A-records now fails
+  over between them instead of being pinned to the first.
+- **DSE Insights reports contact points by name, not by resolved address.** With contact points kept
+  unresolved, the startup event's `contact_points` map goes from `{"db.example.com":
+  ["10.0.0.1:9042", "10.0.0.2:9042"]}` to `{"db.example.com": ["db.example.com:9042"]}`, and the
+  address the session actually connected to is still reported under `initial_control_connection`.
+  The driver does not resolve the names to fill the map back in: that would mean a blocking DNS
+  lookup per contact point on the admin executor, which is the thread this release worked to keep
+  name lookups off.
+
+  For the same reason the map is now keyed on the host **string** rather than the host **name**.
+  Those differ for a contact point supplied as a resolved `InetSocketAddress` carrying no label —
+  which includes `new InetSocketAddress("10.0.0.1", 9042)`, since an IP literal sets no host name.
+  Such a contact point used to be reported under its reverse-DNS (PTR) name and is now reported
+  under the literal, so a `127.0.0.1` contact point that used to appear as `localhost` appears as
+  `127.0.0.1`. That also removes a reverse lookup per such contact point from the admin executor,
+  repeated at every `advanced.monitor-reporting` interval.
+- **A contact point that no address can identify is now marked down before the connection attempt
+  completes.** Establishing which node answered — reading `host_id` from `system.local` — happens
+  while the driver still holds the hostname's other addresses, so a candidate address that cannot
+  identify itself is rejected like any other per-address failure and the next address of the same
+  hostname is tried. When every address has been tried and none worked, the driver fires the same
+  `controlConnectionFailed` event and node-down state change that a refused TCP connection
+  produces, where previously it moved on to the next contact point without either. Nothing to
+  change on your side; expect the DOWN event and its log line in a case that used to be silent.
+- **One failed connection attempt can now increment two error metrics.** A node whose endpoint is a
+  name — an SNI/cloud proxy, a client route, or an `AddressTranslator` with
+  `resolve-addresses = false` — reports a single failure for the whole attempt, with the other
+  addresses' failures attached as suppressed exceptions. When that attempt mixes an authentication
+  failure with transport failures, both `errors.connection.init` and `errors.connection.auth` are
+  incremented for it: counting only the promoted failure would have left `errors.connection.init` at
+  zero while most of the node was unreachable, and counting only the transport ones would have made
+  `errors.connection.auth` unobservable for these deployments, since connection setup is its only
+  writer. If you sum the two counters to get "failed attempts", or divide one by the other, expect
+  the total to exceed the number of attempts on exactly those deployments.
+- **A Cloud proxy given as an IP literal is no longer validated against its reverse-DNS name.**
+  `advanced.ssl-engine-factory.allow-dns-reverse-lookup-san` used to reach a PTR lookup for a proxy
+  configured as `withCloudProxyAddress(new InetSocketAddress("203.0.113.10", 9042))`, because the
+  addresses the driver resolved carried no hostname label. The connection layer now labels every
+  candidate before the SSL engine sees it, so the certificate is checked against the literal and
+  needs an `iPAddress` SAN; a proxy certificate carrying only a DNS SAN for the reverse name will
+  fail the handshake with "No subject alternative names matching IP address … found". Configure the
+  proxy by hostname (what secure connect bundles do) to keep DNS-SAN validation. Proxies configured
+  by hostname are unaffected — those lookups already carried the queried name, so the option made no
+  difference there either.
+- **`AllNodesFailedException` groups a hostname's failures.** A contact point that resolves to
+  several addresses contributes one entry per contact point rather than per address, with each
+  address's failure attached to it as a suppressed exception. If you inspect
+  `AllNodesFailedException.getAllErrors()`, expect fewer entries carrying more detail; the underlying
+  causes are all still reachable through `Throwable.getSuppressed()`.
+- **A name's addresses are tried in random order, and at most
+  `advanced.connection.max-candidate-addresses` of them per connection attempt** (new option,
+  default 5). The shuffle spreads load across a multi-record name's addresses and varies the
+  starting address between attempts. It applies to every contact point, and to an already-identified
+  node when its addresses are interchangeable — an SNI proxy or a cloud private-endpoint route,
+  where the proxy routes by server name so all of its addresses lead to the same node. For those the
+  driver spread connections across the records before this version too, inside
+  `SniEndPoint.resolve()`. The order is kept only for a name that may denote *different* hosts,
+  which is what an `AddressTranslator` can return (`SubnetAddressTranslator` does by default): one
+  node's connection pool converges on one address there, as it did before, and the remaining
+  addresses serve as fallback. The cap applies either way
+  and bounds what one attempt can cost, since every address
+  tried is a full TCP connect plus handshake — and, with wrong credentials, a rejected login
+  (authentication failures do not stop the walk: with a multi-record name they may be specific to
+  the address, e.g. a stale record pointing at a foreign cluster). Where the order is shuffled,
+  addresses beyond the cap are
+  not lost — every attempt samples a fresh random subset, so reconnection rounds reach all of them
+  over time; where it is kept, the cap is a hard limit and records past it are not reached, which is
+  still more than the single address such a name got before. Set the option to `1` to restore
+  one-address-per-attempt behavior.
+- **The control connection can now decline a node after a successful handshake.** Once the driver
+  knows which node answered, it re-checks that node against what the load balancing policy and
+  topology events say about it, and closes the channel if it is IGNORED, forced down or removed,
+  moving on to the next entry in the plan. Previously a contact point reached this way was an
+  ephemeral object that no event had ever named, so the check found nothing and the connection was
+  kept. This matters most with the contact-point fallback above now on by default: if your contact
+  points resolve to nodes the policy excludes, expect the control connection to keep looking rather
+  than settle on one of them. The reason is recorded in the resulting `AllNodesFailedException`.
+  Worth knowing where that leaves you if the *only* reachable nodes are excluded ones — a multi-DC
+  deployment whose local DC is entirely down, where `DefaultLoadBalancingPolicy` has marked every
+  remote node IGNORED: the control connection stays down instead of parking on a remote node, so
+  topology and schema stop being refreshed for the duration. Recovery does not depend on it — the
+  connection pools keep retrying the local nodes themselves, and a successful pool connect is what
+  brings them back UP — but you will see the control connection cycling through its plan in the logs
+  for as long as the local DC is unreachable. A node that is merely `DOWN` is not affected; only
+  IGNORED, forced down and removed are.
+- If you use `TaggingMetricIdGenerator` **and** build the Cloud proxy address yourself with
+  `new InetSocketAddress("proxy-host", port)` rather than through a secure connect bundle: the
+  `node` tag for those nodes changes once. The tag is the endpoint's `toString()`, which for an SNI
+  endpoint is the proxy address followed by the node's host id, and the proxy half of it is what
+  moves:
+
+  | | Java 13 and earlier | Java 14 and later |
+  | --- | --- | --- |
+  | before | `proxy-host/1.2.3.4:9042:<host-id>` | `proxy-host/1.2.3.4:9042:<host-id>` |
+  | after | `proxy-host:9042:<host-id>` | `proxy-host/<unresolved>:9042:<host-id>` |
+
+  The two "after" forms differ because `InetSocketAddress.toString()` began marking unresolved
+  addresses with `/<unresolved>` in Java 14, and the driver now keeps the configured proxy address
+  unresolved so it can be re-expanded to every proxy A-record. The tag no longer depends on which
+  proxy IP a connection happened to land on — that stability is the point, but expect a one-time
+  series rename in dashboards, and note that the new name depends on the JDK you run. The same
+  rename applies if you passed the proxy as an IP literal (`1.2.3.4/1.2.3.4:9042:<host-id>` becomes
+  `1.2.3.4:9042:<host-id>`, or `1.2.3.4/<unresolved>:9042:<host-id>` on Java 14 and later), which is
+  stored unresolved too so that the endpoint's identity cannot change underneath it when something
+  asks the address for its reverse-DNS name. `asMetricPrefix()`, and therefore the default
+  `MetricIdGenerator`, keeps reporting the proxy address as you supplied it — with one exception. If
+  you built that address from an `InetAddress` rather than from a host string
+  (`new InetSocketAddress(InetAddress.getByName("1.2.3.4"), port)`), the prefix used to be computed
+  live and `resolve()` called `getHostName()` on that shared `InetAddress`, so from the first
+  connection onwards the prefix reported whatever reverse-DNS name came back. It now stays the
+  literal. That is the stable answer, but if a PTR record existed it is also a one-time rename.
+- For advanced deployments that provide a custom `NettyOptions`: the
+  `afterBootstrapInitialized()` hook now runs once per logical connection to a node (previously
+  once per attempt, including protocol-version downgrade retries), and it receives the bootstrap
+  *before* the driver installs its channel handler — a handler set by the hook is replaced, and
+  the driver logs a one-time warning if it detects one. An `EventLoopGroup` set by the hook is
+  likewise ignored, and likewise warned about once: every connection attempt is now bound to an
+  event loop the driver picks from `ioEventLoopGroup()`, so override that method instead if you
+  need driver I/O on your own threads. Use the hook for channel options, attributes and
+  `Bootstrap.resolver(...)`; use `afterChannelInitialized()` for pipeline customization.
+- Two `protected` methods that no longer have anything to do are removed. Both are in internal
+  packages, but they were reachable from a subclass, so a custom subclass overriding either of them
+  will no longer compile:
+  - `OptionalLocalDcHelper.checkLocalDatacenterCompatibility(String, Set)` — it warned when a
+    contact point's datacenter differed from the configured local DC, but contact-point nodes never
+    get a datacenter assigned, so it compared against `null` and warned unconditionally instead of
+    on a real mismatch. Note what goes with it: the separate "configured local DC matches no node"
+    warning is retained, but it is not the same diagnostic. If you set `local-datacenter = dc1`,
+    point every contact point at `dc2`, and the cluster does have live `dc1` nodes, that check finds
+    `dc1` among them and says nothing — so that particular misconfiguration is now silent rather
+    than reported in a different place. The deleted check could not report it either (it had no
+    datacenter to compare), which is why it goes, but the gap is real and worth naming.
+  - `ClientRoutesTopologyMonitor.resolveAddress(String)` — a test seam for the JVM DNS lookup that
+    the monitor no longer performs, now that route hostnames are resolved by the connection layer.
+- For the same reason, `ClientRoutesTopologyMonitor.resolve(UUID)` — which is `public` — no longer
+  declares `UnknownHostException`: it hands back the route hostname unresolved instead of looking it
+  up. Calls still compile, but a `catch (UnknownHostException)` wrapped around one does not, since
+  the exception is no longer throwable there. Drop the catch — widening it to `IOException` does not
+  compile either, because a catch clause for a checked exception the body cannot throw is an error
+  in its own right; only `Exception` and its supertypes are exempt from that rule.
+
 ### 4.19.0.7
 
 #### Cloud private-endpoint support via client routes
