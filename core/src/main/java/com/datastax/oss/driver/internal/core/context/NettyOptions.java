@@ -66,7 +66,33 @@ public interface NettyOptions {
 
   /**
    * A hook invoked each time the driver creates a client bootstrap in order to open a channel. This
-   * is a good place to configure any custom option on the bootstrap.
+   * is a good place to configure any custom option, attribute, or {@link
+   * Bootstrap#resolver(io.netty.resolver.AddressResolverGroup)} on the bootstrap.
+   *
+   * <p>The hook runs once per logical connection to a node. When a hostname expands to several IP
+   * addresses, the same bootstrap is shared by every per-address attempt (each attempt uses a
+   * {@link Bootstrap#clone(io.netty.channel.EventLoopGroup)} of it); likewise, protocol-version
+   * downgrade retries reuse it. Before multi-address support the hook ran once per attempt,
+   * including once per downgrade retry.
+   *
+   * <p><b>Anything the hook allocates must outlive the call.</b> Because it runs per connection, a
+   * resolver group constructed inside it — {@code bootstrap.resolver(new
+   * DnsAddressResolverGroup(...))} — is a fresh group every time: a new {@code DnsNameResolver}
+   * with its own datagram channel and its own cold cache, plus a listener registered on the I/O
+   * loop's termination future that only {@code AddressResolverGroup.close()} removes. Build the
+   * group once, hold it in a field, and hand the same instance to every bootstrap.
+   *
+   * <p>The bootstrap does <b>not</b> carry the driver's channel handler yet, and a handler
+   * installed by this hook is <b>not</b> honoured: the driver sets its own handler on each
+   * per-attempt copy afterwards (and logs a one-time warning if it overwrites one). To customize
+   * the pipeline, use {@link #afterChannelInitialized(Channel)} instead. (Before multi-address
+   * support the hook ran after the driver's handler was installed, so replacing it was technically
+   * possible; that was never a supported extension point.)
+   *
+   * <p>An {@link io.netty.channel.EventLoopGroup} set by this hook is likewise <b>not</b> honoured:
+   * {@code Bootstrap#clone(EventLoopGroup)} assigns the group unconditionally, so each per-attempt
+   * copy is bound to the loop the driver picked from {@link #ioEventLoopGroup()}. Configure the
+   * group there instead.
    */
   void afterBootstrapInitialized(Bootstrap bootstrap);
 

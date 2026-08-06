@@ -136,6 +136,13 @@ public enum DefaultDriverOption implements DriverOption {
    */
   CONNECTION_MAX_ORPHAN_REQUESTS("advanced.connection.max-orphan-requests"),
   /**
+   * The maximum number of addresses a single connection attempt will try, when the endpoint it
+   * connects to is a DNS name that resolves to several addresses.
+   *
+   * <p>Value-type: int
+   */
+  CONNECTION_MAX_CANDIDATE_ADDRESSES("advanced.connection.max-candidate-addresses"),
+  /**
    * Whether to log non-fatal errors when the driver tries to open a new connection.
    *
    * <p>Value-type: boolean

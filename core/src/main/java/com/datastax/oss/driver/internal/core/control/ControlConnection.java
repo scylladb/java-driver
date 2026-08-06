@@ -45,6 +45,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
@@ -752,19 +753,47 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     }
   }
 
-  private boolean isAuthFailure(Throwable error) {
-    if (error instanceof AllNodesFailedException) {
-      Collection<List<Throwable>> errors =
-          ((AllNodesFailedException) error).getAllErrors().values();
-      if (errors.isEmpty()) {
-        return false;
-      }
-      for (List<Throwable> nodeErrors : errors) {
-        for (Throwable nodeError : nodeErrors) {
-          if (!(nodeError instanceof AuthenticationException)) {
-            return false;
-          }
+  /**
+   * Whether every contact point failed for the one reason worth telling the operator to go and fix
+   * their configuration over: bad credentials, everywhere.
+   *
+   * <p>Each entry is tested with {@link #isAuthOnly} rather than a bare {@code instanceof}, because
+   * one entry no longer means one address. {@code ChannelFactory} expands a contact-point hostname
+   * to every address it resolves to and reports a single failure for the name, with the other
+   * addresses' failures attached as suppressed exceptions. Looking only at the top-level throwable
+   * would call a name whose records failed {@code [refused, refused, auth]} an authentication
+   * failure, and claim in the log that authentication is what is wrong with the deployment when two
+   * thirds of it is unreachable.
+   */
+  @VisibleForTesting
+  static boolean isAuthFailure(Throwable error) {
+    if (!(error instanceof AllNodesFailedException)) {
+      // Anything else carries no per-node breakdown to inspect, so there is nothing here that says
+      // every contact point rejected the credentials.
+      return false;
+    }
+    Collection<List<Throwable>> errors = ((AllNodesFailedException) error).getAllErrors().values();
+    if (errors.isEmpty()) {
+      return false;
+    }
+    for (List<Throwable> nodeErrors : errors) {
+      for (Throwable nodeError : nodeErrors) {
+        if (!isAuthOnly(nodeError)) {
+          return false;
         }
+      }
+    }
+    return true;
+  }
+
+  /** Whether {@code error} and every failure attached to it are authentication failures. */
+  private static boolean isAuthOnly(Throwable error) {
+    if (!(error instanceof AuthenticationException)) {
+      return false;
+    }
+    for (Throwable suppressed : error.getSuppressed()) {
+      if (!(suppressed instanceof AuthenticationException)) {
+        return false;
       }
     }
     return true;

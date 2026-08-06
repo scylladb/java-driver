@@ -26,6 +26,8 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.AllNodesFailedException;
+import com.datastax.oss.driver.api.core.auth.AuthenticationException;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
@@ -39,8 +41,11 @@ import com.datastax.oss.driver.internal.core.metadata.NodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import java.net.ConnectException;
 import java.time.Duration;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -963,5 +968,56 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     verify(topologyMonitor, never()).getChannelNodeInfo(any(DriverChannel.class));
 
     factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_report_auth_failure_when_every_contact_point_failed_on_authentication() {
+    AllNodesFailedException error =
+        AllNodesFailedException.fromErrors(
+            ImmutableList.of(
+                new SimpleEntry<>(node1, authError(node1)),
+                new SimpleEntry<>(node2, authError(node2))));
+
+    assertThat(ControlConnection.isAuthFailure(error)).isTrue();
+  }
+
+  @Test
+  public void should_not_report_auth_failure_when_an_address_failed_on_something_else() {
+    // One entry no longer means one address: ChannelFactory expands a contact-point hostname to
+    // every address it resolves to and reports one failure for the name, with the other addresses'
+    // failures suppressed. Reading only the top-level throwable would call this an authentication
+    // failure and tell the operator their credentials are wrong, when the name's other records are
+    // simply unreachable.
+    Throwable withUnreachableSibling = authError(node1);
+    withUnreachableSibling.addSuppressed(new ConnectException("connection refused"));
+    AllNodesFailedException error =
+        AllNodesFailedException.fromErrors(
+            ImmutableList.of(new SimpleEntry<>(node1, withUnreachableSibling)));
+
+    assertThat(ControlConnection.isAuthFailure(error)).isFalse();
+  }
+
+  @Test
+  public void should_not_report_auth_failure_when_a_node_failed_on_something_else() {
+    AllNodesFailedException error =
+        AllNodesFailedException.fromErrors(
+            ImmutableList.of(
+                new SimpleEntry<>(node1, authError(node1)),
+                new SimpleEntry<>(node2, new ConnectException("connection refused"))));
+
+    assertThat(ControlConnection.isAuthFailure(error)).isFalse();
+  }
+
+  @Test
+  public void should_not_report_auth_failure_for_a_throwable_with_no_per_node_breakdown() {
+    // Only an AllNodesFailedException carries the per-node errors this question is answered from.
+    // Anything else has nothing to say about the credentials, and answering yes would send an
+    // operator whose connection was refused off to check their authentication configuration.
+    assertThat(ControlConnection.isAuthFailure(new ConnectException("connection refused")))
+        .isFalse();
+  }
+
+  private static Throwable authError(Node node) {
+    return new AuthenticationException(node.getEndPoint(), "mock authentication failure");
   }
 }

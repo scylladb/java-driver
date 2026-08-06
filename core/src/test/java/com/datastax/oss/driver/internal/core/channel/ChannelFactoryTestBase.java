@@ -20,6 +20,8 @@ package com.datastax.oss.driver.internal.core.channel;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.ProtocolVersion;
@@ -42,6 +44,7 @@ import com.datastax.oss.protocol.internal.request.Options;
 import com.datastax.oss.protocol.internal.request.Startup;
 import com.datastax.oss.protocol.internal.response.Ready;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -53,9 +56,12 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalServerChannel;
+import io.netty.resolver.AddressResolverGroup;
+import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Exchanger;
 import java.util.concurrent.TimeUnit;
@@ -123,6 +129,9 @@ public abstract class ChannelFactoryTestBase {
     when(defaultProfile.getDuration(DefaultDriverOption.CONNECTION_SET_KEYSPACE_TIMEOUT))
         .thenReturn(Duration.ofMillis(TIMEOUT_MILLIS));
     when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_MAX_REQUESTS)).thenReturn(1);
+    // The reference.conf default; individual tests may lower it to exercise the cap.
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES))
+        .thenReturn(5);
     when(defaultProfile.getDuration(DefaultDriverOption.HEARTBEAT_INTERVAL))
         .thenReturn(Duration.ofSeconds(30));
     when(defaultProfile.getDuration(DefaultDriverOption.CONNECTION_CONNECT_TIMEOUT))
@@ -186,6 +195,55 @@ public abstract class ChannelFactoryTestBase {
       fail("Timed out reading outbound frame");
     }
     return null; // never reached
+  }
+
+  /**
+   * Like {@link #readOutboundFrame()}, but returns {@code null} instead of failing the test when no
+   * frame arrives within {@code timeoutMillis}.
+   *
+   * <p>Use this to assert that the client did <b>not</b> send another request. Unlike asserting via
+   * a failing read, it also drains a frame that does arrive: the server-side exchange in {@link
+   * ServerInitializer} has no timeout, so a stray unread frame would block the server event loop
+   * and hang the whole suite in {@link #tearDown()} instead of failing just the test.
+   */
+  protected Frame tryReadOutboundFrame(long timeoutMillis) {
+    try {
+      return requestFrameExchanger.exchange(null, timeoutMillis, MILLISECONDS);
+    } catch (InterruptedException e) {
+      fail("unexpected interruption while waiting for outbound frame", e);
+      return null; // never reached
+    } catch (TimeoutException e) {
+      return null;
+    }
+  }
+
+  /**
+   * A {@link Random} that turns {@link java.util.Collections#shuffle} into a no-op, so a test whose
+   * scenario depends on which address is tried first can rely on the order the resolver returned:
+   * shuffle swaps element {@code i-1} with {@code nextInt(i)}, and returning {@code i-1} swaps
+   * every element with itself.
+   *
+   * <p>Assign it to {@link ChannelFactory#random}, the injection point that exists for this.
+   */
+  static final class KeepResolverOrder extends Random {
+    private static final long serialVersionUID = 1L;
+
+    @Override
+    public int nextInt(int bound) {
+      return bound - 1;
+    }
+  }
+
+  /** Installs {@code group} the way a user would, through the {@code NettyOptions} hook. */
+  protected void installResolver(AddressResolverGroup<SocketAddress> group) {
+    doAnswer(
+            invocation -> {
+              Bootstrap bootstrap = invocation.getArgument(0);
+              bootstrap.resolver(group);
+              return null;
+            })
+        .when(nettyOptions)
+        .afterBootstrapInitialized(any(Bootstrap.class));
   }
 
   protected void writeInboundFrame(Frame requestFrame, Message response) {

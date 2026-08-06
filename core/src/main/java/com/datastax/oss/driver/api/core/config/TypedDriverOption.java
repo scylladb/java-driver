@@ -172,6 +172,13 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Integer> CONNECTION_MAX_ORPHAN_REQUESTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS, GenericType.INTEGER);
+  /**
+   * The maximum number of addresses a single connection attempt will try, when the endpoint it
+   * connects to is a DNS name that resolves to several addresses.
+   */
+  public static final TypedDriverOption<Integer> CONNECTION_MAX_CANDIDATE_ADDRESSES =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES, GenericType.INTEGER);
   /** Whether to log non-fatal errors when the driver tries to open a new connection. */
   public static final TypedDriverOption<Boolean> CONNECTION_WARN_INIT_ERROR =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR, GenericType.BOOLEAN);
