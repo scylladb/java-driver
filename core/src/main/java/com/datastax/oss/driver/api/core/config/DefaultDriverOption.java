@@ -837,7 +837,14 @@ public enum DefaultDriverOption implements DriverOption {
    * Whether to resolve the addresses passed to `basic.contact-points`.
    *
    * <p>Value-type: boolean
+   *
+   * @deprecated Setting this option has no effect. Contact points given in the configuration are
+   *     now always kept as unresolved hostnames and expanded to all of their DNS-mapped IPs lazily
+   *     at connection time. This never applied to programmatic contact points passed to {@code
+   *     SessionBuilder.addContactPoints}, which are used exactly as supplied -- an already-resolved
+   *     address stays bound to that one IP.
    */
+  @Deprecated
   RESOLVE_CONTACT_POINTS("advanced.resolve-contact-points"),
 
   /**

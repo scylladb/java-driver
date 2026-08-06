@@ -245,6 +245,9 @@ public class OptionsMap implements Serializable {
     throw new InvalidObjectException("Proxy required");
   }
 
+  // RESOLVE_CONTACT_POINTS is deprecated and has no effect, but it is still a driver option, so the
+  // defaults map stays complete by carrying its reference.conf value.
+  @SuppressWarnings("deprecation")
   protected static void fillWithDriverDefaults(OptionsMap map) {
     Duration initQueryTimeout = Duration.ofSeconds(5);
     Duration requestTimeout = Duration.ofSeconds(2);

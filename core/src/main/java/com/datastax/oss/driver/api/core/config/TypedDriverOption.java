@@ -664,7 +664,16 @@ public class TypedDriverOption<ValueT> {
   /** The coalescer reschedule interval. */
   public static final TypedDriverOption<Duration> COALESCER_INTERVAL =
       new TypedDriverOption<>(DefaultDriverOption.COALESCER_INTERVAL, GenericType.DURATION);
-  /** Whether to resolve the addresses passed to `basic.contact-points`. */
+  /**
+   * Whether to resolve the addresses passed to `basic.contact-points`.
+   *
+   * @deprecated Setting this option has no effect. Contact points given in the configuration are
+   *     now always kept as unresolved hostnames and expanded to all of their DNS-mapped IPs lazily
+   *     at connection time. This never applied to programmatic contact points passed to {@code
+   *     SessionBuilder.addContactPoints}, which are used exactly as supplied -- an already-resolved
+   *     address stays bound to that one IP.
+   */
+  @Deprecated
   public static final TypedDriverOption<Boolean> RESOLVE_CONTACT_POINTS =
       new TypedDriverOption<>(DefaultDriverOption.RESOLVE_CONTACT_POINTS, GenericType.BOOLEAN);
   /**
