@@ -77,6 +77,7 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import io.netty.channel.DefaultEventLoop;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
@@ -168,8 +169,13 @@ public class InsightsClientTest {
     assertThat(insightData.getApplicationName()).isEqualTo("app-name");
     assertThat(insightData.getApplicationVersion()).isEqualTo("1.0.0");
     assertThat(insightData.isApplicationNameWasGenerated()).isEqualTo(false);
+    // Keyed on the literal the fixture configured, not on what the loopback's reverse zone calls
+    // it. This used to read "localhost": the contact point is a *resolved* InetSocketAddress built
+    // from an IP-literal string, which carries no host name, so grouping on getHostName() reverse
+    // -resolved it -- on the admin executor, at startup and at every monitor-reporting interval
+    // after it. See InsightsClient#getResolvedContactPoints.
     assertThat(insightData.getContactPoints())
-        .isEqualTo(ImmutableMap.of("localhost", Collections.singletonList("127.0.0.1:9999")));
+        .isEqualTo(ImmutableMap.of("127.0.0.1", Collections.singletonList("127.0.0.1:9999")));
 
     assertThat(insightData.getInitialControlConnection()).isEqualTo("127.0.0.1:10");
     assertThat(insightData.getLocalAddress()).isEqualTo("127.0.0.1");
@@ -241,6 +247,30 @@ public class InsightsClientTest {
   }
 
   @Test
+  public void should_not_reverse_resolve_a_contact_point_that_carries_no_name() throws Exception {
+    // addContactPoints(new InetSocketAddress(InetAddress.getByAddress(...), port)) yields a
+    // resolved address with no label, and the driver hands it through unchanged. Keying on
+    // getHostName() would send that through InetAddress#getHostName() -- a reverse lookup, on the
+    // admin executor, repeated at every advanced.monitor-reporting interval -- and then name the
+    // group after whatever the reverse zone said rather than after anything the operator wrote.
+    // getHostString() answers the same for every case the field is actually about and looks
+    // nothing up.
+    //
+    // Discriminating wherever the loopback has a reverse mapping, which is any machine with an
+    // ordinary /etc/hosts: getHostName() answers "localhost" there. Where it has none it answers
+    // the literal too, so this can pass without proving anything but can never fail wrongly.
+    Set<InetSocketAddress> contactPoints =
+        ImmutableSet.of(
+            new InetSocketAddress(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}), 9042));
+
+    Map<String, List<String>> resolvedContactPoints =
+        InsightsClient.getResolvedContactPoints(contactPoints);
+
+    assertThat(resolvedContactPoints)
+        .isEqualTo(ImmutableMap.of("127.0.0.1", ImmutableList.of("127.0.0.1:9042")));
+  }
+
+  @Test
   public void should_construct_json_event_status_message() throws IOException {
     // given
     InsightsClient insightsClient =
@@ -275,6 +305,38 @@ public class InsightsClientTest {
             ImmutableMap.of(
                 "127.0.0.1:10", new SessionStateForNode(1, 10),
                 "127.0.0.1:20", new SessionStateForNode(2, 20)));
+  }
+
+  @Test
+  public void should_merge_nodes_that_report_under_the_same_address() throws IOException {
+    // Behind an SNI proxy or a cloud client route, every node's endpoint resolves to the same proxy
+    // address, so the map key connectedNodes is built from is not unique per node. Collectors.toMap
+    // throws IllegalStateException on a duplicate key, which would propagate out of
+    // createStatusMessage() and abort the status report on every interval for any such deployment
+    // with more than one node open.
+    DefaultDriverContext context = mockDefaultDriverContext();
+    mockConnectionPoolsBehindOneProxy(context);
+    InsightsClient insightsClient =
+        new InsightsClient(
+            context,
+            MOCK_TIME_SUPPLIER,
+            INSIGHTS_CONFIGURATION,
+            null,
+            null,
+            null,
+            null,
+            null,
+            EMPTY_STACK_TRACE);
+
+    // when
+    String statusMessage = insightsClient.createStatusMessage();
+
+    // then -- one entry, carrying the totals reached through that address.
+    Insight<InsightsStatusData> insight =
+        new ObjectMapper()
+            .readValue(statusMessage, new TypeReference<Insight<InsightsStatusData>>() {});
+    assertThat(insight.getInsightData().getConnectedNodes())
+        .isEqualTo(ImmutableMap.of("proxy.example.com:9042", new SessionStateForNode(3, 30)));
   }
 
   @Test
@@ -508,6 +570,32 @@ public class InsightsClientTest {
     when(controlConnection.channel()).thenReturn(channel);
     when(context.getControlConnection()).thenReturn(controlConnection);
     return context;
+  }
+
+  /** Two nodes whose endpoints resolve to one and the same (unresolved) proxy address. */
+  private void mockConnectionPoolsBehindOneProxy(DefaultDriverContext driverContext) {
+    InetSocketAddress proxy = InetSocketAddress.createUnresolved("proxy.example.com", 9042);
+
+    Node node1 = mock(Node.class);
+    EndPoint endPoint1 = mock(EndPoint.class);
+    when(endPoint1.resolve()).thenReturn(proxy);
+    when(node1.getEndPoint()).thenReturn(endPoint1);
+    when(node1.getOpenConnections()).thenReturn(1);
+    ChannelPool channelPool1 = mock(ChannelPool.class);
+    when(channelPool1.getInFlight()).thenReturn(10);
+
+    Node node2 = mock(Node.class);
+    EndPoint endPoint2 = mock(EndPoint.class);
+    when(endPoint2.resolve()).thenReturn(proxy);
+    when(node2.getEndPoint()).thenReturn(endPoint2);
+    when(node2.getOpenConnections()).thenReturn(2);
+    ChannelPool channelPool2 = mock(ChannelPool.class);
+    when(channelPool2.getInFlight()).thenReturn(20);
+
+    PoolManager poolManager = mock(PoolManager.class);
+    when(poolManager.getPools())
+        .thenReturn(ImmutableMap.of(node1, channelPool1, node2, channelPool2));
+    when(driverContext.getPoolManager()).thenReturn(poolManager);
   }
 
   private void mockConnectionPools(DefaultDriverContext driverContext) {

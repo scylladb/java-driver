@@ -20,19 +20,31 @@ package com.datastax.oss.driver.internal.core.metadata;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Objects;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class ClientRoutesEndPoint implements EndPoint {
+public class ClientRoutesEndPoint implements PinnableEndPoint {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ClientRoutesEndPoint.class);
+
   private final UUID hostId;
   private final ClientRoutesTopologyMonitor topologyMonitor;
   private final String metricPrefix;
   @NonNull private final EndPoint fallbackEndPoint;
+  /** Kept only so that {@link #pinTo(SocketAddress)} can rebuild an identical copy. */
+  @Nullable private final InetAddress broadcastInetAddress;
+
+  /**
+   * The address this endpoint has been {@linkplain #pinTo(SocketAddress) pinned} to, or {@code
+   * null} if it is not pinned. Deliberately excluded from {@link #equals} and {@link #hashCode},
+   * which key off the host id alone.
+   */
+  @Nullable private final InetSocketAddress pinnedAddress;
 
   /**
    * @param topologyMonitor the topology monitor used to resolve the endpoint address on demand.
@@ -49,12 +61,23 @@ public class ClientRoutesEndPoint implements EndPoint {
       @NonNull UUID hostId,
       @Nullable InetAddress broadcastInetAddress,
       @NonNull EndPoint fallbackEndPoint) {
+    this(topologyMonitor, hostId, broadcastInetAddress, fallbackEndPoint, null);
+  }
+
+  private ClientRoutesEndPoint(
+      @NonNull ClientRoutesTopologyMonitor topologyMonitor,
+      @NonNull UUID hostId,
+      @Nullable InetAddress broadcastInetAddress,
+      @NonNull EndPoint fallbackEndPoint,
+      @Nullable InetSocketAddress pinnedAddress) {
     this.topologyMonitor =
         Objects.requireNonNull(topologyMonitor, "Topology monitor cannot be null");
     this.hostId = Objects.requireNonNull(hostId, "HOST uuid cannot be null");
     this.fallbackEndPoint =
         Objects.requireNonNull(fallbackEndPoint, "Fallback endpoint cannot be null");
     this.metricPrefix = buildMetricPrefix(broadcastInetAddress, hostId);
+    this.broadcastInetAddress = broadcastInetAddress;
+    this.pinnedAddress = pinnedAddress;
   }
 
   @NonNull
@@ -62,18 +85,116 @@ public class ClientRoutesEndPoint implements EndPoint {
     return hostId;
   }
 
+  /**
+   * The endpoint {@link #resolve()} falls back to when this node has no client route.
+   *
+   * <p>Exposed so that {@link ClientRoutesTopologyMonitor#buildNodeEndPoint} can avoid nesting one
+   * of these inside another: for the {@code system.local} row the superclass hands back the control
+   * channel's own endpoint, which in a client-routes deployment is already a {@code
+   * ClientRoutesEndPoint} -- and a <b>pinned</b> one, so nesting it would freeze the fallback on
+   * one proxy IP and add a level per control reconnect.
+   */
+  @NonNull
+  EndPoint getFallbackEndPoint() {
+    return fallbackEndPoint;
+  }
+
+  /**
+   * Returns the address connections should be opened to.
+   *
+   * <p>The client route for this host id is an in-memory lookup over the cached {@code
+   * system.client_routes} contents, and it yields exactly one address by design, so this neither
+   * blocks nor expands to several candidates. The route's hostname is returned {@linkplain
+   * InetSocketAddress#isUnresolved() unresolved}: {@link
+   * com.datastax.oss.driver.internal.core.channel.ChannelFactory} resolves it through Netty's
+   * configured {@code AddressResolverGroup}, so a custom resolver is honoured and no DNS lookup
+   * runs on the caller (the admin event loop, for control-connection reconnects).
+   *
+   * <p>When the topology monitor has no route for this host id — i.e. the node is not reached
+   * through a cloud private endpoint — this delegates to the fallback endpoint.
+   *
+   * <p>Once {@linkplain #pinTo(SocketAddress) pinned} the pinned address is returned directly.
+   */
   @NonNull
   @Override
   public SocketAddress resolve() {
-    try {
-      InetSocketAddress address = topologyMonitor.resolve(hostId);
-      if (address != null) {
-        return address;
-      }
-    } catch (IOException e) {
-      throw new UncheckedIOException("DNS resolution failed for host_id=" + hostId, e);
+    if (pinnedAddress != null) {
+      return pinnedAddress;
     }
-    return fallbackEndPoint.resolve();
+    InetSocketAddress address;
+    try {
+      address = topologyMonitor.resolve(hostId);
+    } catch (IllegalStateException e) {
+      // The monitor is closed, so its route cache is gone -- but resolve() still has to answer, and
+      // the honest answer is "no route available", which is what the fallback endpoint is for.
+      // Throwing here is not contained anywhere useful: PinnableEndPoint#sameIdentity compares
+      // resolve() results for every node of every topology refresh, and neither NodesRefresh nor
+      // MetadataManager#apply catches, so a refresh that raced session shutdown would be dropped
+      // whole and surface only as a DEBUG log in ControlConnection#onSuccessfulReconnect.
+      //
+      // Logged rather than swallowed silently: in a private-endpoint deployment the fallback is the
+      // node's raw broadcast address, which is not client-routable, so the visible symptom is a
+      // bare
+      // connect timeout with nothing naming the cause.
+      LOG.debug(
+          "[{}] Client routes monitor is closed, falling back to {} for this node",
+          hostId,
+          fallbackEndPoint);
+      address = null;
+    }
+    return address != null ? address : fallbackEndPoint.resolve();
+  }
+
+  @NonNull
+  @Override
+  public EndPoint pinTo(@NonNull SocketAddress resolvedAddress) {
+    Objects.requireNonNull(resolvedAddress, "resolvedAddress cannot be null");
+    // Mirror DefaultEndPoint: an address we cannot hold in an InetSocketAddress field skips
+    // pinning rather than failing the connection. So does an unresolved one -- resolve() hands out
+    // the route's hostname unresolved, and ChannelFactory passes it straight back when the user
+    // disabled the resolver or a custom one declines it. Pinning that would freeze the endpoint on
+    // a name that still re-expands on every connect: no address stability gained, and the route
+    // lookup silenced for good, since resolve() short-circuits once pinned.
+    if (!(resolvedAddress instanceof InetSocketAddress)
+        || ((InetSocketAddress) resolvedAddress).isUnresolved()
+        || resolvedAddress.equals(this.pinnedAddress)) {
+      return this;
+    }
+    return new ClientRoutesEndPoint(
+        topologyMonitor,
+        hostId,
+        broadcastInetAddress,
+        fallbackEndPoint,
+        (InetSocketAddress) resolvedAddress);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>{@code true} <b>while this node has a route</b>: a route's addresses are alternative ways in
+   * to this one node, so connections may be spread across them.
+   *
+   * <p>Without one, {@link #resolve()} is the fallback endpoint's answer, and whether <i>those</i>
+   * addresses are interchangeable is not this class's to claim -- for the usual fallback, a {@code
+   * DefaultEndPoint} built from a translated broadcast address, it is {@code false}, and a
+   * translator that hands back a name ({@code SubnetAddressTranslator} does, under {@code
+   * resolve-addresses = false}) is exactly the case where spreading would land one node's channels
+   * on different hosts. So the question is deferred to whoever owns the address.
+   */
+  @Override
+  public boolean addressesAreInterchangeable() {
+    boolean hasRoute;
+    try {
+      hasRoute = topologyMonitor.resolve(hostId) != null;
+    } catch (IllegalStateException closed) {
+      // Same reasoning as resolve(): a closed monitor means "no route", not a failed connect.
+      hasRoute = false;
+    }
+    if (hasRoute) {
+      return true;
+    }
+    return fallbackEndPoint instanceof PinnableEndPoint
+        && ((PinnableEndPoint) fallbackEndPoint).addressesAreInterchangeable();
   }
 
   @Override

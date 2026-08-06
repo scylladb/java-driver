@@ -18,11 +18,13 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
-import java.io.UncheckedIOException;
+import io.netty.channel.local.LocalAddress;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -66,20 +68,23 @@ public class ClientRoutesEndPointTest {
   }
 
   @Test
-  public void should_wrap_io_exceptions_in_unchecked_io_exception() throws UnknownHostException {
+  public void should_return_the_route_address_unresolved() {
+    // The route hostname is handed over unresolved on purpose: ChannelFactory resolves it through
+    // Netty's AddressResolverGroup, so a custom resolver applies to client routes too and no DNS
+    // lookup runs on the admin event loop that connect() is called from.
     UUID hostId = UUID.randomUUID();
-    when(topologyMonitor.resolve(hostId)).thenThrow(new UnknownHostException("no-such-host"));
+    InetSocketAddress route = InetSocketAddress.createUnresolved("route.example.com", 9042);
+    when(topologyMonitor.resolve(hostId)).thenReturn(route);
 
     ClientRoutesEndPoint ep =
         new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
 
-    assertThatThrownBy(ep::resolve)
-        .isInstanceOf(UncheckedIOException.class)
-        .hasCauseInstanceOf(UnknownHostException.class);
+    assertThat(ep.resolve()).isSameAs(route);
+    assertThat(((InetSocketAddress) ep.resolve()).isUnresolved()).isTrue();
   }
 
   @Test
-  public void should_reflect_route_changes_on_subsequent_resolve() throws UnknownHostException {
+  public void should_reflect_route_changes_on_subsequent_resolve() {
     UUID hostId = UUID.randomUUID();
     InetSocketAddress addr1 = new InetSocketAddress("127.0.0.1", 9042);
     InetSocketAddress addr2 = new InetSocketAddress("10.0.0.1", 9043);
@@ -94,6 +99,67 @@ public class ClientRoutesEndPointTest {
     when(topologyMonitor.resolve(hostId)).thenReturn(addr2);
 
     assertThat(ep.resolve()).isEqualTo(addr2);
+  }
+
+  // ---- pinTo() ------------------------------------------------------------
+
+  @Test
+  public void pin_to_should_stop_consulting_the_topology_monitor() {
+    UUID hostId = UUID.randomUUID();
+    InetSocketAddress pinnedTo = new InetSocketAddress("127.0.0.1", 9042);
+
+    ClientRoutesEndPoint original =
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+    EndPoint pinned = original.pinTo(pinnedTo);
+
+    assertThat(pinned.resolve()).isEqualTo(pinnedTo);
+    // No lookup at all -- that is the point: DefaultTopologyMonitor#savePort and the SSL factories
+    // read the channel's endpoint, and must not trigger a blocking re-resolution there.
+    verify(topologyMonitor, never()).resolve(hostId);
+    // Identity is keyed off the host id, so the pinned copy is still the same node.
+    assertThat(pinned).isEqualTo(original);
+    assertThat(original).isEqualTo(pinned);
+    assertThat(pinned.asMetricPrefix()).isEqualTo(original.asMetricPrefix());
+  }
+
+  @Test
+  public void pin_to_should_return_same_instance_when_already_pinned_to_that_address() {
+    ClientRoutesEndPoint original =
+        new ClientRoutesEndPoint(topologyMonitor, UUID.randomUUID(), null, fallbackEndPoint);
+    InetSocketAddress pinnedTo = new InetSocketAddress("127.0.0.1", 9042);
+
+    EndPoint pinned = original.pinTo(pinnedTo);
+
+    assertThat(((ClientRoutesEndPoint) pinned).pinTo(pinnedTo)).isSameAs(pinned);
+  }
+
+  @Test
+  public void pin_to_should_be_a_no_op_for_an_unresolved_address() {
+    // resolve() hands out the route's hostname unresolved, and ChannelFactory passes an address
+    // straight back when the user disabled the resolver or a custom one declines it -- so that
+    // hostname can come back here. Pinning it would freeze the endpoint on a name that still
+    // re-expands on every connect, and silence the route lookup for good, since resolve()
+    // short-circuits once pinned. Both siblings return `this` for the same input.
+    UUID hostId = UUID.randomUUID();
+    InetSocketAddress route = InetSocketAddress.createUnresolved("route.example.com", 9042);
+    when(topologyMonitor.resolve(hostId)).thenReturn(route);
+    ClientRoutesEndPoint endPoint =
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+
+    assertThat(endPoint.pinTo(route)).isSameAs(endPoint);
+    // Still asking the monitor, which is what would have been lost.
+    assertThat(endPoint.resolve()).isEqualTo(route);
+    verify(topologyMonitor, atLeastOnce()).resolve(hostId);
+  }
+
+  @Test
+  public void pin_to_should_be_a_no_op_for_a_non_inet_address() {
+    // Mirror DefaultEndPoint: an address that cannot be held in an InetSocketAddress field (e.g.
+    // the local transport used by unit tests) skips pinning rather than failing the connection.
+    ClientRoutesEndPoint endPoint =
+        new ClientRoutesEndPoint(topologyMonitor, UUID.randomUUID(), null, fallbackEndPoint);
+
+    assertThat(endPoint.pinTo(new LocalAddress("some-id"))).isSameAs(endPoint);
   }
 
   // ---- equals / hashCode --------------------------------------------------
@@ -161,6 +227,71 @@ public class ClientRoutesEndPointTest {
 
     // IPv6 keeps colons (consistent with DefaultEndPoint), dots replaced by underscores
     assertThat(ep.asMetricPrefix()).isEqualTo("0:0:0:0:0:0:0:1_" + hostId);
+  }
+
+  // ---- addressesAreInterchangeable() --------------------------------------
+
+  @Test
+  public void should_report_a_routes_addresses_as_interchangeable() {
+    // The proxy routes by server name, so every address the route's hostname maps to reaches this
+    // same node and connections may be spread across them.
+    UUID hostId = UUID.randomUUID();
+    when(topologyMonitor.resolve(hostId))
+        .thenReturn(InetSocketAddress.createUnresolved("route.example.com", 9042));
+
+    ClientRoutesEndPoint ep =
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+
+    assertThat(ep.addressesAreInterchangeable()).isTrue();
+  }
+
+  @Test
+  public void should_defer_to_the_fallback_when_there_is_no_route() {
+    // Without a route, resolve() is the fallback endpoint's answer, so whether *those* addresses
+    // are
+    // interchangeable is not this class's to claim. The usual fallback is a DefaultEndPoint built
+    // from a translated broadcast address, which says no -- and an AddressTranslator that returns a
+    // name (SubnetAddressTranslator does by default) is exactly the case where spreading would land
+    // one node's channels on different hosts while routing and metrics attribute them to one node.
+    UUID hostId = UUID.randomUUID();
+    when(topologyMonitor.resolve(hostId)).thenReturn(null);
+    EndPoint staticFallback =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("peer.example.com", 9042));
+
+    ClientRoutesEndPoint ep =
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, staticFallback);
+
+    assertThat(ep.addressesAreInterchangeable()).isFalse();
+  }
+
+  @Test
+  public void should_defer_to_a_fallback_that_is_itself_interchangeable() {
+    UUID hostId = UUID.randomUUID();
+    when(topologyMonitor.resolve(hostId)).thenReturn(null);
+    EndPoint sniFallback =
+        new SniEndPoint(InetSocketAddress.createUnresolved("proxy.example.com", 9042), "server");
+
+    ClientRoutesEndPoint ep = new ClientRoutesEndPoint(topologyMonitor, hostId, null, sniFallback);
+
+    assertThat(ep.addressesAreInterchangeable()).isTrue();
+  }
+
+  @Test
+  public void should_not_throw_from_addresses_are_interchangeable_when_the_monitor_is_closed() {
+    // Same reasoning as resolve(): a closed monitor means "no route", not a failed connect. This is
+    // asked on the connect path, so throwing here would fail the attempt outright.
+    UUID hostId = UUID.randomUUID();
+    when(topologyMonitor.resolve(hostId))
+        .thenThrow(new IllegalStateException("Topology monitor is closed"));
+
+    ClientRoutesEndPoint ep =
+        new ClientRoutesEndPoint(
+            topologyMonitor,
+            hostId,
+            null,
+            new DefaultEndPoint(InetSocketAddress.createUnresolved("peer.example.com", 9042)));
+
+    assertThat(ep.addressesAreInterchangeable()).isFalse();
   }
 
   // ---- toString() ---------------------------------------------------------

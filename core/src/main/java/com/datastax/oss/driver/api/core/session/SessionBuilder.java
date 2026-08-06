@@ -751,6 +751,17 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * InetSocketAddress(String, int)} constructor already resolved does not bind the session to that
    * single address.
    *
+   * <p>Prefer {@link InetSocketAddress#createUnresolved(String, int)} all the same, and especially
+   * for a proxy given as an <b>IP address</b>. Whether an address carries a name is read from
+   * {@code getHostString()}, which falls back to the underlying {@link java.net.InetAddress}'s
+   * cached host name -- and that field is filled in, on the very instance passed here, the first
+   * time anything calls {@code getHostName()} on it. The SNI SSL engine does exactly that while
+   * building an engine, unless reverse-lookup SANs are turned off. So an IP that has a {@code PTR}
+   * record can acquire a name mid-session, after which the driver treats that name as the proxy:
+   * the endpoints it builds from then on compare unequal to the earlier ones, report metrics under
+   * a different prefix, and connect to wherever that name resolves. An unresolved address is never
+   * subject to this, and is what the secure connect bundle produces.
+   *
    * @param cloudProxyAddress The address of the Cloud proxy to use.
    * @see <a href="https://en.wikipedia.org/wiki/Server_Name_Indication">Server Name Indication</a>
    */

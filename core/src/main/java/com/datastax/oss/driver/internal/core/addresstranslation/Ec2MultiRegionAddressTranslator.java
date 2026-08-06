@@ -81,6 +81,25 @@ public class Ec2MultiRegionAddressTranslator implements AddressTranslator {
     this.ctx = ctx;
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The domain name the PTR record gives is returned {@linkplain InetSocketAddress#isUnresolved
+   * () unresolved}, so that {@link com.datastax.oss.driver.internal.core.channel.ChannelFactory}
+   * expands it per connect and can try every address it maps to. Only the <i>forward</i> lookup
+   * moves; the reverse one below still happens here, because it is the whole point of this class.
+   *
+   * <p>Resolving forward here would keep whichever address came back first and no other would ever
+   * be tried, since the resolver reports an already-resolved address as nothing to do and the
+   * expansion is skipped. Same defect, and same fix, as {@link FixedHostNameAddressTranslator} --
+   * the two get there differently ({@code InetAddress.getByName} rather than {@code new
+   * InetSocketAddress(String, int)}) but arrive at the same resolved address.
+   *
+   * <p>The forward lookup is still <i>performed</i> here, and its result discarded: it is what
+   * tells this method that the name it is about to hand over is usable, while it still holds the
+   * address to fall back on if it is not. A name that does not resolve is answered with the
+   * original {@code socketAddress}, exactly as it was before the lookup moved.
+   */
   @NonNull
   @Override
   public InetSocketAddress translate(@NonNull InetSocketAddress socketAddress) {
@@ -95,9 +114,37 @@ public class Ec2MultiRegionAddressTranslator implements AddressTranslator {
         return socketAddress;
       }
 
-      InetAddress translatedAddress = InetAddress.getByName(domainName);
-      LOG.debug("[{}] Resolved {} to {}", logPrefix, address, translatedAddress);
-      return new InetSocketAddress(translatedAddress, socketAddress.getPort());
+      // Resolved and thrown away, on purpose. What moves into the connection attempt is the
+      // *choice* of address -- so that every A-record gets a turn -- not the question of whether
+      // the name resolves at all, and that question is this method's to answer: it is the one
+      // place that still holds the working address the PTR record was found from. Returning an
+      // unresolvable name unchecked strands the node for good, since the connect layer has nothing
+      // to fall back to and every refresh re-derives the same name from the same PTR record. A PTR
+      // whose target has no A record is not exotic -- private DNS switched off on the VPC, or
+      // split-horizon DNS that answers the reverse zone but not the forward one -- and before the
+      // lookup moved, the UnknownHostException it throws is what reached the catch below and handed
+      // back the node's raw broadcast address.
+      //
+      // Exactly that question and no more. A PTR record that is merely *stale* -- naming a host
+      // that still resolves, because it is the instance that replaced this one -- passes, since the
+      // addresses come back only to be counted and are never compared against the one this node
+      // answered on. And the question is answered by the JVM's resolver, while the connect goes
+      // through whichever AddressResolverGroup NettyOptions installed: a deployment that points
+      // Netty at a private zone the JVM cannot see, or hands resolution to a pipeline handler
+      // entirely, would have a name rejected here that the connect could have used. Both are
+      // tracked in https://github.com/scylladb/java-driver/issues/1010, and neither is fixable from
+      // here -- this method is synchronous and knows nothing about Netty.
+      //
+      // Cheap where it sits: the JVM caches forward lookups (networkaddress.cache.ttl), and this
+      // method already pays for an uncached JNDI reverse lookup on the same call.
+      InetAddress[] forward = InetAddress.getAllByName(domainName);
+      LOG.debug(
+          "[{}] Resolved {} to {}, which maps to {} address(es)",
+          logPrefix,
+          address,
+          domainName,
+          forward.length);
+      return InetSocketAddress.createUnresolved(domainName, socketAddress.getPort());
     } catch (Exception e) {
       Loggers.warnWithException(
           LOG, "[{}] Error resolving {}, returning it as-is", logPrefix, address, e);

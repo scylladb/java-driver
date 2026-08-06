@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.config.ClientRouteProxy;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRequestHandler;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
@@ -32,7 +33,6 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -195,9 +195,18 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     resolvedRoutesCache.set(Collections.unmodifiableMap(new HashMap<>(routes)));
   }
 
+  /**
+   * Returns the client route for {@code hostId} as an {@linkplain InetSocketAddress#isUnresolved()
+   * unresolved} address, or {@code null} if this node has no route.
+   *
+   * <p>The route's hostname is deliberately left unresolved: {@link
+   * com.datastax.oss.driver.internal.core.channel.ChannelFactory} resolves it through Netty's
+   * configured {@code AddressResolverGroup} at connection time. That keeps this method a pure
+   * in-memory cache lookup, so it is safe to call from an event loop, and it means a custom
+   * resolver applies to client routes just like it does to contact points.
+   */
   @Nullable
-  public InetSocketAddress resolve(@NonNull UUID hostId)
-      throws IllegalStateException, UnknownHostException {
+  public InetSocketAddress resolve(@NonNull UUID hostId) throws IllegalStateException {
     if (closed) {
       throw new IllegalStateException("Topology monitor is closed");
     }
@@ -206,7 +215,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       return null; // no client route for this node — caller falls back to default
     }
 
-    return new InetSocketAddress(resolveAddress(route.getHostname()), route.getPort());
+    return InetSocketAddress.createUnresolved(route.getHostname(), route.getPort());
   }
 
   /**
@@ -480,6 +489,23 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     return new ClientRoutesEndPoint(this, hostId, broadcastInetAddress, fallback);
   }
 
+  @Override
+  public boolean reresolvesNodeAddresses() {
+    // ClientRoutesEndPoint hands the route hostname over unresolved, so the connection layer
+    // re-expands it on every connection attempt -- but only when a route exists for that host_id
+    // (see ClientRoutesEndPoint#resolve()); for mixed/incomplete route sets it delegates to a
+    // static, already-resolved fallback endpoint instead. Only report true when every
+    // currently-known node actually has a live route; otherwise the contact-point reconnection
+    // fallback must stay available for the nodes stuck on that fallback.
+    Map<UUID, ClientRouteRecord> routes = resolvedRoutesCache.get();
+    for (Node node : context.getMetadataManager().getMetadata().getNodes().values()) {
+      if (!routes.containsKey(node.getHostId())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /**
    * Builds the CQL query to fetch client routes.
    *
@@ -644,14 +670,5 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     }
     LOG.debug("[{}] ClientRoutesTopologyMonitor closed", logPrefix);
     return super.closeAsync();
-  }
-
-  /**
-   * Resolves a hostname to an {@link InetAddress}. Extracted as a protected method so that unit
-   * tests can override it to return stubbed addresses without hitting the network.
-   */
-  @NonNull
-  protected InetAddress resolveAddress(@NonNull String hostname) throws UnknownHostException {
-    return InetAddress.getByName(hostname);
   }
 }
