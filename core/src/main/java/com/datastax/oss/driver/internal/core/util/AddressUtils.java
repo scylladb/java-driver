@@ -125,6 +125,44 @@ public class AddressUtils {
   }
 
   /**
+   * Parses {@code hostString} as an IP address literal -- the same two spellings {@link #isLiteral}
+   * recognises -- or returns {@code null} if it is not one. Performs no lookup.
+   *
+   * <p>Here, beside the recognition, because the two have to accept the same strings and nothing
+   * but proximity makes them: a caller that recognises a literal with {@link #carriesName} and then
+   * parses it with a grammar of its own has two grammars to keep in agreement, and only a comment
+   * saying so.
+   *
+   * <p>Neither Guava predicate has a matching parser. {@code InetAddresses#forString} rejects the
+   * bracketed URI form outright, and it resolves an IPv6 zone against the local interfaces,
+   * throwing when the zone names none -- it rejects even {@code fe80::1%lo} on a host that has an
+   * {@code lo} interface. So the brackets come off and the zone is split away before the parse.
+   *
+   * <p>Brackets first, then the zone: {@link #extract} splits a contact point on its <i>last</i>
+   * colon and keeps them, so {@code [fe80::1%eth0]:9042} arrives here as {@code [fe80::1%eth0]} --
+   * splitting on {@code '%'} before unwrapping would leave the closing bracket inside the zone and
+   * the opening one inside the literal, and neither part would parse.
+   *
+   * <p>The zone is <b>dropped</b> rather than resolved, so the result carries the literal's bytes
+   * and nothing else. A caller comparing it is therefore scope-blind -- which {@link
+   * InetAddress#equals} is anyway -- and one that needs the zone should keep the original string.
+   */
+  @Nullable
+  public static InetAddress parseLiteral(String hostString) {
+    String bare = hostString;
+    if (bare.length() > 2 && bare.charAt(0) == '[' && bare.charAt(bare.length() - 1) == ']') {
+      bare = bare.substring(1, bare.length() - 1);
+    }
+    int zoneSeparator = bare.indexOf('%');
+    String literalPart = zoneSeparator < 0 ? bare : bare.substring(0, zoneSeparator);
+    try {
+      return InetAddresses.forString(literalPart);
+    } catch (IllegalArgumentException notALiteral) {
+      return null;
+    }
+  }
+
+  /**
    * Returns a copy of {@code ip} labelled with {@code hostName}, or with no label at all when
    * {@code hostName} is {@code null}, preserving an IPv6 zone if there is one.
    *

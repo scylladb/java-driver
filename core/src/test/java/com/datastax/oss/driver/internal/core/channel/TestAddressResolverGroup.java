@@ -63,13 +63,50 @@ class TestAddressResolverGroup extends AddressResolverGroup<SocketAddress> {
    */
   private final boolean claimNothingIsResolved;
 
+  /**
+   * Whether to decline every address, as a real resolver does for an address type it does not
+   * handle ({@code DefaultNameResolver} declines anything that is not an {@link
+   * InetSocketAddress}). Netty then passes the address through untouched, and so does the driver.
+   */
+  private final boolean declineEverything;
+
+  /**
+   * Whether to claim that every address is already resolved, even one that is plainly a name. That
+   * is what {@code NoopAddressResolverGroup} does — Netty's way of saying "leave the name alone,
+   * something in the pipeline will deal with it", which is how a {@code ProxyHandler} gets the name
+   * rather than an IP. Netty hands such an address straight to {@code doConnect()}.
+   */
+  private final boolean claimEverythingIsResolved;
+
+  /** A stand-in for {@code NoopAddressResolverGroup}: supports everything, resolves nothing. */
+  static TestAddressResolverGroup claimingEverythingIsResolved() {
+    return new TestAddressResolverGroup(null, false, false, true);
+  }
+
   TestAddressResolverGroup(@Nullable List<SocketAddress> answer) {
     this(answer, false);
   }
 
   TestAddressResolverGroup(@Nullable List<SocketAddress> answer, boolean claimNothingIsResolved) {
+    this(answer, claimNothingIsResolved, false);
+  }
+
+  TestAddressResolverGroup(
+      @Nullable List<SocketAddress> answer,
+      boolean claimNothingIsResolved,
+      boolean declineEverything) {
+    this(answer, claimNothingIsResolved, declineEverything, false);
+  }
+
+  private TestAddressResolverGroup(
+      @Nullable List<SocketAddress> answer,
+      boolean claimNothingIsResolved,
+      boolean declineEverything,
+      boolean claimEverythingIsResolved) {
     this.answer = answer;
     this.claimNothingIsResolved = claimNothingIsResolved;
+    this.declineEverything = declineEverything;
+    this.claimEverythingIsResolved = claimEverythingIsResolved;
   }
 
   @Override
@@ -80,11 +117,14 @@ class TestAddressResolverGroup extends AddressResolverGroup<SocketAddress> {
 
       @Override
       public boolean isSupported(SocketAddress address) {
-        return true;
+        return !declineEverything;
       }
 
       @Override
       public boolean isResolved(SocketAddress address) {
+        if (claimEverythingIsResolved) {
+          return true;
+        }
         if (claimNothingIsResolved) {
           return false;
         }

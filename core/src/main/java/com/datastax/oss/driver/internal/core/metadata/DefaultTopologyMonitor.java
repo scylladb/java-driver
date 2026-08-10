@@ -30,6 +30,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.UnexpectedResponseExce
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
+import com.datastax.oss.driver.internal.core.util.AddressUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -232,6 +233,11 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     peersV2Columns = null;
   }
 
+  @Override
+  public void resetLocalColumnCache() {
+    localColumns = null;
+  }
+
   /**
    * Returns a new list containing only the elements of {@code serverColumns} that are present in
    * {@code needed}, preserving the server-response order. Returns an empty list (never {@code
@@ -352,22 +358,68 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     }
     EndPoint localEndPoint = channel.getEndPoint();
     return query(channel, buildQuery(localColumns, "system.local", "key='local'"))
-        .thenApply(
-            result -> {
-              if (localColumns == null && !result.getColumnNames().isEmpty()) {
-                localColumns =
-                    intersectWithNeeded(result.getColumnNames(), LOCAL_COLUMNS_OF_INTEREST);
-              }
-              Iterator<AdminRow> iterator = result.iterator();
-              if (!iterator.hasNext()) {
-                throw new IllegalStateException(
-                    "Expected a row in system.local for node info resolution, got empty result");
-              }
-              AdminRow localRow = iterator.next();
-              InetSocketAddress broadcastRpcAddress =
-                  getBroadcastRpcAddress(localRow, localEndPoint);
-              return nodeInfoBuilder(localRow, broadcastRpcAddress, localEndPoint).build();
-            });
+        .thenApply(result -> toLocalNodeInfo(result, localEndPoint));
+  }
+
+  /**
+   * Decodes the single {@code system.local} row of {@code result} into a {@link NodeInfo}, warming
+   * the local column cache from it on the way.
+   *
+   * <p>The warming is only sound because the caller clears this cache <b>before</b> each read.
+   * {@link #getChannelNodeInfo} is no longer reached only for the control channel the driver keeps:
+   * {@code ControlConnection#readChannelNodeInfo} runs it from a connect hook, once per candidate
+   * address of a contact point, and whether that candidate is the one kept is not known when the
+   * read returns -- the hook can refuse it, {@code ChannelFactory} can abandon it afterwards (a
+   * REGISTER rejection, or a hook the timeout gave up on whose response arrives anyway), and {@code
+   * ControlConnection} re-asks about the node once the channel is open. The intersection can only
+   * ever shrink, so a refused candidate would otherwise narrow the projection for every {@code
+   * system.local} read of the session, costing the accepted node's extra columns for as long as the
+   * cache lives -- and on the first connection, the one round where the hook is guaranteed to run,
+   * {@code #onSuccessfulReconnect} returns before it would reset them.
+   *
+   * <p>Clearing first rather than undoing afterwards is what makes that hold: an undo on the
+   * rejection paths cannot see the projection a <i>previous</i> candidate left behind, and two of
+   * those paths are {@code ChannelFactory}'s and invisible to the hook. With the cache cleared
+   * first, every read is a {@code SELECT *} that re-learns from whoever answered it. See {@link
+   * #resetLocalColumnCache()} and {@code ControlConnection#readChannelNodeInfo}.
+   *
+   * <p>The write below is unconditional, not guarded on the cache still being null, because
+   * "cleared before each read" orders the reads and not the <i>responses</i>. A candidate abandoned
+   * on the connect-hook timeout is abandoned rather than cancelled, so its {@code system.local}
+   * answer can arrive after the next candidate cleared the cache -- and a first-writer-wins guard
+   * would then install the refused candidate's intersection and decline to overwrite it with the
+   * accepted one's. Overwriting costs nothing on any other path: a projected read returns exactly
+   * the projection it asked for, and intersecting that with {@code LOCAL_COLUMNS_OF_INTEREST} again
+   * yields the same list.
+   *
+   * <p>That covers two of the three orders in which a stray answer, the kept candidate's answer,
+   * and {@code ControlConnection}'s read of the capture can land. A stray answering <b>before</b>
+   * the kept candidate is overwritten here. A stray answering <b>between</b> the kept candidate and
+   * that read replaces the capture, so {@code NodeInfoHolder#getFor} misses and {@code
+   * ControlConnection#resolveChannelNodeIfNeeded} goes back for a fresh read -- cleared first, on
+   * the channel that is actually open.
+   *
+   * <p>What neither end catches is a stray answering <b>after</b> that read: the capture was still
+   * the kept candidate's when it was consulted, so nothing falls back, and the stray's warming is
+   * then the last one to land. The window is the REGISTER round trip plus a hop to the admin
+   * thread, and a reconnect self-corrects at {@code #resetColumnCaches()}; the first connection
+   * does not, because {@code ControlConnection#onSuccessfulReconnect} returns at its {@code
+   * isFirstConnection} check before reaching it. Closing it means the projection carrying the
+   * channel it was learned from, so that a write from any other channel is dropped outright rather
+   * than two guards agreeing by construction -- deferred, and named here rather than claimed away.
+   */
+  private NodeInfo toLocalNodeInfo(AdminResult result, EndPoint localEndPoint) {
+    if (!result.getColumnNames().isEmpty()) {
+      localColumns = intersectWithNeeded(result.getColumnNames(), LOCAL_COLUMNS_OF_INTEREST);
+    }
+    Iterator<AdminRow> iterator = result.iterator();
+    if (!iterator.hasNext()) {
+      throw new IllegalStateException(
+          "Expected a row in system.local for node info resolution, got empty result");
+    }
+    AdminRow localRow = iterator.next();
+    InetSocketAddress broadcastRpcAddress = getBroadcastRpcAddress(localRow, localEndPoint);
+    return nodeInfoBuilder(localRow, broadcastRpcAddress, localEndPoint).build();
   }
 
   @Override
@@ -659,8 +711,92 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
       // Don't rely on system.local.rpc_address for the control node, because it mistakenly
       // reports the normal RPC address instead of the broadcast one (CASSANDRA-11181). We
       // already know the endpoint anyway since we've just used it to query.
+      return connectedNodeEndPoint(localEndPoint);
+    }
+  }
+
+  /**
+   * The endpoint to register the connected node under: the address the control channel actually
+   * reached, rather than the contact point it was reached through.
+   *
+   * <p>They differ when the control connection came up through a contact point, because a contact
+   * point is kept unresolved and {@code ChannelFactory} binds a {@linkplain PinnableEndPoint
+   * pinned} copy of it to the one address the channel reached -- a copy that, by that interface's
+   * contract, is identified exactly like the unpinned original. Registering the node under it would
+   * give it a <i>hostname</i> identity: metric names and tags derived from a name that denotes the
+   * whole cluster rather than this node. That is bad enough on its own, but the real damage is that
+   * the identity is not the node's: the reconnection fallback hands the contact points back on
+   * every reconnection round, so each successive control node acquires the same one. Two live nodes
+   * then report under a single metric prefix, sharing get-or-create metric objects, until the next
+   * refresh moves the older one back to its own address -- and {@code clearMetrics()} recomputes
+   * the names to delete from the prefix the node still holds, taking the newcomer's freshly
+   * registered series with it (see {@code DefaultNode#setEndPoint}).
+   *
+   * <p>Deriving the identity from the address actually connected to fixes all of that at once: it
+   * is this node's own address, so it is unique to it, and re-registering an unchanged control node
+   * becomes a no-op instead of an identity change.
+   *
+   * <p>The identity comes from the connected address's <b>bytes</b>, not from its host string. That
+   * string is not the node's either -- for a hostname contact point it is the queried name, which
+   * every resolver attaches to what it returns and {@code ChannelFactory#reattachHostname} restores
+   * when a custom one does not, so reading it back here would produce the contact point's prefix
+   * again and this method would do nothing at all. It is also not stable: for an IP-literal contact
+   * point it starts out as the literal and begins reporting a reverse-DNS name as soon as {@code
+   * DefaultSslEngineFactory} calls {@code getHostName()} on the shared {@code InetAddress}, so an
+   * identity keyed off it would depend on whether TLS is enabled and whether a PTR record exists.
+   * Stripping the label (see {@link AddressUtils#stripHostName}) settles both.
+   *
+   * <p>What the node connects to is unaffected: the rebuilt endpoint still {@linkplain
+   * EndPoint#resolve() resolves} to the labelled address the channel reached, so the TLS peer host
+   * and the Kerberos service name stay the name the operator configured, with no reverse lookup --
+   * see {@link DefaultEndPoint#identifiedBy}.
+   *
+   * <p>Two costs come with it, both narrower than the damage above and both named here rather than
+   * argued away. The rewrite is an identity change, so {@code DefaultNode#setEndPoint} clears the
+   * previous updater's metrics before the swap, and Dropwizard and MicroProfile recompute the names
+   * to delete from the prefix the node still holds -- which under a translator that hands back one
+   * name for the whole cluster is a prefix every node shares, so promoting such a peer to control
+   * node takes the cluster's node-metric series with it (the root of that is {@code clearMetrics()}
+   * not remembering what it registered; see https://github.com/scylladb/java-driver/issues/1010).
+   * And the endpoint this hands back resolves to one address, so the control node is the single
+   * node in such a deployment that does <b>not</b> get its name re-expanded per connection attempt:
+   * its pool cannot fail over to a sibling record and will not pick up a DNS change until the
+   * control connection moves and the node is re-derived from {@code system.peers}. That is the
+   * trade {@code TopologyMonitor#reresolvesNodeAddresses()} describes for this node, and it is why
+   * the contact-point reconnection fallback is what recovers it.
+   *
+   * <p>Endpoints this cannot rebuild are returned untouched -- a third-party {@link EndPoint}, or
+   * one whose {@code resolve()} is not a resolved {@code InetSocketAddress} (the user disabled
+   * Netty's resolver, or a custom one declined the address, so nothing was pinned). So is one that
+   * already carries the connected address, which is every reconnection to an identified node and
+   * every refresh after the first: the existing instance is kept so that the control node's
+   * endpoint stays {@code ==} to the channel's, which is what lets {@link #refreshNode}'s
+   * control-node check settle on the identity short-circuit in {@code equals()}. Where that does
+   * not hold -- the channel kept an unresolved endpoint because adoption was skipped -- the check
+   * falls through to a full address comparison, which for a <i>name</i> costs a lookup on the admin
+   * thread and only answers "equal" if the resolver lists the reached address first. A miss there
+   * is not fatal, but it does send refreshNode on to query the peers table for the control node's
+   * own address, which by definition has no row; see
+   * https://github.com/scylladb/java-driver/issues/1006.
+   */
+  private static EndPoint connectedNodeEndPoint(EndPoint localEndPoint) {
+    if (!(localEndPoint instanceof DefaultEndPoint)) {
       return localEndPoint;
     }
+    SocketAddress connected = localEndPoint.resolve();
+    if (!(connected instanceof InetSocketAddress)
+        || ((InetSocketAddress) connected).isUnresolved()) {
+      return localEndPoint;
+    }
+    InetSocketAddress reached = (InetSocketAddress) connected;
+    InetSocketAddress identity = AddressUtils.stripHostName(reached);
+    if (identity == null) {
+      return localEndPoint;
+    }
+    DefaultEndPoint asConnected = DefaultEndPoint.identifiedBy(identity, reached);
+    return asConnected.asMetricPrefix().equals(localEndPoint.asMetricPrefix())
+        ? localEndPoint
+        : asConnected;
   }
 
   // Called when a new node is being added; the peers table is keyed by broadcast_address,

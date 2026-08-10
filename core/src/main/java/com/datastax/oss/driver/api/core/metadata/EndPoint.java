@@ -43,6 +43,16 @@ public interface EndPoint {
    * what {@code DefaultEndPoint} does for contact points backed by a hostname, so a single
    * unreachable IP behind a multi-record name no longer fails the connection.
    *
+   * <p>One caveat if the name covers <b>several different nodes</b> rather than several addresses
+   * of one. The driver can bind a connection to the address it reached, so that the node it
+   * identified there keeps reconnecting to that same address, but only for its own endpoint type --
+   * an implementation from outside the driver cannot be bound. Its contact-point connect is still
+   * spread across the records, so the control connection may identify the node behind the third
+   * one, while that node's pool keeps the resolver's order and converges on the first. Prefer the
+   * driver's own {@code DefaultEndPoint} for a name that fronts more than one node; a custom
+   * implementation is on solid ground for several addresses of a single node, which is the case
+   * this paragraph is really about.
+   *
    * <p><b>Implementations must not resolve names themselves, and must not block.</b> The driver
    * calls this from its admin event loop, and it performs the expansion through Netty's configured
    * {@code AddressResolverGroup} — the same resolver an unresolved address reaches when it is
@@ -50,14 +60,23 @@ public interface EndPoint {
    * {@link java.net.InetAddress#getAllByName(String)}) would both block that loop and bypass a
    * custom resolver installed via {@code NettyOptions#afterBootstrapInitialized(Bootstrap)}.
    *
-   * <p><b>Callers must not assume the returned address is resolved.</b> It is for a node discovered
-   * from {@code system.peers} (built from that node's physical broadcast RPC address) and for the
-   * node the control connection is on (bound to the address that connection reached). It is
-   * <b>not</b> for a node reached through the Cloud SNI proxy, or through a cloud private-endpoint
-   * client route: there the address is the configured hostname, and {@link
-   * java.net.InetSocketAddress#getAddress()} returns {@code null}. Read the host with {@link
-   * java.net.InetSocketAddress#getHostString()}, which yields whichever of the two the address
-   * carries and never triggers a reverse lookup.
+   * <p><b>Callers must not assume the returned address is resolved.</b> It normally is for a node
+   * discovered from {@code system.peers} (built from that node's physical broadcast RPC address),
+   * and normally is for the node the control connection is on (bound to the address that connection
+   * reached). It is <b>not</b> for a node reached through the Cloud SNI proxy, or through a cloud
+   * private-endpoint client route: there the address is the configured hostname, and {@link
+   * java.net.InetSocketAddress#getAddress()} returns {@code null}.
+   *
+   * <p>"Normally" is doing work in that sentence, and the control node is where it does most of it.
+   * Binding the endpoint to the address the connection reached is best effort: it is skipped for an
+   * endpoint the driver did not build, for one whose {@code resolve()} is not an {@link
+   * java.net.InetSocketAddress}, and for one that comes back <i>already</i> unresolved -- which is
+   * what a pipeline that connects through a proxy handler, a disabled resolver, or a custom {@code
+   * AddressResolverGroup} reporting the name as resolved all produce, and all of which are
+   * supported. On any of those the control node keeps the contact-point name it was reached
+   * through. So read the host with {@link java.net.InetSocketAddress#getHostString()}, which yields
+   * whichever of the two the address carries and never triggers a reverse lookup, rather than
+   * reaching through {@code getAddress()}.
    *
    * @apiNote <b>Timeout note:</b> when a name expands to several addresses they are tried in
    *     sequence, so the worst-case time before the node is declared unreachable is N times a full

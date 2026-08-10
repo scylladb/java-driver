@@ -19,8 +19,6 @@ package com.datastax.oss.driver.internal.core.channel;
 
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
@@ -29,7 +27,6 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.metadata.PinnableEndPoint;
 import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.local.LocalAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -118,18 +115,15 @@ public class ChannelFactoryPinnedEndPointTest extends ChannelFactoryTestBase {
 
   @Test
   public void should_not_pin_to_an_unresolved_address() {
-    // Given – Bootstrap.disableResolver(), one of the paths where resolveCandidates hands the
-    // endpoint's own address straight back. For an endpoint that reports a name, the candidate is
-    // therefore still that name.
+    // Given – a resolver that reports every address already resolved, which is what
+    // NoopAddressResolverGroup does when something in the pipeline resolves the name instead.
+    // resolveCandidates() honours the claim and hands the endpoint's own address straight back, so
+    // for an endpoint that reports a name the candidate is still that name. This is the only path
+    // that reaches pin() with an unresolved address: the other two pass-throughs materialize an IP
+    // literal or fail, and resolveAll's results have the unresolved ones dropped.
     when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
     when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
-    doAnswer(
-            invocation -> {
-              ((Bootstrap) invocation.getArgument(0)).disableResolver();
-              return null;
-            })
-        .when(nettyOptions)
-        .afterBootstrapInitialized(any(Bootstrap.class));
+    installResolver(TestAddressResolverGroup.claimingEverythingIsResolved());
     ChannelFactory factory = newChannelFactory();
     List<SocketAddress> pinnedTo = new ArrayList<>();
     TestPinnableEndPoint endPoint =
@@ -142,8 +136,9 @@ public class ChannelFactoryPinnedEndPointTest extends ChannelFactoryTestBase {
           }
         };
 
-    // When – the connect itself cannot succeed against a name nothing resolves; what matters is
-    // what happened before it was attempted.
+    // When – the connect itself cannot succeed: these tests run over Netty's local transport, which
+    // has no server bound to an InetSocketAddress. pin() runs before the attempt, so what it was
+    // handed is settled either way.
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
             endPoint, null, null, DriverChannelOptions.DEFAULT, NoopNodeMetricUpdater.INSTANCE);

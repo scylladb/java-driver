@@ -71,6 +71,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // Then
     assertThatStage(channelFuture)
         .isSuccess(channel -> assertThat(channel.getClusterName()).isEqualTo("mockClusterName"));
+    // Read directly, not awaited: completeCandidate() records the negotiated state *before* it
+    // publishes the channel, so the value is already there for anyone the completed future reaches
+    // -- inline dependents included. Reading it straight is what pins that ordering. Awaiting would
+    // pass either way, and used to: while the latch still ran after the publish, an inline read
+    // here could see the pre-latch null, which is how this flaked on JDK 17 in CI.
     assertThat(factory.protocolVersion).isEqualTo(DefaultProtocolVersion.V4);
   }
 
@@ -186,6 +191,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // Then
     assertThatStage(channelFuture)
         .isSuccess(channel -> assertThat(channel.getClusterName()).isEqualTo("mockClusterName"));
+    // Read directly, not awaited: completeCandidate() records the negotiated state *before* it
+    // publishes the channel, so the value is already there for anyone the completed future reaches
+    // -- inline dependents included. Reading it straight is what pins that ordering. Awaiting would
+    // pass either way, and used to: while the latch still ran after the publish, an inline read
+    // here could see the pre-latch null, which is how this flaked on JDK 17 in CI.
     assertThat(factory.protocolVersion).isEqualTo(DefaultProtocolVersion.V4);
   }
 
@@ -232,6 +242,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     writeInboundFrame(requestFrame, TestResponses.clusterNameResponse("mockClusterName"));
     assertThatStage(channelFuture)
         .isSuccess(channel -> assertThat(channel.getClusterName()).isEqualTo("mockClusterName"));
+    // Read directly, not awaited: completeCandidate() records the negotiated state *before* it
+    // publishes the channel, so the value is already there for anyone the completed future reaches
+    // -- inline dependents included. Reading it straight is what pins that ordering. Awaiting would
+    // pass either way, and used to: while the latch still ran after the publish, an inline read
+    // here could see the pre-latch null, which is how this flaked on JDK 17 in CI.
     assertThat(factory.protocolVersion).isEqualTo(DefaultProtocolVersion.V3);
   }
 

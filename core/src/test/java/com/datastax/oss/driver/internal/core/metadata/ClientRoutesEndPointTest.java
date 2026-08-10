@@ -27,11 +27,13 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import io.netty.channel.local.LocalAddress;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.util.UUID;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -242,7 +244,7 @@ public class ClientRoutesEndPointTest {
     ClientRoutesEndPoint ep =
         new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
 
-    assertThat(ep.addressesAreInterchangeable()).isTrue();
+    assertThat(ep.addressesAreInterchangeable(ep.resolve())).isTrue();
   }
 
   @Test
@@ -261,7 +263,7 @@ public class ClientRoutesEndPointTest {
     ClientRoutesEndPoint ep =
         new ClientRoutesEndPoint(topologyMonitor, hostId, null, staticFallback);
 
-    assertThat(ep.addressesAreInterchangeable()).isFalse();
+    assertThat(ep.addressesAreInterchangeable(ep.resolve())).isFalse();
   }
 
   @Test
@@ -273,25 +275,84 @@ public class ClientRoutesEndPointTest {
 
     ClientRoutesEndPoint ep = new ClientRoutesEndPoint(topologyMonitor, hostId, null, sniFallback);
 
-    assertThat(ep.addressesAreInterchangeable()).isTrue();
+    assertThat(ep.addressesAreInterchangeable(ep.resolve())).isTrue();
   }
 
   @Test
   public void should_not_throw_from_addresses_are_interchangeable_when_the_monitor_is_closed() {
     // Same reasoning as resolve(): a closed monitor means "no route", not a failed connect. This is
-    // asked on the connect path, so throwing here would fail the attempt outright.
+    // asked on the connect path, so throwing here would fail the attempt outright. It cannot throw
+    // any more for a structural reason rather than a caught one -- the answer comes off the address
+    // resolve() already returned, so the monitor is not consulted a second time at all.
     UUID hostId = UUID.randomUUID();
     when(topologyMonitor.resolve(hostId))
         .thenThrow(new IllegalStateException("Topology monitor is closed"));
+    EndPoint staticFallback =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("peer.example.com", 9042));
 
     ClientRoutesEndPoint ep =
-        new ClientRoutesEndPoint(
-            topologyMonitor,
-            hostId,
-            null,
-            new DefaultEndPoint(InetSocketAddress.createUnresolved("peer.example.com", 9042)));
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, staticFallback);
 
-    assertThat(ep.addressesAreInterchangeable()).isFalse();
+    // resolve() catches the closure and answers with the fallback; that address is what the connect
+    // would dial, so that is what this is asked about.
+    SocketAddress chosen = ep.resolve();
+    assertThat(chosen).isEqualTo(staticFallback.resolve());
+    Mockito.clearInvocations(topologyMonitor);
+
+    assertThat(ep.addressesAreInterchangeable(chosen)).isFalse();
+    verify(topologyMonitor, never()).resolve(Mockito.any());
+  }
+
+  @Test
+  public void should_not_spread_a_fallback_address_when_a_route_appears_mid_connect() {
+    // The race this signature exists to close. ChannelFactory.connect() calls resolve() and then,
+    // separately, asks whether the addresses may be spread across; the route cache is swapped from
+    // the routes-query thread, so a CLIENT_ROUTES_CHANGE can land between the two. In the direction
+    // that matters the address already chosen is the *fallback's* -- under a translator returning a
+    // name, one that may denote several hosts -- and a route appearing afterwards would authorise
+    // shuffling it, landing one node's channels on different servers. Deciding from the address
+    // that was actually handed out makes the second read irrelevant.
+    UUID hostId = UUID.randomUUID();
+    EndPoint translatedName =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("rack1.example.com", 9042));
+    ClientRoutesEndPoint ep =
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, translatedName);
+
+    // Read #1: no route, so the connect will dial the fallback's name.
+    when(topologyMonitor.resolve(hostId)).thenReturn(null);
+    SocketAddress chosen = ep.resolve();
+    assertThat(chosen).isEqualTo(translatedName.resolve());
+
+    // A route is published in the window between the two calls.
+    InetSocketAddress route = InetSocketAddress.createUnresolved("route.example.com", 9042);
+    when(topologyMonitor.resolve(hostId)).thenReturn(route);
+    // The cache really has changed -- a fresh resolve() would now hand out the route.
+    assertThat(ep.resolve()).isEqualTo(route);
+
+    // But the address this connect settled on is still the fallback's, and that is what decides.
+    assertThat(ep.addressesAreInterchangeable(chosen)).isFalse();
+  }
+
+  @Test
+  public void should_answer_without_consulting_the_monitor_once_pinned() {
+    // resolve() short-circuits on the pinned address and stops consulting the route cache, so this
+    // must not consult it either -- a pinned endpoint denotes the one server it is fixed to.
+    UUID hostId = UUID.randomUUID();
+    when(topologyMonitor.resolve(hostId))
+        .thenReturn(InetSocketAddress.createUnresolved("route.example.com", 9042));
+    ClientRoutesEndPoint ep =
+        new ClientRoutesEndPoint(topologyMonitor, hostId, null, fallbackEndPoint);
+    // Unpinned it does consult the cache, and says yes -- so the assertion below is about pinning,
+    // not about the route having gone away.
+    assertThat(ep.addressesAreInterchangeable(ep.resolve())).isTrue();
+
+    ClientRoutesEndPoint pinnedEp =
+        (ClientRoutesEndPoint) ep.pinTo(new InetSocketAddress("127.0.0.1", 9042));
+    assertThat(pinnedEp).isNotSameAs(ep);
+    Mockito.reset(topologyMonitor);
+
+    assertThat(pinnedEp.addressesAreInterchangeable(pinnedEp.resolve())).isFalse();
+    verify(topologyMonitor, never()).resolve(Mockito.any());
   }
 
   // ---- toString() ---------------------------------------------------------

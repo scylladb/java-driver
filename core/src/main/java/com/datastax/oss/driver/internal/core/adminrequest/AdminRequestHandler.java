@@ -30,8 +30,9 @@ import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.request.Query;
+import com.datastax.oss.protocol.internal.request.Register;
 import com.datastax.oss.protocol.internal.request.query.QueryOptions;
-import com.datastax.oss.protocol.internal.response.Result;
+import com.datastax.oss.protocol.internal.response.Ready;
 import com.datastax.oss.protocol.internal.response.result.Prepared;
 import com.datastax.oss.protocol.internal.response.result.Rows;
 import io.netty.util.concurrent.Future;
@@ -67,6 +68,24 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
         com.datastax.oss.protocol.internal.response.result.Void.class);
   }
 
+  /**
+   * Registers this connection for the given protocol events, as {@link
+   * com.datastax.oss.protocol.internal.request.Register REGISTER} used to be sent as the last step
+   * of protocol initialization.
+   */
+  public static AdminRequestHandler<Void> register(
+      DriverChannel channel, List<String> eventTypes, Duration timeout, String logPrefix) {
+    return new AdminRequestHandler<>(
+        channel,
+        true,
+        new Register(eventTypes),
+        Frame.NO_PAYLOAD,
+        timeout,
+        logPrefix,
+        "register for events " + eventTypes,
+        Ready.class);
+  }
+
   public static AdminRequestHandler<AdminResult> query(
       DriverChannel channel,
       String query,
@@ -98,7 +117,7 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
   private final Duration timeout;
   private final String logPrefix;
   private final String debugString;
-  private final Class<? extends Result> expectedResponseType;
+  private final Class<? extends Message> expectedResponseType;
   protected final CompletableFuture<ResultT> result = new CompletableFuture<>();
 
   // This is only ever accessed on the channel's event loop, so it doesn't need to be volatile
@@ -112,7 +131,7 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
       Duration timeout,
       String logPrefix,
       String debugString,
-      Class<? extends Result> expectedResponseType) {
+      Class<? extends Message> expectedResponseType) {
     this.channel = channel;
     this.shouldPreAcquireId = shouldPreAcquireId;
     this.message = message;
@@ -190,8 +209,9 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
       @SuppressWarnings("unchecked")
       ResultT result = (ResultT) ByteBuffer.wrap(prepared.preparedQueryId);
       setFinalResult(result);
-    } else if (expectedResponseType
-        == com.datastax.oss.protocol.internal.response.result.Void.class) {
+    } else if (expectedResponseType == com.datastax.oss.protocol.internal.response.result.Void.class
+        || expectedResponseType == Ready.class) {
+      // Neither carries a payload: a schema change or a REGISTER acknowledgement.
       setFinalResult(null);
     } else {
       setFinalError(new AssertionError("Unhandled response type" + expectedResponseType));

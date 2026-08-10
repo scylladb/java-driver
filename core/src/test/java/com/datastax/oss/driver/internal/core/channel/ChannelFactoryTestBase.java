@@ -57,6 +57,8 @@ import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalServerChannel;
 import io.netty.resolver.AddressResolverGroup;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timer;
 import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.Collections;
@@ -95,6 +97,12 @@ public abstract class ChannelFactoryTestBase {
 
   DefaultEventLoopGroup serverGroup;
   DefaultEventLoopGroup clientGroup;
+  // Separate from clientGroup, as in production: this is where the shard-aware port scan is
+  // dispatched, and it must not be the channel's own I/O loop.
+  DefaultEventLoopGroup adminGroup;
+  // Where the connect-hook timeout is armed -- deliberately neither of the two groups above, since
+  // the hook runs on one of them and the blocking port scan on the other.
+  Timer timer;
 
   @Mock InternalDriverContext context;
   @Mock DriverConfig driverConfig;
@@ -120,6 +128,10 @@ public abstract class ChannelFactoryTestBase {
 
     serverGroup = new DefaultEventLoopGroup(1);
     clientGroup = new DefaultEventLoopGroup(1);
+    adminGroup = new DefaultEventLoopGroup(1);
+    // A short tick so that stop() -- which joins the worker thread, and runs for every test in
+    // every subclass of this base -- does not wait out a default 100ms one.
+    timer = new HashedWheelTimer(10, TimeUnit.MILLISECONDS);
 
     when(context.getConfig()).thenReturn(driverConfig);
     when(driverConfig.getDefaultProfile()).thenReturn(defaultProfile);
@@ -140,6 +152,8 @@ public abstract class ChannelFactoryTestBase {
     when(context.getProtocolVersionRegistry()).thenReturn(protocolVersionRegistry);
     when(context.getNettyOptions()).thenReturn(nettyOptions);
     when(nettyOptions.ioEventLoopGroup()).thenReturn(clientGroup);
+    when(nettyOptions.adminEventExecutorGroup()).thenReturn(adminGroup);
+    when(nettyOptions.getTimer()).thenReturn(timer);
     when(nettyOptions.channelClass()).thenAnswer((Answer<Object>) i -> LocalChannel.class);
     when(nettyOptions.allocator()).thenReturn(ByteBufAllocator.DEFAULT);
     when(context.getFrameCodec())
@@ -353,5 +367,7 @@ public abstract class ChannelFactoryTestBase {
     clientGroup
         .shutdownGracefully(TIMEOUT_MILLIS, TIMEOUT_MILLIS * 2, TimeUnit.MILLISECONDS)
         .sync();
+    adminGroup.shutdownGracefully(TIMEOUT_MILLIS, TIMEOUT_MILLIS * 2, TimeUnit.MILLISECONDS).sync();
+    timer.stop();
   }
 }

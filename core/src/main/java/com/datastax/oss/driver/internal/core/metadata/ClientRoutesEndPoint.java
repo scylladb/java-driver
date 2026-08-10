@@ -171,30 +171,49 @@ public class ClientRoutesEndPoint implements PinnableEndPoint {
   /**
    * {@inheritDoc}
    *
-   * <p>{@code true} <b>while this node has a route</b>: a route's addresses are alternative ways in
-   * to this one node, so connections may be spread across them.
+   * <p>{@code true} <b>when the address came from a route</b>: a route's addresses are alternative
+   * ways in to this one node, so connections may be spread across them.
    *
-   * <p>Without one, {@link #resolve()} is the fallback endpoint's answer, and whether <i>those</i>
-   * addresses are interchangeable is not this class's to claim -- for the usual fallback, a {@code
+   * <p>Otherwise the address is the fallback endpoint's, and whether <i>those</i> addresses are
+   * interchangeable is not this class's to claim -- for the usual fallback, a {@code
    * DefaultEndPoint} built from a translated broadcast address, it is {@code false}, and a
    * translator that hands back a name ({@code SubnetAddressTranslator} does, under {@code
    * resolve-addresses = false}) is exactly the case where spreading would land one node's channels
    * on different hosts. So the question is deferred to whoever owns the address.
+   *
+   * <p>Which of the two it is is read off {@code resolvedAddress} rather than by asking the route
+   * cache a second time. The cache is an {@code AtomicReference} swapped from the routes-query
+   * thread, not from the one {@code ChannelFactory#connect} runs on, so a {@code
+   * CLIENT_ROUTES_CHANGE} landing between {@link #resolve()} and this call would otherwise have the
+   * two disagree -- and in the direction that matters, a route appearing after a fallback address
+   * was already chosen, the disagreement authorises shuffling exactly the kind of name this method
+   * exists to protect.
+   *
+   * <p>Reading the fallback twice in one connect is safe for every fallback the driver builds:
+   * {@code fallbackEndPoint} is final, and each of them is a {@link DefaultEndPoint} whose {@code
+   * resolve()} is a field read. It is not safe by <i>type</i>, though -- the field is declared
+   * {@link EndPoint}, and on the {@code system.local} path it holds whatever {@code
+   * DefaultTopologyMonitor#buildNodeEndPoint} returned, which passes a subclass's endpoint through
+   * unchanged. A fallback whose {@code resolve()} is not idempotent -- the shape {@link
+   * SniEndPoint} itself had until contact points were kept unresolved, rotating through the proxy's
+   * A-records on every call -- would answer differently here than it did there, and its own address
+   * would then be reported as route-derived and spread across. Not reachable in tree; closing it
+   * properly means having {@code resolve()} report which source it used, which is per-connect state
+   * on an endpoint shared by every connect, so it is named here rather than claimed away.
    */
   @Override
-  public boolean addressesAreInterchangeable() {
-    boolean hasRoute;
-    try {
-      hasRoute = topologyMonitor.resolve(hostId) != null;
-    } catch (IllegalStateException closed) {
-      // Same reasoning as resolve(): a closed monitor means "no route", not a failed connect.
-      hasRoute = false;
+  public boolean addressesAreInterchangeable(@NonNull SocketAddress resolvedAddress) {
+    // Pinned: resolve() short-circuits on the pinned address, so that is what was handed out, and
+    // it denotes the single server this endpoint is now fixed to. Mirrored here so the pinned case
+    // does not consult the route cache at all -- resolve() has not done so since it was pinned.
+    if (pinnedAddress != null) {
+      return false;
     }
-    if (hasRoute) {
-      return true;
-    }
-    return fallbackEndPoint instanceof PinnableEndPoint
-        && ((PinnableEndPoint) fallbackEndPoint).addressesAreInterchangeable();
+    // resolve() returns either the route's address or the fallback's, so anything that is not the
+    // fallback's came from a route.
+    return !resolvedAddress.equals(fallbackEndPoint.resolve())
+        || (fallbackEndPoint instanceof PinnableEndPoint
+            && ((PinnableEndPoint) fallbackEndPoint).addressesAreInterchangeable(resolvedAddress));
   }
 
   @Override

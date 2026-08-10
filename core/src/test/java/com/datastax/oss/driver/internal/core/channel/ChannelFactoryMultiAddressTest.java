@@ -29,6 +29,7 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.TestResponses;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.PinnableEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.SniEndPoint;
 import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.util.AddressUtils;
@@ -38,12 +39,14 @@ import com.datastax.oss.protocol.internal.request.Startup;
 import com.datastax.oss.protocol.internal.response.Authenticate;
 import com.datastax.oss.protocol.internal.response.Ready;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.channel.local.LocalAddress;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketAddress;
+import java.net.SocketException;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
@@ -506,51 +509,61 @@ public class ChannelFactoryMultiAddressTest extends ChannelFactoryTestBase {
         .containsExactly(UNREACHABLE_1, UNREACHABLE_2);
   }
 
-  // ---- spreadAcrossAddresses() ----------------------------------------------
+  // ---- addressesAreInterchangeable() and the two booleans derived from it ----
 
   /** The endpoints below only have to exist; nothing in this section connects to them. */
   private static final InetSocketAddress SOME_ADDRESS =
       InetSocketAddress.createUnresolved("node.example.com", 9042);
 
   @Test
-  public void should_spread_across_the_addresses_of_a_contact_point() {
-    // Nothing is known about a contact point's addresses -- they may be different nodes -- so there
-    // is no node identity to preserve and every shape is spread.
-    assertThat(ChannelFactory.spreadAcrossAddresses(new DefaultEndPoint(SOME_ADDRESS), false))
-        .isTrue();
+  public void should_report_a_proxy_endpoint_interchangeable() {
+    // An SNI proxy routes by server name, so every one of its A-records reaches the same node.
     assertThat(
-            ChannelFactory.spreadAcrossAddresses(
-                new SniEndPoint(SOME_ADDRESS, "server-name"), false))
+            ChannelFactory.addressesAreInterchangeable(
+                new SniEndPoint(SOME_ADDRESS, "server-name"), SOME_ADDRESS))
         .isTrue();
   }
 
   @Test
-  public void should_spread_across_the_addresses_of_an_identified_node_behind_a_proxy() {
-    // An SNI proxy routes by server name, so every one of its A-records reaches this same node.
-    // Spreading is what SniEndPoint#resolve() itself did, by rotating through the sorted records,
-    // before resolution moved to the connection layer.
+  public void should_not_report_a_plain_endpoint_interchangeable() {
+    // The case the flag exists to exclude: a DefaultEndPoint holding a name an AddressTranslator
+    // supplied carries no guarantee that its addresses are one server.
     assertThat(
-            ChannelFactory.spreadAcrossAddresses(
-                new SniEndPoint(SOME_ADDRESS, "server-name"), true))
-        .isTrue();
-  }
-
-  @Test
-  public void should_keep_the_order_for_an_identified_node_on_a_plain_endpoint() {
-    // The case the interchangeability flag exists to exclude: a DefaultEndPoint holding a name an
-    // AddressTranslator supplied carries no guarantee that its addresses are one node.
-    assertThat(ChannelFactory.spreadAcrossAddresses(new DefaultEndPoint(SOME_ADDRESS), true))
+            ChannelFactory.addressesAreInterchangeable(
+                new DefaultEndPoint(SOME_ADDRESS), SOME_ADDRESS))
         .isFalse();
   }
 
   @Test
-  public void should_keep_the_order_for_an_identified_node_on_a_third_party_endpoint() {
+  public void should_not_report_a_third_party_endpoint_interchangeable() {
     // An EndPoint that does not implement PinnableEndPoint cannot say, and the conservative reading
-    // is the one that preserves node identity.
+    // is the one that assumes nothing.
     EndPoint thirdParty = mock(EndPoint.class);
     when(thirdParty.resolve()).thenReturn(SOME_ADDRESS);
 
-    assertThat(ChannelFactory.spreadAcrossAddresses(thirdParty, true)).isFalse();
+    assertThat(ChannelFactory.addressesAreInterchangeable(thirdParty, SOME_ADDRESS)).isFalse();
+  }
+
+  @Test
+  public void should_spread_unless_an_identified_node_says_its_addresses_are_not_one_server() {
+    // A contact point always spreads: nothing is known about its addresses -- they may be
+    // different nodes -- so there is no node identity to preserve.
+    assertThat(ChannelFactory.spreadAcrossAddresses(false, false)).isTrue();
+    assertThat(ChannelFactory.spreadAcrossAddresses(false, true)).isTrue();
+    // An identified node spreads only where its addresses are interchangeable.
+    assertThat(ChannelFactory.spreadAcrossAddresses(true, true)).isTrue();
+    assertThat(ChannelFactory.spreadAcrossAddresses(true, false)).isFalse();
+  }
+
+  @Test
+  public void should_treat_one_server_as_answering_everywhere_only_on_identity_or_interchange() {
+    // Not the negation of the above, and the difference is the whole of DRIVER-201's rolling-
+    // upgrade case: an unidentified contact point on a plain multi-record name is spread across
+    // its addresses *and* must not let one address's rejection speak for the others.
+    assertThat(ChannelFactory.sameServerAtEveryAddress(false, false)).isFalse();
+    assertThat(ChannelFactory.sameServerAtEveryAddress(false, true)).isTrue();
+    assertThat(ChannelFactory.sameServerAtEveryAddress(true, false)).isTrue();
+    assertThat(ChannelFactory.sameServerAtEveryAddress(true, true)).isTrue();
   }
 
   // ---- reattachHostname() ---------------------------------------------------
@@ -615,11 +628,12 @@ public class ChannelFactoryMultiAddressTest extends ChannelFactoryTestBase {
   }
 
   @Test
-  public void should_pass_candidate_through_when_original_carries_no_name() throws Exception {
+  public void should_pass_redirected_candidate_through_when_original_is_an_ip_literal()
+      throws Exception {
     // An original written as an IP literal has no name to carry over, and inventing one from the
     // literal would be worse than leaving the candidate alone: a resolver is free to redirect it to
     // a different IP, which would then be labelled with the literal form of a *different* address.
-    InetSocketAddress original = new InetSocketAddress("127.0.0.1", 9042);
+    InetSocketAddress original = InetSocketAddress.createUnresolved("127.0.0.1", 9042);
     InetSocketAddress candidate =
         new InetSocketAddress(InetAddress.getByAddress(new byte[] {10, 0, 0, 1}), 9042);
 
@@ -630,21 +644,212 @@ public class ChannelFactoryMultiAddressTest extends ChannelFactoryTestBase {
   }
 
   @Test
-  public void should_reattach_name_of_a_resolved_original() throws Exception {
-    // A resolved original still reaches the resolver -- whether an address needs resolving is the
-    // resolver's call, and a custom one may redirect it. Its name is the one the operator
-    // configured, so it must survive onto whatever the resolver substitutes, exactly as it did when
-    // Netty resolved the TCP destination and the channel kept the original endpoint for TLS.
-    InetSocketAddress original = new InetSocketAddress("localhost", 9042);
+  public void should_reattach_the_literal_when_the_resolver_returns_the_same_address()
+      throws Exception {
+    // Not a no-op, even though the label says the same thing the bytes do: a *nameless* address is
+    // what InetSocketAddress#getHostName() answers with a blocking reverse lookup, so leaving the
+    // candidate unlabelled is what would send DefaultSslEngineFactory to a PTR record instead of
+    // the
+    // literal the operator configured. Before multi-address support the contact point stayed
+    // unresolved and the literal came back with no lookup at all; labelling restores exactly that.
+    InetSocketAddress original = InetSocketAddress.createUnresolved("127.0.0.1", 9042);
     InetSocketAddress candidate =
-        new InetSocketAddress(InetAddress.getByAddress(new byte[] {10, 0, 0, 1}), 9042);
+        new InetSocketAddress(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}), 9042);
 
     InetSocketAddress result =
         (InetSocketAddress) ChannelFactory.reattachHostname(original, candidate);
 
+    assertThat(result.getHostString()).isEqualTo("127.0.0.1");
+    // The point of the exercise: getHostName() is a field read answering the configured literal,
+    // not a reverse lookup.
+    assertThat(result.getAddress().getHostName()).isEqualTo("127.0.0.1");
+    assertThat(result.getAddress().getHostAddress()).isEqualTo("127.0.0.1");
+    // And the labelled candidate still reports as a literal, so nothing downstream mistakes it for
+    // a name.
+    assertThat(AddressUtils.carriesName(result)).isFalse();
+  }
+
+  @Test
+  public void should_match_a_non_canonical_ipv6_literal_against_the_candidate() throws Exception {
+    // The literal is compared as an address, not as a string: "::1" and the candidate's
+    // getHostAddress() ("0:0:0:0:0:0:0:1") never compare equal as text.
+    InetSocketAddress original = InetSocketAddress.createUnresolved("::1", 9042);
+    byte[] loopback = new byte[16];
+    loopback[15] = 1;
+    InetSocketAddress candidate = new InetSocketAddress(InetAddress.getByAddress(loopback), 9042);
+
+    InetSocketAddress result =
+        (InetSocketAddress) ChannelFactory.reattachHostname(original, candidate);
+
+    assertThat(result.getHostString()).isEqualTo("::1");
+    assertThat(result.getAddress()).isEqualTo(candidate.getAddress());
+  }
+
+  // ---- materializeLiteral() --------------------------------------------------
+
+  @Test
+  public void should_materialize_an_unresolved_ipv4_literal() {
+    // A literal needs no name service, so an endpoint holding one has no business failing where
+    // resolution is unavailable -- and endpoints hold one routinely now that contact points are
+    // kept unresolved whatever they were written as.
+    InetSocketAddress literal = InetSocketAddress.createUnresolved("127.0.0.1", 9042);
+
+    InetSocketAddress result = (InetSocketAddress) ChannelFactory.materializeLiteral(literal);
+
+    assertThat(result.isUnresolved()).isFalse();
+    assertThat(result.getAddress().getAddress()).isEqualTo(new byte[] {127, 0, 0, 1});
+    assertThat(result.getPort()).isEqualTo(9042);
+    // Labelled with the literal, not left nameless: getHostName() on a nameless address is a
+    // blocking reverse lookup, and DefaultSslEngineFactory would validate the certificate against
+    // whatever PTR record it returned instead of what the operator configured.
+    assertThat(result.getHostName()).isEqualTo("127.0.0.1");
+    assertThat(AddressUtils.carriesName(result)).isFalse();
+  }
+
+  @Test
+  public void should_materialize_a_bracketed_ipv6_literal() {
+    // The spelling AddressUtils#extract preserves: it splits a contact point on its last colon, so
+    // "[::1]:9042" arrives with the brackets still on.
+    InetSocketAddress literal = InetSocketAddress.createUnresolved("[::1]", 9042);
+
+    InetSocketAddress result = (InetSocketAddress) ChannelFactory.materializeLiteral(literal);
+
+    byte[] loopback = new byte[16];
+    loopback[15] = 1;
+    assertThat(result.isUnresolved()).isFalse();
+    assertThat(result.getAddress().getAddress()).isEqualTo(loopback);
+    // Without the brackets: InetAddress.getByAddress(String, byte[]) strips them from the label it
+    // is handed. Still a literal, so getHostName() still answers without a reverse lookup, which is
+    // the only property this label exists for.
+    assertThat(result.getHostName()).isEqualTo("::1");
+  }
+
+  @Test
+  public void should_materialize_a_zoned_ipv6_literal() throws Exception {
+    // A named IPv6 zone is a literal to AddressUtils#carriesName, so it reaches here -- and unlike
+    // the byte-matching in reattachHostname, which resolves the zone through Guava, the JDK turns
+    // the name into a scope id itself. That costs a NetworkInterface syscall rather than a name
+    // lookup, which is the one place materializeLiteral is not free.
+    InetAddress linkLocal = aLinkLocalAddress();
+    assumeThat(linkLocal)
+        .as("requires a host with a link-local IPv6 address on some interface")
+        .isNotNull();
+    // Already the zoned spelling: getHostAddress() on a scoped address renders the zone as the
+    // interface name, e.g. "fe80:0:0:0:...%eth0".
+    String spelling = linkLocal.getHostAddress();
+    assumeThat(spelling).as("expected a named zone").contains("%");
+
+    InetSocketAddress result =
+        (InetSocketAddress)
+            ChannelFactory.materializeLiteral(InetSocketAddress.createUnresolved(spelling, 9042));
+
+    assertThat(result).isNotNull();
+    assertThat(result.isUnresolved()).isFalse();
+    assertThat(result.getAddress().getAddress()).isEqualTo(linkLocal.getAddress());
+    assertThat(result.getPort()).isEqualTo(9042);
+  }
+
+  /**
+   * A link-local IPv6 address of some interface on this host, or {@code null} if it has none. Only
+   * a zone that names an interface which actually carries an address in that scope survives {@code
+   * InetAddress.getByName}, so the address has to be discovered rather than made up.
+   */
+  @Nullable
+  private static InetAddress aLinkLocalAddress() {
+    try {
+      for (NetworkInterface nic : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+        for (InetAddress address : Collections.list(nic.getInetAddresses())) {
+          if (address instanceof Inet6Address && address.isLinkLocalAddress()) {
+            return address;
+          }
+        }
+      }
+    } catch (SocketException unavailable) {
+      // Treated as "this host has none".
+    }
+    return null;
+  }
+
+  @Test
+  public void should_not_materialize_a_zone_this_host_does_not_have() {
+    // The gate and the materializer disagree here: carriesName() calls it a literal, and
+    // InetAddress.getByName() cannot turn a name it has no interface for into a scope id. Falling
+    // through to the caller's diagnostic is the right outcome -- such an address could not have
+    // been connected to either -- but its wording is about host names, which this is not. Recorded
+    // so that the mismatch is a known one rather than a surprise.
+    assertThat(
+            ChannelFactory.materializeLiteral(
+                InetSocketAddress.createUnresolved("fe80::1%no-such-interface", 9042)))
+        .isNull();
+  }
+
+  @Test
+  public void should_not_materialize_a_shorthand_ipv4_literal() {
+    // "127.1" is /127.0.0.1 to InetAddress.getByName and to Netty's default resolver, but Guava's
+    // parser requires four dotted parts, so carriesName() calls it a host name and this returns at
+    // the first gate. Deliberate: getByName("1234") returns /0.0.4.210, so a test as lenient as
+    // the JDK's would turn an all-digit host name into a packed IPv4 address. The cost is that
+    // such a contact point works normally and fails only where no resolver runs.
+    assertThat(ChannelFactory.materializeLiteral(InetSocketAddress.createUnresolved("127.1", 9042)))
+        .isNull();
+  }
+
+  @Test
+  public void should_not_materialize_a_hostname() {
+    // The whole point of the diagnostic this sits in front of: a name genuinely needs a resolver,
+    // and passing it through would fail later inside Netty with UnresolvedAddressException, naming
+    // neither the address nor the reason.
+    assertThat(
+            ChannelFactory.materializeLiteral(
+                InetSocketAddress.createUnresolved("node.example.com", 9042)))
+        .isNull();
+  }
+
+  @Test
+  public void should_not_materialize_an_already_resolved_address() throws Exception {
+    // Nothing to do; the caller passes it through untouched.
+    assertThat(
+            ChannelFactory.materializeLiteral(
+                new InetSocketAddress(InetAddress.getByAddress(new byte[] {10, 0, 0, 1}), 9042)))
+        .isNull();
+  }
+
+  @Test
+  public void should_reattach_the_name_of_an_already_resolved_original() throws Exception {
+    // A resolved original reaches this only because a custom resolver reported it as unresolved in
+    // order to redirect it, and its name is re-attached like any other. `new
+    // InetSocketAddress(String, int)` resolves eagerly and keeps the name it was given, so this is
+    // the shape an AddressTranslator or a third-party EndPoint hands over -- and leaving the
+    // redirected candidate nameless is not neutral: DefaultSslEngineFactory would then take the TLS
+    // peer host from a blocking reverse lookup and validate the certificate against a PTR record
+    // instead of the configured DNS SAN, which is not what the pre-multi-address path did.
+    InetSocketAddress original = new InetSocketAddress("localhost", 9042);
+    InetSocketAddress candidate =
+        new InetSocketAddress(InetAddress.getByAddress(new byte[] {10, 0, 0, 1}), 9042);
+
+    assertThat(original.isUnresolved()).isFalse();
     assertThat(AddressUtils.carriesName(original)).isTrue();
+
+    InetSocketAddress result =
+        (InetSocketAddress) ChannelFactory.reattachHostname(original, candidate);
+
     assertThat(result.getHostString()).isEqualTo("localhost");
-    assertThat(result.getAddress().getHostAddress()).isEqualTo("10.0.0.1");
+    assertThat(result.getAddress().getAddress()).isEqualTo(new byte[] {10, 0, 0, 1});
+    assertThat(result.getPort()).isEqualTo(9042);
+  }
+
+  @Test
+  public void should_leave_a_resolved_original_alone_when_it_carries_no_name() throws Exception {
+    // The other half: a resolved original whose InetAddress has no cached hostName renders the IP
+    // literal, so it takes the literal branch and only matches the address it denotes. A redirect
+    // stays unlabelled rather than being given a name that resolves elsewhere.
+    InetSocketAddress original =
+        new InetSocketAddress(InetAddress.getByAddress(new byte[] {10, 0, 0, 2}), 9042);
+    InetSocketAddress candidate =
+        new InetSocketAddress(InetAddress.getByAddress(new byte[] {10, 0, 0, 1}), 9042);
+
+    assertThat(AddressUtils.carriesName(original)).isFalse();
+    assertThat(ChannelFactory.reattachHostname(original, candidate)).isSameAs(candidate);
   }
 
   @Test
@@ -659,6 +864,108 @@ public class ChannelFactoryMultiAddressTest extends ChannelFactoryTestBase {
     assertThat(result.getHostString()).isEqualTo("test.cluster.fake");
     assertThat(result.getAddress()).isEqualTo(candidate.getAddress());
     assertThat(result.getPort()).isEqualTo(9042);
+  }
+
+  @Test
+  public void should_label_a_candidate_from_a_bracketed_ipv6_literal_original() throws Exception {
+    // A contact point written "[2001:db8::5]:9042" reaches here with its brackets on: extract()
+    // splits on the last colon and keeps everything before it. carriesName() classifies that as a
+    // literal, so this takes the IP-literal branch -- and the branch has to unwrap the brackets
+    // before parsing, because InetAddresses.forString rejects the bracketed form outright.
+    // Failing to parse would return the candidate unlabelled and hand getHostName() a reverse
+    // lookup, which is the outcome the branch exists to prevent.
+    byte[] bytes = InetAddress.getByName("2001:db8::5").getAddress();
+    InetSocketAddress original = InetSocketAddress.createUnresolved("[2001:db8::5]", 9042);
+    InetSocketAddress candidate =
+        new InetSocketAddress(InetAddress.getByAddress(null, bytes), 9042);
+
+    InetSocketAddress result =
+        (InetSocketAddress) ChannelFactory.reattachHostname(original, candidate);
+
+    // Labelled with the literal, and with no lookup. The brackets are gone because
+    // InetAddress.getByAddress(String, byte[]) strips a surrounding pair from the name it is
+    // given -- which is the canonical outcome: getHostString() now answers a bare literal, so
+    // carriesName() reports it as a literal on the way back too.
+    assertThat(result.getHostString()).isEqualTo("2001:db8::5");
+    assertThat(result.getAddress().getAddress()).isEqualTo(bytes);
+    assertThat(result.getPort()).isEqualTo(9042);
+  }
+
+  @Test
+  public void should_not_label_a_redirected_candidate_from_a_bracketed_original() throws Exception {
+    // The redirect guard has to survive the unwrapping: a candidate that is not the address the
+    // bracketed literal denotes must come back unlabelled. Before brackets were recognised this
+    // case took the name-wins branch instead, which relabels unconditionally.
+    InetSocketAddress original = InetSocketAddress.createUnresolved("[2001:db8::5]", 9042);
+    InetSocketAddress candidate =
+        new InetSocketAddress(
+            InetAddress.getByAddress(null, InetAddress.getByName("2001:db8::6").getAddress()),
+            9042);
+
+    assertThat(ChannelFactory.reattachHostname(original, candidate)).isSameAs(candidate);
+  }
+
+  @Test
+  public void should_label_a_candidate_from_a_bracketed_and_zoned_ipv6_literal_original()
+      throws Exception {
+    // Brackets *and* a zone: the brackets have to come off first, or splitting on '%' leaves the
+    // closing bracket inside the zone and the opening one inside the literal, and neither half
+    // parses.
+    byte[] linkLocal = new byte[16];
+    linkLocal[0] = (byte) 0xfe;
+    linkLocal[1] = (byte) 0x80;
+    linkLocal[15] = 1;
+    InetSocketAddress original = InetSocketAddress.createUnresolved("[fe80::1%eth0]", 9042);
+    InetSocketAddress candidate =
+        new InetSocketAddress(Inet6Address.getByAddress(null, linkLocal, 3), 9042);
+
+    InetSocketAddress result =
+        (InetSocketAddress) ChannelFactory.reattachHostname(original, candidate);
+
+    // Bare literal with the zone intact -- getByAddress() strips only the brackets.
+    assertThat(result.getHostString()).isEqualTo("fe80::1%eth0");
+    assertThat(result.getAddress().getAddress()).isEqualTo(linkLocal);
+  }
+
+  @Test
+  public void should_label_a_candidate_from_a_zoned_ipv6_literal_original() throws Exception {
+    // The original is a *literal* with a zone, which carriesName() reports as a literal (Guava's
+    // isInetAddress accepts a zone suffix), so reattachHostname takes its IP-literal branch. That
+    // branch cannot hand the string to InetAddresses.forString: Guava resolves the zone against the
+    // local interfaces and throws when it does not name one -- it rejects even "%lo" on a host that
+    // has an lo interface. Failing there would return the candidate unlabelled, and getHostName()
+    // would then answer with a reverse lookup, which is precisely what this branch exists to stop.
+    byte[] linkLocal = new byte[16];
+    linkLocal[0] = (byte) 0xfe;
+    linkLocal[1] = (byte) 0x80;
+    linkLocal[15] = 1;
+    InetSocketAddress original = InetSocketAddress.createUnresolved("fe80::1%eth0", 9042);
+    InetSocketAddress candidate =
+        new InetSocketAddress(Inet6Address.getByAddress(null, linkLocal, 3), 9042);
+
+    InetSocketAddress result =
+        (InetSocketAddress) ChannelFactory.reattachHostname(original, candidate);
+
+    // Labelled with the literal exactly as configured, zone included, and with no lookup.
+    assertThat(result.getHostString()).isEqualTo("fe80::1%eth0");
+    assertThat(result.getAddress().getAddress()).isEqualTo(linkLocal);
+    assertThat(result.getPort()).isEqualTo(9042);
+  }
+
+  @Test
+  public void should_not_label_a_candidate_that_is_a_different_address_from_a_zoned_original()
+      throws Exception {
+    // The redirect guard still has to hold on the zoned path: a candidate that is not the address
+    // the literal denotes must come back unlabelled.
+    byte[] other = new byte[16];
+    other[0] = (byte) 0xfe;
+    other[1] = (byte) 0x80;
+    other[15] = 2;
+    InetSocketAddress original = InetSocketAddress.createUnresolved("fe80::1%eth0", 9042);
+    InetSocketAddress candidate =
+        new InetSocketAddress(Inet6Address.getByAddress(null, other, 3), 9042);
+
+    assertThat(ChannelFactory.reattachHostname(original, candidate)).isSameAs(candidate);
   }
 
   @Test
@@ -735,6 +1042,60 @@ public class ChannelFactoryMultiAddressTest extends ChannelFactoryTestBase {
   }
 
   @Test
+  public void should_fail_future_when_addresses_are_interchangeable_throws() {
+    // The other implementation-supplied method connect() calls synchronously, and the one that is
+    // easy to miss: it decides whether the resolved addresses may be shuffled. Escaping here would
+    // be worse than escaping from resolve(), because ControlConnection#reconnect neither wraps its
+    // connect() call nor catches inside the whenCompleteAsync callback that drives the recursive
+    // ones -- the throwable would be swallowed and Reconnection left stuck ATTEMPT_IN_PROGRESS,
+    // with no further attempts.
+    when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
+    when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
+    ChannelFactory factory = newChannelFactory();
+    IllegalStateException failure =
+        new IllegalStateException("addressesAreInterchangeable() blew up");
+
+    CompletionStage<DriverChannel> channelFuture =
+        factory.connect(
+            new ThrowingSpreadEndPoint(failure),
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE,
+            // Either value would do: the endpoint is consulted on every connect, because both of
+            // the booleans derived from its answer need it -- an unidentified contact point still
+            // has to know whether one address's rejection speaks for the rest.
+            false);
+
+    assertThatStage(channelFuture).isFailed(e -> assertThat(e).isSameAs(failure));
+  }
+
+  @Test
+  public void should_fail_future_when_endpoint_spread_check_throws_an_error() {
+    // The guard catches Throwable, not Exception. An endpoint supplied by someone else can fail
+    // with an Error just as readily as with an exception -- NoClassDefFoundError or
+    // ExceptionInInitializerError out of lazy class initialization in a shaded or OSGi deployment,
+    // AssertionError under -ea -- and the outcome of letting one escape is the same hang: nothing
+    // upstream completes the future, so the attempt sits with Reconnection stuck in
+    // ATTEMPT_IN_PROGRESS and no further attempt is ever scheduled.
+    when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
+    when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
+    ChannelFactory factory = newChannelFactory();
+    Error failure = new NoClassDefFoundError("com/example/CustomEndPointSupport");
+
+    CompletionStage<DriverChannel> channelFuture =
+        factory.connect(
+            new ThrowingSpreadEndPoint(failure),
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE,
+            true);
+
+    assertThatStage(channelFuture).isFailed(e -> assertThat(e).isSameAs(failure));
+  }
+
+  @Test
   public void should_fail_future_when_endpoint_resolve_returns_null() {
     // EndPoint.resolve() is contractually non-null, but a broken third-party implementation must
     // fail fast rather than NPE later inside an event-loop task, which would leave the future
@@ -795,6 +1156,46 @@ public class ChannelFactoryMultiAddressTest extends ChannelFactoryTestBase {
     @Override
     public SocketAddress resolve() {
       throw failure;
+    }
+
+    @NonNull
+    @Override
+    public String asMetricPrefix() {
+      return "test";
+    }
+  }
+
+  /**
+   * A {@link PinnableEndPoint} whose {@code addressesAreInterchangeable()} throws, standing in for
+   * any implementation-supplied override that can fail -- {@code ClientRoutesEndPoint}'s reaches
+   * the topology monitor and catches only {@link IllegalStateException}.
+   */
+  private static class ThrowingSpreadEndPoint implements PinnableEndPoint {
+
+    private final Throwable failure;
+
+    ThrowingSpreadEndPoint(Throwable failure) {
+      this.failure = failure;
+    }
+
+    @NonNull
+    @Override
+    public SocketAddress resolve() {
+      return InetSocketAddress.createUnresolved("test.cluster.fake", 9042);
+    }
+
+    @Override
+    public boolean addressesAreInterchangeable(@NonNull SocketAddress resolvedAddress) {
+      if (failure instanceof Error) {
+        throw (Error) failure;
+      }
+      throw (RuntimeException) failure;
+    }
+
+    @NonNull
+    @Override
+    public EndPoint pinTo(@NonNull SocketAddress resolvedAddress) {
+      return this;
     }
 
     @NonNull

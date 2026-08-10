@@ -83,9 +83,10 @@ public interface PinnableEndPoint extends EndPoint {
    * Whether the addresses this endpoint expands to are interchangeable, i.e. reaching any one of
    * them is reaching the same node.
    *
-   * <p>This is what decides whether {@code ChannelFactory} may spread connections across them. The
-   * question is a property of <b>what the name denotes</b>, and it splits the name-based endpoints
-   * in two:
+   * <p>{@code ChannelFactory} asks this once per connect and answers two questions with it: whether
+   * it may spread connections across the addresses, and whether a rejection observed at one of them
+   * settles the rest. The question itself is a property of <b>what the name denotes</b>, and it
+   * splits the name-based endpoints in two:
    *
    * <ul>
    *   <li>A <b>front door</b> — an SNI proxy, a cloud private-endpoint route — publishes several
@@ -102,11 +103,45 @@ public interface PinnableEndPoint extends EndPoint {
    *       resolver's order, so a pool converges on one address and the rest serve as fallback.
    * </ul>
    *
-   * <p>Only consulted for a node the driver has already identified. A contact point is spread
-   * across its addresses regardless, since they may well be different nodes and there is no node
-   * identity to preserve yet.
+   * <p>Asked for every endpoint, identified node or contact point alike, but combined with node
+   * identity differently for each of the two questions {@code ChannelFactory} derives (see its
+   * {@code spreadAcrossAddresses} and {@code sameServerAtEveryAddress}):
+   *
+   * <ul>
+   *   <li><b>Spreading.</b> An unidentified contact point is spread across its addresses whatever
+   *       this answers — they may well be different nodes, and there is no node identity to
+   *       preserve yet. So this only ever <i>withholds</i> spreading, and only for an identified
+   *       node.
+   *   <li><b>Failure scope.</b> An identified node's addresses are all that node, so a rejection
+   *       there is node-wide whatever this answers. For an unidentified contact point it is this
+   *       method that decides: a front door means one server answered for all of them, a plain
+   *       multi-record name means the next address is a different server and must still be tried.
+   * </ul>
+   *
+   * <p>Which is why {@code false} is the safe default and is what {@link EndPoint} implementations
+   * outside this interface get: it neither withholds spreading from a contact point nor lets one
+   * address speak for the others.
+   *
+   * <p>Implementations should derive the answer from {@code resolvedAddress} — what {@link
+   * #resolve()} just returned for this connect — rather than by asking the same source again. An
+   * endpoint whose answer comes from mutable state consulted twice can be asked on either side of a
+   * change and give two answers that describe different addresses, and the one that matters is the
+   * address actually about to be dialled. {@code ClientRoutesEndPoint} is the case in point: a
+   * route appearing between the two reads would authorise spreading for an address that came from
+   * its <i>fallback</i> endpoint, which is the one thing this method exists to prevent.
+   *
+   * <p>Stated as guidance and not as a guarantee, because the driver's own implementation of it
+   * does not fully hold: {@code ClientRoutesEndPoint#addressesAreInterchangeable} decides "not from
+   * a route" by comparing against {@code fallbackEndPoint.resolve()}, which is asking a source
+   * again. It is sound for every fallback the driver builds — each is a {@code DefaultEndPoint}
+   * whose {@code resolve()} is a field read — and unsound by type, since the field is declared
+   * {@link EndPoint}. That method's own javadoc sets out the case and the fix it would take (having
+   * {@code resolve()} report which source it used); it is named here so that an implementer reading
+   * this paragraph is not told the in-tree code satisfies something it does not.
+   *
+   * @param resolvedAddress the address {@link #resolve()} returned for this connect attempt.
    */
-  default boolean addressesAreInterchangeable() {
+  default boolean addressesAreInterchangeable(@NonNull SocketAddress resolvedAddress) {
     return false;
   }
 

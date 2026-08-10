@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.channel;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import net.jcip.annotations.Immutable;
@@ -54,17 +55,41 @@ public class DriverChannelOptions {
    */
   public final boolean reportConfig;
 
+  /**
+   * A step the caller runs against every candidate channel after protocol initialization, with the
+   * power to reject it while {@link ChannelFactory} still holds the endpoint's other addresses, or
+   * {@code null} if the caller has no vetting to do. Precedent for a behavioral member here: {@link
+   * #eventCallback}.
+   *
+   * <p>The control connection supplies one when connecting to a node whose {@code host_id} is not
+   * yet known -- a contact point, the one case with something to learn -- to read {@code
+   * system.local} and refuse a channel whose node cannot identify itself.
+   *
+   * @see ConnectHook
+   */
+  public final ConnectHook connectHook;
+
+  /**
+   * How long the factory waits for {@link #connectHook}'s stage before treating the candidate as
+   * rejected. Never null when {@link #connectHook} is set.
+   */
+  public final Duration connectHookTimeout;
+
   private DriverChannelOptions(
       CqlIdentifier keyspace,
       List<String> eventTypes,
       EventCallback eventCallback,
       String ownerLogPrefix,
-      boolean reportConfig) {
+      boolean reportConfig,
+      ConnectHook connectHook,
+      Duration connectHookTimeout) {
     this.keyspace = keyspace;
     this.eventTypes = eventTypes;
     this.eventCallback = eventCallback;
     this.ownerLogPrefix = ownerLogPrefix;
     this.reportConfig = reportConfig;
+    this.connectHook = connectHook;
+    this.connectHookTimeout = connectHookTimeout;
   }
 
   public static class Builder {
@@ -73,6 +98,8 @@ public class DriverChannelOptions {
     private EventCallback eventCallback = null;
     private String ownerLogPrefix = null;
     private boolean reportConfig = false;
+    private ConnectHook connectHook = null;
+    private Duration connectHookTimeout = null;
 
     public Builder withKeyspace(CqlIdentifier keyspace) {
       this.keyspace = keyspace;
@@ -100,9 +127,27 @@ public class DriverChannelOptions {
       return this;
     }
 
+    /**
+     * Arms a step that vets every candidate channel after protocol initialization, bounded by the
+     * given timeout. See {@link ConnectHook} for the contract.
+     */
+    public Builder withConnectHook(ConnectHook connectHook, Duration connectHookTimeout) {
+      Preconditions.checkNotNull(connectHook);
+      Preconditions.checkNotNull(connectHookTimeout);
+      this.connectHook = connectHook;
+      this.connectHookTimeout = connectHookTimeout;
+      return this;
+    }
+
     public DriverChannelOptions build() {
       return new DriverChannelOptions(
-          keyspace, eventTypes, eventCallback, ownerLogPrefix, reportConfig);
+          keyspace,
+          eventTypes,
+          eventCallback,
+          ownerLogPrefix,
+          reportConfig,
+          connectHook,
+          connectHookTimeout);
     }
   }
 }

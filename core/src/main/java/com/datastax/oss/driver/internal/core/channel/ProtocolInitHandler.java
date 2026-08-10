@@ -52,7 +52,6 @@ import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.request.AuthResponse;
 import com.datastax.oss.protocol.internal.request.Options;
 import com.datastax.oss.protocol.internal.request.Query;
-import com.datastax.oss.protocol.internal.request.Register;
 import com.datastax.oss.protocol.internal.request.Startup;
 import com.datastax.oss.protocol.internal.response.AuthChallenge;
 import com.datastax.oss.protocol.internal.response.AuthSuccess;
@@ -159,7 +158,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
     GET_CLUSTER_NAME,
     SET_KEYSPACE,
     AUTH_RESPONSE,
-    REGISTER,
   }
 
   private class InitRequest extends ChannelHandlerRequest {
@@ -170,12 +168,10 @@ class ProtocolInitHandler extends ConnectInitHandler {
     private Message request;
     private Authenticator authenticator;
     private ByteBuffer authResponseToken;
-    private final List<String> registerEventTypes;
 
     InitRequest(ChannelHandlerContext ctx) {
       super(ctx, timeoutMillis);
       this.step = querySupportedOptions ? Step.OPTIONS : Step.STARTUP;
-      this.registerEventTypes = options.eventTypes;
     }
 
     @Override
@@ -206,8 +202,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
           return request = new Query("USE " + options.keyspace.asCql(false));
         case AUTH_RESPONSE:
           return request = new AuthResponse(authResponseToken);
-        case REGISTER:
-          return request = new Register(registerEventTypes);
         default:
           throw new AssertionError("unhandled step: " + step);
       }
@@ -330,21 +324,11 @@ class ProtocolInitHandler extends ConnectInitHandler {
             if (options.keyspace != null) {
               step = Step.SET_KEYSPACE;
               send();
-            } else if (!registerEventTypes.isEmpty()) {
-              step = Step.REGISTER;
-              send();
             } else {
               setConnectSuccess();
             }
           }
         } else if (step == Step.SET_KEYSPACE && response instanceof SetKeyspace) {
-          if (!registerEventTypes.isEmpty()) {
-            step = Step.REGISTER;
-            send();
-          } else {
-            setConnectSuccess();
-          }
-        } else if (step == Step.REGISTER && response instanceof Ready) {
           setConnectSuccess();
         } else if (response instanceof Error) {
           Error error = (Error) response;
@@ -366,17 +350,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
           } else if (step == Step.SET_KEYSPACE
               && error.code == ProtocolConstants.ErrorCode.INVALID) {
             fail(new InvalidKeyspaceException(error.message));
-          } else if (step == Step.REGISTER
-              && error.code == ErrorCode.PROTOCOL_ERROR
-              && error.message.contains(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE)) {
-            // The server rejected CLIENT_ROUTES_CHANGE as an unknown event type.
-            // Fail the connection so that the caller (ClientRoutesTopologyMonitor.init())
-            // gets a clear error instead of silently degrading.
-            fail(
-                "Server does not support CLIENT_ROUTES_CHANGE event "
-                    + "(requires ScyllaDB Enterprise >= 2026.1). "
-                    + "Either upgrade the server or remove the client routes configuration.",
-                null);
           } else {
             failOnUnexpected(error);
           }

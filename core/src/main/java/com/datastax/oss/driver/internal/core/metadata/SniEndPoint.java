@@ -30,6 +30,15 @@ public class SniEndPoint implements PinnableEndPoint {
   private final String serverName;
 
   /**
+   * Built once, like {@link DefaultEndPoint}'s and {@link ClientRoutesEndPoint}'s. Both of the
+   * fields it derives from are final, and {@link PinnableEndPoint#sameIdentity} makes this the
+   * driver's identity test for endpoints: it is called for both sides of every node on every
+   * topology refresh, and {@code ControlConnection#isControlNode} calls it again for every distance
+   * and state event arriving during a control connect.
+   */
+  private final String metricPrefix;
+
+  /**
    * The proxy IP this endpoint has been {@linkplain #pinTo(SocketAddress) pinned} to, or {@code
    * null} if it is not pinned. Deliberately excluded from {@link #equals} and {@link #hashCode}: a
    * pinned copy denotes the same node as the original.
@@ -56,6 +65,13 @@ public class SniEndPoint implements PinnableEndPoint {
         storeUnresolved(Objects.requireNonNull(proxyAddress, "SNI address cannot be null"));
     this.serverName = Objects.requireNonNull(serverName, "SNI Server name cannot be null");
     this.pinnedAddress = pinnedAddress;
+    String hostString = this.proxyAddress.getHostString();
+    if (hostString == null) {
+      throw new IllegalArgumentException(
+          "Could not extract a host string from provided proxy address " + proxyAddress);
+    }
+    this.metricPrefix =
+        hostString.replace('.', '_') + ':' + this.proxyAddress.getPort() + '_' + serverName;
   }
 
   /**
@@ -81,9 +97,20 @@ public class SniEndPoint implements PinnableEndPoint {
    * {@link #asMetricPrefix()} off a string that can change underneath them would move a node's
    * metrics mid-session and make endpoints built before and after the first TLS handshake compare
    * unequal. An unresolved address has no such field to fill in: its host string is fixed at
-   * construction, and {@code getHostName()} on it performs no lookup. SNI's reverse lookup still
-   * happens, on the {@linkplain #pinTo(SocketAddress) pinned} copy that carries the IP the channel
-   * actually reached.
+   * construction, and {@code getHostName()} on it performs no lookup.
+   *
+   * <p>The reverse lookup does not simply move to the {@linkplain #pinTo(SocketAddress) pinned}
+   * copy, though: it stops happening. {@code ChannelFactory#reattachHostname} labels every
+   * candidate before it is pinned -- with the queried name when the proxy is a hostname, and with
+   * the literal itself when it is an IP literal, deliberately, so that the SSL engine is never
+   * handed a PTR record. Either way {@code getHostName()} on the pinned copy is a field read, so
+   * {@code advanced.ssl-engine-factory.allow-dns-reverse-lookup-san} no longer changes what this
+   * endpoint's certificate is validated against. For a hostname proxy that is what happened before
+   * as well ({@code InetAddress.getAllByName} labels its answers with the queried name). For an
+   * IP-literal proxy it is a change: those answers carried no label, so the option did reach a PTR
+   * record, and a proxy certificate that carries only a DNS SAN for that name now fails the
+   * handshake. Documented in the upgrade guide; not restored, because restoring it means a blocking
+   * reverse lookup inside the channel initializer, which is what this change removed.
    *
    * <p>What this cannot defend against is an instance the caller polluted before handing it over,
    * i.e. called {@code getHostName()} on themselves.
@@ -148,9 +175,16 @@ public class SniEndPoint implements PinnableEndPoint {
    * same node, and connections may be spread across them. That restores what this endpoint did
    * itself before resolution moved to the connection layer, when {@code resolve()} sorted the proxy
    * A-records and rotated through them on every call.
+   *
+   * <p>It is the right answer to the other question this decides too: because one server answers
+   * behind every A-record, a protocol-version or event-type rejection observed at one of them is a
+   * rejection by all of them, and the remaining proxy IPs need not be dialled to confirm it.
+   *
+   * <p>The address is not consulted: there is only ever one source here — the proxy — so every
+   * address this endpoint can hand out has the same answer.
    */
   @Override
-  public boolean addressesAreInterchangeable() {
+  public boolean addressesAreInterchangeable(@NonNull SocketAddress resolvedAddress) {
     return true;
   }
 
@@ -182,11 +216,6 @@ public class SniEndPoint implements PinnableEndPoint {
   @NonNull
   @Override
   public String asMetricPrefix() {
-    String hostString = proxyAddress.getHostString();
-    if (hostString == null) {
-      throw new IllegalArgumentException(
-          "Could not extract a host string from provided proxy address " + proxyAddress);
-    }
-    return hostString.replace('.', '_') + ':' + proxyAddress.getPort() + '_' + serverName;
+    return metricPrefix;
   }
 }

@@ -78,6 +78,12 @@ public class ChannelFactoryNettyResolverTest extends ChannelFactoryTestBase {
         new TestAddressResolverGroup(Arrays.asList(UNREACHABLE, SERVER_ADDRESS.resolve()));
     installResolver(resolverGroup);
     ChannelFactory factory = newChannelFactory();
+    // Keeping the resolver's order is what makes success here mean anything: it puts the dead
+    // record first, so the connect can only succeed by falling back to the second address. Left to
+    // the production shuffle the dialled order is a coin flip for a two-element list, and this test
+    // would pass about half the time even with the fallback in tryNextCandidate() broken -- those
+    // runs simply dial the reachable address first and never exercise it.
+    factory.random = new KeepResolverOrder();
 
     // When – the endpoint itself performs no resolution at all; it just yields the hostname.
     CompletionStage<DriverChannel> channelFuture =
@@ -90,9 +96,8 @@ public class ChannelFactoryNettyResolverTest extends ChannelFactoryTestBase {
     // The handshake only happens once we fall back to the reachable second address.
     completeSimpleChannelInit();
 
-    // Then – the custom resolver was consulted for the hostname, and *all* the addresses it
-    // returned
-    // were tried, so the connection survived the dead first record.
+    // Then – the custom resolver was consulted for the hostname, and the dead first record did
+    // not end the attempt: the connection survived it by trying the address behind it.
     assertThatStage(channelFuture).isSuccess();
     assertThat(resolverGroup.queried)
         .as("the custom Netty resolver must be the one expanding the hostname")
@@ -222,6 +227,147 @@ public class ChannelFactoryNettyResolverTest extends ChannelFactoryTestBase {
   }
 
   @Test
+  public void should_materialize_an_ip_literal_when_the_user_disabled_the_resolver() {
+    // Given – disableResolver() and an endpoint holding an unresolved IP literal, which is now the
+    // ordinary shape: contact points are kept unresolved whatever they were written as. Before
+    // that they arrived here already resolved and disableResolver() worked with them, and a
+    // literal needs no name service for that to stay true.
+    when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
+    when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
+    TestAddressResolverGroup resolverGroup =
+        new TestAddressResolverGroup(Collections.singletonList(UNREACHABLE));
+    doAnswer(
+            invocation -> {
+              Bootstrap bootstrap = invocation.getArgument(0);
+              bootstrap.resolver(resolverGroup).disableResolver();
+              return null;
+            })
+        .when(nettyOptions)
+        .afterBootstrapInitialized(any(Bootstrap.class));
+    ChannelFactory factory = newChannelFactory();
+
+    // When
+    CompletionStage<DriverChannel> channelFuture =
+        factory.connect(
+            new DefaultEndPoint(InetSocketAddress.createUnresolved("127.0.0.1", 9042)),
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
+
+    // Then – it got as far as dialling the literal. The transport in this harness is Netty's local
+    // one, so an InetSocketAddress has nothing bound to it and the connect is refused by name --
+    // which is the point: the attempt failed at the socket, not at the "nothing will resolve this"
+    // diagnostic it used to die on before reaching one.
+    assertThatStage(channelFuture)
+        .isFailed(
+            e -> {
+              assertThat(e).isNotInstanceOf(IllegalStateException.class);
+              assertThat(e).hasMessageContaining("127.0.0.1");
+            });
+    assertThat(resolverGroup.resolverRequested).isFalse();
+  }
+
+  @Test
+  public void should_still_fail_a_hostname_when_the_user_disabled_the_resolver() {
+    // The other half of the same branch: a name genuinely needs a resolver, so it keeps failing --
+    // with a message that names disableResolver() as the cause, since that is what the operator
+    // has to undo.
+    when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
+    when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
+    doAnswer(
+            invocation -> {
+              Bootstrap bootstrap = invocation.getArgument(0);
+              bootstrap
+                  .resolver(new TestAddressResolverGroup(Collections.singletonList(UNREACHABLE)))
+                  .disableResolver();
+              return null;
+            })
+        .when(nettyOptions)
+        .afterBootstrapInitialized(any(Bootstrap.class));
+    ChannelFactory factory = newChannelFactory();
+
+    CompletionStage<DriverChannel> channelFuture =
+        factory.connect(
+            new DefaultEndPoint(HOSTNAME),
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
+
+    assertThatStage(channelFuture)
+        .isFailed(
+            e -> {
+              assertThat(e).isInstanceOf(IllegalStateException.class);
+              assertThat(e.getMessage())
+                  .contains("test.cluster.fake")
+                  .contains("the bootstrap has name resolution disabled");
+            });
+  }
+
+  @Test
+  public void should_pass_a_declined_address_through_untouched() {
+    // Given – a resolver that declines every address, as a real one does for an address type it
+    // does
+    // not handle (DefaultNameResolver declines anything that is not an InetSocketAddress). Netty
+    // passes such an address through in Bootstrap#doResolveAndConnect0, and so must the driver.
+    when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
+    when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
+    TestAddressResolverGroup resolverGroup =
+        new TestAddressResolverGroup(Collections.singletonList(UNREACHABLE), false, true);
+    installResolver(resolverGroup);
+    ChannelFactory factory = newChannelFactory();
+
+    // When – the endpoint yields an already-usable address.
+    CompletionStage<DriverChannel> channelFuture =
+        factory.connect(
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
+    completeSimpleChannelInit();
+
+    // Then – it connected to the address as given; nothing was looked up or substituted.
+    assertThatStage(channelFuture).isSuccess();
+    assertThat(resolverGroup.queried).isEmpty();
+  }
+
+  @Test
+  public void should_report_a_declined_unresolved_address_as_such() {
+    // Given – the same declining resolver, but now the address needs resolving. Nothing downstream
+    // will do it (connectToAddress uses a bootstrap clone with disableResolver()), so this fails
+    // every connection attempt for the session and the message has to name the actual cause. Naming
+    // the disabled-resolver case instead would send the operator looking for a
+    // Bootstrap.disableResolver() nobody called.
+    when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
+    when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
+    installResolver(
+        new TestAddressResolverGroup(Collections.singletonList(UNREACHABLE), false, true));
+    ChannelFactory factory = newChannelFactory();
+
+    // When
+    CompletionStage<DriverChannel> channelFuture =
+        factory.connect(
+            new DefaultEndPoint(HOSTNAME),
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
+
+    // Then
+    assertThatStage(channelFuture)
+        .isFailed(
+            e -> {
+              assertThat(e).isInstanceOf(IllegalStateException.class);
+              assertThat(e.getMessage())
+                  .contains("test.cluster.fake")
+                  .contains("the configured resolver does not support this address")
+                  .doesNotContain("disableResolver");
+            });
+  }
+
+  @Test
   public void should_pass_already_resolved_address_through_untouched() {
     // Given – an endpoint whose address is already resolved, which is the common case: metadata
     // nodes hold resolved addresses from the peers rows, so this is every pool refill and every
@@ -252,6 +398,49 @@ public class ChannelFactoryNettyResolverTest extends ChannelFactoryTestBase {
     assertThat(resolverGroup.resolverRequested)
         .as("whether an address needs resolving must be the resolver's decision")
         .isTrue();
+  }
+
+  @Test
+  public void should_pass_a_name_through_when_the_resolver_claims_it_is_resolved() {
+    // Given – NoopAddressResolverGroup's shape: supports every address, reports every address
+    // resolved. That is not a broken resolver, it is Netty's documented way of handing name
+    // resolution to something in the pipeline -- a ProxyHandler added through
+    // NettyOptions.afterChannelInitialized(), which intercepts the connect and sends the name on
+    // to the proxy. Netty's own Bootstrap#doResolveAndConnect0 short-circuits on exactly this and
+    // calls doConnect() with the address untouched.
+    //
+    // Refusing it would fail *every* connect of the session, contact points now being kept
+    // unresolved whatever they were written as -- so 127.0.0.1:9042 would die here too.
+    when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
+    when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
+    TestAddressResolverGroup resolverGroup =
+        TestAddressResolverGroup.claimingEverythingIsResolved();
+    installResolver(resolverGroup);
+    ChannelFactory factory = newChannelFactory();
+
+    // When
+    CompletionStage<DriverChannel> channelFuture =
+        factory.connect(
+            new DefaultEndPoint(HOSTNAME),
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
+
+    // Then – the connect was attempted with the name as-is. It cannot succeed here: these tests run
+    // over Netty's local transport, which has no server bound to an InetSocketAddress, so the
+    // failure comes from the transport. What matters is which failure -- withholding the
+    // pass-through fails it in resolveCandidates() instead, with the IllegalStateException that
+    // tells the operator to fix their resolver.
+    assertThatStage(channelFuture)
+        .isFailed(
+            e ->
+                assertThat(e)
+                    .as("the resolver's claim must be honoured, as Netty honours it")
+                    .isNotInstanceOf(IllegalStateException.class));
+    assertThat(resolverGroup.queried)
+        .as("an address the resolver called resolved must not then be resolved")
+        .isEmpty();
   }
 
   @Test
