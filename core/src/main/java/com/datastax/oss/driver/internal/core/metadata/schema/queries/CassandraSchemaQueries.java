@@ -171,7 +171,7 @@ public abstract class CassandraSchemaQueries implements SchemaQueries {
   }
 
   protected boolean shouldApplyUsingTimeout() {
-    // We use non-null sharding info as a proxy check for cluster being a ScyllaDB cluster
+    // We use non-null sharding info as a proxy check for cluster being a ScyllaDB cluster.
     return (channel.getShardingInfo() != null);
   }
 
