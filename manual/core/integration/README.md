@@ -473,8 +473,10 @@ dependency:
 [Jackson](https://github.com/FasterXML/jackson) is used:
 
 * when Insights monitoring is enabled;
-* when [Json codecs](../custom_codecs) are being used. 
- 
+* when [Json codecs](../custom_codecs) are being used;
+* when driver configuration reporting is enabled — `advanced.driver-config-reporting.enabled`, which
+  **defaults to true**. The report is serialized to JSON with Jackson.
+
 Jackson is declared as a required dependency, but the driver can operate normally without it. If you
 don't use any of the above features, you can safely exclude the dependency:
 
@@ -491,6 +493,11 @@ don't use any of the above features, you can safely exclude the dependency:
   </exclusions>
 </dependency>
 ```
+
+Note that configuration reporting is the one feature in that list which is enabled by default, so
+excluding Jackson turns it off without you having to opt out: the driver logs an informational message
+at startup and does not send `DRIVER_CONFIG`. Nothing else changes — `SESSION_ID` is still sent on
+every connection, and connecting is unaffected.
 
 #### Esri
 

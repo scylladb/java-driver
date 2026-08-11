@@ -167,6 +167,19 @@ public class DefaultDriverConfigReporterTest {
     assertThat(options).containsKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
   }
 
+  @Test
+  public void should_report_nothing_at_all_without_jackson() {
+    // DefaultDriverContext substitutes NoopDriverConfigReporter when Jackson is absent, since
+    // linking DefaultDriverConfigReporter on such a classpath raises a NoClassDefFoundError — an
+    // Error, raised before any of its methods run, so neither its own fail-safe nor its caller in
+    // ProtocolInitHandler could contain it. The absent-classpath path itself cannot be exercised
+    // in-process; what is checked here is that the substitute contributes nothing and, in
+    // particular, does not need a context to say so.
+    Map<String, String> options = new HashMap<>();
+    new NoopDriverConfigReporter().populateControlConnectionOptions(options);
+    assertThat(options).isEmpty();
+  }
+
   // ==================== Fail-safe ====================
 
   @Test

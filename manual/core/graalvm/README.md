@@ -152,8 +152,11 @@ following configurations must be added:
 ### Using the Jackson JSON library
 
 [Jackson](https://github.com/FasterXML/jackson) is used in [a few places](../integration#jackson) in 
-the driver, but is an optional dependency; if you intend to use Jackson, the following 
-configurations must be added:
+the driver, but is an optional dependency. One of those places — driver configuration reporting — is
+enabled by default, so the entries below are needed unless you are content for it to be disabled: the
+driver detects Jackson reflectively, and without them it will not find it and will skip the report.
+
+If you intend to use Jackson, the following configurations must be added:
 
 1. Create the following reflection.json file, or add these entries to an existing file:
 
