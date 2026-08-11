@@ -78,4 +78,16 @@ public class ConstantSpeculativeExecutionPolicyTest {
     // Second speculative execution starts, we're at 3 => stop
     assertThat(policy.nextExecution(null, null, request, 3)).isNegative();
   }
+
+  @Test
+  public void should_expose_the_parameters_it_was_built_with() {
+    // Read by the configuration report, which describes the running policy rather than the profile:
+    // a later reload does not reach these fields, and this option is not modifiable at runtime.
+    mockOptions(3, 100);
+    ConstantSpeculativeExecutionPolicy policy =
+        new ConstantSpeculativeExecutionPolicy(context, DriverExecutionProfile.DEFAULT_NAME);
+
+    assertThat(policy.getMaxExecutions()).isEqualTo(3);
+    assertThat(policy.getConstantDelayMillis()).isEqualTo(100);
+  }
 }
