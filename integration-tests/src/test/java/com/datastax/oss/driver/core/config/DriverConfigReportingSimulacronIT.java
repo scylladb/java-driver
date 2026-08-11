@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.core.config;
 
+import static com.datastax.oss.driver.core.config.DriverConfigReportingAssertions.assertDriverConfigPayload;
 import static com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter.DRIVER_CONFIG_KEY;
 import static com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder.CLIENT_ID_KEY;
 import static com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder.SESSION_ID_KEY;
@@ -33,9 +34,6 @@ import com.datastax.oss.protocol.internal.request.Register;
 import com.datastax.oss.protocol.internal.request.Startup;
 import com.datastax.oss.simulacron.common.cluster.ClusterSpec;
 import com.datastax.oss.simulacron.common.cluster.QueryLog;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +57,7 @@ import org.junit.experimental.categories.Category;
  *       <em>whatever</em> {@code advanced.driver-config-reporting.enabled} is set to — it is an
  *       innate startup option, not part of configuration reporting;
  *   <li>{@code DRIVER_CONFIG} is present only on the control connection, and only when {@code
- *       advanced.driver-config-reporting.enabled} is true.
+ *       advanced.driver-config-reporting.enabled} is true (which is the default).
  * </ul>
  *
  * <p>The control connection is identified independently of the reported options: it is the only
@@ -74,8 +72,6 @@ import org.junit.experimental.categories.Category;
  */
 @Category(ParallelizableTests.class)
 public class DriverConfigReportingSimulacronIT {
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   // A single node yields one dedicated control connection plus a pool connection (local.size
   // defaults to 1), i.e. at least two distinct session connections of which only the control one
@@ -118,27 +114,10 @@ public class DriverConfigReportingSimulacronIT {
       assertThat(withDriverConfig).hasSize(1);
       assertThat(withDriverConfig.get(0).getConnection()).isEqualTo(controlConnection);
 
-      // The payload is the stage-1 report: valid JSON carrying exactly the schema version.
-      assertStageOnePayload(options(withDriverConfig.get(0)).get(DRIVER_CONFIG_KEY));
+      // The payload is the stage-2 report: valid JSON carrying the schema version and the full
+      // configuration (checked here via the always-present query.load-balancing.policy group).
+      assertDriverConfigPayload(options(withDriverConfig.get(0)).get(DRIVER_CONFIG_KEY));
     }
-  }
-
-  /**
-   * Asserts that a {@code DRIVER_CONFIG} value is the stage-1 payload: well-formed JSON whose
-   * {@code version} is the integer {@code 1}. Guards against an incorrect schema version or a
-   * malformed blob slipping through a mere key-presence check.
-   */
-  private static void assertStageOnePayload(String driverConfig) {
-    JsonNode root;
-    try {
-      root = OBJECT_MAPPER.readTree(driverConfig);
-    } catch (JsonProcessingException e) {
-      throw new AssertionError("DRIVER_CONFIG is not valid JSON: " + driverConfig, e);
-    }
-    assertThat(root.path("version").isInt())
-        .as("version is an integer in %s", driverConfig)
-        .isTrue();
-    assertThat(root.path("version").intValue()).isEqualTo(1);
   }
 
   @Test
@@ -160,6 +139,25 @@ public class DriverConfigReportingSimulacronIT {
       // ... while the configuration itself is reported nowhere.
       assertThat(startups)
           .allSatisfy(log -> assertThat(options(log)).doesNotContainKey(DRIVER_CONFIG_KEY));
+    }
+  }
+
+  @Test
+  public void should_report_driver_config_by_default() {
+    // No override for advanced.driver-config-reporting.enabled: exercises the shipped default.
+    try (CqlSession session = SessionUtils.newSession(SIMULACRON_RULE)) {
+      awaitControlAndPoolConnected();
+
+      List<QueryLog> startups = sessionStartups();
+      assertThat(distinctConnections(startups)).isGreaterThanOrEqualTo(2);
+
+      assertThat(startups).allSatisfy(log -> assertThat(options(log)).containsKey(SESSION_ID_KEY));
+      List<QueryLog> withDriverConfig =
+          startups.stream()
+              .filter(log -> options(log).containsKey(DRIVER_CONFIG_KEY))
+              .collect(Collectors.toList());
+      assertThat(withDriverConfig).hasSize(1);
+      assertDriverConfigPayload(options(withDriverConfig.get(0)).get(DRIVER_CONFIG_KEY));
     }
   }
 

@@ -1175,16 +1175,26 @@ public enum DefaultDriverOption implements DriverOption {
    */
   ADDRESS_TRANSLATOR_RESOLVE_ADDRESSES("advanced.address-translator.resolve-addresses"),
   /**
-   * Whether the driver reports its effective configuration to ScyllaDB at connection time.
+   * Whether the driver reports its effective configuration to the cluster at connection time.
+   * Defaults to {@code true}.
    *
-   * <p>When {@code true}, the driver adds two entries to the CQL {@code STARTUP} options, which
-   * ScyllaDB stores in {@code system.clients.client_options} so operators can inspect driver
-   * settings while investigating incidents: a {@code SESSION_ID} on every connection (so the server
-   * can group a session's connections) and a compact JSON payload under the {@code DRIVER_CONFIG}
-   * key on the control connection only. At this stage the {@code DRIVER_CONFIG} payload carries
-   * only schema-version metadata (<code>{"version":1}</code>); reporting of the effective
-   * configuration fields is planned for a later stage. When {@code false}, neither entry is sent
-   * and there is no change on the wire.
+   * <p>When {@code true}, the control connection adds a compact JSON payload under the {@code
+   * DRIVER_CONFIG} key to its CQL {@code STARTUP} options, which the server stores in its
+   * client-connection system table ({@code system.clients} on ScyllaDB, {@code
+   * system_views.clients} on Cassandra 4.1+) so operators can inspect driver settings while
+   * investigating incidents. It describes the effective configuration of the driver's default
+   * execution profile (connection/socket settings, timeouts, retry/reconnection/
+   * speculative-execution/load-balancing policies, connection pooling, query defaults, and TLS).
+   * Only the control connection sends it, since it describes the whole session. When {@code false},
+   * {@code DRIVER_CONFIG} is not sent.
+   *
+   * <p>This option governs {@code DRIVER_CONFIG} only. The {@code SESSION_ID} startup option, which
+   * lets the server group all of a session's connections, is an innate driver behavior: it is sent
+   * on every connection unconditionally, whatever this is set to. So turning reporting off is not
+   * the same as leaving the wire unchanged.
+   *
+   * <p>Reporting is best-effort: if the report cannot be built, or would exceed 32 KiB, it is
+   * skipped (with a warning) rather than allowed to interfere with connecting.
    *
    * <p>Value type: boolean
    */

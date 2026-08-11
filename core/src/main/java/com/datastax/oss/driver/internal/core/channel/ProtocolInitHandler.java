@@ -191,9 +191,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
           return request = Options.INSTANCE;
         case STARTUP:
           Map<String, String> startupOptions = new HashMap<>(context.getStartupOptions());
-          if (featureStore != null) {
-            featureStore.populateStartupOptions(startupOptions);
-          }
+          featureStore.populateStartupOptions(startupOptions);
           // The DRIVER_CONFIG blob describes the whole session, so only the control connection
           // carries it (options.reportConfig); the other connections are correlated to it by the
           // SESSION_ID that every connection already carries from context.getStartupOptions().

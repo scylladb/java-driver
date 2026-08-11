@@ -373,6 +373,10 @@ public class DefaultSession implements CqlSession {
         context.getAuthProvider();
         context.getSslHandlerFactory();
         context.getTimestampGenerator();
+        // Also resolved here, and not only for the reason above: it is used from the connection
+        // initialization path, so leaving it lazy would make a Netty event loop the first thread to
+        // load its (and Jackson's) classes, mid-Startup.
+        context.getDriverConfigReporter();
       } catch (Throwable error) {
         RunOrSchedule.on(adminExecutor, this::closePolicies);
         context

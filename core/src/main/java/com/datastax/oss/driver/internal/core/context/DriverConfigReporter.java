@@ -29,7 +29,7 @@ import java.util.Map;
  * SESSION_ID} startup option, which the driver sends on every connection unconditionally and
  * independently of this reporter.
  *
- * <p>Governed by {@code advanced.driver-config-reporting.enabled}.
+ * <p>Governed by {@code advanced.driver-config-reporting.enabled} (enabled by default).
  */
 public interface DriverConfigReporter {
 
@@ -42,6 +42,9 @@ public interface DriverConfigReporter {
    * <p><b>Implementations must not throw:</b> this runs on the connection initialization path, so a
    * failure to build the report must be swallowed (and logged) rather than propagated, otherwise it
    * would prevent the session from establishing or reconnecting.
+   *
+   * <p>The report describes the driver's own configuration only, so nothing here depends on which
+   * backend answered: it can be built before the connection learns anything about its peer.
    */
   void populateControlConnectionOptions(Map<String, String> startupOptions);
 }
