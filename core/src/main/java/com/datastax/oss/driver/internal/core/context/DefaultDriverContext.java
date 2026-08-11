@@ -375,8 +375,33 @@ public class DefaultDriverContext implements InternalDriverContext {
         .build();
   }
 
+  /**
+   * Returns the component that reports the driver configuration on the control connection's Startup
+   * message.
+   *
+   * <p>Guarded by the presence of Jackson, which {@link DefaultDriverConfigReporter} serializes the
+   * report with. The driver declares Jackson as a required dependency but documents that it can be
+   * excluded when unused (see {@code manual/core/integration}), so on such a classpath merely
+   * <em>loading</em> the default implementation raises a {@link NoClassDefFoundError} — an {@code
+   * Error}, not an exception, and raised while linking the class rather than from any method it
+   * declares, so the reporter's own fail-safe cannot catch it and neither can its caller. Since
+   * this runs on the connection initialization path, that would take a documented, supported
+   * configuration from "reporting is skipped" to "no connection can be established". Choosing the
+   * implementation here is therefore the only place the check can live.
+   *
+   * @see #getDriverConfigReporter()
+   */
   protected DriverConfigReporter buildDriverConfigReporter() {
-    return new DefaultDriverConfigReporter(this);
+    if (DefaultDependencyChecker.isPresent(JACKSON)) {
+      return new DefaultDriverConfigReporter(this);
+    }
+    // Logged unconditionally, unlike the Insights equivalent in #buildLifecycleListeners: reporting
+    // ships enabled, so someone who trimmed Jackson never opted out of it and would otherwise have
+    // no signal that it is off.
+    LOG.info(
+        "Could not initialize driver configuration reporting; "
+            + "this is normal if Jackson was explicitly excluded from classpath");
+    return new NoopDriverConfigReporter();
   }
 
   protected Map<String, LoadBalancingPolicy> buildLoadBalancingPolicies() {

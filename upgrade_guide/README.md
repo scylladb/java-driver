@@ -38,7 +38,9 @@ a client's connections and inspect its driver settings while investigating an in
   policies by class name: the simple name, or the fully-qualified name when the policy is an
   anonymous class (which has no simple name). Reporting it is best-effort: if the report cannot be
   built, or would exceed 32 KiB, it is skipped (with a warning) rather than allowed to interfere
-  with connecting.
+  with connecting. It is serialized with Jackson, which the driver
+  [allows you to exclude](../manual/core/integration/#jackson); on such a classpath the report is
+  skipped and an informational message is logged at startup. `SESSION_ID` is unaffected.
 
 Reporting the configuration is **enabled by default**. To turn it off:
 
