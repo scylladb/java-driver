@@ -39,7 +39,17 @@ public interface DriverConfigReporter {
    *
    * <p><b>Implementations must not throw:</b> a failure to build the report must be swallowed (and
    * logged) rather than propagated, so that a diagnostic aid can never break cluster
-   * initialization.
+   * initialization. For the same reason they must bound the report's size and return {@code null}
+   * rather than an oversized one: {@code STARTUP} option values carry an unchecked 16-bit length
+   * prefix, so a value over 65535 encoded bytes corrupts the frame instead of merely being useless.
+   * The built-in reporter caps the report at 32KiB of UTF-8, the limit the other ScyllaDB drivers
+   * apply.
+   *
+   * <p>An implementation that cannot even be <em>loaded</em> is handled one level up rather than
+   * here: {@link DefaultDriverConfigReporter} needs Jackson, and on a classpath without it the
+   * failure is a {@link LinkageError} raised while initializing the class, which no method of this
+   * interface could catch. {@code Connection.Factory.buildDriverConfigReport} contains that and
+   * reports nothing, so the connection is still established.
    *
    * @return the report to send under the {@code DRIVER_CONFIG} startup option, or {@code null} to
    *     send nothing.
