@@ -90,6 +90,8 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
 
   private final int usedHostsPerRemoteDc;
   private final boolean dontHopForLocalCL;
+  private final boolean localDcExplicit;
+  private final boolean localRackExplicit;
 
   private volatile Configuration configuration;
 
@@ -109,6 +111,52 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
     this.localRack = localRack == null ? UNSET : localRack;
     this.usedHostsPerRemoteDc = usedHostsPerRemoteDc;
     this.dontHopForLocalCL = !allowRemoteDCsForLocalConsistencyLevel;
+    this.localDcExplicit = !Strings.isNullOrEmpty(localDc);
+    this.localRackExplicit = !Strings.isNullOrEmpty(localRack);
+  }
+
+  /**
+   * The datacenter this policy considers local, or {@code null} if it has neither been configured
+   * explicitly nor inferred yet. When {@link #isLocalDcExplicit()} is {@code false}, this is the
+   * datacenter inferred from the first contacted node, which is only available once the policy has
+   * been initialized.
+   *
+   * @return the local datacenter name, or {@code null}.
+   */
+  public String getLocalDc() {
+    String dc = localDc;
+    return Strings.isNullOrEmpty(dc) ? null : dc;
+  }
+
+  /**
+   * The rack this policy considers local, or {@code null} if it has neither been configured
+   * explicitly nor inferred yet.
+   *
+   * @return the local rack name, or {@code null}.
+   */
+  public String getLocalRack() {
+    String rack = localRack;
+    return Strings.isNullOrEmpty(rack) ? null : rack;
+  }
+
+  /**
+   * Whether the local datacenter was configured explicitly (as opposed to being inferred from the
+   * first contacted node).
+   *
+   * @return {@code true} if the local datacenter was set explicitly.
+   */
+  public boolean isLocalDcExplicit() {
+    return localDcExplicit;
+  }
+
+  /**
+   * Whether the local rack was configured explicitly (as opposed to being inferred from the first
+   * contacted node).
+   *
+   * @return {@code true} if the local rack was set explicitly.
+   */
+  public boolean isLocalRackExplicit() {
+    return localRackExplicit;
   }
 
   @Override

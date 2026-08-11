@@ -392,6 +392,16 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
     return childPolicy;
   }
 
+  /**
+   * The strategy this policy uses to order the replicas of a query's partition, as specified at
+   * instantiation.
+   *
+   * @return the replica ordering strategy.
+   */
+  public ReplicaOrdering getReplicaOrdering() {
+    return replicaOrdering;
+  }
+
   @Override
   public void init(Cluster cluster, Collection<Host> hosts) {
     clusterMetadata = cluster.getMetadata();

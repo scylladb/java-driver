@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A load balancing policy wrapper that ensures that only hosts matching the predicate will ever be
@@ -39,6 +40,7 @@ import java.util.List;
 public class HostFilterPolicy implements ChainableLoadBalancingPolicy {
   private final LoadBalancingPolicy childPolicy;
   private final Predicate<Host> predicate;
+  private final ImmutableSet<String> whiteListedDcs;
 
   /**
    * Create a new policy that wraps the provided child policy but only "allows" hosts matching the
@@ -49,13 +51,38 @@ public class HostFilterPolicy implements ChainableLoadBalancingPolicy {
    *     (whether they will get connected to or not depends on the child policy).
    */
   public HostFilterPolicy(LoadBalancingPolicy childPolicy, Predicate<Host> predicate) {
+    this(childPolicy, predicate, ImmutableSet.<String>of());
+  }
+
+  private HostFilterPolicy(
+      LoadBalancingPolicy childPolicy,
+      Predicate<Host> predicate,
+      ImmutableSet<String> whiteListedDcs) {
     this.childPolicy = childPolicy;
     this.predicate = predicate;
+    this.whiteListedDcs = whiteListedDcs;
   }
 
   @Override
   public LoadBalancingPolicy getChildPolicy() {
     return childPolicy;
+  }
+
+  /**
+   * The datacenters this policy restricts the session to, or an empty set if that is not something
+   * it can say.
+   *
+   * <p>A {@link Predicate} is opaque once built, so only {@link
+   * #fromDCWhiteList(LoadBalancingPolicy, Iterable)} populates this: it is the one factory whose
+   * argument <em>is</em> the set of allowed datacenters. An instance built from {@link
+   * #fromDCBlackList(LoadBalancingPolicy, Iterable)} or from a caller-supplied predicate returns an
+   * empty set — a denied datacenter names no preferred one, and an arbitrary predicate cannot be
+   * read back at all.
+   *
+   * @return an immutable set of allowed datacenter names, empty when unknown.
+   */
+  public Set<String> getWhiteListedDatacenters() {
+    return whiteListedDcs;
   }
 
   /**
@@ -137,7 +164,8 @@ public class HostFilterPolicy implements ChainableLoadBalancingPolicy {
    */
   public static HostFilterPolicy fromDCWhiteList(
       LoadBalancingPolicy childPolicy, Iterable<String> dcs) {
-    return new HostFilterPolicy(childPolicy, hostDCPredicate(dcs, true));
+    ImmutableSet<String> whiteListedDcs = ImmutableSet.copyOf(dcs);
+    return new HostFilterPolicy(childPolicy, hostDCPredicate(whiteListedDcs, true), whiteListedDcs);
   }
 
   /**
