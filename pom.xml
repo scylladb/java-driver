@@ -88,6 +88,10 @@
         <logback.version>1.2.13</logback.version>
         <byteman.version>3.0.8</byteman.version>
         <burningwave.tools.version>0.27.2</burningwave.tools.version>
+        <!-- 1.5.x is the last minor line targeting Java 8. DefaultDriverConfigReporterTest asserts
+             on this validator's exact ValidationMessage wording, so a bump may need those strings
+             updated. -->
+        <json-schema-validator.version>1.5.9</json-schema-validator.version>
         <surefire.version>3.5.4</surefire.version>
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
@@ -400,6 +404,12 @@
                 <groupId>org.awaitility</groupId>
                 <artifactId>awaitility</artifactId>
                 <version>4.3.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.networknt</groupId>
+                <artifactId>json-schema-validator</artifactId>
+                <version>${json-schema-validator.version}</version>
             </dependency>
 
         </dependencies>

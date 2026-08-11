@@ -187,6 +187,11 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
