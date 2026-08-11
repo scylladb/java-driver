@@ -52,6 +52,26 @@ public class ConstantSpeculativeExecutionPolicy implements SpeculativeExecutionP
     this.maxSpeculativeExecutions = maxSpeculativeExecutions;
   }
 
+  /**
+   * The number of speculative executions this policy schedules for a request, as specified at
+   * instantiation. This does not include the initial, normal request.
+   *
+   * @return the number of speculative executions, always strictly positive.
+   */
+  public int getMaxSpeculativeExecutions() {
+    return maxSpeculativeExecutions;
+  }
+
+  /**
+   * The delay between each speculative execution, as specified at instantiation. Zero means all
+   * executions are sent immediately, along with the original request.
+   *
+   * @return the delay in milliseconds, never negative.
+   */
+  public long getConstantDelayMillis() {
+    return constantDelayMillis;
+  }
+
   @Override
   public SpeculativeExecutionPlan newPlan(String loggedKeyspace, Statement statement) {
     return new SpeculativeExecutionPlan() {

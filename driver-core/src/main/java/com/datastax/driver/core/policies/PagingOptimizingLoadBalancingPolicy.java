@@ -12,12 +12,17 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public class PagingOptimizingLoadBalancingPolicy implements LoadBalancingPolicy {
+public class PagingOptimizingLoadBalancingPolicy implements ChainableLoadBalancingPolicy {
   private final LoadBalancingPolicy wrapped;
   private volatile CopyOnWriteArrayList<Host> hosts;
 
   public PagingOptimizingLoadBalancingPolicy(LoadBalancingPolicy loadBalancingPolicy) {
     wrapped = loadBalancingPolicy;
+  }
+
+  @Override
+  public LoadBalancingPolicy getChildPolicy() {
+    return wrapped;
   }
 
   @Override

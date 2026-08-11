@@ -58,6 +58,26 @@ public class PercentileSpeculativeExecutionPolicy implements SpeculativeExecutio
     this.maxSpeculativeExecutions = maxSpeculativeExecutions;
   }
 
+  /**
+   * The maximum number of speculative executions this policy triggers for a request, as specified
+   * at instantiation. This does not include the initial, normal request.
+   *
+   * @return the maximum number of speculative executions, always strictly positive.
+   */
+  public int getMaxSpeculativeExecutions() {
+    return maxSpeculativeExecutions;
+  }
+
+  /**
+   * The latency percentile a request must fall into to be considered slow, as specified at
+   * instantiation.
+   *
+   * @return the percentile, in the range 0 (inclusive) to 100 (exclusive).
+   */
+  public double getPercentile() {
+    return percentile;
+  }
+
   @Override
   public SpeculativeExecutionPlan newPlan(String loggedKeyspace, Statement statement) {
     return new SpeculativeExecutionPlan() {
