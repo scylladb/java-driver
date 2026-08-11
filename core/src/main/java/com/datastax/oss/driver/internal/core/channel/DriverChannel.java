@@ -170,8 +170,7 @@ public class DriverChannel {
   }
 
   public ShardingInfo getShardingInfo() {
-    ConnectionShardingInfo info = getSupportedFeatures().getShardingInfo();
-    return info != null ? info.shardingInfo : null;
+    return getSupportedFeatures().getNodeShardingInfo();
   }
 
   public LwtInfo getLwtInfo() {

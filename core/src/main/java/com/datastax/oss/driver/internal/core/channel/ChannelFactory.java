@@ -104,6 +104,26 @@ public class ChannelFactory {
   public static final String INFLIGHT_HANDLER_NAME = "inflight";
   public static final String INIT_HANDLER_NAME = "init";
 
+  /**
+   * The number of orphaned requests a connection is actually built with, which is not always the
+   * configured {@code advanced.connection.max-orphan-requests}: that option has to stay below
+   * {@code advanced.connection.max-requests-per-connection}, and a value that does not is silently
+   * corrected to a quarter of it (the caller logs a warning when that happens).
+   *
+   * <p>Shared with {@code DefaultDriverConfigReporter}, which reports this number as {@code
+   * connection.requests.orphaned.max}: one implementation means the report cannot claim a limit the
+   * connection was not built with.
+   *
+   * @param maxRequestsPerConnection the configured {@code max-requests-per-connection}.
+   * @param maxOrphanRequests the configured {@code max-orphan-requests}.
+   */
+  public static int effectiveMaxOrphanRequests(
+      int maxRequestsPerConnection, int maxOrphanRequests) {
+    return (maxOrphanRequests >= maxRequestsPerConnection)
+        ? maxRequestsPerConnection / 4
+        : maxOrphanRequests;
+  }
+
   private final String logPrefix;
   protected final InternalDriverContext context;
 
@@ -377,20 +397,21 @@ public class ChannelFactory {
             (int) defaultConfig.getBytes(DefaultDriverOption.PROTOCOL_MAX_FRAME_LENGTH);
         int maxRequestsPerConnection =
             defaultConfig.getInt(DefaultDriverOption.CONNECTION_MAX_REQUESTS);
-        int maxOrphanRequests =
+        int configuredMaxOrphanRequests =
             defaultConfig.getInt(DefaultDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS);
-        if (maxOrphanRequests >= maxRequestsPerConnection) {
+        int maxOrphanRequests =
+            effectiveMaxOrphanRequests(maxRequestsPerConnection, configuredMaxOrphanRequests);
+        if (configuredMaxOrphanRequests >= maxRequestsPerConnection) {
           if (LOGGED_ORPHAN_WARNING.compareAndSet(false, true)) {
             LOG.warn(
                 "[{}] Invalid value for {}: {}. It must be lower than {}. "
                     + "Defaulting to {} (1/4 of max-requests) instead.",
                 logPrefix,
                 DefaultDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS.getPath(),
-                maxOrphanRequests,
+                configuredMaxOrphanRequests,
                 DefaultDriverOption.CONNECTION_MAX_REQUESTS.getPath(),
-                maxRequestsPerConnection / 4);
+                maxOrphanRequests);
           }
-          maxOrphanRequests = maxRequestsPerConnection / 4;
         }
 
         InFlightHandler inFlightHandler =

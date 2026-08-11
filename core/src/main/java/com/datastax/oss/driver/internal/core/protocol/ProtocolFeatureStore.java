@@ -2,6 +2,7 @@ package com.datastax.oss.driver.internal.core.protocol;
 
 import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.util.AttributeKey;
 import java.util.List;
@@ -37,6 +38,19 @@ public class ProtocolFeatureStore {
 
   public ShardingInfo.ConnectionShardingInfo getShardingInfo() {
     return shardingInfo;
+  }
+
+  /**
+   * The node-level sharding information the server advertised on this connection, unwrapped from
+   * the per-connection {@link ShardingInfo.ConnectionShardingInfo} (whose {@code shardId} is
+   * specific to this one connection and so of no interest to node-level or session-level callers).
+   *
+   * @return {@code null} if the server advertised no sharding information, which is the driver's
+   *     own proxy check for "this is not ScyllaDB".
+   */
+  @Nullable
+  public ShardingInfo getNodeShardingInfo() {
+    return shardingInfo == null ? null : shardingInfo.shardingInfo;
   }
 
   public TabletInfo getTabletFeatureInfo() {
