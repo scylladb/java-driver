@@ -49,6 +49,7 @@ public class ConstantReconnectionPolicy implements ReconnectionPolicy {
   private static final Logger LOG = LoggerFactory.getLogger(ConstantReconnectionPolicy.class);
 
   private final String logPrefix;
+  private final Duration delay;
   private final ReconnectionSchedule schedule;
 
   /** Builds a new instance. */
@@ -61,10 +62,22 @@ public class ConstantReconnectionPolicy implements ReconnectionPolicy {
           String.format(
               "Invalid negative delay for "
                   + DefaultDriverOption.RECONNECTION_BASE_DELAY.getPath()
-                  + " (got %d)",
+                  + " (got %s)",
               delay));
     }
+    this.delay = delay;
     this.schedule = () -> delay;
+  }
+
+  /**
+   * The fixed delay between reconnection attempts that this instance was built with.
+   *
+   * <p>Read from the configuration once, at construction: a later configuration reload does not
+   * affect an already-running policy. Exposed so that diagnostics can describe the delay actually
+   * in force rather than whatever the profile currently says.
+   */
+  public Duration getDelay() {
+    return delay;
   }
 
   @NonNull

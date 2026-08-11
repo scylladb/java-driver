@@ -33,6 +33,18 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
     this.sslEngineFactory = sslEngineFactory;
   }
 
+  /**
+   * The engine factory this handler factory actually builds its engines from.
+   *
+   * <p>Not necessarily the one behind {@code DriverContext#getSslEngineFactory()}: a context that
+   * overrides {@code buildSslHandlerFactory()} may wrap an engine factory of its own choosing, in
+   * which case the configured one is never consulted on the connection path. Diagnostics that want
+   * to describe the engine in force must read it from here rather than from the context.
+   */
+  public SslEngineFactory getSslEngineFactory() {
+    return sslEngineFactory;
+  }
+
   @Override
   public SslHandler newSslHandler(Channel channel, EndPoint remoteEndpoint) {
     SSLEngine engine = sslEngineFactory.newSslEngine(remoteEndpoint);

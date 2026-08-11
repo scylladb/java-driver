@@ -121,6 +121,18 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     }
   }
 
+  /**
+   * Whether this policy reorders replicas to avoid slow ones, as it was configured when the policy
+   * was built.
+   *
+   * <p>Read from the profile in the constructor and never re-read, so a configuration reload does
+   * not reach the running policy. Exposed for {@code DRIVER_CONFIG} reporting, which must describe
+   * the ordering actually in force rather than what the profile currently says.
+   */
+  public boolean isAvoidingSlowReplicas() {
+    return avoidSlowReplicas;
+  }
+
   @NonNull
   @Override
   protected Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {

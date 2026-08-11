@@ -66,6 +66,28 @@ public class ConstantSpeculativeExecutionPolicy implements SpeculativeExecutionP
     }
   }
 
+  /**
+   * The maximum number of executions this instance was built with, including the initial,
+   * non-speculative one.
+   *
+   * <p>Read from the configuration once, at construction: a later configuration reload does not
+   * affect an already-running policy. Exposed so that diagnostics can describe the limit actually
+   * in force rather than whatever the profile currently says.
+   */
+  public int getMaxExecutions() {
+    return maxExecutions;
+  }
+
+  /**
+   * The fixed delay between executions that this instance was built with, in milliseconds; see
+   * {@link #getMaxExecutions()} for why it is exposed.
+   *
+   * <p>Already truncated to whole milliseconds, which is the precision this policy schedules with.
+   */
+  public long getConstantDelayMillis() {
+    return constantDelayMillis;
+  }
+
   @Override
   public long nextExecution(
       @NonNull @SuppressWarnings("unused") Node node,

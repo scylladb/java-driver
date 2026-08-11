@@ -235,13 +235,29 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
    * Before initialization, this method always returns null.
    */
   @Nullable
-  protected String getLocalDatacenter() {
+  public String getLocalDatacenter() {
     return localDc;
   }
 
   @Nullable
-  protected String getLocalRack() {
+  public String getLocalRack() {
     return localRack;
+  }
+
+  /**
+   * Returns the maximum number of nodes per remote datacenter this policy will append to a query
+   * plan when failing over, as it was configured when the policy was built.
+   *
+   * <p>Read from the profile in the constructor and never re-read, so a configuration reload does
+   * not reach the running policy. Exposed for {@code DRIVER_CONFIG} reporting, which must describe
+   * the failover behavior actually in force rather than what the profile currently says.
+   *
+   * <p>Note this is only the first of the three conditions {@link #maybeAddDcFailover} requires: it
+   * also needs a local datacenter, and a request that {@link #isDcFailoverAllowedForRequest}
+   * admits.
+   */
+  public int getMaxNodesPerRemoteDc() {
+    return maxNodesPerRemoteDc;
   }
 
   /** @return The nodes currently considered as live. */
