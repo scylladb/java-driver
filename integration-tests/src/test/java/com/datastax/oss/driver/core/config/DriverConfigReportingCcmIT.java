@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.core.config;
 
+import static com.datastax.oss.driver.core.config.DriverConfigReportingAssertions.assertDriverConfigPayload;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
@@ -32,14 +33,12 @@ import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -57,11 +56,14 @@ import org.junit.rules.TestRule;
  * Simulacron only proves what the driver <em>sends</em>, this confirms that a real server
  * <em>accepts</em> the extra {@code STARTUP} keys and <em>stores</em> them, so that (a) {@code
  * SESSION_ID} is present on every one of the session's connections with a single shared value, and
- * (b) {@code DRIVER_CONFIG} is stored for exactly one connection (the control connection).
+ * (b) {@code DRIVER_CONFIG} is stored for exactly one connection, which is the control connection —
+ * matched by address and port against the control connection's channel, so the check cannot be
+ * satisfied by a pooled connection.
  *
- * <p>Runs on both backends, asserting identical behavior — only the table that exposes the stored
- * options differs: ScyllaDB uses {@code system.clients.client_options}, while Apache Cassandra
- * exposes it in {@code system_views.clients.client_options} (added in Cassandra 4.1).
+ * <p>The report itself describes the driver's own configuration, so it reads identically on both
+ * backends; only the table that exposes the stored options differs: ScyllaDB uses {@code
+ * system.clients.client_options}, while Apache Cassandra exposes it in {@code
+ * system_views.clients.client_options} (added in Cassandra 4.1).
  */
 @Category(ParallelizableTests.class)
 @BackendRequirement(
@@ -75,8 +77,6 @@ import org.junit.rules.TestRule;
 public class DriverConfigReportingCcmIT {
 
   private static final String DRIVER_NAME = "ScyllaDB Java Driver";
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();
 
@@ -134,34 +134,48 @@ public class DriverConfigReportingCcmIT {
         rows.stream().map(row -> clientOptions(row).get("SESSION_ID")).collect(Collectors.toSet());
     assertThat(sessionIds).containsExactly(sessionId(session));
 
-    // (b) DRIVER_CONFIG is stored for exactly one connection (the control connection), and its
-    // value round-trips through the server intact as the stage-1 payload: valid JSON carrying
-    // exactly the schema version.
-    List<String> driverConfigs =
+    // (b) DRIVER_CONFIG is stored for exactly one connection, and that connection is the control
+    // one — identified independently of the reported options, by the local address and port of the
+    // control connection's channel (which is what the server records as the client's address).
+    List<Row> withDriverConfig =
         rows.stream()
-            .map(row -> clientOptions(row).get("DRIVER_CONFIG"))
-            .filter(Objects::nonNull)
+            .filter(row -> clientOptions(row).get("DRIVER_CONFIG") != null)
             .collect(Collectors.toList());
-    assertThat(driverConfigs).hasSize(1);
-    assertStageOnePayload(driverConfigs.get(0));
+    assertThat(withDriverConfig).hasSize(1);
+
+    Row controlRow = withDriverConfig.get(0);
+    InetSocketAddress controlAddress = controlConnectionAddress(session);
+    assertThat(controlRow.getInetAddress("address")).isEqualTo(controlAddress.getAddress());
+    assertThat(controlRow.getInt("port")).isEqualTo(controlAddress.getPort());
+
+    // Its value round-trips through the server intact as the stage-2 payload: valid JSON carrying
+    // the schema version and the full configuration.
+    JsonNode report = assertDriverConfigPayload(clientOptions(controlRow).get("DRIVER_CONFIG"));
+
+    // The report is configuration, not observation, so every field reads the same on both backends
+    // — including the server-side internal-query timeout, even though only ScyllaDB actually gets
+    // the "USING TIMEOUT" clause that turns advanced.metadata.schema.request-timeout into a
+    // server-side limit.
+    JsonNode timeout = report.path("control-plane").path("queries").path("system").path("timeout");
+    assertThat(timeout.path("server-side-ms").asLong()).isPositive();
+
+    // Likewise the shard-awareness intent: a property of the configuration, not of the peer.
+    assertThat(
+            report.path("connection").path("pool").path("shard-aware").path("enabled").asBoolean())
+        .isTrue();
   }
 
   /**
-   * Asserts that a {@code DRIVER_CONFIG} value is the stage-1 payload: well-formed JSON whose
-   * {@code version} is the integer {@code 1}. Guards against an incorrect schema version or a
-   * malformed blob slipping through a mere key-presence check.
+   * The local address of the control connection's channel — the source address of that TCP
+   * connection, and therefore what the server records in the clients table's {@code address} and
+   * {@code port} columns (CCM connects directly, with no proxy or address translation in between).
    */
-  private static void assertStageOnePayload(String driverConfig) {
-    JsonNode root;
-    try {
-      root = OBJECT_MAPPER.readTree(driverConfig);
-    } catch (JsonProcessingException e) {
-      throw new AssertionError("DRIVER_CONFIG is not valid JSON: " + driverConfig, e);
-    }
-    assertThat(root.path("version").isInt())
-        .as("version is an integer in %s", driverConfig)
-        .isTrue();
-    assertThat(root.path("version").intValue()).isEqualTo(1);
+  private InetSocketAddress controlConnectionAddress(CqlSession session) {
+    return (InetSocketAddress)
+        ((InternalDriverContext) session.getContext())
+            .getControlConnection()
+            .channel()
+            .localAddress();
   }
 
   /**

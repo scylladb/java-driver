@@ -19,6 +19,46 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.1
+
+#### The driver reports a session identifier, and its configuration, at connection time
+
+Two CQL `STARTUP` options are new. The server stores them in its client-connection system table
+(`system.clients` on ScyllaDB, `system_views.clients` on Cassandra 4.1+), so that operators can group
+a client's connections and inspect its driver settings while investigating an incident.
+
+* `SESSION_ID` — a driver-generated identifier, shared by all of a session's connections. It is sent
+  on **every** connection, unconditionally: it is an innate behavior with no configuration option to
+  turn it off. It is not derived from `CLIENT_ID`, which remains user-settable and unchanged.
+* `DRIVER_CONFIG` — a compact JSON description of the effective configuration of the session's
+  default execution profile (connection/socket settings, timeouts,
+  retry/reconnection/speculative-execution/load-balancing policies, connection pooling, query
+  defaults, and TLS). Only the control connection sends it, since it describes the whole session.
+  It reports settings only — never credentials, statements or data — and identifies non-built-in
+  policies by class name: the simple name, or the fully-qualified name when the policy is an
+  anonymous class (which has no simple name). Reporting it is best-effort: if the report cannot be
+  built, or would exceed 32 KiB, it is skipped (with a warning) rather than allowed to interfere
+  with connecting.
+
+Reporting the configuration is **enabled by default**. To turn it off:
+
+```properties
+datastax-java-driver.advanced.driver-config-reporting.enabled = false
+```
+
+Note that this option does not affect `SESSION_ID`.
+
+#### Two `BasicLoadBalancingPolicy` accessors widened from `protected` to `public`
+
+`BasicLoadBalancingPolicy.getLocalDatacenter()` and `getLocalRack()` are now `public`, so that the
+configuration report above can describe the datacenter and rack the policy actually resolved rather
+than whatever the profile currently says.
+
+Binary compatibility is unaffected — an already-compiled subclass keeps working. But if you
+[extend `BasicLoadBalancingPolicy`](../manual/core/load_balancing/#custom-implementation) and
+override either method, you have to widen your override to `public` in order to recompile: Java does
+not allow an override to reduce visibility.
+
 ### 4.19.0.7
 
 #### Cloud private-endpoint support via client routes

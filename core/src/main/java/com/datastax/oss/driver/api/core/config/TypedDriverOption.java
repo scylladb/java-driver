@@ -976,7 +976,7 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DefaultDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, GenericType.BOOLEAN);
 
-  /** Whether the driver reports its configuration to ScyllaDB at connection time. */
+  /** Whether the driver reports its configuration to the cluster at connection time. */
   public static final TypedDriverOption<Boolean> DRIVER_CONFIG_REPORTING_ENABLED =
       new TypedDriverOption<>(
           DefaultDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, GenericType.BOOLEAN);
