@@ -141,8 +141,8 @@ public abstract class ChannelFactoryTestBase {
     when(context.getEventBus()).thenReturn(eventBus);
     when(context.getWriteCoalescer()).thenReturn(new PassThroughWriteCoalescer(null));
     when(context.getCompressor()).thenReturn(compressor);
-    // The init handler consults the config reporter for every connection; default to a no-op.
-    when(context.getDriverConfigReporter()).thenReturn((startupOptions, reportDriverConfig) -> {});
+    // The init handler consults the config reporter for the control connection; default to a no-op.
+    when(context.getDriverConfigReporter()).thenReturn(startupOptions -> {});
 
     // Start local server
     ServerBootstrap serverBootstrap =

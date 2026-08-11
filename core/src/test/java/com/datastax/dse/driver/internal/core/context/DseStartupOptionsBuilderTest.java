@@ -80,6 +80,8 @@ public class DseStartupOptionsBuilderTest {
     Version version = Version.parse(startup.options.get(StartupOptionsBuilder.DRIVER_VERSION_KEY));
     assertThat(version).isEqualTo(Session.OSS_DRIVER_COORDINATES.getVersion());
     assertThat(startup.options).containsKey(StartupOptionsBuilder.CLIENT_ID_KEY);
+    // SESSION_ID is innate and must survive on the DSE path too.
+    assertThat(startup.options).containsKey(StartupOptionsBuilder.SESSION_ID_KEY);
   }
 
   @Test

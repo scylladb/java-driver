@@ -37,8 +37,20 @@ public class StartupOptionsBuilder {
   public static final String APPLICATION_VERSION_KEY = "APPLICATION_VERSION";
   public static final String CLIENT_ID_KEY = "CLIENT_ID";
 
+  /**
+   * STARTUP option key under which the session's identifier is sent, so that the server can group
+   * all of a session's connections (and correlate them with the configuration that the control
+   * connection reports under {@code DRIVER_CONFIG}).
+   *
+   * <p>This is an innate driver behavior: the option is sent on every connection, unconditionally.
+   * In particular it is <em>not</em> governed by {@code advanced.driver-config-reporting.enabled},
+   * which only decides whether the control connection also reports the configuration itself.
+   */
+  public static final String SESSION_ID_KEY = "SESSION_ID";
+
   protected final InternalDriverContext context;
   private UUID clientId;
+  private UUID sessionId;
   private String applicationName;
   private String applicationVersion;
 
@@ -84,9 +96,9 @@ public class StartupOptionsBuilder {
    *
    * <p>The default set of options are built here and include {@link
    * com.datastax.oss.protocol.internal.request.Startup#COMPRESSION_KEY} (if the context passed in
-   * has a compressor/algorithm set), and the driver's {@link #DRIVER_NAME_KEY} and {@link
-   * #DRIVER_VERSION_KEY}. The {@link com.datastax.oss.protocol.internal.request.Startup}
-   * constructor will add {@link
+   * has a compressor/algorithm set), the driver's {@link #DRIVER_NAME_KEY} and {@link
+   * #DRIVER_VERSION_KEY}, and the {@link #SESSION_ID_KEY}. The {@link
+   * com.datastax.oss.protocol.internal.request.Startup} constructor will add {@link
    * com.datastax.oss.protocol.internal.request.Startup#CQL_VERSION_KEY}.
    *
    * @return Map of Startup Options.
@@ -94,13 +106,24 @@ public class StartupOptionsBuilder {
   public Map<String, String> build() {
     DriverExecutionProfile config = context.getConfig().getDefaultProfile();
 
-    NullAllowingImmutableMap.Builder<String, String> builder = NullAllowingImmutableMap.builder(3);
+    NullAllowingImmutableMap.Builder<String, String> builder = NullAllowingImmutableMap.builder(4);
     // add compression (if configured) and driver name and version
     String compressionAlgorithm = context.getCompressor().algorithm();
     if (compressionAlgorithm != null && !compressionAlgorithm.trim().isEmpty()) {
       builder.put(Startup.COMPRESSION_KEY, compressionAlgorithm.trim());
     }
     builder.put(DRIVER_NAME_KEY, getDriverName()).put(DRIVER_VERSION_KEY, getDriverVersion());
+
+    // Identifier of this session, sent on every connection so the server can group them. Not
+    // derived from the (user-settable, Insights-oriented) CLIENT_ID below, so that it is guaranteed
+    // unique per session as the grouping key requires. Generated lazily here rather than eagerly in
+    // a field initializer, mirroring clientId; DefaultDriverContext builds the startup options
+    // exactly once per session (LazyReference), which is what makes the value stable across all of
+    // the session's connections, including reconnects.
+    if (sessionId == null) {
+      sessionId = Uuids.random();
+    }
+    builder.put(SESSION_ID_KEY, sessionId.toString());
 
     // Add Insights entries, falling back to generation / config if no programmatic values provided:
     if (clientId == null) {
