@@ -18,6 +18,7 @@ package com.datastax.driver.core;
 import com.datastax.driver.core.exceptions.UnsupportedFeatureException;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.datastax.driver.core.utils.MoreObjects;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -101,10 +102,14 @@ public class QueryOptions {
    * <p>The consistency level set through this method will be use for queries that don't explicitly
    * have a consistency level, i.e. when {@link Statement#getConsistencyLevel} returns {@code null}.
    *
-   * @param consistencyLevel the new consistency level to set as default.
+   * @param consistencyLevel the new consistency level to set as default. It must not be {@code
+   *     null}: every query needs a consistency level, so a null default would fail any statement
+   *     that does not set one of its own.
    * @return this {@code QueryOptions} instance.
+   * @throws NullPointerException if {@code consistencyLevel} is {@code null}.
    */
   public QueryOptions setConsistencyLevel(ConsistencyLevel consistencyLevel) {
+    Preconditions.checkNotNull(consistencyLevel, "consistencyLevel cannot be null");
     this.consistencySet = true;
     this.consistency = consistencyLevel;
     return this;
