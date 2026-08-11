@@ -18,8 +18,8 @@
 package com.datastax.oss.driver.core.config;
 
 import static com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter.DRIVER_CONFIG_KEY;
-import static com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter.SESSION_ID_KEY;
 import static com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder.CLIENT_ID_KEY;
+import static com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder.SESSION_ID_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
@@ -52,12 +52,14 @@ import org.junit.experimental.categories.Category;
  * CQL {@code STARTUP} frames the driver sends.
  *
  * <p>Simulacron records every inbound frame with its originating client connection, so we can
- * verify that when {@code advanced.driver-config-reporting.enabled} is:
+ * verify that:
  *
  * <ul>
- *   <li><b>true</b> — {@code SESSION_ID} is present (and identical) on <em>every</em> session
- *       connection, while {@code DRIVER_CONFIG} is present only on the control connection;
- *   <li><b>false</b> — neither option is present on any session connection.
+ *   <li>{@code SESSION_ID} is present (and identical) on <em>every</em> session connection,
+ *       <em>whatever</em> {@code advanced.driver-config-reporting.enabled} is set to — it is an
+ *       innate startup option, not part of configuration reporting;
+ *   <li>{@code DRIVER_CONFIG} is present only on the control connection, and only when {@code
+ *       advanced.driver-config-reporting.enabled} is true.
  * </ul>
  *
  * <p>The control connection is identified independently of the reported options: it is the only
@@ -140,7 +142,7 @@ public class DriverConfigReportingSimulacronIT {
   }
 
   @Test
-  public void should_report_nothing_when_disabled() {
+  public void should_still_report_session_id_when_driver_config_reporting_is_disabled() {
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, false)
@@ -151,13 +153,13 @@ public class DriverConfigReportingSimulacronIT {
       List<QueryLog> startups = sessionStartups();
       assertThat(distinctConnections(startups)).isGreaterThanOrEqualTo(2);
 
-      // Neither option is sent on any session connection: zero change on the wire when disabled.
+      // SESSION_ID does not depend on the option: it is still sent, with a single shared value...
+      assertThat(startups).allSatisfy(log -> assertThat(options(log)).containsKey(SESSION_ID_KEY));
+      assertThat(startups.stream().map(log -> options(log).get(SESSION_ID_KEY)).distinct())
+          .hasSize(1);
+      // ... while the configuration itself is reported nowhere.
       assertThat(startups)
-          .allSatisfy(
-              log ->
-                  assertThat(options(log))
-                      .doesNotContainKey(SESSION_ID_KEY)
-                      .doesNotContainKey(DRIVER_CONFIG_KEY));
+          .allSatisfy(log -> assertThat(options(log)).doesNotContainKey(DRIVER_CONFIG_KEY));
     }
   }
 

@@ -19,12 +19,10 @@ package com.datastax.oss.driver.internal.core.context;
 
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
-import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Map;
-import java.util.UUID;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +42,6 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
   /** STARTUP option key under which the config JSON is sent. */
   public static final String DRIVER_CONFIG_KEY = "DRIVER_CONFIG";
 
-  /** STARTUP option key under which the per-session identifier is sent. */
-  public static final String SESSION_ID_KEY = "SESSION_ID";
-
   /**
    * Major schema version. Adding keys is backward-compatible and does not bump this; only
    * changing/removing the meaning of an existing key does.
@@ -57,19 +52,12 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
 
   protected final InternalDriverContext context;
 
-  // Dedicated, driver-generated identifier for this session. Not derived from the (user-settable,
-  // Insights-oriented) CLIENT_ID, so that it is guaranteed unique per session as the grouping key
-  // requires. The reporter is a per-session singleton (built once via LazyReference), so this value
-  // is stable and shared across all of the session's connections.
-  private final UUID sessionId = Uuids.random();
-
   public DefaultDriverConfigReporter(InternalDriverContext context) {
     this.context = context;
   }
 
   @Override
-  public void populateStartupOptions(
-      Map<String, String> startupOptions, boolean reportDriverConfig) {
+  public void populateControlConnectionOptions(Map<String, String> startupOptions) {
     // Configuration reporting is a best-effort diagnostic aid: it runs on the connection
     // initialization path, so any failure here (a bad config read, a misbehaving policy while
     // introspecting, a serialization error) must be swallowed rather than allowed to break the
@@ -78,19 +66,12 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
       if (!isEnabled()) {
         return;
       }
-      // SESSION_ID on every connection so the server can group a session's connections.
-      startupOptions.put(SESSION_ID_KEY, sessionId.toString());
-      // DRIVER_CONFIG blob only on the control connection.
-      if (reportDriverConfig) {
-        String json = buildJson();
-        if (json != null) {
-          startupOptions.put(DRIVER_CONFIG_KEY, json);
-        }
+      String json = buildJson();
+      if (json != null) {
+        startupOptions.put(DRIVER_CONFIG_KEY, json);
       }
     } catch (RuntimeException e) {
-      LOG.warn(
-          "Error while building the driver configuration report; skipping driver config reporting",
-          e);
+      LOG.warn("Error while building the driver configuration report; skipping DRIVER_CONFIG", e);
     }
   }
 

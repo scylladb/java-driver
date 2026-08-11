@@ -361,6 +361,10 @@ public class DefaultDriverContext implements InternalDriverContext {
   /**
    * Returns the options to send in a Startup message.
    *
+   * <p>Called once per session (the result is held by a {@code LazyReference} and copied into every
+   * connection's {@code STARTUP}), which is what makes the {@link
+   * StartupOptionsBuilder#SESSION_ID_KEY SESSION_ID} it contains stable for the whole session.
+   *
    * @see #getStartupOptions()
    */
   protected Map<String, String> buildStartupOptions() {

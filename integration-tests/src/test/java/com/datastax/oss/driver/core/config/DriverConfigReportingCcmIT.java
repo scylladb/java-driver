@@ -30,6 +30,8 @@ import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.ParallelizableTests;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -125,10 +127,12 @@ public class DriverConfigReportingCcmIT {
           row.getMap("client_options", String.class, String.class));
     }
 
-    // (a) Every connection carries SESSION_ID, and all of them share a single value (one session).
+    // (a) Every row carries this session's SESSION_ID (that is what they were selected on), and
+    // there is more than one of them — otherwise (b) below would be vacuous.
+    assertThat(rows).hasSizeGreaterThanOrEqualTo(2);
     Set<String> sessionIds =
         rows.stream().map(row -> clientOptions(row).get("SESSION_ID")).collect(Collectors.toSet());
-    assertThat(sessionIds).doesNotContainNull().hasSize(1);
+    assertThat(sessionIds).containsExactly(sessionId(session));
 
     // (b) DRIVER_CONFIG is stored for exactly one connection (the control connection), and its
     // value round-trips through the server intact as the stage-1 payload: valid JSON carrying
@@ -161,12 +165,29 @@ public class DriverConfigReportingCcmIT {
   }
 
   /**
+   * The {@code SESSION_ID} this session reports, read from the session-wide startup options — the
+   * same map the driver copies into every connection's {@code STARTUP}.
+   */
+  private String sessionId(CqlSession session) {
+    String sessionId =
+        ((InternalDriverContext) session.getContext())
+            .getStartupOptions()
+            .get(StartupOptionsBuilder.SESSION_ID_KEY);
+    assertThat(sessionId).isNotNull();
+    return sessionId;
+  }
+
+  /**
    * The rows in the clients table that belong to this driver session's connections: this driver, in
-   * a {@code READY} state, and carrying the reporting {@code SESSION_ID}. Transient
-   * protocol-version negotiation attempts (no driver identity, closed immediately) are excluded,
-   * and their absence here is itself the confirmation that they leave no lingering session rows.
+   * a {@code READY} state, and carrying <em>this</em> session's {@code SESSION_ID}.
+   *
+   * <p>Scoping on the id value matters: {@code SESSION_ID} is sent unconditionally by every driver
+   * session, and this class shares its CCM cluster with the other parallelizable ITs, so a
+   * key-presence filter would also match their connections. The {@code READY} filter is what
+   * excludes the transient protocol-version negotiation attempts (closed immediately).
    */
   private List<Row> driverConnections(CqlSession session) {
+    String sessionId = sessionId(session);
     return session
         .execute(
             "SELECT address, port, connection_stage, driver_name, client_options FROM "
@@ -176,7 +197,7 @@ public class DriverConfigReportingCcmIT {
         .filter(row -> DRIVER_NAME.equals(row.getString("driver_name")))
         // connection_stage casing differs across backends; compare case-insensitively.
         .filter(row -> "READY".equalsIgnoreCase(row.getString("connection_stage")))
-        .filter(row -> clientOptions(row).containsKey("SESSION_ID"))
+        .filter(row -> sessionId.equals(clientOptions(row).get("SESSION_ID")))
         .collect(Collectors.toList());
   }
 
