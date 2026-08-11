@@ -34,8 +34,10 @@ public interface DriverConfigReporter {
    * Builds the configuration report, or returns {@code null} if it could not be built (in which
    * case no {@code DRIVER_CONFIG} option is sent).
    *
-   * <p>Called once per {@link Cluster}, while it initializes; the returned string is then reused
-   * for every control connection that cluster opens.
+   * <p>Called once per control connection, from its {@code STARTUP} frame assembly, and not cached:
+   * the report describes the objects in force at the handshake that sends it, rather than the
+   * configuration the {@link Cluster} was constructed from. Implementations must therefore tolerate
+   * being called on a Netty event loop, and repeatedly over a cluster's lifetime.
    *
    * <p><b>Implementations must not throw:</b> a failure to build the report must be swallowed (and
    * logged) rather than propagated, so that a diagnostic aid can never break cluster

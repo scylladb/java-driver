@@ -18,6 +18,9 @@ package com.datastax.driver.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.driver.core.utils.ScyllaVersion;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -35,7 +38,10 @@ import org.testng.annotations.Test;
  *       shared value;
  *   <li>{@code SESSION_ID} is shared across every {@code Session} obtained from the same {@code
  *       Cluster} (it is Cluster-scoped, not Session-scoped — see {@link Connection.Factory});
- *   <li>{@code DRIVER_CONFIG} is stored for exactly one connection (the control connection);
+ *   <li>{@code DRIVER_CONFIG} is stored for exactly one connection (the control connection), as the
+ *       full versioned JSON report;
+ *   <li>a later control connection reports the datacenter the load balancing policy has inferred in
+ *       the meantime, which the first one could not yet know;
  *   <li>with reporting disabled, {@code SESSION_ID} is still stored but {@code DRIVER_CONFIG} is
  *       not.
  * </ul>
@@ -43,9 +49,8 @@ import org.testng.annotations.Test;
  * <p>The cluster under test uses the default configuration — no {@code withDriverConfigReporting}
  * call — so these also assert that reporting is enabled by default.
  *
- * <p>Stage 1 emits only the schema version, so {@code DRIVER_CONFIG} is asserted to be {@code
- * {"version":1}}. ScyllaDB-only: {@code system.clients.client_options} is a Scylla feature (added
- * in ScyllaDB 2026.1).
+ * <p>ScyllaDB-only: {@code system.clients.client_options} is a Scylla feature (added in ScyllaDB
+ * 2026.1).
  */
 @ScyllaVersion(
     minOSS = "2026.1",
@@ -69,6 +74,90 @@ public class DriverConfigReportingCcmTest extends CCMTestsSupport {
         .as("connections carrying this cluster's SESSION_ID")
         .isGreaterThanOrEqualTo(2);
 
+    // DRIVER_CONFIG is stored for exactly one connection (the control connection, which
+    // soleDriverConfig asserts), and what arrived is the versioned report shape once parsed rather
+    // than merely a plausible string. The byte-for-byte round trip lives in the reconnect test
+    // below, where a rebuild is comparable with what was sent; there is nothing to compare this
+    // first report against, since the driver keeps no copy and rebuilding now would produce a
+    // different, later report.
+    //
+    // Asserted by JSON type and not by value alone: asInt() coerces a string "1", and has() is
+    // satisfied by an explicit null, so either would pass on a report of the wrong shape.
+    JsonNode report = parse(soleDriverConfig(rows));
+    JsonNode version = report.path("version");
+    assertThat(version.isIntegralNumber()).as("version is a JSON integer").isTrue();
+    assertThat(version.intValue()).isEqualTo(1);
+    assertThat(
+            report.path("connection").path("pool").path("shard-aware").path("enabled").isBoolean())
+        .as("connection.pool.shard-aware.enabled is a JSON boolean")
+        .isTrue();
+  }
+
+  @Test(groups = "short")
+  public void should_report_the_inferred_datacenter_after_a_control_connection_reconnect() {
+    // Its own Cluster rather than the class-level one, because this test is the only one here that
+    // mutates the cluster it observes: forcing a reconnect leaves the superseded control connection
+    // in system.clients until the server reaps its row, so two rows carry a DRIVER_CONFIG for a
+    // while. should_store_session_id_on_all_connections_and_driver_config_on_control asserts there
+    // is exactly one, and TestNG orders methods within a class alphabetically, which runs it after
+    // this one -- against the very cluster this would have perturbed.
+    try (Cluster cluster = register(createClusterBuilder().build())) {
+      try (Session ignored = cluster.connect()) {
+        String sessionId = sessionId(cluster);
+        List<Row> rows = awaitClusterConnections(sessionId, 2);
+        assertThat(rows).as("connections carrying this cluster's SESSION_ID").isNotEmpty();
+
+        // The default load balancing policy is TokenAwarePolicy(DCAwareRoundRobinPolicy) with no
+        // configured datacenter, so it infers one -- but only in Cluster.Manager.init(), which runs
+        // after the first control connection's STARTUP. That first report can therefore say no more
+        // than "a datacenter will be inferred".
+        JsonNode first = parse(soleDriverConfig(rows));
+        JsonNode firstPreference = first.path("connection").path("node-preference");
+        assertThat(firstPreference.path("type").asText()).isEqualTo("dc-auto");
+        assertThat(firstPreference.has("local-dc")).isFalse();
+
+        // Force a new control connection. Every one of them builds its own report, so this is where
+        // the datacenter the policy has since inferred reaches the server.
+        Set<String> before = connectionKeys(rows);
+        cluster.manager.controlConnection.triggerReconnect();
+
+        String reconnected = awaitNewDriverConfig(sessionId, before);
+        assertThat(reconnected)
+            .as("DRIVER_CONFIG on the reconnected control connection")
+            .isNotNull();
+
+        String localDc = cluster.manager.controlConnection.connectedHost().getDatacenter();
+        assertThat(localDc).as("datacenter of the node the control connection is on").isNotEmpty();
+        JsonNode second = parse(reconnected);
+        // dc-auto keeps an inferred datacenter under the plain local-dc key; only rack-auto
+        // prefixes.
+        assertThat(second.path("connection").path("node-preference").path("local-dc").asText())
+            .isEqualTo(localDc);
+        assertThat(
+                second
+                    .path("query")
+                    .path("load-balancing")
+                    .path("node-preference")
+                    .path("local-dc")
+                    .asText())
+            .isEqualTo(localDc);
+
+        // Byte-for-byte against a report built right now, rather than a spot-check of a few keys:
+        // an oversized STARTUP value is silently truncated by an unchecked 16-bit length prefix
+        // instead of being rejected (which is why MAX_DRIVER_CONFIG_LENGTH exists), and truncation,
+        // reordering or encoding damage is exactly what a key-by-key check would miss. A rebuild is
+        // a fair comparison only here: by now the protocol version is negotiated and PoolingOptions
+        // settled, and the policy has inferred everything it is going to.
+        assertThat(reconnected)
+            .isEqualTo(cluster.manager.connectionFactory.buildDriverConfigReport());
+      }
+    }
+  }
+
+  /**
+   * The single {@code DRIVER_CONFIG} among the given connections, which the control one carries.
+   */
+  private String soleDriverConfig(List<Row> rows) {
     List<String> driverConfigs = new ArrayList<String>();
     for (Row row : rows) {
       String driverConfig = clientOptions(row).get("DRIVER_CONFIG");
@@ -76,11 +165,46 @@ public class DriverConfigReportingCcmTest extends CCMTestsSupport {
         driverConfigs.add(driverConfig);
       }
     }
-
-    // DRIVER_CONFIG is stored for exactly one connection (the control connection). Stage 1 reports
-    // only the schema version.
     assertThat(driverConfigs).hasSize(1);
-    assertThat(driverConfigs.get(0)).isEqualTo("{\"version\":1}");
+    return driverConfigs.get(0);
+  }
+
+  /**
+   * Polls {@code system.clients} until a connection of the given {@code SESSION_ID}'s cluster, and
+   * outside {@code excludeKeys}, carries a {@code DRIVER_CONFIG}; returns it, or {@code null} if
+   * none appears in time. Scoped to one cluster because every other driver connection to this CCM
+   * node is equally "new" to a key snapshot — including the class-level session's control
+   * connection, which carries a {@code DRIVER_CONFIG} of its own.
+   */
+  private String awaitNewDriverConfig(String sessionId, Set<String> excludeKeys) {
+    long deadline = System.currentTimeMillis() + 60_000L;
+    while (System.currentTimeMillis() < deadline) {
+      for (Row row : newDriverConnections(excludeKeys)) {
+        Map<String, String> options = clientOptions(row);
+        if (!sessionId.equals(options.get("SESSION_ID"))) {
+          continue;
+        }
+        String driverConfig = options.get("DRIVER_CONFIG");
+        if (driverConfig != null) {
+          return driverConfig;
+        }
+      }
+      try {
+        Thread.sleep(500L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+    return null;
+  }
+
+  private JsonNode parse(String json) {
+    try {
+      return new ObjectMapper().readTree(json);
+    } catch (IOException e) {
+      throw new AssertionError("DRIVER_CONFIG is not valid JSON: " + json, e);
+    }
   }
 
   @Test(groups = "short")

@@ -166,10 +166,10 @@ class Connection {
   private final ApplicationInfo applicationInfo;
   private ProtocolFeatureStore protocolFeatureStore;
 
-  // The DRIVER_CONFIG blob this connection reports in its STARTUP options, or null to report none.
-  // Set only for the control connection, so the (potentially large) config blob is sent once per
-  // Cluster rather than on every connection. SESSION_ID is still sent on every connection.
-  private final String driverConfig;
+  // Whether this connection reports the DRIVER_CONFIG blob in its STARTUP options. Set only for the
+  // control connection, so the (potentially large) config blob is sent once per Cluster rather than
+  // on every connection. SESSION_ID is still sent on every connection.
+  private final boolean reportConfig;
 
   /**
    * Create a new connection to a Cassandra node and associate it with the given pool.
@@ -181,11 +181,11 @@ class Connection {
    *     connection can also be associated to an owner later with {@link #setOwner(Owner)}.
    */
   protected Connection(String name, EndPoint endPoint, Factory factory, Owner owner) {
-    this(name, endPoint, factory, owner, null);
+    this(name, endPoint, factory, owner, false);
   }
 
   private Connection(
-      String name, EndPoint endPoint, Factory factory, Owner owner, String driverConfig) {
+      String name, EndPoint endPoint, Factory factory, Owner owner, boolean reportConfig) {
     this.endPoint = endPoint;
     this.factory = factory;
     this.dispatcher = new Dispatcher();
@@ -195,7 +195,7 @@ class Connection {
     this.defaultKeyspaceAttempt = new SetKeyspaceAttempt(null, thisFuture);
     this.targetKeyspace = new AtomicReference<SetKeyspaceAttempt>(defaultKeyspaceAttempt);
     this.applicationInfo = factory.configuration.getApplicationInfo();
-    this.driverConfig = driverConfig;
+    this.reportConfig = reportConfig;
   }
 
   /** Create a new connection to a Cassandra node. */
@@ -534,10 +534,16 @@ class Connection {
         // server can group all the connections opened from this Cluster.
         extraOptions.put(SESSION_ID_KEY, factory.sessionId.toString());
 
-        // Built once when the Cluster initialized; non-null only on the control connection, and
-        // only when driver config reporting is enabled.
-        if (driverConfig != null) {
-          extraOptions.put(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, driverConfig);
+        // Built here, on the control connection only, and rebuilt for every one of them: the report
+        // must describe the objects in force at this handshake, not the ones that existed when the
+        // Cluster was constructed. A load balancing policy is initialized after the first control
+        // connection's STARTUP, so a datacenter or rack it infers can only reach the server on a
+        // later one.
+        if (reportConfig) {
+          String driverConfig = factory.buildDriverConfigReport();
+          if (driverConfig != null) {
+            extraOptions.put(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, driverConfig);
+          }
         }
 
         if (protocolFeatureStore != null) {
@@ -1318,21 +1324,19 @@ class Connection {
     // affiliation, so Cluster-wide is the finest granularity available here).
     final UUID sessionId = UUID.randomUUID();
 
-    // The DRIVER_CONFIG blob sent on the control connection, or null when driver config reporting
-    // is disabled (or the report could not be built). Built once here, as the Cluster initializes,
-    // and reused for every control connection this factory opens: it is never rebuilt while the
-    // session is in flight.
-    final String driverConfig;
+    // Whether this factory reports DRIVER_CONFIG at all: false when reporting is disabled, or when
+    // the reporter cannot be loaded on this classpath (see canBuildDriverConfigReport). The report
+    // itself is not cached — it is rebuilt for every control connection.
+    final boolean driverConfigReportable;
 
     Factory(Cluster.Manager manager, Configuration configuration) {
       this.defaultHandler = manager;
       this.manager = manager;
       this.reaper = manager.reaper;
       this.configuration = configuration;
-      this.driverConfig =
+      this.driverConfigReportable =
           configuration.isDriverConfigReportingEnabled()
-              ? new DefaultDriverConfigReporter(configuration).buildReport()
-              : null;
+              && canBuildDriverConfigReport(configuration);
       this.authProvider = configuration.getProtocolOptions().getAuthProvider();
       this.protocolVersion = configuration.getProtocolOptions().initialProtocolVersion;
       this.nettyOptions = configuration.getNettyOptions();
@@ -1349,6 +1353,63 @@ class Connection {
                   .configuration
                   .getThreadingOptions()
                   .createThreadFactory(manager.clusterName, "timeouter"));
+    }
+
+    /**
+     * The {@code DRIVER_CONFIG} report to send in this handshake's {@code STARTUP} options, or
+     * {@code null} when there is none to send.
+     *
+     * <p>Called once per control connection, from the {@code STARTUP} frame assembly, rather than
+     * cached: the report describes the objects that are in force, and one of them changes after the
+     * first handshake. {@code Cluster.Manager.init()} builds this factory before it initializes the
+     * load balancing policy, so a datacenter or rack the policy infers from the node it reaches is
+     * unknown while the first control connection is being opened and known on every later one.
+     * Rebuilding costs a few hundred microseconds on a connection that opens once per Cluster and
+     * then only on reconnect.
+     */
+    String buildDriverConfigReport() {
+      return driverConfigReportable
+          ? new DefaultDriverConfigReporter(configuration).buildReport()
+          : null;
+    }
+
+    /**
+     * Whether {@link DefaultDriverConfigReporter} can be loaded and run at all on this classpath.
+     * Also serves to load it here, on the {@link Cluster} initialization thread, rather than
+     * leaving a Netty event loop to be the first to touch Jackson; the report it builds is
+     * deliberately discarded, since every control connection builds its own.
+     *
+     * <p>Guarded because {@link DefaultDriverConfigReporter} serializes the report with Jackson,
+     * and holds an {@code ObjectMapper} in a static field: without Jackson, merely
+     * <em>initializing</em> that class raises {@link NoClassDefFoundError}. That is an {@code
+     * Error} raised while initializing the class rather than from any method it declares, so the
+     * reporter's own fail-safe cannot contain it and neither can anything it calls — and this runs
+     * on the {@link Cluster} initialization path, so it would take a classpath that merely lacks an
+     * optional serializer from "the report is skipped" to "no connection can be established at
+     * all". Choosing whether to touch the class is therefore the only place the check can live.
+     *
+     * <p>{@link LinkageError} rather than {@code NoClassDefFoundError} alone, so that a partially
+     * present or version-mismatched Jackson — which surfaces as {@code ExceptionInInitializerError}
+     * out of the static initializer — is covered too; probing for one class name would pass and
+     * then still fail here. This is the same fallback {@code SnappyCompressor} applies for its own
+     * optional library, and it does not contradict {@link
+     * DefaultDriverConfigReporter#buildReport()} deliberately not catching bare {@code Error}: that
+     * is about report building never masking a real JVM-level failure, while this is a call site
+     * tolerating a missing optional dependency.
+     */
+    static boolean canBuildDriverConfigReport(Configuration configuration) {
+      try {
+        new DefaultDriverConfigReporter(configuration).buildReport();
+        return true;
+      } catch (LinkageError e) {
+        // Logged unconditionally, and at WARN: reporting ships enabled, so nobody opted into it and
+        // nobody would think to look for a message saying it is off.
+        logger.warn(
+            "Cannot build the driver configuration report, so no DRIVER_CONFIG will be reported; "
+                + "this is expected if Jackson was excluded from the classpath ({})",
+            e.toString());
+        return false;
+      }
     }
 
     int getPort() {
@@ -1368,9 +1429,9 @@ class Connection {
     }
 
     /**
-     * Same as {@link #open(Host)}, but when {@code reportConfig} is true, hands the connection the
-     * {@code DRIVER_CONFIG} blob to report, marking it as the control connection (a no-op when
-     * driver config reporting is disabled, since there is then no blob to report).
+     * Same as {@link #open(Host)}, but when {@code reportConfig} is true, marks the connection as
+     * the control connection, which builds and reports a {@code DRIVER_CONFIG} blob of its own in
+     * its {@code STARTUP} options (a no-op when driver config reporting is disabled).
      */
     Connection open(Host host, boolean reportConfig)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
@@ -1381,8 +1442,7 @@ class Connection {
 
       host.convictionPolicy.signalConnectionsOpening(1);
       Connection connection =
-          new Connection(
-              buildConnectionName(host), endPoint, this, null, reportConfig ? driverConfig : null);
+          new Connection(buildConnectionName(host), endPoint, this, null, reportConfig);
       // This method opens the connection synchronously, so wait until it's initialized
       try {
         connection.initAsync().get();

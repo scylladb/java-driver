@@ -150,6 +150,19 @@ public class DefaultDriverConfigReporterTest {
   }
 
   @Test(groups = "unit")
+  public void should_build_the_report_through_the_connection_factory_guard() throws Exception {
+    // Connection.Factory never touches DefaultDriverConfigReporter on the connection path: on a
+    // classpath without Jackson, initializing that class raises a LinkageError from its static
+    // ObjectMapper field -- an Error raised while initializing the class, so no fail-safe inside it
+    // could catch it, and the Cluster would fail to initialize at all rather than merely skip the
+    // report. The guard runs once, as the Cluster initializes, and decides whether any control
+    // connection may build a report at all; on a normal classpath it is transparent, which is what
+    // this pins.
+    assertThat(Connection.Factory.canBuildDriverConfigReport(Cluster.builder().getConfiguration()))
+        .isTrue();
+  }
+
+  @Test(groups = "unit")
   public void should_skip_driver_config_when_it_exceeds_the_size_limit() {
     // STARTUP option values are written with an unchecked 16-bit length prefix, so an oversized
     // report would corrupt the frame and fail the handshake rather than merely be useless. Parts of
