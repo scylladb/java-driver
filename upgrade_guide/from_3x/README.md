@@ -31,9 +31,25 @@ The core driver is available from:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>java-driver-core</artifactId>
-  <version>4.8.0-scylla-0-SNAPSHOT</version>
+  <version>${driver.version}</version>
 </dependency>
 ```
+
+### What changes for ScyllaDB users
+
+If you are coming from Java Driver 3.x, the artifact names all change. The group id does not:
+both major versions are published under `com.scylladb`.
+
+| Driver 3.x | Driver 4.x |
+|---|---|
+| `scylla-driver-core` | `java-driver-core`. The query builder is no longer part of it — see [Query builder](#query-builder) |
+| `scylla-driver-mapping` | `java-driver-mapper-runtime`, plus the `java-driver-mapper-processor` annotation processor at compile time ([setup](../../manual/mapper/config/)) |
+| `scylla-driver-extras` | no counterpart. It held only codecs: the JDK 8 date/time ones are now native to core (see [CQL to Java type mappings](#cql-to-java-type-mappings)), and the rest are covered by [custom codecs](../../manual/core/custom_codecs/) |
+
+Note that parts of the manual are inherited from the upstream Apache Cassandra® driver and show
+`org.apache.cassandra` as the group id. For this fork, use `com.scylladb`.
+
+Java Driver 3.x is deprecated and in maintenance mode; it receives critical bug fixes only.
 
 ### Runtime requirements
 
@@ -398,7 +414,7 @@ The query builder is now distributed as a separate artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>java-driver-query-builder</artifactId>
-  <version>4.8.0-scylla-0-SNAPSHOT</version>
+  <version>${driver.version}</version>
 </dependency>
 ```
 
