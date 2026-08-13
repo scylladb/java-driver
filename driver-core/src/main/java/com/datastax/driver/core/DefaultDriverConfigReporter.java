@@ -42,6 +42,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.Beta;
 import com.google.common.base.Strings;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -158,6 +159,7 @@ import org.slf4j.LoggerFactory;
  * {@code connection.read}, {@code control-plane.queries.system.timeout.client-side-ms} and {@code
  * query.defaults.request}.
  */
+@Beta
 public class DefaultDriverConfigReporter implements DriverConfigReporter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultDriverConfigReporter.class);

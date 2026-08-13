@@ -40,6 +40,7 @@ import com.datastax.driver.core.policies.ReconnectionPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
 import com.datastax.driver.core.utils.MoreFutures;
+import com.google.common.annotations.Beta;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
 import com.google.common.base.Predicates;
@@ -1458,6 +1459,7 @@ public class Cluster implements Closeable {
      *
      * @param enabled whether driver configuration reporting is enabled.
      */
+    @Beta
     public Builder withDriverConfigReporting(boolean enabled) {
       configurationBuilder.withDriverConfigReporting(enabled);
       return this;

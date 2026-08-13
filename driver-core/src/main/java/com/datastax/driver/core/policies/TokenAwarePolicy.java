@@ -35,6 +35,7 @@ import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.Token;
+import com.google.common.annotations.Beta;
 import com.google.common.collect.AbstractIterator;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -398,6 +399,7 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
    *
    * @return the replica ordering strategy.
    */
+  @Beta
   public ReplicaOrdering getReplicaOrdering() {
     return replicaOrdering;
   }
