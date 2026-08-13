@@ -17,6 +17,7 @@ package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 import com.datastax.driver.core.QueryTrace.Event;
 import com.datastax.driver.core.utils.ScyllaOnly;
@@ -36,6 +37,13 @@ import org.testng.annotations.Test;
     })
 public class ShardAwarenessTest extends CCMTestsSupport {
   private static final Logger logger = LoggerFactory.getLogger(ShardAwarenessTest.class);
+
+  /**
+   * How many times a traced read is re-issued when its query trace comes back without the local
+   * read event. Guards against incomplete traces, not against a wrong shard.
+   */
+  private static final int MAX_TRACE_ATTEMPTS = 3;
+
   private final boolean useAdvancedShardAwareness;
 
   @Factory(dataProvider = "dataProvider")
@@ -62,37 +70,63 @@ public class ShardAwarenessTest extends CCMTestsSupport {
   private void verifyCorrectShardSingleRow(String pk, String ck, String v, String shard) {
     PreparedStatement prepared =
         session().prepare("SELECT pk, ck, v FROM shardawaretest.t WHERE pk=? AND ck=?");
-    ResultSet result = session().execute(prepared.bind(pk, ck).enableTracing());
 
-    Row row = result.one();
-    assertTrue(result.isExhausted());
-    assertThat(row).isNotNull();
-    assertThat(row.getString("pk")).isEqualTo(pk);
-    assertThat(row.getString("ck")).isEqualTo(ck);
-    assertThat(row.getString("v")).isEqualTo(v);
+    for (int attempt = 1; attempt <= MAX_TRACE_ATTEMPTS; attempt++) {
+      // Bind a fresh statement on every attempt. Reusing one BoundStatement across attempts
+      // would pin the coordinator through the paging optimization, which would silently void
+      // the shard assertion below.
+      ResultSet result = session().execute(prepared.bind(pk, ck).enableTracing());
 
-    ExecutionInfo executionInfo = result.getExecutionInfo();
+      Row row = result.one();
+      assertTrue(result.isExhausted());
+      assertThat(row).isNotNull();
+      assertThat(row.getString("pk")).isEqualTo(pk);
+      assertThat(row.getString("ck")).isEqualTo(ck);
+      assertThat(row.getString("v")).isEqualTo(v);
 
-    QueryTrace trace = executionInfo.getQueryTrace();
-    boolean anyLocal = false;
-    for (Event event : trace.getEvents()) {
-      logger.info(
-          "  {} - {} - [{}] - {}",
-          event.getSourceElapsedMicros(),
-          event.getSource(),
-          event.getThreadName(),
-          event.getDescription());
-      // Only data-local events carry the owning shard. Scylla 2025.1 adds coordinator-side
-      // events that legitimately run on shard 0 regardless of the data shard. Also, since
-      // Scylla 2025.1 the thread name carries a service-level suffix ("shard N/sl:<level>"),
-      // so strip it before comparing.
-      if (event.getDescription().contains("querying locally")) {
-        anyLocal = true;
-        String normalized = event.getThreadName().replaceFirst("/sl:[^/]*$", "");
-        assertThat(normalized).startsWith(shard);
+      ExecutionInfo executionInfo = result.getExecutionInfo();
+
+      QueryTrace trace = executionInfo.getQueryTrace();
+      boolean anyLocal = false;
+      for (Event event : trace.getEvents()) {
+        logger.info(
+            "  {} - {} - [{}] - {}",
+            event.getSourceElapsedMicros(),
+            event.getSource(),
+            event.getThreadName(),
+            event.getDescription());
+        // Only data-local events carry the owning shard. Scylla 2025.1 adds coordinator-side
+        // events that legitimately run on shard 0 regardless of the data shard. Also, since
+        // Scylla 2025.1 the thread name carries a service-level suffix ("shard N/sl:<level>"),
+        // so strip it before comparing.
+        if (event.getDescription().contains("querying locally")) {
+          anyLocal = true;
+          String normalized = event.getThreadName().replaceFirst("/sl:[^/]*$", "");
+          assertThat(normalized).startsWith(shard);
+        }
       }
+      if (anyLocal) {
+        return;
+      }
+      // QueryTrace waits only until the coordinator's session row reports a duration; the
+      // events fetched alongside it can still be incomplete, and QueryTrace.doFetchTrace
+      // documents that the trace "may not contain the log of replicas". An event list without
+      // the local read is therefore not a functional failure, so retry with a fresh trace.
+      // Re-executing the query is the only way to get one: once a trace has been fetched its
+      // events are cached and frozen, so re-reading the same trace can never return more.
+      logger.warn(
+          "Attempt {}/{} for pk={}: trace {} carried no 'querying locally' event ({} events);"
+              + " retrying with a fresh trace",
+          attempt,
+          MAX_TRACE_ATTEMPTS,
+          pk,
+          trace.getTraceId(),
+          trace.getEvents().size());
     }
-    assertTrue(anyLocal, "No 'querying locally' trace event was observed for the query");
+    fail(
+        "No 'querying locally' trace event was observed for the query after "
+            + MAX_TRACE_ATTEMPTS
+            + " attempts");
   }
 
   @Test(groups = "short")
