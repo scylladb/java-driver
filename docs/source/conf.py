@@ -34,7 +34,14 @@ LATEST_VERSION = 'scylla-4.19.0.x'
 # Set which versions are not released yet.
 UNSTABLE_VERSIONS = []
 # Set which versions are deprecated
-DEPRECATED_VERSIONS = []
+DEPRECATED_VERSIONS = [
+    'scylla-3.7.2.x',
+    'scylla-3.10.2.x',
+    'scylla-3.11.0.x',
+    'scylla-3.11.2.x',
+    'scylla-3.11.4.x',
+    'scylla-3.11.5.x'
+]
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
