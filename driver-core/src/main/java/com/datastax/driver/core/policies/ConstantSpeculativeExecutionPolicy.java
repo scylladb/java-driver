@@ -18,6 +18,7 @@ package com.datastax.driver.core.policies;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -58,6 +59,7 @@ public class ConstantSpeculativeExecutionPolicy implements SpeculativeExecutionP
    *
    * @return the number of speculative executions, always strictly positive.
    */
+  @Beta
   public int getMaxSpeculativeExecutions() {
     return maxSpeculativeExecutions;
   }
@@ -68,6 +70,7 @@ public class ConstantSpeculativeExecutionPolicy implements SpeculativeExecutionP
    *
    * @return the delay in milliseconds, never negative.
    */
+  @Beta
   public long getConstantDelayMillis() {
     return constantDelayMillis;
   }

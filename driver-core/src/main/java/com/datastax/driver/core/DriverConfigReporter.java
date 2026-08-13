@@ -15,6 +15,8 @@
  */
 package com.datastax.driver.core;
 
+import com.google.common.annotations.Beta;
+
 /**
  * Builds the {@code DRIVER_CONFIG} payload that the control connection sends in its CQL {@code
  * STARTUP} options, so ScyllaDB can store it in {@code system.clients.client_options} and operators
@@ -28,6 +30,7 @@ package com.datastax.driver.core;
  * connection stores {@code DRIVER_CONFIG}; other nodes only see {@code SESSION_ID}-bearing pooled-
  * connection rows. Consumers must query and aggregate across all nodes to see the full picture.
  */
+@Beta
 public interface DriverConfigReporter {
 
   /**

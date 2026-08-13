@@ -16,6 +16,7 @@
 package com.datastax.driver.core;
 
 import com.datastax.driver.core.policies.Policies;
+import com.google.common.annotations.Beta;
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
@@ -236,6 +237,7 @@ public class Configuration {
    *
    * @return {@code true} if driver configuration reporting is enabled.
    */
+  @Beta
   public boolean isDriverConfigReportingEnabled() {
     return driverConfigReportingEnabled;
   }
@@ -288,6 +290,7 @@ public class Configuration {
      * @param driverConfigReportingEnabled whether driver configuration reporting is enabled.
      * @return this builder.
      */
+    @Beta
     public Builder withDriverConfigReporting(boolean driverConfigReportingEnabled) {
       this.driverConfigReportingEnabled = driverConfigReportingEnabled;
       return this;

@@ -19,6 +19,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.collect.ImmutableSet;
@@ -81,6 +82,7 @@ public class HostFilterPolicy implements ChainableLoadBalancingPolicy {
    *
    * @return an immutable set of allowed datacenter names, empty when unknown.
    */
+  @Beta
   public Set<String> getWhiteListedDatacenters() {
     return whiteListedDcs;
   }

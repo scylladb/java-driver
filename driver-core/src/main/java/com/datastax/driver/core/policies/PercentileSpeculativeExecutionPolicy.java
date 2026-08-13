@@ -22,6 +22,7 @@ import com.datastax.driver.core.Host;
 import com.datastax.driver.core.LatencyTracker;
 import com.datastax.driver.core.PercentileTracker;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -64,6 +65,7 @@ public class PercentileSpeculativeExecutionPolicy implements SpeculativeExecutio
    *
    * @return the maximum number of speculative executions, always strictly positive.
    */
+  @Beta
   public int getMaxSpeculativeExecutions() {
     return maxSpeculativeExecutions;
   }
@@ -74,6 +76,7 @@ public class PercentileSpeculativeExecutionPolicy implements SpeculativeExecutio
    *
    * @return the percentile, in the range 0 (inclusive) to 100 (exclusive).
    */
+  @Beta
   public double getPercentile() {
     return percentile;
   }

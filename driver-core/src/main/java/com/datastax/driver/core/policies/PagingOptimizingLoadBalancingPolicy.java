@@ -8,6 +8,7 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -21,6 +22,7 @@ public class PagingOptimizingLoadBalancingPolicy implements ChainableLoadBalanci
   }
 
   @Override
+  @Beta
   public LoadBalancingPolicy getChildPolicy() {
     return wrapped;
   }

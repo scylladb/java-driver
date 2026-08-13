@@ -21,6 +21,7 @@ import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -102,6 +103,7 @@ public class DCAwareRoundRobinPolicy implements LoadBalancingPolicy {
    *
    * @return the local datacenter name, or {@code null}.
    */
+  @Beta
   public String getLocalDc() {
     String dc = localDc;
     return Strings.isNullOrEmpty(dc) ? null : dc;
@@ -113,6 +115,7 @@ public class DCAwareRoundRobinPolicy implements LoadBalancingPolicy {
    *
    * @return {@code true} if the local datacenter was set explicitly.
    */
+  @Beta
   public boolean isLocalDcExplicit() {
     return localDcExplicit;
   }
@@ -123,6 +126,7 @@ public class DCAwareRoundRobinPolicy implements LoadBalancingPolicy {
    *
    * @return the number of used hosts per remote datacenter.
    */
+  @Beta
   public int getUsedHostsPerRemoteDc() {
     return usedHostsPerRemoteDc;
   }
