@@ -133,7 +133,20 @@ big-endian systems, but _Scylla_ does not officially support these systems.
 If you are upgrading from a previous version of the driver, be sure to have a look at
 the [upgrade guide](/upgrade_guide/).
 
+## Migrating to Java Driver 4.x
 
+The [4.x migration guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/) covers the
+API changes in detail. The first thing to change is the dependency: the artifacts are renamed, while
+the `com.scylladb` group id stays the same.
+
+| Driver 3.x | Driver 4.x |
+|---|---|
+| `scylla-driver-core` | `java-driver-core`, plus `java-driver-query-builder` if you use the query builder |
+| `scylla-driver-mapping` | `java-driver-mapper-runtime`, plus the `java-driver-mapper-processor` annotation processor |
+| `scylla-driver-extras` | no counterpart; its codecs are either native to 4.x core or covered by its custom-codec support |
+
+All four 4.x artifacts are published under `com.scylladb` from **4.7.2.0** onwards; there is no
+earlier 4.x release under this group id.
 
 ## License
 &copy; DataStax, Inc. 
