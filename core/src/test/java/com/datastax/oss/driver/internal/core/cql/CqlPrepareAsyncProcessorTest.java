@@ -50,12 +50,12 @@ public class CqlPrepareAsyncProcessorTest {
   }
 
   /**
-   * When the cached future is already completed, process() should return the exact same instance
-   * (identity). This ensures callers hold a strong reference to the cached CF, preventing
-   * weak-value eviction under GC pressure.
+   * process() always hands out a defensive copy, including for an already-completed entry: keeping
+   * the entry alive is the anchor's job, so the cached future never needs to be exposed. A caller
+   * that obtrudes on its copy must not corrupt what the cache holds.
    */
   @Test
-  public void should_return_cached_future_directly_when_already_completed() throws Exception {
+  public void should_return_defensive_copy_when_future_is_already_completed() throws Exception {
     PrepareRequest request = new DefaultPrepareRequest("SELECT 1");
     PreparedStatement ps = Mockito.mock(PreparedStatement.class);
 
@@ -63,10 +63,13 @@ public class CqlPrepareAsyncProcessorTest {
     CompletableFuture<PreparedStatement> completed = CompletableFuture.completedFuture(ps);
     cache.put(request, completed);
 
-    // process() should return the exact same object
     CompletionStage<PreparedStatement> returned = processor.process(request, null, null, "test");
 
-    assertThat(returned).isSameAs(completed);
+    assertThat(returned).isNotSameAs(completed);
+    assertThat(returned.toCompletableFuture().get()).isSameAs(ps);
+
+    returned.toCompletableFuture().obtrudeValue(null);
+    assertThat(completed.get()).isSameAs(ps);
   }
 
   /**

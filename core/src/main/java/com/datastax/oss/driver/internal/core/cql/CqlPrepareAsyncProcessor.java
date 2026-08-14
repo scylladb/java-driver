@@ -175,11 +175,6 @@ public class CqlPrepareAsyncProcessor
                   });
         }
       }
-      // If the future is already completed, return it directly to maintain a strong reference
-      // in the cache and avoid premature GC with weakValues() (ScyllaDB PR #892).
-      if (result.isDone()) {
-        return result;
-      }
       // Return a defensive copy. So if a client cancels its request, the cache won't be impacted
       // nor a potential concurrent request.
       return result.thenApply(x -> x); // copy() is available only since Java 9
