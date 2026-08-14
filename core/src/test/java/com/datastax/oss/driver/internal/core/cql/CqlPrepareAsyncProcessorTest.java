@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
+import static com.datastax.oss.driver.internal.core.cql.PreparedStatementTestHelper.newPreparedStatement;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.oss.driver.api.core.cql.PrepareRequest;
@@ -25,6 +26,7 @@ import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.type.UserDefinedTypeBuilder;
 import com.datastax.oss.driver.shaded.guava.common.cache.Cache;
+import java.lang.ref.WeakReference;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -105,5 +107,64 @@ public class CqlPrepareAsyncProcessorTest {
 
     assertThat(CqlPrepareAsyncProcessor.typeMatches(oldType, DataTypes.listOf(resultType)))
         .isTrue();
+  }
+
+  /**
+   * The anchor is what keeps a weakly-held cache entry alive: while the application holds the
+   * statement, the entry survives GC even though nothing else references the cached future.
+   */
+  @Test
+  public void should_keep_cache_entry_alive_via_prepared_statement_anchor() throws Exception {
+    PrepareRequest request = new DefaultPrepareRequest("SELECT 1");
+
+    // The only surviving reference is the statement; the future stays in the callee's frame.
+    DefaultPreparedStatement ps = anchorNewEntry(request);
+
+    collectGarbage();
+
+    assertThat(cache.getIfPresent(request)).isNotNull();
+    assertThat(cache.getIfPresent(request).get()).isSameAs(ps);
+  }
+
+  /**
+   * The reverse: once the statement becomes unreachable the whole cycle is collectible, so the
+   * anchor cannot turn the cache into a leak.
+   */
+  @Test
+  public void should_evict_cache_entry_when_prepared_statement_is_unreachable() throws Exception {
+    PrepareRequest request = new DefaultPrepareRequest("SELECT 1");
+
+    // Wrapping in a WeakReference lets us drop the statement without keeping it in a local.
+    WeakReference<DefaultPreparedStatement> ps = new WeakReference<>(anchorNewEntry(request));
+
+    collectGarbage();
+
+    assertThat(ps.get())
+        .as("statement was not collected, so the cache assertion below proves nothing")
+        .isNull();
+    assertThat(cache.getIfPresent(request)).isNull();
+  }
+
+  /**
+   * Reproduces what {@link CqlPrepareAsyncProcessor#process} does on a successful prepare: cache
+   * the future, anchor it on the resulting statement, then complete it. The future is deliberately
+   * a local of this method, so it becomes unreachable as soon as this frame returns.
+   */
+  private DefaultPreparedStatement anchorNewEntry(PrepareRequest request) {
+    CompletableFuture<PreparedStatement> cachedFuture = new CompletableFuture<>();
+    cache.put(request, cachedFuture);
+
+    DefaultPreparedStatement ps = newPreparedStatement();
+    ps.setPrepareCacheAnchor(cachedFuture);
+    cachedFuture.complete(ps);
+    return ps;
+  }
+
+  private void collectGarbage() throws InterruptedException {
+    for (int i = 0; i < 10; i++) {
+      System.gc();
+      Thread.sleep(50);
+      cache.cleanUp();
+    }
   }
 }
