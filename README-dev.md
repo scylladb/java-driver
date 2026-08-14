@@ -15,6 +15,18 @@ Once you have installed the above software, you can build and preview the docume
 
 To generate the reference documentation of the driver, run the command `make javadoc`. This command generates the reference documentation using the Javadoc tool in the `_build/dirhtml/<VERSION>/api` directory.
 
+## Multiversion build
+
+`make -C docs multiversion` builds the documentation site and javadoc for every branch in `BRANCHES` (`docs/source/conf.py`).
+
+`docs/_utils/javadoc-multiversion.sh` selects the JDK per branch: branches up to `scylla-4.19.0.x` need JDK 8, newer ones JDK 11.
+
+To add a new documented version:
+
+1. Add the branch to `BRANCHES` in `docs/source/conf.py`, and update `LATEST_VERSION` if it is the new latest. New branches build with JDK 11 by default.
+2. Only if the branch needs a different JDK, map it in `docs/_utils/javadoc-multiversion.sh`.
+3. Only if that JDK is not installed by the workflow yet, add it to the `setup-java` step in `.github/workflows/docs-pages.yml`.
+
 ## Using the Makefile
 
 Most day-to-day tasks are wrapped in the top-level `Makefile` so you do not have to remember long Maven invocations. Common targets include:
