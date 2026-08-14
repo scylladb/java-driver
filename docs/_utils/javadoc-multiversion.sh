@@ -27,6 +27,9 @@ if [[ -n "$SELECTED_JDK" ]]; then
     echo "Building javadoc for '${SPHINX_MULTIVERSION_NAME:-?}' with JDK ${JDK_VERSION} (${SELECTED_JDK})"
     export JAVA_HOME="$SELECTED_JDK"
     export PATH="$JAVA_HOME/bin:$PATH"
+elif [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+    echo "${JDK_HOME_VAR} is not set: add JDK ${JDK_VERSION} to the setup-java step in docs-pages.yml" >&2
+    exit 1
 else
     echo "Building javadoc for '${SPHINX_MULTIVERSION_NAME:-?}' with the default JDK (${JDK_HOME_VAR} is not set)"
 fi
