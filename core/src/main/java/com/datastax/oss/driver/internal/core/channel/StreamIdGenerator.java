@@ -24,8 +24,8 @@ import net.jcip.annotations.NotThreadSafe;
 /**
  * Manages the set of identifiers used to distinguish multiplexed requests on a channel.
  *
- * <p>{@link #preAcquire()} / {@link #getAvailableIds()} follow atomic semantics. See {@link
- * DriverChannel#preAcquireId()} for more explanations.
+ * <p>{@link #preAcquire()}, {@link #cancelPreAcquire()}, and {@link #getAvailableIds()} follow
+ * atomic semantics. See {@link DriverChannel#preAcquireId()} for more explanations.
  *
  * <p>Other methods are not synchronized, they are only called by {@link InFlightHandler} on the I/O
  * thread.

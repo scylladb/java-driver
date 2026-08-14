@@ -45,6 +45,7 @@ import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
@@ -62,6 +63,7 @@ import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.pool.ChannelPoolFactory;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -890,6 +892,36 @@ public class DefaultSessionPoolsTest {
 
     // Pool should have been closed
     verify(pool2, VERIFY_TIMEOUT).setKeyspace(newKeyspace);
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_if_pool_returns_closed_channel() {
+    ChannelPool pool1 = mockPool(node1);
+    ChannelPool pool2 = mockPool(node2);
+    ChannelPool pool3 = mockPool(node3);
+    MockChannelPoolFactoryHelper factoryHelper =
+        MockChannelPoolFactoryHelper.builder(channelPoolFactory)
+            .success(node1, KEYSPACE, NodeDistance.LOCAL, pool1)
+            .success(node2, KEYSPACE, NodeDistance.LOCAL, pool2)
+            .success(node3, KEYSPACE, NodeDistance.LOCAL, pool3)
+            .build();
+
+    CompletionStage<CqlSession> initFuture = newSession();
+    factoryHelper.waitForCall(node1, KEYSPACE, NodeDistance.LOCAL);
+    factoryHelper.waitForCall(node2, KEYSPACE, NodeDistance.LOCAL);
+    factoryHelper.waitForCall(node3, KEYSPACE, NodeDistance.LOCAL);
+    assertThatStage(initFuture).isSuccess();
+    DefaultSession session =
+        (DefaultSession) CompletableFutures.getCompleted(initFuture.toCompletableFuture());
+    DriverChannel channel = mock(DriverChannel.class);
+    ChannelFuture closeFuture = mock(ChannelFuture.class);
+    when(closeFuture.isDone()).thenReturn(true);
+    when(channel.closeFuture()).thenReturn(closeFuture);
+    when(pool1.next(null, null)).thenReturn(channel);
+
+    assertThat(session.getChannel(node1, "test")).isNull();
+
+    verify(channel).cancelPreAcquireId();
   }
 
   private ChannelPool mockPool(Node node) {

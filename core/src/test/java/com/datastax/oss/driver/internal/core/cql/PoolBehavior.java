@@ -87,6 +87,14 @@ public class PoolBehavior {
         .write(any(Message.class), anyBoolean(), anyMap(), any(ResponseCallback.class));
   }
 
+  public void verifyPreAcquireCancelled() {
+    verify(channel).cancelPreAcquireId();
+  }
+
+  public void verifyPreAcquireNotCancelled() {
+    verify(channel, never()).cancelPreAcquireId();
+  }
+
   public void setWriteSuccess() {
     writePromise.setSuccess(null);
   }

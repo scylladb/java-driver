@@ -117,6 +117,14 @@ public class InFlightHandler extends ChannelDuplexHandler {
   }
 
   private void write(ChannelHandlerContext ctx, RequestMessage message, ChannelPromise promise) {
+    // From this point on, this handler owns the pre-acquired stream id and is responsible for
+    // releasing it on every failure path.
+    if (!message.markPreAcquireIdAsSubmitted()) {
+      LOG.warn(
+          "[{}] Dropping write because its stream id reservation was already cancelled", logPrefix);
+      promise.setFailure(new IllegalStateException("Stream id reservation was already cancelled"));
+      return;
+    }
     if (closingGracefully) {
       promise.setFailure(new IllegalStateException("Channel is closing"));
       streamIds.cancelPreAcquire();
@@ -394,6 +402,10 @@ public class InFlightHandler extends ChannelDuplexHandler {
 
   boolean preAcquireId() {
     return streamIds.preAcquire();
+  }
+
+  void cancelPreAcquireId() {
+    streamIds.cancelPreAcquire();
   }
 
   int getInFlight() {

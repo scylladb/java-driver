@@ -19,17 +19,21 @@ package com.datastax.oss.driver.internal.core.channel;
 
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.DefaultChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.EventExecutor;
 import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.jcip.annotations.ThreadSafe;
@@ -59,19 +63,26 @@ public class DefaultWriteCoalescer implements WriteCoalescer {
 
   @Override
   public ChannelFuture writeAndFlush(Channel channel, Object message) {
-    ChannelPromise writePromise = channel.newPromise();
+    Flusher flusher = getFlusher(channel);
+    ChannelPromise writePromise =
+        new DefaultChannelPromise(channel, flusher.listenerNotificationExecutor);
     Write write = new Write(channel, message, writePromise);
-    enqueue(write, channel.eventLoop());
+    flusher.enqueue(write);
     return writePromise;
   }
 
-  private void enqueue(Write write, EventLoop eventLoop) {
-    Flusher flusher = flushers.computeIfAbsent(eventLoop, Flusher::new);
-    flusher.enqueue(write);
+  @Override
+  public EventExecutor listenerNotificationExecutor(Channel channel) {
+    return getFlusher(channel).listenerNotificationExecutor;
+  }
+
+  private Flusher getFlusher(Channel channel) {
+    return flushers.computeIfAbsent(channel.eventLoop(), Flusher::new);
   }
 
   private class Flusher {
     private final EventLoop eventLoop;
+    private final RejectionSafeEventExecutor listenerNotificationExecutor;
 
     // These variables are accessed both from client threads and the event loop
     private final Queue<Write> writes = new ConcurrentLinkedQueue<>();
@@ -82,13 +93,52 @@ public class DefaultWriteCoalescer implements WriteCoalescer {
 
     private Flusher(EventLoop eventLoop) {
       this.eventLoop = eventLoop;
+      this.listenerNotificationExecutor = new RejectionSafeEventExecutor(eventLoop);
     }
 
     private void enqueue(Write write) {
       boolean added = writes.offer(write);
       assert added; // always true (see MpscLinkedAtomicQueue implementation)
       if (running.compareAndSet(false, true)) {
-        eventLoop.execute(this::runOnEventLoop);
+        try {
+          eventLoop.execute(this::runOnEventLoop);
+        } catch (Throwable t) {
+          // execute() rejected the task, so this write can never reach the pipeline. Remove it
+          // before making the flusher schedulable again; otherwise a concurrent retry could submit
+          // a request whose caller has already cancelled its pre-acquired stream id.
+          boolean removed = writes.remove(write);
+          // This assertion only verifies the expected queue state. If assertions are disabled and
+          // a stale message reaches the pipeline, RequestMessage's ownership gate fails its promise
+          // instead of consuming a live stream id.
+          assert removed;
+
+          // Other writers might have enqueued while running was true. The event loop is rejecting
+          // work, so retrying on the same executor cannot make progress; fail them instead.
+          if (t instanceof RejectedExecutionException) {
+            ClosedConnectionException failure = rejectedExecutionFailure(t);
+            failPendingWrites(failure);
+            throw failure;
+          }
+          failPendingWrites(t);
+          throw t;
+        }
+      }
+    }
+
+    private void failPendingWrites(Throwable failure) {
+      while (true) {
+        Write write;
+        while ((write = writes.poll()) != null) {
+          write.fail(failure);
+        }
+
+        // Allow concurrent enqueues to schedule a new run. If a write was added while we still
+        // owned the running flag and nobody claimed it after we released it, reclaim ownership and
+        // fail that write too.
+        running.set(false);
+        if (writes.isEmpty() || !running.compareAndSet(false, true)) {
+          return;
+        }
       }
     }
 
@@ -99,7 +149,11 @@ public class DefaultWriteCoalescer implements WriteCoalescer {
       while ((write = writes.poll()) != null) {
         Channel channel = write.channel;
         channels.add(channel);
-        channel.write(write.message, write.writePromise);
+        try {
+          channel.write(write.message, write.writePromise);
+        } catch (Throwable t) {
+          write.fail(t);
+        }
       }
 
       for (Channel channel : channels) {
@@ -124,10 +178,25 @@ public class DefaultWriteCoalescer implements WriteCoalescer {
       // on. If not, we need to do it ourselves.
       boolean shouldRestartMyself = running.compareAndSet(false, true);
 
-      if (shouldRestartMyself && !eventLoop.isShuttingDown()) {
-        eventLoop.schedule(this::runOnEventLoop, rescheduleIntervalNanos, TimeUnit.NANOSECONDS);
+      if (shouldRestartMyself) {
+        if (eventLoop.isShuttingDown()) {
+          failPendingWrites(
+              rejectedExecutionFailure(
+                  new RejectedExecutionException("Event loop is shutting down")));
+        } else {
+          try {
+            eventLoop.schedule(this::runOnEventLoop, rescheduleIntervalNanos, TimeUnit.NANOSECONDS);
+          } catch (Throwable t) {
+            failPendingWrites(
+                t instanceof RejectedExecutionException ? rejectedExecutionFailure(t) : t);
+          }
+        }
       }
     }
+  }
+
+  private static ClosedConnectionException rejectedExecutionFailure(Throwable cause) {
+    return new ClosedConnectionException("Channel event loop rejected a write task", cause);
   }
 
   private static class Write {
@@ -139,6 +208,13 @@ public class DefaultWriteCoalescer implements WriteCoalescer {
       this.channel = channel;
       this.message = message;
       this.writePromise = writePromise;
+    }
+
+    private void fail(Throwable failure) {
+      if (message instanceof DriverChannel.RequestMessage) {
+        ((DriverChannel.RequestMessage) message).cancelPreAcquireId();
+      }
+      writePromise.tryFailure(failure);
     }
   }
 }

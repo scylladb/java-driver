@@ -37,12 +37,14 @@ import com.datastax.oss.driver.internal.core.protocol.ShardingInfo;
 import com.datastax.oss.driver.internal.core.protocol.ShardingInfo.ConnectionShardingInfo;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.protocol.internal.Message;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoop;
 import io.netty.util.AttributeKey;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import java.net.SocketAddress;
@@ -50,6 +52,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import net.jcip.annotations.ThreadSafe;
 
 /**
@@ -73,6 +76,7 @@ public class DriverChannel {
   private final Channel channel;
   private final InFlightHandler inFlightHandler;
   private final WriteCoalescer writeCoalescer;
+  private final EventExecutor listenerNotificationExecutor;
   private final ProtocolVersion protocolVersion;
   private final AtomicBoolean closing = new AtomicBoolean();
   private final AtomicBoolean forceClosing = new AtomicBoolean();
@@ -87,10 +91,16 @@ public class DriverChannel {
     this.channel = channel;
     this.inFlightHandler = channel.pipeline().get(InFlightHandler.class);
     this.writeCoalescer = writeCoalescer;
+    this.listenerNotificationExecutor = writeCoalescer.listenerNotificationExecutor(channel);
     this.protocolVersion = protocolVersion;
   }
 
   /**
+   * Once this method is entered, it takes ownership of the caller's pre-acquired stream id: it
+   * either submits the request to {@link InFlightHandler} or cancels the reservation and returns a
+   * failed future. Callers must invoke {@link #cancelPreAcquireId()} themselves only if they fail
+   * before reaching this method.
+   *
    * @return a future that succeeds when the request frame was successfully written on the channel.
    *     Beyond that, the caller will be notified through the {@code responseCallback}.
    */
@@ -100,10 +110,38 @@ public class DriverChannel {
       Map<String, ByteBuffer> customPayload,
       ResponseCallback responseCallback) {
     if (closing.get()) {
-      return channel.newFailedFuture(new IllegalStateException("Driver channel is closing"));
+      cancelPreAcquireId();
+      return newFailedWriteFuture(new IllegalStateException("Driver channel is closing"));
     }
-    RequestMessage message = new RequestMessage(request, tracing, customPayload, responseCallback);
-    return writeCoalescer.writeAndFlush(channel, message);
+    RequestMessage message =
+        new RequestMessage(request, tracing, customPayload, responseCallback, inFlightHandler);
+    try {
+      Future<Void> writeFuture = writeCoalescer.writeAndFlush(channel, message);
+      writeFuture.addListener(
+          future -> {
+            if (!future.isSuccess()) {
+              message.cancelPreAcquireId();
+            }
+          });
+      // A custom coalescer might return a promise whose listener executor already rejects tasks.
+      // If the write failed synchronously, the listener above might not have run. The ownership
+      // transition is atomic, so this check is safe even if the listener did run.
+      if (writeFuture.isDone() && !writeFuture.isSuccess()) {
+        message.cancelPreAcquireId();
+      }
+      return writeFuture;
+    } catch (Throwable t) {
+      // This method must not throw after taking ownership because callers only cancel failures
+      // that happen before they invoke it.
+      message.cancelPreAcquireId();
+      return newFailedWriteFuture(t);
+    }
+  }
+
+  private Future<Void> newFailedWriteFuture(Throwable failure) {
+    // Event-loop shutdown can reject listener notification. The shared executor falls back to the
+    // completing thread so retry/error handling still runs, possibly inline on this call stack.
+    return listenerNotificationExecutor.newFailedFuture(failure);
   }
 
   /**
@@ -193,7 +231,9 @@ public class DriverChannel {
    *
    * <p>There must be <b>exactly one</b> invocation of this method before each call to {@link
    * #write(Message, boolean, Map, ResponseCallback)}. If this method returns true, the client
-   * <b>must</b> proceed with the write. If it returns false, it <b>must not</b> proceed.
+   * <b>must</b> proceed with the write or call {@link #cancelPreAcquireId()} if it fails before
+   * reaching the write. If it returns false, it must neither proceed with the write nor cancel the
+   * reservation.
    *
    * <p>This method is used together with {@link #getAvailableIds()} to track how many requests are
    * currently executing on the channel, and avoid submitting a request that would result in a
@@ -218,6 +258,14 @@ public class DriverChannel {
    */
   public boolean preAcquireId() {
     return inFlightHandler.preAcquireId();
+  }
+
+  /**
+   * Cancels the reservation made by a successful {@link #preAcquireId()} call when its matching
+   * request cannot be submitted to {@link #write(Message, boolean, Map, ResponseCallback)}.
+   */
+  public void cancelPreAcquireId() {
+    inFlightHandler.cancelPreAcquireId();
   }
 
   /**
@@ -323,20 +371,49 @@ public class DriverChannel {
   // This is essentially a stripped-down Frame. We can't materialize the frame before writing,
   // because we need the stream id, which is assigned from within the event loop.
   static class RequestMessage {
+    private static final AtomicIntegerFieldUpdater<RequestMessage> OWNS_PRE_ACQUIRE_ID =
+        AtomicIntegerFieldUpdater.newUpdater(RequestMessage.class, "ownsPreAcquireId");
+
     final Message request;
     final boolean tracing;
     final Map<String, ByteBuffer> customPayload;
     final ResponseCallback responseCallback;
+    private final InFlightHandler preAcquireIdOwner;
 
+    @SuppressWarnings("unused") // accessed through OWNS_PRE_ACQUIRE_ID
+    private volatile int ownsPreAcquireId;
+
+    @VisibleForTesting
     RequestMessage(
         Message message,
         boolean tracing,
         Map<String, ByteBuffer> customPayload,
         ResponseCallback responseCallback) {
+      this(message, tracing, customPayload, responseCallback, null);
+    }
+
+    RequestMessage(
+        Message message,
+        boolean tracing,
+        Map<String, ByteBuffer> customPayload,
+        ResponseCallback responseCallback,
+        InFlightHandler preAcquireIdOwner) {
       this.request = message;
       this.tracing = tracing;
       this.customPayload = customPayload;
       this.responseCallback = responseCallback;
+      this.preAcquireIdOwner = preAcquireIdOwner;
+      this.ownsPreAcquireId = preAcquireIdOwner == null ? 0 : 1;
+    }
+
+    boolean markPreAcquireIdAsSubmitted() {
+      return preAcquireIdOwner == null || OWNS_PRE_ACQUIRE_ID.compareAndSet(this, 1, 0);
+    }
+
+    void cancelPreAcquireId() {
+      if (OWNS_PRE_ACQUIRE_ID.compareAndSet(this, 1, 0)) {
+        preAcquireIdOwner.cancelPreAcquireId();
+      }
     }
   }
 

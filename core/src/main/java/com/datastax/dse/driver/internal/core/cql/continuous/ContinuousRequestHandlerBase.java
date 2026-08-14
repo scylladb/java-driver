@@ -282,10 +282,12 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
     abortGlobalRequestOrChosenCallback(error);
   }
 
-  private void abortGlobalRequestOrChosenCallback(@NonNull Throwable error) {
-    if (!chosenCallback.completeExceptionally(error)) {
+  private boolean abortGlobalRequestOrChosenCallback(@NonNull Throwable error) {
+    boolean completedChosenCallback = chosenCallback.completeExceptionally(error);
+    if (!completedChosenCallback) {
       chosenCallback.thenAccept(callback -> callback.abort(error, false));
     }
+    return completedChosenCallback;
   }
 
   public CompletionStage<ResultSetT> handle() {
@@ -367,23 +369,51 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
         abortGlobalRequestOrChosenCallback(AllNodesFailedException.fromErrors(errors));
       }
     } else if (!chosenCallback.isDone()) {
-      NodeResponseCallback nodeResponseCallback =
-          new NodeResponseCallback(
-              statement,
-              node,
-              channel,
-              currentExecutionIndex,
-              retryCount,
-              scheduleSpeculativeExecution,
-              logPrefix);
-      inFlightCallbacks.add(nodeResponseCallback);
-      channel
-          .write(
-              getMessage(statement),
-              isTracingEnabled(statement),
-              createPayload(statement),
-              nodeResponseCallback)
-          .addListener(nodeResponseCallback);
+      boolean writeSubmitted = false;
+      Throwable terminalPreWriteFailure = null;
+      NodeResponseCallback nodeResponseCallback = null;
+      try {
+        nodeResponseCallback =
+            new NodeResponseCallback(
+                statement,
+                node,
+                channel,
+                currentExecutionIndex,
+                retryCount,
+                scheduleSpeculativeExecution,
+                logPrefix);
+        inFlightCallbacks.add(nodeResponseCallback);
+        Future<java.lang.Void> writeFuture =
+            channel.write(
+                getMessage(statement),
+                isTracingEnabled(statement),
+                createPayload(statement),
+                nodeResponseCallback);
+        writeSubmitted = true;
+        writeFuture.addListener(nodeResponseCallback);
+      } catch (Throwable t) {
+        if (!writeSubmitted && activeExecutionsCount.decrementAndGet() == 0) {
+          if (abortGlobalRequestOrChosenCallback(t)) {
+            terminalPreWriteFailure = t;
+          }
+        }
+        throw t;
+      } finally {
+        if (!writeSubmitted) {
+          if (nodeResponseCallback != null) {
+            inFlightCallbacks.remove(nodeResponseCallback);
+          }
+          try {
+            channel.cancelPreAcquireId();
+          } finally {
+            if (terminalPreWriteFailure != null) {
+              throttler.signalError(this, terminalPreWriteFailure);
+            }
+          }
+        }
+      }
+    } else {
+      channel.cancelPreAcquireId();
     }
   }
 
@@ -486,6 +516,16 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
       // chosenCallback should always be complete by the time tests call this
       throw new AssertionError("Expected callback to be chosen at this point");
     }
+  }
+
+  @VisibleForTesting
+  int getActiveExecutionsCount() {
+    return activeExecutionsCount.get();
+  }
+
+  @VisibleForTesting
+  int getInFlightCallbackCount() {
+    return inFlightCallbacks.size();
   }
 
   private void recordError(@NonNull Node node, @NonNull Throwable error) {

@@ -19,6 +19,9 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +40,7 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.protocol.internal.request.Prepare;
@@ -60,10 +64,12 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
   @Test
   public void should_complete_result_if_first_node_replies_immediately() {
-    try (RequestHandlerTestHarness harness =
-        RequestHandlerTestHarness.builder()
-            .withResponse(node1, defaultFrameOf(singleRow()))
-            .build()) {
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    node1Behavior.setWriteSuccess();
+    node1Behavior.setResponseSuccess(defaultFrameOf(singleRow()));
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
 
       CompletionStage<AsyncResultSet> resultSetFuture =
           new CqlRequestHandler(
@@ -89,6 +95,7 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
                 assertThat(executionInfo.getSuccessfulExecutionIndex()).isEqualTo(0);
                 assertThat(executionInfo.getWarnings()).isEmpty();
               });
+      node1Behavior.verifyPreAcquireNotCancelled();
     }
   }
 
@@ -146,6 +153,34 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
                                 .singleElement()
                                 .isInstanceOf(NodeUnavailableException.class));
               });
+    }
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_if_request_decoration_fails_before_write() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RuntimeException failure = new RuntimeException("mock failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      // This only verifies stream-id cleanup; the other failure-path leaks are tracked in #980.
+      assertThatThrownBy(
+              () ->
+                  new CqlRequestHandler(
+                      UNDEFINED_IDEMPOTENCE_STATEMENT,
+                      harness.getSession(),
+                      harness.getContext(),
+                      "test"))
+          .isSameAs(failure);
+
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
     }
   }
 

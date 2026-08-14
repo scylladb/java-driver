@@ -269,6 +269,7 @@ public class DefaultSession implements CqlSession {
         return null;
       } else if (channel.closeFuture().isDone()) {
         LOG.trace("[{}] Pool returned closed connection to {}, skipping", logPrefix, node);
+        channel.cancelPreAcquireId();
         return null;
       } else {
         return channel;

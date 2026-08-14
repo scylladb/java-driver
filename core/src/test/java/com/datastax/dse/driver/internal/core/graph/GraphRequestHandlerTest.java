@@ -27,10 +27,12 @@ import static com.datastax.dse.driver.internal.core.graph.GraphTestUtils.singleG
 import static com.datastax.oss.driver.api.core.type.codec.TypeCodecs.BIGINT;
 import static com.datastax.oss.driver.api.core.type.codec.TypeCodecs.TEXT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.matches;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -575,6 +577,37 @@ public class GraphRequestHandlerTest {
     assertThat(m).isInstanceOf(Query.class);
     Query q = ((Query) m);
     assertThat(q.options.consistency).isEqualTo(DefaultConsistencyLevel.THREE.getProtocolCode());
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_if_graph_payload_conversion_fails() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    ScriptGraphStatement graphStatement =
+        Mockito.spy(ScriptGraphStatement.newInstance("mock query"));
+    doThrow(failure).when(graphStatement).getCustomPayload();
+
+    GraphRequestHandlerTestHarness.Builder builder = GraphRequestHandlerTestHarness.builder();
+    PoolBehavior nodeBehavior = builder.customBehavior(node);
+    try (GraphRequestHandlerTestHarness harness = builder.build()) {
+      GraphSupportChecker graphSupportChecker = mock(GraphSupportChecker.class);
+      when(graphSupportChecker.inferGraphProtocol(any(), any(), any()))
+          .thenReturn(GRAPH_BINARY_1_0);
+      GraphBinaryModule module = createGraphBinaryModule(harness.getContext());
+
+      assertThatThrownBy(
+              () ->
+                  new GraphRequestHandler(
+                      graphStatement,
+                      harness.getSession(),
+                      harness.getContext(),
+                      "test",
+                      module,
+                      graphSupportChecker))
+          .isSameAs(failure);
+
+      nodeBehavior.verifyNoWrite();
+      nodeBehavior.verifyPreAcquireCancelled();
+    }
   }
 
   @DataProvider

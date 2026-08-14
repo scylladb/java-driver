@@ -20,18 +20,34 @@ package com.datastax.oss.driver.internal.core.channel;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelPromise;
+import io.netty.channel.DefaultChannelPromise;
+import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.EventExecutor;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import net.jcip.annotations.ThreadSafe;
 
 /** No-op implementation of the write coalescer: each write is flushed immediately. */
 @ThreadSafe
 public class PassThroughWriteCoalescer implements WriteCoalescer {
 
+  private final ConcurrentMap<EventLoop, RejectionSafeEventExecutor> listenerExecutors =
+      new ConcurrentHashMap<>();
+
   public PassThroughWriteCoalescer(@SuppressWarnings("unused") DriverContext context) {
     // nothing to do
   }
 
   @Override
+  public EventExecutor listenerNotificationExecutor(Channel channel) {
+    return listenerExecutors.computeIfAbsent(channel.eventLoop(), RejectionSafeEventExecutor::new);
+  }
+
+  @Override
   public ChannelFuture writeAndFlush(Channel channel, Object message) {
-    return channel.writeAndFlush(message);
+    ChannelPromise promise =
+        new DefaultChannelPromise(channel, listenerNotificationExecutor(channel));
+    return channel.writeAndFlush(message, promise);
   }
 }

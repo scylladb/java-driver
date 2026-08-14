@@ -72,10 +72,31 @@ abstract class ChannelHandlerRequest implements ResponseCallback {
               String.format(
                   "%s has reached its maximum number of simultaneous requests", channel)));
     } else {
-      DriverChannel.RequestMessage message =
-          new DriverChannel.RequestMessage(getRequest(), false, Frame.NO_PAYLOAD, this);
-      ChannelFuture writeFuture = channel.writeAndFlush(message);
-      writeFuture.addListener(this::writeListener);
+      boolean writeSubmitted = false;
+      DriverChannel.RequestMessage message = null;
+      try {
+        message =
+            new DriverChannel.RequestMessage(
+                getRequest(), false, Frame.NO_PAYLOAD, this, inFlightHandler);
+        ChannelFuture writeFuture = channel.writeAndFlush(message);
+        DriverChannel.RequestMessage submittedMessage = message;
+        writeFuture.addListener(
+            future -> {
+              if (!future.isSuccess()) {
+                submittedMessage.cancelPreAcquireId();
+              }
+              writeListener(future);
+            });
+        writeSubmitted = true;
+      } finally {
+        if (!writeSubmitted) {
+          if (message == null) {
+            inFlightHandler.cancelPreAcquireId();
+          } else {
+            message.cancelPreAcquireId();
+          }
+        }
+      }
     }
   }
 

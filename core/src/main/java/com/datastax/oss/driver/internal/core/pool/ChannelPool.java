@@ -168,7 +168,9 @@ public class ChannelPool implements AsyncAutoCloseable {
    *     request path, and we want to avoid complex check-then-act semantics; therefore this might
    *     race and return a channel that is already closed, or {@code null}. In those cases, it is up
    *     to the caller to fail fast and move to the next node.
-   *     <p>There is no need to return the channel.
+   *     <p>A non-null result owns a pre-acquired stream id. The caller must either submit a request
+   *     through {@link DriverChannel#write} or release it through {@link
+   *     DriverChannel#cancelPreAcquireId()} if it cannot submit.
    */
   public DriverChannel next(@Nullable Token routingKey, @Nullable Integer shardSuggestion) {
     if (!singleThreaded.initialized) {

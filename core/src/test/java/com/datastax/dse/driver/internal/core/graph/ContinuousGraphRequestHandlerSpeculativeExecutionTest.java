@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -257,6 +258,59 @@ public class ContinuousGraphRequestHandlerSpeculativeExecutionTest {
               anyLong(),
               eq(TimeUnit.NANOSECONDS));
       verifyNoMoreInteractions(nodeMetricUpdater1);
+    }
+  }
+
+  @Test
+  @UseDataProvider(location = DseTestDataProviders.class, value = "idempotentGraphConfig")
+  public void should_cancel_pre_acquired_id_if_result_completes_after_channel_acquired(
+      boolean defaultIdempotence, GraphStatement<?> statement) throws Exception {
+    GraphRequestHandlerTestHarness.Builder harnessBuilder =
+        GraphRequestHandlerTestHarness.builder().withDefaultIdempotence(defaultIdempotence);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+
+    try (GraphRequestHandlerTestHarness harness = harnessBuilder.build()) {
+      SpeculativeExecutionPolicy speculativeExecutionPolicy =
+          harness.getContext().getSpeculativeExecutionPolicy(DriverExecutionProfile.DEFAULT_NAME);
+      long firstExecutionDelay = 100L;
+      when(speculativeExecutionPolicy.nextExecution(
+              any(Node.class), eq(null), eq(statement), eq(1)))
+          .thenReturn(firstExecutionDelay);
+
+      GraphBinaryModule module = createGraphBinaryModule(harness.getContext());
+      CompletionStage<AsyncGraphResultSet> resultSetFuture =
+          new ContinuousGraphRequestHandler(
+                  statement,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test",
+                  module,
+                  graphSupportChecker)
+              .handle();
+      node1Behavior.verifyWrite();
+      node1Behavior.setWriteSuccess();
+
+      CapturedTimeout speculativeExecution = harness.nextScheduledTimeout();
+      assertThat(speculativeExecution.getDelay(TimeUnit.MILLISECONDS))
+          .isEqualTo(firstExecutionDelay);
+
+      // Simulate the initial execution winning after the speculative execution reserves an ID,
+      // but before it submits its write.
+      doAnswer(
+              invocation -> {
+                node1Behavior.setResponseSuccess(
+                    defaultDseFrameOf(singleGraphRow(GraphProtocol.GRAPH_BINARY_1_0, module)));
+                return node2Behavior.getChannel();
+              })
+          .when(harness.getSession())
+          .getChannel(eq(node2), anyString());
+
+      speculativeExecution.task().run(speculativeExecution);
+
+      assertThatStage(resultSetFuture).isSuccess();
+      node2Behavior.verifyNoWrite();
+      node2Behavior.verifyPreAcquireCancelled();
     }
   }
 
