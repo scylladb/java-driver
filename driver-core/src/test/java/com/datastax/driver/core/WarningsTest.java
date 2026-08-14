@@ -115,6 +115,7 @@ public class WarningsTest extends CCMTestsSupport {
   }
 
   @Test(groups = "isolated")
+  @ScyllaSkip /* @IntegrationTestDisabledScyllaFailure */
   @CassandraVersion("3.0.0")
   public void should_execute_query_and_not_log_server_side_warnings() throws Exception {
     // Get the system property value for disabling logging server side warnings
