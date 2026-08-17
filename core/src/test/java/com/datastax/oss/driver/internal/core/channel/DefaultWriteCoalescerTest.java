@@ -41,6 +41,8 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.ScheduledFuture;
 import java.time.Duration;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -188,6 +190,55 @@ public class DefaultWriteCoalescerTest {
         .isFailed(
             error ->
                 assertThat(error).isInstanceOf(ClosedConnectionException.class).hasCause(failure));
+    assertThat(streamIds.getAvailableIds()).isEqualTo(1);
+  }
+
+  @Test
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public void should_fail_concurrently_enqueued_writes_when_rescheduling_is_cancelled()
+      throws Exception {
+    DefaultWriteCoalescer coalescer = new DefaultWriteCoalescer(context);
+    StreamIdGenerator streamIds = new StreamIdGenerator(1);
+    assertThat(streamIds.preAcquire()).isTrue();
+    DriverChannel.RequestMessage queuedMessage = newRequestMessage(streamIds);
+    AtomicReference<ChannelFuture> queuedFuture = new AtomicReference<>();
+    ScheduledFuture<?> rescheduleFuture = mock(ScheduledFuture.class);
+    AtomicReference<GenericFutureListener> rescheduleListener = new AtomicReference<>();
+
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Runnable.class).run();
+              return null;
+            })
+        .when(eventLoop)
+        .execute(any(Runnable.class));
+    doAnswer(
+            invocation -> {
+              queuedFuture.set(coalescer.writeAndFlush(channel, queuedMessage));
+              return null;
+            })
+        .when(channel)
+        .flush();
+    when(eventLoop.schedule(any(Runnable.class), anyLong(), eq(TimeUnit.NANOSECONDS)))
+        .thenReturn((ScheduledFuture) rescheduleFuture);
+    when(rescheduleFuture.addListener(any()))
+        .thenAnswer(
+            invocation -> {
+              rescheduleListener.set(invocation.getArgument(0));
+              return rescheduleFuture;
+            });
+
+    coalescer.writeAndFlush(channel, new Object());
+
+    when(rescheduleFuture.isCancelled()).thenReturn(true);
+    rescheduleListener.get().operationComplete(rescheduleFuture);
+
+    assertThat(queuedFuture.get())
+        .isFailed(
+            error ->
+                assertThat(error)
+                    .isInstanceOf(ClosedConnectionException.class)
+                    .hasCauseInstanceOf(RejectedExecutionException.class));
     assertThat(streamIds.getAvailableIds()).isEqualTo(1);
   }
 

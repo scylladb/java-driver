@@ -27,6 +27,7 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.DefaultChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.ScheduledFuture;
 import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
@@ -185,7 +186,24 @@ public class DefaultWriteCoalescer implements WriteCoalescer {
                   new RejectedExecutionException("Event loop is shutting down")));
         } else {
           try {
-            eventLoop.schedule(this::runOnEventLoop, rescheduleIntervalNanos, TimeUnit.NANOSECONDS);
+            ScheduledFuture<?> rescheduleFuture =
+                eventLoop.schedule(
+                    this::runOnEventLoop, rescheduleIntervalNanos, TimeUnit.NANOSECONDS);
+            rescheduleFuture.addListener(
+                future -> {
+                  if (future.isCancelled()) {
+                    failPendingWrites(
+                        rejectedExecutionFailure(
+                            new RejectedExecutionException(
+                                "Event loop cancelled a scheduled write task")));
+                  } else if (!future.isSuccess()) {
+                    Throwable failure = future.cause();
+                    failPendingWrites(
+                        failure instanceof RejectedExecutionException
+                            ? rejectedExecutionFailure(failure)
+                            : failure);
+                  }
+                });
           } catch (Throwable t) {
             failPendingWrites(
                 t instanceof RejectedExecutionException ? rejectedExecutionFailure(t) : t);
