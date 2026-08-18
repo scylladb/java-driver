@@ -155,7 +155,7 @@ jobs:
         with:
           check_name: Unit tests report (JDK ${{ matrix.java-version }})
           require_tests: true
-          report_paths: "*/**/target/*-reports/*.xml"
+          report_paths: "*/**/target/*-reports/TEST-*.xml"
           follow_symlink: true
           detailed_summary: true
           updateComment: false
@@ -292,7 +292,7 @@ jobs:
         with:
           check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }} (${{ matrix.test-group }}, JDK ${{ matrix.java-version }})
           require_tests: true
-          report_paths: "*/**/target/*-reports/*.xml"
+          report_paths: "*/**/target/*-reports/TEST-*.xml"
           follow_symlink: true
           detailed_summary: true
           updateComment: false
@@ -412,7 +412,7 @@ jobs:
         with:
           check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }} (${{ matrix.test-group }}, JDK ${{ matrix.java-version }})
           require_tests: true
-          report_paths: "*/**/target/*-reports/*.xml"
+          report_paths: "*/**/target/*-reports/TEST-*.xml"
           follow_symlink: true
           detailed_summary: true
           updateComment: false
