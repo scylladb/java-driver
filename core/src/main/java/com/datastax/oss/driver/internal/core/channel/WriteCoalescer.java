@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.channel;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.util.concurrent.EventExecutor;
 
 /**
  * Optimizes the write operations on Netty channels.
@@ -29,6 +30,15 @@ import io.netty.channel.ChannelFuture;
  * to be accumulated and flushed together for better performance.
  */
 public interface WriteCoalescer {
+  /**
+   * Returns the executor to notify write-future listeners. Notifications normally run on the
+   * channel's event loop, but must fall back to the completing thread if shutdown rejects them.
+   * Implementations must use this executor for the future returned by {@link #writeAndFlush}.
+   */
+  default EventExecutor listenerNotificationExecutor(Channel channel) {
+    return new RejectionSafeEventExecutor(channel.eventLoop());
+  }
+
   /**
    * Writes and flushes the message to the channel, possibly at a later time, but <b>the order of
    * messages must be preserved</b>.

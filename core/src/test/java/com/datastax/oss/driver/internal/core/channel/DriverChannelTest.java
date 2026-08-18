@@ -18,6 +18,11 @@
 package com.datastax.oss.driver.internal.core.channel;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
@@ -27,11 +32,14 @@ import com.datastax.oss.protocol.internal.response.result.Void;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.DefaultChannelPromise;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import java.util.AbstractMap;
 import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.RejectedExecutionException;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -143,6 +151,113 @@ public class DriverChannelTest extends ChannelHandlerTestBase {
         .hasMessageContaining("Channel was force-closed");
   }
 
+  @Test
+  public void should_cancel_pre_acquired_id_when_write_is_rejected_before_submission() {
+    // Given
+    when(streamIds.preAcquire()).thenReturn(true);
+    assertThat(driverChannel.preAcquireId()).isTrue();
+    driverChannel.close();
+
+    // When
+    Future<java.lang.Void> writeFuture =
+        driverChannel.write(new Query("test"), false, Frame.NO_PAYLOAD, new MockResponseCallback());
+
+    // Then
+    assertThat(writeFuture).isFailed();
+    verify(streamIds).cancelPreAcquire();
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_when_coalesced_write_throws() {
+    // Given
+    RuntimeException failure = new RuntimeException("mock failure");
+    driverChannel =
+        new DriverChannel(
+            new EmbeddedEndPoint(),
+            channel,
+            (channel, message) -> {
+              throw failure;
+            },
+            DefaultProtocolVersion.V3);
+    when(streamIds.preAcquire()).thenReturn(true);
+    assertThat(driverChannel.preAcquireId()).isTrue();
+
+    // When
+    Future<java.lang.Void> writeFuture =
+        driverChannel.write(new Query("test"), false, Frame.NO_PAYLOAD, new MockResponseCallback());
+
+    // Then
+    assertThat(writeFuture).isFailed(error -> assertThat(error).isSameAs(failure));
+    verify(streamIds).cancelPreAcquire();
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_when_coalesced_write_throws_error() {
+    // Given
+    AssertionError failure = new AssertionError("mock failure");
+    driverChannel =
+        new DriverChannel(
+            new EmbeddedEndPoint(),
+            channel,
+            (channel, message) -> {
+              throw failure;
+            },
+            DefaultProtocolVersion.V3);
+    when(streamIds.preAcquire()).thenReturn(true);
+    assertThat(driverChannel.preAcquireId()).isTrue();
+
+    // When
+    Future<java.lang.Void> writeFuture =
+        driverChannel.write(new Query("test"), false, Frame.NO_PAYLOAD, new MockResponseCallback());
+
+    // Then
+    assertThat(writeFuture).isFailed(error -> assertThat(error).isSameAs(failure));
+    verify(streamIds).cancelPreAcquire();
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_when_coalesced_write_fails_asynchronously() {
+    // Given
+    RuntimeException failure = new RuntimeException("mock failure");
+    when(streamIds.preAcquire()).thenReturn(true);
+    assertThat(driverChannel.preAcquireId()).isTrue();
+
+    // When
+    Future<java.lang.Void> writeFuture =
+        driverChannel.write(new Query("test"), false, Frame.NO_PAYLOAD, new MockResponseCallback());
+    writeCoalescer.failWrites(failure);
+
+    // Then
+    assertThat(writeFuture).isFailed(error -> assertThat(error).isSameAs(failure));
+    verify(streamIds).cancelPreAcquire();
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_when_custom_coalescer_listener_is_rejected() {
+    // Given
+    RuntimeException failure = new RuntimeException("mock failure");
+    EventExecutor rejectingExecutor = mock(EventExecutor.class);
+    when(rejectingExecutor.inEventLoop()).thenReturn(false);
+    doThrow(new RejectedExecutionException()).when(rejectingExecutor).execute(any(Runnable.class));
+    driverChannel =
+        new DriverChannel(
+            new EmbeddedEndPoint(),
+            channel,
+            (channel, message) ->
+                new DefaultChannelPromise(channel, rejectingExecutor).setFailure(failure),
+            DefaultProtocolVersion.V3);
+    when(streamIds.preAcquire()).thenReturn(true);
+    assertThat(driverChannel.preAcquireId()).isTrue();
+
+    // When
+    Future<java.lang.Void> writeFuture =
+        driverChannel.write(new Query("test"), false, Frame.NO_PAYLOAD, new MockResponseCallback());
+
+    // Then
+    assertThat(writeFuture).isFailed(error -> assertThat(error).isSameAs(failure));
+    verify(streamIds).cancelPreAcquire();
+  }
+
   // Simple implementation that holds all the writes, and flushes them when it's explicitly
   // triggered.
   private class MockWriteCoalescer implements WriteCoalescer {
@@ -159,6 +274,12 @@ public class DriverChannelTest extends ChannelHandlerTestBase {
     void triggerFlush() {
       for (Map.Entry<Object, ChannelPromise> entry : messages) {
         channel.writeAndFlush(entry.getKey(), entry.getValue());
+      }
+    }
+
+    void failWrites(Throwable failure) {
+      for (Map.Entry<Object, ChannelPromise> entry : messages) {
+        entry.getValue().tryFailure(failure);
       }
     }
   }

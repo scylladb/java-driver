@@ -82,6 +82,27 @@ public class InFlightHandlerTest extends ChannelHandlerTestBase {
   }
 
   @Test
+  public void should_fail_write_if_pre_acquired_id_was_already_cancelled() {
+    // Given
+    addToPipeline();
+    InFlightHandler handler = channel.pipeline().get(InFlightHandler.class);
+    assertThat(handler.preAcquireId()).isTrue();
+    DriverChannel.RequestMessage message =
+        new DriverChannel.RequestMessage(
+            QUERY, false, Frame.NO_PAYLOAD, new MockResponseCallback(), handler);
+    message.cancelPreAcquireId();
+
+    // When
+    ChannelFuture writeFuture = channel.writeAndFlush(message);
+
+    // Then
+    assertThat(writeFuture)
+        .isFailed(error -> assertThat(error).isInstanceOf(IllegalStateException.class));
+    verify(streamIds).cancelPreAcquire();
+    verify(streamIds, never()).acquire();
+  }
+
+  @Test
   public void should_assign_streamid_and_send_frame() {
     // Given
     addToPipeline();

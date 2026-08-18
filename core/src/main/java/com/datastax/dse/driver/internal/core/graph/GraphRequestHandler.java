@@ -302,29 +302,37 @@ public class GraphRequestHandler implements Throttled {
             NO_SUCCESSFUL_EXECUTION);
       }
     } else {
-      NodeResponseCallback nodeResponseCallback =
-          new NodeResponseCallback(
-              statement,
-              node,
-              queryPlan,
-              channel,
-              currentExecutionIndex,
-              retryCount,
-              scheduleNextExecution,
-              logPrefix);
-      DriverExecutionProfile executionProfile =
-          Conversions.resolveExecutionProfile(statement, context);
-      GraphProtocol graphSubProtocol =
-          GraphConversions.resolveGraphSubProtocol(statement, graphSupportChecker, context);
-      Message message =
-          GraphConversions.createMessageFromGraphStatement(
-              statement, graphSubProtocol, executionProfile, context, graphBinaryModule);
-      Map<String, ByteBuffer> customPayload =
-          GraphConversions.createCustomPayload(
-              statement, graphSubProtocol, executionProfile, context, graphBinaryModule);
-      channel
-          .write(message, statement.isTracing(), customPayload, nodeResponseCallback)
-          .addListener(nodeResponseCallback);
+      boolean writeSubmitted = false;
+      try {
+        NodeResponseCallback nodeResponseCallback =
+            new NodeResponseCallback(
+                statement,
+                node,
+                queryPlan,
+                channel,
+                currentExecutionIndex,
+                retryCount,
+                scheduleNextExecution,
+                logPrefix);
+        DriverExecutionProfile executionProfile =
+            Conversions.resolveExecutionProfile(statement, context);
+        GraphProtocol graphSubProtocol =
+            GraphConversions.resolveGraphSubProtocol(statement, graphSupportChecker, context);
+        Message message =
+            GraphConversions.createMessageFromGraphStatement(
+                statement, graphSubProtocol, executionProfile, context, graphBinaryModule);
+        Map<String, ByteBuffer> customPayload =
+            GraphConversions.createCustomPayload(
+                statement, graphSubProtocol, executionProfile, context, graphBinaryModule);
+        Future<java.lang.Void> writeFuture =
+            channel.write(message, statement.isTracing(), customPayload, nodeResponseCallback);
+        writeSubmitted = true;
+        writeFuture.addListener(nodeResponseCallback);
+      } finally {
+        if (!writeSubmitted) {
+          channel.cancelPreAcquireId();
+        }
+      }
     }
   }
 

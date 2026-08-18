@@ -229,14 +229,22 @@ public class CqlPrepareHandler implements Throttled {
     if (channel == null) {
       setFinalError(AllNodesFailedException.fromErrors(this.errors));
     } else {
-      InitialPrepareCallback initialPrepareCallback =
-          new InitialPrepareCallback(request, node, channel, retryCount);
+      boolean writeSubmitted = false;
+      try {
+        InitialPrepareCallback initialPrepareCallback =
+            new InitialPrepareCallback(request, node, channel, retryCount);
 
-      Prepare message = toPrepareMessage(request);
+        Prepare message = toPrepareMessage(request);
 
-      channel
-          .write(message, false, request.getCustomPayload(), initialPrepareCallback)
-          .addListener(initialPrepareCallback);
+        Future<Void> writeFuture =
+            channel.write(message, false, request.getCustomPayload(), initialPrepareCallback);
+        writeSubmitted = true;
+        writeFuture.addListener(initialPrepareCallback);
+      } finally {
+        if (!writeSubmitted) {
+          channel.cancelPreAcquireId();
+        }
+      }
     }
   }
 
@@ -316,20 +324,26 @@ public class CqlPrepareHandler implements Throttled {
       LOG.trace("[{}] Could not get a channel to reprepare on {}, skipping", logPrefix, node);
       return CompletableFuture.completedFuture(null);
     } else {
-      ThrottledAdminRequestHandler<ByteBuffer> handler =
-          ThrottledAdminRequestHandler.prepare(
-              channel,
-              false,
-              toPrepareMessage(request),
-              request.getCustomPayload(),
-              Conversions.resolveRequestTimeout(request, executionProfile),
-              throttler,
-              session.getMetricUpdater(),
-              logPrefix);
+      ThrottledAdminRequestHandler<ByteBuffer> handler;
+      try {
+        handler =
+            ThrottledAdminRequestHandler.prepare(
+                channel,
+                false,
+                toPrepareMessage(request),
+                request.getCustomPayload(),
+                Conversions.resolveRequestTimeout(request, executionProfile),
+                throttler,
+                session.getMetricUpdater(),
+                logPrefix);
+      } catch (Throwable t) {
+        channel.cancelPreAcquireId();
+        throw t;
+      }
       return handler
           .start()
           .handle(
-              (result, error) -> {
+              (preparedId, error) -> {
                 if (error == null) {
                   LOG.trace("[{}] Successfully reprepared on {}", logPrefix, node);
                 } else {

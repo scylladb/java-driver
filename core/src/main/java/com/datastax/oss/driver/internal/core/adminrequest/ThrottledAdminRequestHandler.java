@@ -38,6 +38,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
@@ -104,10 +105,11 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
   private final long startTimeNanos;
   private final RequestThrottler throttler;
   private final SessionMetricUpdater metricUpdater;
+  private final AtomicBoolean holdsExternalReservation;
 
   protected ThrottledAdminRequestHandler(
       DriverChannel channel,
-      boolean preAcquireId,
+      boolean shouldPreAcquireId,
       Message message,
       Map<String, ByteBuffer> customPayload,
       Duration timeout,
@@ -118,7 +120,7 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
       Class<? extends Result> expectedResponseType) {
     super(
         channel,
-        preAcquireId,
+        shouldPreAcquireId,
         message,
         customPayload,
         timeout,
@@ -128,31 +130,56 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
     this.startTimeNanos = System.nanoTime();
     this.throttler = throttler;
     this.metricUpdater = metricUpdater;
+    this.holdsExternalReservation = new AtomicBoolean(!shouldPreAcquireId);
   }
 
   @Override
   public CompletionStage<ResultT> start() {
     // Don't write request yet, wait for green light from throttler
-    throttler.register(this);
+    try {
+      throttler.register(this);
+    } catch (Throwable t) {
+      cancelExternalReservation();
+      // Registration can fail before the throttler admits this request, so complete the result
+      // without calling this class's override, which would signal a permit that was never acquired.
+      super.setFinalError(t);
+      throw t;
+    }
     return result;
   }
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    if (wasDelayed) {
-      metricUpdater.updateTimer(
-          DefaultSessionMetric.THROTTLING_DELAY,
-          null,
-          System.nanoTime() - startTimeNanos,
-          TimeUnit.NANOSECONDS);
+    try {
+      if (wasDelayed) {
+        metricUpdater.updateTimer(
+            DefaultSessionMetric.THROTTLING_DELAY,
+            null,
+            System.nanoTime() - startTimeNanos,
+            TimeUnit.NANOSECONDS);
+      }
+      holdsExternalReservation.set(false);
+      super.start();
+    } catch (Throwable t) {
+      cancelExternalReservation();
+      setFinalError(t);
+      throw t;
     }
-    super.start();
   }
 
   @Override
   public void onThrottleFailure(@NonNull RequestThrottlingException error) {
+    cancelExternalReservation();
     metricUpdater.incrementCounter(DefaultSessionMetric.THROTTLING_ERRORS, null);
     setFinalError(error);
+  }
+
+  private void cancelExternalReservation() {
+    // register() can invoke onThrottleReady() synchronously. If that callback throws, both
+    // onThrottleReady() and start() catch the same failure, so cancellation must be idempotent.
+    if (holdsExternalReservation.compareAndSet(true, false)) {
+      cancelCallerOwnedPreAcquireId();
+    }
   }
 
   @Override

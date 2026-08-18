@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.matches;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,7 +50,9 @@ import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.internal.core.ProtocolFeature;
 import com.datastax.oss.driver.internal.core.cql.PoolBehavior;
@@ -208,6 +211,34 @@ public class ContinuousCqlRequestHandlerTest extends ContinuousCqlRequestHandler
                       .handle())
           .isInstanceOf(IllegalStateException.class)
           .hasMessage("Cannot execute continuous paging requests with protocol version " + version);
+    }
+  }
+
+  @Test
+  public void should_unwind_execution_if_request_setup_fails_before_write() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    SimpleStatement statement = Mockito.spy(SimpleStatement.newInstance("mock query"));
+    doThrow(failure).when(statement).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestHandlerTestHarness.Builder builder =
+        continuousHarnessBuilder().withProtocolVersion(DSE_V2);
+    PoolBehavior node1Behavior = builder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = builder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      ContinuousCqlRequestHandler handler =
+          new ContinuousCqlRequestHandler(
+              statement, harness.getSession(), harness.getContext(), "test");
+      CompletionStage<ContinuousAsyncResultSet> resultSetFuture = handler.handle();
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(handler.getActiveExecutionsCount()).isZero();
+      assertThat(handler.getInFlightCallbackCount()).isZero();
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      verify(throttler).signalError(handler, failure);
     }
   }
 

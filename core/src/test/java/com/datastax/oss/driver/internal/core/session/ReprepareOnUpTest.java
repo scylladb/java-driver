@@ -19,12 +19,20 @@ package com.datastax.oss.driver.internal.core.session;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestThrottlingException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
@@ -70,6 +78,7 @@ public class ReprepareOnUpTest {
   @Mock private TopologyMonitor topologyMonitor;
   @Mock private MetricsFactory metricsFactory;
   @Mock private SessionMetricUpdater metricUpdater;
+  @Mock private RequestThrottler throttler;
   private Runnable whenPrepared;
   private CompletionStage<Void> done;
 
@@ -90,6 +99,7 @@ public class ReprepareOnUpTest {
 
     when(context.getMetricsFactory()).thenReturn(metricsFactory);
     when(metricsFactory.getSessionUpdater()).thenReturn(metricUpdater);
+    when(context.getRequestThrottler()).thenReturn(throttler);
 
     done = new CompletableFuture<>();
     whenPrepared = () -> ((CompletableFuture<Void>) done).complete(null);
@@ -335,6 +345,52 @@ public class ReprepareOnUpTest {
     }
 
     assertThatStage(done).isSuccess(v -> assertThat(reprepareOnUp.queries).isEmpty());
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_if_reprepare_query_fails_before_write() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    doThrow(failure).when(throttler).register(any());
+    ReprepareOnUp reprepareOnUp =
+        new ReprepareOnUp(
+            "test",
+            pool,
+            ImmediateEventExecutor.INSTANCE,
+            getMockPayloads('a'),
+            context,
+            whenPrepared);
+
+    assertThatThrownBy(
+            () -> reprepareOnUp.queryAsync(new Query("mock query"), Collections.emptyMap(), "mock"))
+        .isSameAs(failure);
+
+    verify(channel).cancelPreAcquireId();
+  }
+
+  @Test
+  public void should_cancel_pre_acquired_id_if_reprepare_query_is_rejected_by_throttler() {
+    RequestThrottlingException failure = new RequestThrottlingException("mock failure");
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleFailure(failure);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+    ReprepareOnUp reprepareOnUp =
+        new ReprepareOnUp(
+            "test",
+            pool,
+            ImmediateEventExecutor.INSTANCE,
+            getMockPayloads('a'),
+            context,
+            whenPrepared);
+
+    CompletionStage<AdminResult> result =
+        reprepareOnUp.queryAsync(new Query("mock query"), Collections.emptyMap(), "mock");
+
+    assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(failure));
+    verify(channel).cancelPreAcquireId();
   }
 
   private Map<ByteBuffer, RepreparePayload> getMockPayloads(char... values) {

@@ -131,9 +131,32 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
               String.format(
                   "%s has reached its maximum number of simultaneous requests", channel)));
     } else {
-      channel.write(message, false, customPayload, this).addListener(this::onWriteComplete);
+      boolean writeSubmitted = false;
+      try {
+        Future<Void> writeFuture = channel.write(message, false, customPayload, this);
+        writeSubmitted = true;
+        writeFuture.addListener(this::onWriteComplete);
+      } finally {
+        if (!writeSubmitted) {
+          channel.cancelPreAcquireId();
+        }
+      }
     }
     return result;
+  }
+
+  /**
+   * Cancels a stream id reservation supplied by the caller.
+   *
+   * <p>This is only valid when {@code shouldPreAcquireId} is {@code false}; otherwise this handler
+   * does not own a reservation before {@link #start()}.
+   */
+  protected final void cancelCallerOwnedPreAcquireId() {
+    if (shouldPreAcquireId) {
+      throw new IllegalStateException(
+          "Cannot cancel a caller-owned reservation when this handler pre-acquires its own id");
+    }
+    channel.cancelPreAcquireId();
   }
 
   private void onWriteComplete(Future<? super Void> future) {
