@@ -65,6 +65,9 @@ import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.netty.channel.Channel;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.ssl.SslHandler;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -75,6 +78,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -107,6 +112,7 @@ public class DefaultDriverConfigReporterTest {
   private InternalDriverContext mockContext;
   private DriverExecutionProfile mockProfile;
   private DefaultDriverConfigReporter reporter;
+  private EmbeddedChannel reportingChannel;
 
   @Before
   public void setup() {
@@ -116,6 +122,12 @@ public class DefaultDriverConfigReporterTest {
     when(mockContext.getConfig()).thenReturn(config);
     when(config.getDefaultProfile()).thenReturn(mockProfile);
     reporter = new DefaultDriverConfigReporter(mockContext);
+    reportingChannel = new EmbeddedChannel();
+  }
+
+  @After
+  public void cleanup() {
+    reportingChannel.finishAndReleaseAll();
   }
 
   private void enableReporting(boolean enabled) {
@@ -127,7 +139,7 @@ public class DefaultDriverConfigReporterTest {
   private DefaultDriverConfigReporter reporterReporting(Supplier<String> json) {
     return new DefaultDriverConfigReporter(mockContext) {
       @Override
-      String buildJson() {
+      String buildJson(Channel channel) {
         return json.get();
       }
     };
@@ -142,7 +154,8 @@ public class DefaultDriverConfigReporterTest {
   public void should_add_driver_config_when_enabled() {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
-    reporterReporting(() -> "{\"version\":1}").populateControlConnectionOptions(options);
+    reporterReporting(() -> "{\"version\":1}")
+        .populateControlConnectionOptions(options, reportingChannel);
     assertThat(options)
         .hasSize(1)
         .containsEntry(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}");
@@ -152,7 +165,7 @@ public class DefaultDriverConfigReporterTest {
   public void should_add_nothing_when_disabled() {
     enableReporting(false);
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options);
+    reporter.populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -163,7 +176,7 @@ public class DefaultDriverConfigReporterTest {
     // getBoolean(), ignoring the fallback that is under test here.
     Map<String, String> options = new HashMap<>();
     defaultsReporter(map -> map.remove(TypedDriverOption.DRIVER_CONFIG_REPORTING_ENABLED))
-        .populateControlConnectionOptions(options);
+        .populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).containsKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
   }
 
@@ -176,7 +189,7 @@ public class DefaultDriverConfigReporterTest {
     // in-process; what is checked here is that the substitute contributes nothing and, in
     // particular, does not need a context to say so.
     Map<String, String> options = new HashMap<>();
-    new NoopDriverConfigReporter().populateControlConnectionOptions(options);
+    new NoopDriverConfigReporter().populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -187,7 +200,7 @@ public class DefaultDriverConfigReporterTest {
     when(mockProfile.getBoolean(DefaultDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, true))
         .thenThrow(new IllegalStateException("config blew up"));
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options); // must not throw
+    reporter.populateControlConnectionOptions(options, reportingChannel); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -199,7 +212,7 @@ public class DefaultDriverConfigReporterTest {
             () -> {
               throw new IllegalStateException("introspection blew up");
             })
-        .populateControlConnectionOptions(options); // must not throw
+        .populateControlConnectionOptions(options, reportingChannel); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -208,7 +221,7 @@ public class DefaultDriverConfigReporterTest {
     // buildJson() returns null when Jackson fails to serialize the node tree.
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
-    reporterReporting(() -> null).populateControlConnectionOptions(options);
+    reporterReporting(() -> null).populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -285,7 +298,7 @@ public class DefaultDriverConfigReporterTest {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
     reporterReporting(() -> oversizedReport())
-        .populateControlConnectionOptions(options); // must not throw
+        .populateControlConnectionOptions(options, reportingChannel); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -294,7 +307,7 @@ public class DefaultDriverConfigReporterTest {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
     String atLimit = padTo(DefaultDriverConfigReporter.MAX_DRIVER_CONFIG_LENGTH);
-    reporterReporting(() -> atLimit).populateControlConnectionOptions(options);
+    reporterReporting(() -> atLimit).populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).containsEntry(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, atLimit);
   }
 
@@ -314,13 +327,13 @@ public class DefaultDriverConfigReporterTest {
     // Built, well-formed and over the limit: it is dropped for its size, not because building it
     // failed. Reporting is left at the shipped default here, since defaultsReporter() reads a real
     // profile rather than the bare mock the tests above use.
-    String json = reporter.buildJson();
+    String json = reporter.buildJson(reportingChannel);
     assertConformsToSchema(MAPPER.readTree(json));
     assertThat(json.getBytes(StandardCharsets.UTF_8).length)
         .isGreaterThan(DefaultDriverConfigReporter.MAX_DRIVER_CONFIG_LENGTH);
 
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options);
+    reporter.populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -1505,6 +1518,42 @@ public class DefaultDriverConfigReporterTest {
   }
 
   @Test
+  public void should_not_report_tls_when_the_configured_ssl_handler_was_removed() throws Exception {
+    SslEngineFactory factory = new ProgrammaticSslEngineFactory(SSLContext.getDefault());
+    DefaultDriverConfigReporter r =
+        reporterWith(
+            defaults(map -> {}),
+            exponentialReconnection(),
+            mock(DefaultRetryPolicy.class),
+            mock(NoSpeculativeExecutionPolicy.class),
+            loadBalancing(DefaultLoadBalancingPolicy.class),
+            clientSideGenerator(),
+            Optional.of(factory));
+
+    reportingChannel.pipeline().remove(SslHandler.class);
+
+    assertThat(report(r).get("connection").has("tls")).isFalse();
+  }
+
+  @Test
+  public void should_report_tls_when_a_pipeline_hook_added_an_ssl_handler() throws Exception {
+    reportingChannel.pipeline().addLast(clientSslHandler());
+    DefaultDriverConfigReporter r =
+        reporterWith(
+            defaults(map -> {}),
+            exponentialReconnection(),
+            mock(DefaultRetryPolicy.class),
+            mock(NoSpeculativeExecutionPolicy.class),
+            loadBalancing(DefaultLoadBalancingPolicy.class),
+            clientSideGenerator(),
+            Optional.empty());
+
+    JsonNode tls = report(r).get("connection").get("tls");
+    assertThat(tls).isNotNull();
+    assertThat(tls.has("hostname-verification")).isFalse();
+  }
+
+  @Test
   public void should_omit_hostname_verification_for_an_unrecognized_engine_factory()
       throws Exception {
     // The JDK path, but with a custom engine factory that is none of the driver's own, so its host
@@ -1620,7 +1669,9 @@ public class DefaultDriverConfigReporterTest {
     when(ctx.getSslEngineFactory())
         .thenThrow(new AssertionError("the configured engine factory must not be resolved"));
 
-    JsonNode report = MAPPER.readTree(new DefaultDriverConfigReporter(ctx).buildJson());
+    reportingChannel.pipeline().addLast(clientSslHandler());
+    JsonNode report =
+        MAPPER.readTree(new DefaultDriverConfigReporter(ctx).buildJson(reportingChannel));
     // The group is built from the wrapped engine factory alone; getSslEngineFactory() throwing
     // proves it was never consulted.
     assertThat(report.get("connection").get("tls").get("hostname-verification").asBoolean())
@@ -2595,7 +2646,7 @@ public class DefaultDriverConfigReporterTest {
   }
 
   private JsonNode report(DefaultDriverConfigReporter reporter) throws Exception {
-    return MAPPER.readTree(reporter.buildJson());
+    return MAPPER.readTree(reporter.buildJson(reportingChannel));
   }
 
   /** A real default execution profile with the given customizations applied. */
@@ -2667,6 +2718,9 @@ public class DefaultDriverConfigReporterTest {
       Optional<SslEngineFactory> ssl,
       Optional<SslHandlerFactory> sslHandler,
       String programmaticLocalDc) {
+    if (sslHandler.isPresent() && reportingChannel.pipeline().get(SslHandler.class) == null) {
+      reportingChannel.pipeline().addLast(clientSslHandler());
+    }
     return new DefaultDriverConfigReporter(
         contextWith(
             profile,
@@ -2678,6 +2732,16 @@ public class DefaultDriverConfigReporterTest {
             ssl,
             sslHandler,
             programmaticLocalDc));
+  }
+
+  private static SslHandler clientSslHandler() {
+    try {
+      SSLEngine engine = SSLContext.getDefault().createSSLEngine();
+      engine.setUseClientMode(true);
+      return new SslHandler(engine);
+    } catch (Exception e) {
+      throw new AssertionError("Could not create test SSL handler", e);
+    }
   }
 
   /**

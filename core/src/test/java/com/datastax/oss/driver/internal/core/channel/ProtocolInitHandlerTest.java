@@ -107,7 +107,8 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
         .thenReturn(Duration.ofSeconds(30));
     when(internalDriverContext.getProtocolVersionRegistry()).thenReturn(protocolVersionRegistry);
     // The init handler consults the config reporter for the control connection; default to a no-op.
-    when(internalDriverContext.getDriverConfigReporter()).thenReturn(startupOptions -> {});
+    when(internalDriverContext.getDriverConfigReporter())
+        .thenReturn((startupOptions, controlChannel) -> {});
 
     channel
         .pipeline()
@@ -163,7 +164,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   private void stubConfigReporter() {
     when(internalDriverContext.getDriverConfigReporter())
         .thenReturn(
-            startupOptions ->
+            (startupOptions, controlChannel) ->
                 startupOptions.put(
                     DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}"));
   }
@@ -216,7 +217,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     assertThat(requestFrame.message).isInstanceOf(Startup.class);
     Startup startup = (Startup) requestFrame.message;
     assertThat(startup.options).doesNotContainKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
-    verify(reporter, never()).populateControlConnectionOptions(any());
+    verify(reporter, never()).populateControlConnectionOptions(any(), any());
   }
 
   @Test

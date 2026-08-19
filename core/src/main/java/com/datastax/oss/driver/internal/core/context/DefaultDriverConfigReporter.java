@@ -50,7 +50,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.netty.channel.Channel;
+import io.netty.handler.ssl.SslHandler;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
@@ -189,8 +192,8 @@ import org.slf4j.LoggerFactory;
  * cross-driver schema doesn't define; this is a known gap, not an oversight.
  *
  * <p><b>Thread safety:</b> this class is safe to use as shipped, and holds no mutable state. Note
- * that {@code buildJson()} runs on every control-connection (re)initialization, and may be called
- * concurrently with a reconnect racing a fresh session start.
+ * that {@code buildJson(Channel)} runs on every control-connection (re)initialization, and may be
+ * called concurrently with a reconnect racing a fresh session start.
  */
 @ThreadSafe
 public class DefaultDriverConfigReporter implements DriverConfigReporter {
@@ -231,7 +234,8 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
   }
 
   @Override
-  public void populateControlConnectionOptions(Map<String, String> startupOptions) {
+  public void populateControlConnectionOptions(
+      @NonNull Map<String, String> startupOptions, @NonNull Channel channel) {
     // Configuration reporting is a best-effort diagnostic aid: it runs on the connection
     // initialization path, so any failure here (a bad config read, a misbehaving policy while
     // introspecting, a serialization error) must be swallowed rather than allowed to break the
@@ -247,7 +251,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
       if (!isEnabled()) {
         return;
       }
-      String json = buildJson();
+      String json = buildJson(channel);
       if (json == null) {
         return;
       }
@@ -288,22 +292,23 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * class's to enforce: a future change to session bootstrap that dropped one of those from the
    * eager list would quietly reintroduce that.
    *
-   * <p>The configured SSL <em>engine</em> factory is deliberately not among them: {@link #tls()}
-   * reads the engine factory held by the {@code JdkSslHandlerFactory} in force rather than the one
-   * behind {@code getSslEngineFactory()}. Those can differ — a context that overrides {@code
-   * buildSslHandlerFactory()} may wrap an engine factory of its own — and going through the context
-   * would both describe an engine nothing on the connection path uses and risk being the first
-   * caller to resolve it, which for the built-in factory means reading keystore/truststore files on
-   * a Netty event-loop thread (and failing the whole report if that throws).
+   * <p>The configured SSL <em>engine</em> factory is deliberately not among them: {@link
+   * #tls(Channel)} reads the engine factory held by the {@code JdkSslHandlerFactory} in force
+   * rather than the one behind {@code getSslEngineFactory()}. Those can differ — a context that
+   * overrides {@code buildSslHandlerFactory()} may wrap an engine factory of its own — and going
+   * through the context would both describe an engine nothing on the connection path uses and risk
+   * being the first caller to resolve it, which for the built-in factory means reading
+   * keystore/truststore files on a Netty event-loop thread (and failing the whole report if that
+   * throws).
    *
    * @return the report, or {@code null} if it could not be serialized — in which case {@code
    *     DRIVER_CONFIG} is skipped rather than the connection failed.
    */
   @Nullable
-  String buildJson() {
+  String buildJson(Channel channel) {
     ObjectNode root = OBJECT_MAPPER.createObjectNode();
     root.put("version", SCHEMA_VERSION);
-    populateConfig(root, context.getConfig().getDefaultProfile());
+    populateConfig(root, context.getConfig().getDefaultProfile(), channel);
     try {
       return OBJECT_MAPPER.writeValueAsString(root);
     } catch (JsonProcessingException e) {
@@ -318,14 +323,14 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * plus the context's policies. Each group follows the cross-driver schema; a key the Java driver
    * has no equivalent for is omitted rather than reported as {@code null}.
    */
-  private void populateConfig(ObjectNode root, DriverExecutionProfile config) {
+  private void populateConfig(ObjectNode root, DriverExecutionProfile config, Channel channel) {
     // Resolved once and shared: the load balancing policy decides both its own group and the
     // node-location preferences reported under two different parents, and resolving it twice would
     // mean a second SPI lookup on the Netty event-loop thread that is building STARTUP.
     LoadBalancingPolicy loadBalancingPolicy =
         context.getLoadBalancingPolicy(DriverExecutionProfile.DEFAULT_NAME);
     NodeLocation nodeLocation = nodeLocation(config, loadBalancingPolicy);
-    root.set("connection", connection(config, nodeLocation));
+    root.set("connection", connection(config, nodeLocation, channel));
     root.set("control-plane", controlPlane(config));
     root.set("query", query(config, loadBalancingPolicy, nodeLocation));
   }
@@ -335,7 +340,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * top of it, how it is re-established, and which part of the cluster gets one at all.
    */
   private ObjectNode connection(
-      DriverExecutionProfile config, @Nullable NodeLocation nodeLocation) {
+      DriverExecutionProfile config, @Nullable NodeLocation nodeLocation, Channel channel) {
     ObjectNode n = connectionTimeouts(config);
     n.set("socket", socket(config));
     ObjectNode reconnection = OBJECT_MAPPER.createObjectNode();
@@ -343,7 +348,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     n.set("reconnection", reconnection);
     // Optional, and absent rather than false when off: presence of the group is what says TLS is
     // enabled, since the schema dropped the boolean that used to carry it.
-    ObjectNode tls = tls();
+    ObjectNode tls = tls(channel);
     if (tls != null) {
       n.set("tls", tls);
     }
@@ -1078,15 +1083,16 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * so presence of the group is what reports that it is on.
    */
   @Nullable
-  private ObjectNode tls() {
-    // TLS is on exactly when the channel pipeline gets an SSL handler, which ChannelFactory decides
-    // from the low-level SslHandlerFactory. Deliberately not getSslEngineFactory(): that is only
-    // the public JDK-based path that DefaultDriverContext.buildSslHandlerFactory() wraps, and an
+  private ObjectNode tls(Channel channel) {
+    // TLS is on exactly when the channel pipeline has an SSL handler. ChannelFactory installs one
+    // from the low-level SslHandlerFactory before NettyOptions.afterChannelInitialized(), but that
+    // hook may add, replace, or remove handlers; report the pipeline left in force rather than the
+    // factory's configuration intent. Deliberately not getSslEngineFactory(): that is only the
+    // public JDK-based path that DefaultDriverContext.buildSslHandlerFactory() wraps, and an
     // override of that method (the documented expert extension point, e.g. Netty's native OpenSSL)
     // supplies a handler factory with no engine factory at all — a session that is encrypted all
     // the same.
-    Optional<SslHandlerFactory> handlerFactory = context.getSslHandlerFactory();
-    if (!handlerFactory.isPresent()) {
+    if (channel.pipeline().get(SslHandler.class) == null) {
       return null;
     }
     ObjectNode n = OBJECT_MAPPER.createObjectNode();
@@ -1105,8 +1111,10 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     // SessionBuilder.withSslContext(...) (ProgrammaticSslEngineFactory) validates only if
     // explicitly asked to (default off) regardless of that option, so reading the option here would
     // falsely report validation as on when it isn't.
-    SslHandlerFactory factory = handlerFactory.get();
-    if (factory.getClass() == JdkSslHandlerFactory.class) {
+    Optional<SslHandlerFactory> handlerFactory = context.getSslHandlerFactory();
+    if (handlerFactory.isPresent()
+        && handlerFactory.get().getClass() == JdkSslHandlerFactory.class) {
+      SslHandlerFactory factory = handlerFactory.get();
       SslEngineFactory engineFactory = ((JdkSslHandlerFactory) factory).getSslEngineFactory();
       hostnameValidation(engineFactory).ifPresent(v -> n.put("hostname-verification", v));
     }
