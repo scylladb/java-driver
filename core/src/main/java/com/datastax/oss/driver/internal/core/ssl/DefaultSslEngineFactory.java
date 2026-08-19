@@ -70,12 +70,16 @@ public class DefaultSslEngineFactory implements SslEngineFactory {
   private final SSLContext sslContext;
   private final String[] cipherSuites;
   private final boolean requireHostnameValidation;
+  private final boolean hostnameValidationKnown;
   private final boolean allowDnsReverseLookupSan;
   private ReloadingKeyManagerFactory kmf;
 
   /** Builds a new instance from the driver configuration. */
   public DefaultSslEngineFactory(DriverContext driverContext) {
     DriverExecutionProfile config = driverContext.getConfig().getDefaultProfile();
+    this.hostnameValidationKnown =
+        config.isDefined(DefaultDriverOption.SSL_KEYSTORE_PATH)
+            || config.isDefined(DefaultDriverOption.SSL_TRUSTSTORE_PATH);
     try {
       this.sslContext = buildContext(config);
     } catch (Exception e) {
@@ -135,6 +139,11 @@ public class DefaultSslEngineFactory implements SslEngineFactory {
       engine.setSSLParameters(parameters);
     }
     return engine;
+  }
+
+  /** Whether this factory built the trust-manager path that interprets the engine's parameters. */
+  boolean isHostnameValidationKnown() {
+    return hostnameValidationKnown;
   }
 
   protected SSLContext buildContext(DriverExecutionProfile config) throws Exception {

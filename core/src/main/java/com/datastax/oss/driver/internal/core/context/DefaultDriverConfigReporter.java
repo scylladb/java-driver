@@ -1090,18 +1090,18 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     }
     ObjectNode n = OBJECT_MAPPER.createObjectNode();
     // Host name validation, on the other hand, is read from the SSLParameters of the engine the
-    // JdkSslHandlerFactory actually wrapped for the connection. This avoids exposing diagnostic
-    // accessors on public engine-factory implementations and reports runtime behavior rather than
-    // configuration intent. Anything else (a native-OpenSSL handler, a bespoke one) leaves it
+    // JdkSslHandlerFactory actually wrapped for the connection, but only when the built-in factory
+    // also knows which trust-manager path interprets those parameters. An arbitrary extended trust
+    // manager can ignore a nonempty endpoint-identification algorithm or verify names without one.
+    // Anything else (a native-OpenSSL handler, a bespoke or programmatic JDK context) leaves it
     // unknown, and the schema's field is optional precisely so that unknown can be said by
-    // omission: reporting false would claim a session is not checking host names when it may well
-    // be. Exact-class check, like the policy branches above:
+    // omission. Exact-class check, like the policy branches above:
     // JdkSslHandlerFactory is not final, and a subclass need not use the engine it was given.
     //
     // Note this is the engine's own state, not the SSL_HOSTNAME_VALIDATION config option. A factory
     // supplied through SessionBuilder.withSslContext(...) ignores that option, and its arbitrary
-    // SSLContext may enforce host names in a custom trust manager even without an endpoint-
-    // identification algorithm; that case is therefore unknown rather than guessed from config.
+    // SSLContext may enforce or ignore host names independently of the endpoint-identification
+    // algorithm; that case is therefore unknown rather than guessed from config or parameters.
     SslHandlerFactory factory = handlerFactory.get();
     if (factory.getClass() == JdkSslHandlerFactory.class) {
       Boolean hostnameValidationRequired =

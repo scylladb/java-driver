@@ -23,6 +23,7 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
+import java.lang.ref.WeakReference;
 import javax.net.ssl.SSLEngine;
 import net.jcip.annotations.ThreadSafe;
 
@@ -52,32 +53,40 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
    * Whether the SSL engine built for {@code channel} verifies host names, or {@code null} when it
    * cannot be determined.
    *
-   * <p>This deliberately retains the exact handler returned by {@link #newSslHandler}, and reads
-   * its engine lazily only while that handler remains in the channel pipeline. Engine introspection
-   * is diagnostic work and belongs under the configuration reporter's fail-safe; doing it while the
-   * handler is created would let a user-supplied engine that throws from {@code getSSLParameters()}
-   * prevent every connection, even when reporting is disabled.
+   * <p>This deliberately records the exact handler returned by {@link #newSslHandler} through a
+   * weak reference, and reads its engine lazily only while that handler remains in the channel
+   * pipeline. Engine introspection is diagnostic work and belongs under the configuration
+   * reporter's fail-safe; doing it while the handler is created would let a user-supplied engine
+   * that throws from {@code getSSLParameters()} prevent every connection, even when reporting is
+   * disabled.
    */
   @Nullable
   public Boolean getHostnameValidationRequired(Channel channel) {
     HandlerReference reference = channel.attr(HANDLER_REFERENCE).get();
-    if (reference == null
-        || reference.factory != this
-        || channel.pipeline().context(reference.handler) == null) {
+    if (reference == null || reference.factory != this) {
+      return null;
+    }
+    SslHandler handler = reference.handler.get();
+    if (handler == null || channel.pipeline().context(handler) == null) {
+      return null;
+    }
+    if (!isHostnameValidationKnown()) {
       return null;
     }
     String endpointIdentificationAlgorithm =
-        reference.handler.engine().getSSLParameters().getEndpointIdentificationAlgorithm();
-    if (endpointIdentificationAlgorithm != null && !endpointIdentificationAlgorithm.isEmpty()) {
-      return true;
-    } else if (sslEngineFactory.getClass() == DefaultSslEngineFactory.class) {
-      // The built-in configuration factory is the only path where absence of the algorithm is a
-      // known disabled setting. ProgrammaticSslEngineFactory accepts an arbitrary SSLContext whose
-      // trust manager could verify host names itself, and custom factories have the same ambiguity;
-      // report those as unknown instead of falsely claiming that verification is off.
-      return false;
+        handler.engine().getSSLParameters().getEndpointIdentificationAlgorithm();
+    return endpointIdentificationAlgorithm != null && !endpointIdentificationAlgorithm.isEmpty();
+  }
+
+  private boolean isHostnameValidationKnown() {
+    if (sslEngineFactory.getClass() == DefaultSslEngineFactory.class) {
+      return ((DefaultSslEngineFactory) sslEngineFactory).isHostnameValidationKnown();
+    } else if (sslEngineFactory.getClass() == SniSslEngineFactory.class) {
+      return ((SniSslEngineFactory) sslEngineFactory).isHostnameValidationKnown();
     }
-    return null;
+    // ProgrammaticSslEngineFactory and arbitrary factories can wrap a custom trust manager that
+    // ignores a nonempty endpoint-identification algorithm or verifies names without one.
+    return false;
   }
 
   @Override
@@ -87,11 +96,11 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
 
   private static final class HandlerReference {
     private final JdkSslHandlerFactory factory;
-    private final SslHandler handler;
+    private final WeakReference<SslHandler> handler;
 
     private HandlerReference(JdkSslHandlerFactory factory, SslHandler handler) {
       this.factory = factory;
-      this.handler = handler;
+      this.handler = new WeakReference<>(handler);
     }
   }
 }
