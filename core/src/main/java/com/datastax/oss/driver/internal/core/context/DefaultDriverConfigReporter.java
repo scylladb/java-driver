@@ -26,8 +26,6 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
-import com.datastax.oss.driver.api.core.ssl.ProgrammaticSslEngineFactory;
-import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.api.core.time.TimestampGenerator;
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.connection.ConstantReconnectionPolicy;
@@ -39,9 +37,7 @@ import com.datastax.oss.driver.internal.core.retry.ConsistencyDowngradingRetryPo
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import com.datastax.oss.driver.internal.core.specex.ConstantSpeculativeExecutionPolicy;
 import com.datastax.oss.driver.internal.core.specex.NoSpeculativeExecutionPolicy;
-import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
-import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
 import com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator;
@@ -50,7 +46,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.netty.channel.Channel;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
@@ -104,13 +102,12 @@ import org.slf4j.LoggerFactory;
  * basic.request.serial-consistency} outside the schema's two serial levels and the like are omitted
  * rather than emitted as a value the schema rejects. Two optional booleans are omitted for a third
  * reason — the answer is genuinely unknown, which is the only thing the schema lets their absence
- * mean: {@code connection.tls.hostname-verification} when the SSL handler or engine factory in
- * force is not one this class recognizes, and {@code query.defaults.client-timestamps} when the
- * timestamp generator is not (see {@link #hostnameValidation} and {@link #clientTimestamps}).
- * Guessing a boolean there would describe a security control, or a write-timestamp source, that may
- * well be the opposite — which is also why neither is asked of the SPI itself: an accessor on
- * {@link SslEngineFactory} or {@link TimestampGenerator} would have needed a default, and a default
- * answer is exactly the guess being avoided.
+ * mean: {@code connection.tls.hostname-verification} when the SSL handler or engine in force does
+ * not expose it, and {@code query.defaults.client-timestamps} when the timestamp generator is not
+ * one this class recognizes (see {@link #tls} and {@link #clientTimestamps}). Guessing a boolean
+ * there would describe a security control, or a write-timestamp source, that may well be the
+ * opposite — which is also why neither is asked of the SPI itself: an accessor on either SPI would
+ * have needed a default, and a default answer is exactly the guess being avoided.
  *
  * <p><b>A new field owes three checks</b>, each of which this class has already got wrong once and
  * each of which is cheap to run before review does it for you:
@@ -189,8 +186,8 @@ import org.slf4j.LoggerFactory;
  * cross-driver schema doesn't define; this is a known gap, not an oversight.
  *
  * <p><b>Thread safety:</b> this class is safe to use as shipped, and holds no mutable state. Note
- * that {@code buildJson()} runs on every control-connection (re)initialization, and may be called
- * concurrently with a reconnect racing a fresh session start.
+ * that {@code buildJson(Channel)} runs on every control-connection (re)initialization, and may be
+ * called concurrently with a reconnect racing a fresh session start.
  */
 @ThreadSafe
 public class DefaultDriverConfigReporter implements DriverConfigReporter {
@@ -231,7 +228,8 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
   }
 
   @Override
-  public void populateControlConnectionOptions(Map<String, String> startupOptions) {
+  public void populateControlConnectionOptions(
+      @NonNull Map<String, String> startupOptions, @NonNull Channel channel) {
     // Configuration reporting is a best-effort diagnostic aid: it runs on the connection
     // initialization path, so any failure here (a bad config read, a misbehaving policy while
     // introspecting, a serialization error) must be swallowed rather than allowed to break the
@@ -247,7 +245,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
       if (!isEnabled()) {
         return;
       }
-      String json = buildJson();
+      String json = buildJson(channel);
       if (json == null) {
         return;
       }
@@ -288,22 +286,23 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * class's to enforce: a future change to session bootstrap that dropped one of those from the
    * eager list would quietly reintroduce that.
    *
-   * <p>The configured SSL <em>engine</em> factory is deliberately not among them: {@link #tls()}
-   * reads the engine factory held by the {@code JdkSslHandlerFactory} in force rather than the one
-   * behind {@code getSslEngineFactory()}. Those can differ — a context that overrides {@code
-   * buildSslHandlerFactory()} may wrap an engine factory of its own — and going through the context
-   * would both describe an engine nothing on the connection path uses and risk being the first
-   * caller to resolve it, which for the built-in factory means reading keystore/truststore files on
-   * a Netty event-loop thread (and failing the whole report if that throws).
+   * <p>The configured SSL <em>engine</em> factory is deliberately not among them: {@link
+   * #tls(Channel)} reads state recorded for the control channel by the {@code JdkSslHandlerFactory}
+   * in force rather than resolving the factory behind {@code getSslEngineFactory()}. Those can
+   * differ — a context that overrides {@code buildSslHandlerFactory()} may wrap an engine factory
+   * of its own — and going through the context would both describe an engine nothing on the
+   * connection path uses and risk being the first caller to resolve it, which for the built-in
+   * factory means reading keystore/truststore files on a Netty event-loop thread (and failing the
+   * whole report if that throws).
    *
    * @return the report, or {@code null} if it could not be serialized — in which case {@code
    *     DRIVER_CONFIG} is skipped rather than the connection failed.
    */
   @Nullable
-  String buildJson() {
+  String buildJson(Channel channel) {
     ObjectNode root = OBJECT_MAPPER.createObjectNode();
     root.put("version", SCHEMA_VERSION);
-    populateConfig(root, context.getConfig().getDefaultProfile());
+    populateConfig(root, context.getConfig().getDefaultProfile(), channel);
     try {
       return OBJECT_MAPPER.writeValueAsString(root);
     } catch (JsonProcessingException e) {
@@ -318,14 +317,14 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * plus the context's policies. Each group follows the cross-driver schema; a key the Java driver
    * has no equivalent for is omitted rather than reported as {@code null}.
    */
-  private void populateConfig(ObjectNode root, DriverExecutionProfile config) {
+  private void populateConfig(ObjectNode root, DriverExecutionProfile config, Channel channel) {
     // Resolved once and shared: the load balancing policy decides both its own group and the
     // node-location preferences reported under two different parents, and resolving it twice would
     // mean a second SPI lookup on the Netty event-loop thread that is building STARTUP.
     LoadBalancingPolicy loadBalancingPolicy =
         context.getLoadBalancingPolicy(DriverExecutionProfile.DEFAULT_NAME);
     NodeLocation nodeLocation = nodeLocation(config, loadBalancingPolicy);
-    root.set("connection", connection(config, nodeLocation));
+    root.set("connection", connection(config, nodeLocation, channel));
     root.set("control-plane", controlPlane(config));
     root.set("query", query(config, loadBalancingPolicy, nodeLocation));
   }
@@ -335,7 +334,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * top of it, how it is re-established, and which part of the cluster gets one at all.
    */
   private ObjectNode connection(
-      DriverExecutionProfile config, @Nullable NodeLocation nodeLocation) {
+      DriverExecutionProfile config, @Nullable NodeLocation nodeLocation, Channel channel) {
     ObjectNode n = connectionTimeouts(config);
     n.set("socket", socket(config));
     ObjectNode reconnection = OBJECT_MAPPER.createObjectNode();
@@ -343,7 +342,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     n.set("reconnection", reconnection);
     // Optional, and absent rather than false when off: presence of the group is what says TLS is
     // enabled, since the schema dropped the boolean that used to carry it.
-    ObjectNode tls = tls();
+    ObjectNode tls = tls(channel);
     if (tls != null) {
       n.set("tls", tls);
     }
@@ -1059,9 +1058,9 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * which both of them extend, is package-private, so nothing outside its own package can inherit
    * its behavior without going through one of these two.
    *
-   * <p>{@code instanceof}, not the exact-class checks the policy branches use, for the same reason
-   * as in {@link #hostnameValidation}: this reads a property the generator has rather than deciding
-   * which built-in is in force, and a subclass inherits the {@code next()} that supplies it.
+   * <p>{@code instanceof}, not the exact-class checks the policy branches use: this reads a
+   * property the generator has rather than deciding which built-in is in force, and a subclass
+   * inherits the {@code next()} that supplies it.
    */
   private static Optional<Boolean> clientTimestamps(TimestampGenerator generator) {
     if (generator instanceof AtomicTimestampGenerator
@@ -1078,7 +1077,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
    * so presence of the group is what reports that it is on.
    */
   @Nullable
-  private ObjectNode tls() {
+  private ObjectNode tls(Channel channel) {
     // TLS is on exactly when the channel pipeline gets an SSL handler, which ChannelFactory decides
     // from the low-level SslHandlerFactory. Deliberately not getSslEngineFactory(): that is only
     // the public JDK-based path that DefaultDriverContext.buildSslHandlerFactory() wraps, and an
@@ -1090,59 +1089,28 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
       return null;
     }
     ObjectNode n = OBJECT_MAPPER.createObjectNode();
-    // Host name validation, on the other hand, is a property of the JDK SSLEngine that the engine
-    // factory configures, so it can only be read on the JDK path — when the handler factory in
-    // force is the JdkSslHandlerFactory that buildSslHandlerFactory() wraps an engine factory in —
-    // and read off that handler rather than through the context (see #buildJson for why the two can
-    // disagree, and why resolving the context's is worse). Anything else (a native-OpenSSL handler,
-    // a bespoke one) leaves it unknown, and the schema's field is optional precisely so that
-    // unknown can be said by omission: reporting false would claim a session is not checking host
-    // names when it may well be. Exact-class check, like the policy branches above:
+    // Host name validation, on the other hand, is read from the SSLParameters of the engine the
+    // JdkSslHandlerFactory actually wrapped for the connection. This avoids exposing diagnostic
+    // accessors on public engine-factory implementations and reports runtime behavior rather than
+    // configuration intent. Anything else (a native-OpenSSL handler, a bespoke one) leaves it
+    // unknown, and the schema's field is optional precisely so that unknown can be said by
+    // omission: reporting false would claim a session is not checking host names when it may well
+    // be. Exact-class check, like the policy branches above:
     // JdkSslHandlerFactory is not final, and a subclass need not use the engine it was given.
     //
-    // Note this is the factory's own state, not the SSL_HOSTNAME_VALIDATION config option: that
-    // option only governs the built-in DefaultSslEngineFactory. A factory supplied via
-    // SessionBuilder.withSslContext(...) (ProgrammaticSslEngineFactory) validates only if
-    // explicitly asked to (default off) regardless of that option, so reading the option here would
-    // falsely report validation as on when it isn't.
+    // Note this is the engine's own state, not the SSL_HOSTNAME_VALIDATION config option. A factory
+    // supplied through SessionBuilder.withSslContext(...) ignores that option, and its arbitrary
+    // SSLContext may enforce host names in a custom trust manager even without an endpoint-
+    // identification algorithm; that case is therefore unknown rather than guessed from config.
     SslHandlerFactory factory = handlerFactory.get();
     if (factory.getClass() == JdkSslHandlerFactory.class) {
-      SslEngineFactory engineFactory = ((JdkSslHandlerFactory) factory).getSslEngineFactory();
-      hostnameValidation(engineFactory).ifPresent(v -> n.put("hostname-verification", v));
+      Boolean hostnameValidationRequired =
+          ((JdkSslHandlerFactory) factory).getHostnameValidationRequired(channel);
+      if (hostnameValidationRequired != null) {
+        n.put("hostname-verification", hostnameValidationRequired);
+      }
     }
     return n;
-  }
-
-  /**
-   * Whether the engine factory in force validates host names, or {@link Optional#empty()} when it
-   * is not one this class recognizes.
-   *
-   * <p>Read by naming the driver's own factories rather than through an accessor on {@link
-   * SslEngineFactory}, deliberately: the interface obliges nobody to answer, so a default answer
-   * there would have described a security control on behalf of every implementation that never
-   * considered the question — including the ones that misdescribe it. Unknown is instead said by
-   * omission, which is what the schema's optional field is for.
-   *
-   * <p>{@code instanceof}, not the exact-class checks the policy branches use, and for the same
-   * reason as {@link #nodeLocation}: those decide <em>which</em> built-in is in force and must not
-   * be fooled by a subclass, whereas this one reads a value the factory already holds, and a
-   * subclass inherits it along with the {@code newSslEngine} that acts on it. A subclass that
-   * overrides {@code newSslEngine} to configure the engine differently — the only way to break that
-   * — reports its parent's answer; extending one of these factories is documented as a way to reuse
-   * it, not to invert it.
-   */
-  private static Optional<Boolean> hostnameValidation(@Nullable SslEngineFactory engineFactory) {
-    if (engineFactory instanceof DefaultSslEngineFactory) {
-      return Optional.of(((DefaultSslEngineFactory) engineFactory).isHostnameValidationRequired());
-    } else if (engineFactory instanceof ProgrammaticSslEngineFactory) {
-      return Optional.of(
-          ((ProgrammaticSslEngineFactory) engineFactory).isHostnameValidationRequired());
-    } else if (engineFactory instanceof SniSslEngineFactory) {
-      // No accessor to read: SniSslEngineFactory sets the "HTTPS" endpoint identification algorithm
-      // on every engine it builds, unconditionally.
-      return Optional.of(true);
-    }
-    return Optional.empty();
   }
 
   /**
