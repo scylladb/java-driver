@@ -135,13 +135,6 @@ jobs:
       - name: Run unit tests
         run: make test-unit
 
-      - name: Copy test results
-        if: always()
-        run: |
-          shopt -s globstar
-          mkdir unit
-          cp --parents ./**/target/*-reports/*.xml unit/
-
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
@@ -265,15 +258,8 @@ jobs:
           MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
         run: make test-integration-cassandra
 
-      - name: Copy test results
-        if: steps.run-integration-tests.outcome == 'failure'
-        run: |
-          shopt -s globstar
-          mkdir cassandra-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
-          cp --parents ./**/target/*-reports/*.xml cassandra-${{ matrix.cassandra-version }}-${{ matrix.test-group }}/
-
       - name: Upload test results
-        if: steps.run-integration-tests.outcome == 'failure'
+        if: failure() && steps.run-integration-tests.outcome == 'failure'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: test-results-${{ matrix.java-version }}-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
@@ -385,16 +371,9 @@ jobs:
           MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
         run: make test-integration-scylla
 
-      - name: Copy test results
-        if: steps.run-integration-tests.outcome == 'failure'
-        run: |
-          shopt -s globstar
-          mkdir scylla-${{ matrix.scylla-version }}-${{ matrix.test-group }}
-          cp --parents ./**/target/*-reports/*.xml scylla-${{ matrix.scylla-version }}-${{ matrix.test-group }}/
-
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: steps.run-integration-tests.outcome == 'failure'
+        if: failure() && steps.run-integration-tests.outcome == 'failure'
         with:
           name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}-${{ matrix.test-group }}
           path: "*/**/target/*-reports/*.xml"
