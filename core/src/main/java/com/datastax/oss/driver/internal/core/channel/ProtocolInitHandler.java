@@ -35,6 +35,7 @@ import com.datastax.oss.driver.api.core.connection.ConnectionInitException;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
+import com.datastax.oss.driver.internal.core.context.DriverConfigReporter.TlsInfo;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.protocol.BytesToSegmentDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
@@ -62,8 +63,10 @@ import com.datastax.oss.protocol.internal.response.Ready;
 import com.datastax.oss.protocol.internal.response.Supported;
 import com.datastax.oss.protocol.internal.response.result.Rows;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.ssl.SslHandler;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
@@ -192,14 +195,14 @@ class ProtocolInitHandler extends ConnectInitHandler {
         case STARTUP:
           Map<String, String> startupOptions = new HashMap<>(context.getStartupOptions());
           featureStore.populateStartupOptions(startupOptions);
-          // The DRIVER_CONFIG blob describes the whole session, so only the control connection
-          // carries it (options.reportConfig); the other connections are correlated to it by the
-          // SESSION_ID that every connection already carries from context.getStartupOptions().
-          // No-op when driver config reporting is disabled.
+          // Most of DRIVER_CONFIG describes the whole session; its TLS group describes the control
+          // connection carrying it. Other connections are correlated to it by the SESSION_ID that
+          // every connection already carries from context.getStartupOptions(). No-op when driver
+          // config reporting is disabled.
           if (options.reportConfig) {
             context
                 .getDriverConfigReporter()
-                .populateControlConnectionOptions(startupOptions, ctx.channel());
+                .populateControlConnectionOptions(startupOptions, currentTlsInfo());
           }
           return request = new Startup(startupOptions);
         case GET_CLUSTER_NAME:
@@ -212,6 +215,21 @@ class ProtocolInitHandler extends ConnectInitHandler {
           return request = new Register(registerEventTypes);
         default:
           throw new AssertionError("unhandled step: " + step);
+      }
+    }
+
+    private TlsInfo currentTlsInfo() {
+      try {
+        return tlsInfo(channel);
+      } catch (RuntimeException e) {
+        // Configuration reporting is best-effort and must never prevent a connection. TLS presence
+        // is still assumed because the failure came while inspecting its handler, but the schema
+        // permits hostname-verification to be omitted when unknown.
+        LOG.warn(
+            "[{}] Could not inspect hostname verification on the active SSL engine; omitting it",
+            logPrefix,
+            e);
+        return TlsInfo.enabledWithUnknownHostnameVerification();
       }
     }
 
@@ -416,6 +434,21 @@ class ProtocolInitHandler extends ConnectInitHandler {
     public String toString() {
       return "init query " + step;
     }
+  }
+
+  static TlsInfo tlsInfo(Channel channel) {
+    // SslHandlerFactory always returns SslHandler, and this reads the pipeline after
+    // NettyOptions.afterChannelInitialized() has had a chance to add, replace, remove, or
+    // reconfigure it. A hook that implements encryption with a handler unrelated to SslHandler
+    // cannot be identified generically and is therefore reported as TLS-disabled.
+    SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
+    if (sslHandler == null) {
+      return TlsInfo.disabled();
+    }
+    String endpointIdentificationAlgorithm =
+        sslHandler.engine().getSSLParameters().getEndpointIdentificationAlgorithm();
+    return TlsInfo.enabled(
+        endpointIdentificationAlgorithm != null && !endpointIdentificationAlgorithm.isEmpty());
   }
 
   /**

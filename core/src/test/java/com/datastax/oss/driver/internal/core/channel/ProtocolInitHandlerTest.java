@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.channel;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -43,6 +44,7 @@ import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.TestResponses;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter;
 import com.datastax.oss.driver.internal.core.context.DriverConfigReporter;
+import com.datastax.oss.driver.internal.core.context.DriverConfigReporter.TlsInfo;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
@@ -64,6 +66,8 @@ import com.datastax.oss.protocol.internal.response.Ready;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.ssl.SslHandler;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -72,8 +76,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.slf4j.LoggerFactory;
@@ -108,7 +116,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     when(internalDriverContext.getProtocolVersionRegistry()).thenReturn(protocolVersionRegistry);
     // The init handler consults the config reporter for the control connection; default to a no-op.
     when(internalDriverContext.getDriverConfigReporter())
-        .thenReturn((startupOptions, controlChannel) -> {});
+        .thenReturn((startupOptions, tlsInfo) -> {});
 
     channel
         .pipeline()
@@ -161,17 +169,24 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   }
 
   // Mirrors the real reporter, which only ever sees the control connection.
-  private void stubConfigReporter() {
-    when(internalDriverContext.getDriverConfigReporter())
-        .thenReturn(
-            (startupOptions, controlChannel) ->
-                startupOptions.put(
-                    DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}"));
+  private DriverConfigReporter stubConfigReporter() {
+    DriverConfigReporter reporter = mock(DriverConfigReporter.class);
+    doAnswer(
+            invocation -> {
+              invocation
+                  .<Map<String, String>>getArgument(0)
+                  .put(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}");
+              return null;
+            })
+        .when(reporter)
+        .populateControlConnectionOptions(any(), any());
+    when(internalDriverContext.getDriverConfigReporter()).thenReturn(reporter);
+    return reporter;
   }
 
   @Test
   public void should_report_driver_config_on_control_connection() {
-    stubConfigReporter();
+    DriverConfigReporter reporter = stubConfigReporter();
     channel
         .pipeline()
         .addLast(
@@ -191,6 +206,41 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     assertThat(requestFrame.message).isInstanceOf(Startup.class);
     Startup startup = (Startup) requestFrame.message;
     assertThat(startup.options).containsKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
+
+    ArgumentCaptor<TlsInfo> tlsInfo = ArgumentCaptor.forClass(TlsInfo.class);
+    verify(reporter).populateControlConnectionOptions(any(), tlsInfo.capture());
+    assertThat(tlsInfo.getValue().isEnabled()).isFalse();
+  }
+
+  @Test
+  public void should_read_tls_from_the_replacement_ssl_engine() throws Exception {
+    EmbeddedChannel sslChannel = new EmbeddedChannel();
+    try {
+      sslChannel
+          .pipeline()
+          .addLast(ChannelFactory.SSL_HANDLER_NAME, sslHandler(/* hostnameVerification= */ true));
+      sslChannel
+          .pipeline()
+          .replace(
+              ChannelFactory.SSL_HANDLER_NAME,
+              ChannelFactory.SSL_HANDLER_NAME,
+              sslHandler(/* hostnameVerification= */ false));
+
+      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel);
+      assertThat(tlsInfo.isEnabled()).isTrue();
+      assertThat(tlsInfo.getHostnameVerification()).contains(false);
+    } finally {
+      sslChannel.finishAndReleaseAll();
+    }
+  }
+
+  private static SslHandler sslHandler(boolean hostnameVerification) throws Exception {
+    SSLEngine engine = SSLContext.getDefault().createSSLEngine();
+    engine.setUseClientMode(true);
+    SSLParameters parameters = engine.getSSLParameters();
+    parameters.setEndpointIdentificationAlgorithm(hostnameVerification ? "HTTPS" : null);
+    engine.setSSLParameters(parameters);
+    return new SslHandler(engine, true);
   }
 
   @Test

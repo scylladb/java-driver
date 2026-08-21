@@ -1184,9 +1184,9 @@ public enum DefaultDriverOption implements DriverOption {
    * system_views.clients} on Cassandra 4.1+) so operators can inspect driver settings while
    * investigating incidents. It describes the effective configuration of the driver's default
    * execution profile (connection/socket settings, timeouts, retry/reconnection/
-   * speculative-execution/load-balancing policies, connection pooling, query defaults, and TLS).
-   * Only the control connection sends it, since it describes the whole session. When {@code false},
-   * {@code DRIVER_CONFIG} is not sent.
+   * speculative-execution/load-balancing policies, connection pooling, and query defaults), plus
+   * the effective TLS state of the control connection carrying it. Only the control connection
+   * sends it. When {@code false}, {@code DRIVER_CONFIG} is not sent.
    *
    * <p>This option governs {@code DRIVER_CONFIG} only. The {@code SESSION_ID} startup option, which
    * lets the server group all of a session's connections, is an innate driver behavior: it is sent

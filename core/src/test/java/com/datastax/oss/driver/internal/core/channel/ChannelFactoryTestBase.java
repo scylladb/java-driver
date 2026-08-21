@@ -142,7 +142,7 @@ public abstract class ChannelFactoryTestBase {
     when(context.getWriteCoalescer()).thenReturn(new PassThroughWriteCoalescer(null));
     when(context.getCompressor()).thenReturn(compressor);
     // The init handler consults the config reporter for the control connection; default to a no-op.
-    when(context.getDriverConfigReporter()).thenReturn((startupOptions, controlChannel) -> {});
+    when(context.getDriverConfigReporter()).thenReturn((startupOptions, tlsInfo) -> {});
 
     // Start local server
     ServerBootstrap serverBootstrap =
