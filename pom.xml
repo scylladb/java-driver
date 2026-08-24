@@ -44,6 +44,7 @@
         <module>driver-examples</module>
         <module>driver-tests</module>
         <module>driver-dist</module>
+        <module>driver-coverage-report</module>
     </modules>
 
     <properties>
@@ -881,7 +882,7 @@
                 <extensions>true</extensions>
                 <configuration>
                     <publishingServerId>central</publishingServerId>
-                    <excludeArtifacts>scylla-driver-tests-parent,scylla-driver-tests-osgi,scylla-driver-tests-osgi-common,scylla-driver-tests-osgi-shaded,scylla-driver-tests-shading,scylla-driver-tests-shading-shaded,scylla-driver-tests-shading-unshaded,scylla-driver-tests-osgi-unshaded,scylla-driver-tests-stress,scylla-driver-dist,scylla-driver-examples</excludeArtifacts>
+                    <excludeArtifacts>scylla-driver-coverage-report,scylla-driver-tests-parent,scylla-driver-tests-osgi,scylla-driver-tests-osgi-common,scylla-driver-tests-osgi-shaded,scylla-driver-tests-shading,scylla-driver-tests-shading-shaded,scylla-driver-tests-shading-unshaded,scylla-driver-tests-osgi-unshaded,scylla-driver-tests-stress,scylla-driver-dist,scylla-driver-examples</excludeArtifacts>
                     <autoPublish>${release.autopublish}</autoPublish>
                     <waitUntil>validated</waitUntil>
                 </configuration>
@@ -958,6 +959,21 @@
              it. Enable with -Pcoverage (see `make ... COVERAGE=true`). -->
         <profile>
             <id>coverage</id>
+            <properties>
+                <!-- Every lane writes execution data under a name of its own, so two lanes can
+                     leave their results side by side in one target directory without either
+                     truncating the other. jacoco:report-aggregate scans target/*.exec, so all of
+                     them are read. `make ... COVERAGE=true` names the lane; a bare -Pcoverage
+                     falls back to a generic name. -->
+                <coverage.lane>local</coverage.lane>
+                <jacoco.destFile>${project.build.directory}/jacoco-${coverage.lane}.exec</jacoco.destFile>
+                <!-- The agent is attached only by the modules the aggregate reports on, which
+                     switch this back off for themselves. Everywhere else it would slow every
+                     forked test JVM down to record execution data that jacoco:report-aggregate
+                     never reads: it reads target/*.exec from driver-coverage-report's own
+                     dependencies and nowhere else. -->
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
             <build>
                 <plugins>
                     <plugin>

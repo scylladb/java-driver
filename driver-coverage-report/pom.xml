@@ -1,0 +1,148 @@
+<!--
+
+    Copyright (C) 2026 ScyllaDB
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.scylladb</groupId>
+        <artifactId>scylla-driver-parent</artifactId>
+        <version>3.11.5.19-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>scylla-driver-coverage-report</artifactId>
+    <packaging>pom</packaging>
+    <name>Java Driver for Scylla and Apache Cassandra - Coverage report</name>
+    <description>Aggregates the JaCoCo execution data produced by the other modules into a single
+        coverage report. Produces no released artifact.</description>
+
+    <!-- These dependencies are what defines the scope of the aggregated report: jacoco:report-aggregate
+         reports on every dependency that is part of the same reactor, and on nothing else. It also
+         reads execution data from target/*.exec in those same modules and nowhere else, so data any
+         other module records is ignored however it was collected. Test-only and non-published
+         modules (driver-examples, driver-tests/**, driver-dist) are left out on purpose. -->
+    <dependencies>
+
+        <dependency>
+            <groupId>com.scylladb</groupId>
+            <artifactId>scylla-driver-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.scylladb</groupId>
+            <artifactId>scylla-driver-mapping</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.scylladb</groupId>
+            <artifactId>scylla-driver-extras</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+
+        <plugins>
+
+            <!-- Nothing here is published; see also the excludeArtifacts list in the parent pom. -->
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>clirr-maven-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-source-plugin</artifactId>
+                <configuration>
+                    <skipSource>true</skipSource>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-install-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+
+        </plugins>
+
+    </build>
+
+    <profiles>
+
+        <!-- Deliberately a profile of its own, not part of `coverage`. This module is in the
+             default reactor, so an unconditional binding would render a report on every
+             `mvn install`; and binding it under `coverage` would render one at the end of every
+             instrumented test lane, since that is the profile those lanes enable. Only
+             `make coverage-report` asks for the aggregate. -->
+        <profile>
+            <id>coverage-report</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>report-aggregate</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>report-aggregate</goal>
+                                </goals>
+                                <configuration>
+                                    <title>Java Driver for Scylla and Apache Cassandra 3.x</title>
+                                    <!-- Left at the plugin default of HTML, XML and CSV. The
+                                         directory is spelled out because the Makefile has to
+                                         name it too. -->
+                                    <outputDirectory>${project.build.directory}/site/jacoco-aggregate</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+    </profiles>
+
+</project>

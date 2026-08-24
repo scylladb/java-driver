@@ -34,6 +34,12 @@
     <name>Java Driver for Scylla and Apache Cassandra - Object Mapping</name>
     <description>Object mapper for the CQL Java Driver.</description>
 
+    <properties>
+        <!-- Instrumented under -Pcoverage, which switches the agent off by default; this module is
+             one of the three the aggregate report covers. See driver-coverage-report/pom.xml. -->
+        <jacoco.skip>false</jacoco.skip>
+    </properties>
+
     <dependencies>
 
         <dependency>
