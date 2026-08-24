@@ -125,6 +125,51 @@ sudo ifconfig lo0 alias 127.0.1.2 up
 ...
 ```
 
+### Code coverage
+
+Coverage is measured with [JaCoCo](https://www.jacoco.org/jacoco/) and is off by default: the agent
+slows every forked test JVM down, so it is opt-in through the `coverage` Maven profile. Pass
+`COVERAGE=true` to any of the `test-*` Make targets to enable it, then aggregate:
+
+```sh
+make test-unit COVERAGE=true
+make coverage-report
+```
+
+`make coverage-report` reads whatever execution data is already on disk, so several lanes can be
+combined into one number:
+
+```sh
+make test-unit COVERAGE=true
+make test-integration-scylla COVERAGE=true
+make coverage-report
+```
+
+Nothing has to be moved out of the way between the two: each lane writes its execution data under a
+name of its own (`jacoco-unit.exec`, `jacoco-scylla-LATEST.exec`, ...) and truncates only that file
+before it starts, so one lane can never overwrite another's results or read stale ones as its own.
+
+The report lands in `driver-coverage-report/target/site/jacoco-aggregate` (HTML, XML and CSV), and
+`make clean-coverage` removes it along with the execution data. In CI, the unit and integration jobs
+upload their execution data and the "Coverage report" job aggregates it; the percentage shows up in
+that job's summary and the HTML report is attached as an artifact.
+
+Two things to know about the scope of the report:
+
+- It covers the modules that `driver-coverage-report` depends on: `driver-core`,
+  `driver-mapping` and `driver-extras`. `driver-examples`, `driver-tests/**` and `driver-dist`
+  are out of scope, and the agent is not attached to them at all: the data would only be recorded
+  for nobody to read.
+- Only Surefire is instrumented. That covers the unit tests and, because 3.x runs its integration
+  tests as TestNG `short`-group tests, the integration tests as well. The Failsafe-run tests in
+  `driver-tests/**` (OSGi, shading) are left out: the OSGi ones load the driver inside their own
+  Pax Exam container, and those modules are outside the report's scope in any case.
+
+JaCoCo matches execution data to classes by checksum, so the data has to come from the same build of
+the classes the report is rendered against. If a report shows code you know was exercised as
+uncovered, look for `Execution data for class ... does not match` in the Maven log; the usual cause
+is stale execution data from before a recompile, which `make clean-coverage` clears.
+
 ## Updating GitHub Actions workflows
 
 GitHub Actions workflows in this repository pin all third-party actions to specific commit SHAs
