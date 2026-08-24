@@ -93,6 +93,12 @@
              updated. -->
         <json-schema-validator.version>1.5.9</json-schema-validator.version>
         <surefire.version>3.5.4</surefire.version>
+        <jacoco.version>0.8.14</jacoco.version>
+        <!-- Always defined, so that surefire's late-replaced @{jacoco.argline} always
+             resolves. The 'coverage' profile overwrites it with the JaCoCo agent argument via
+             jacoco:prepare-agent; without that profile (or with -Djacoco.skip=true) it stays
+             empty instead of leaking a literal @{...} token into the forked test JVM. -->
+        <jacoco.argline />
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
@@ -735,12 +741,18 @@
                 </plugin>
 
                 <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
+                </plugin>
+
+                <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${surefire.version}</version>
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
-                        <argLine>-Djdk.attach.allowAttachSelf=true</argLine>
+                        <argLine>-Djdk.attach.allowAttachSelf=true @{jacoco.argline}</argLine>
                         <runOrder>alphabetical</runOrder>
                         <systemPropertyVariables>
                             <cassandra.version>${cassandra.version}</cassandra.version>
@@ -936,6 +948,36 @@
                                  have the isolated group. -->
                             <includes />
                         </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Opt-in code coverage. Kept out of the default build on purpose: the JaCoCo agent slows
+             every forked test JVM down, and the existing test lanes must stay able to run without
+             it. Enable with -Pcoverage (see `make ... COVERAGE=true`). -->
+        <profile>
+            <id>coverage</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-agent</id>
+                                <goals>
+                                    <goal>prepare-agent</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Do not use the default 'argLine' property name: the
+                                         surefire argLine already carries
+                                         -Djdk.attach.allowAttachSelf=true, and a dedicated
+                                         property lets us give it an empty default. -->
+                                    <propertyName>jacoco.argline</propertyName>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
