@@ -22,6 +22,36 @@ SONATYPE_TOKEN_PASSWORD ?=
 RELEASE_SKIP_TESTS ?= false
 RELEASE_TARGET_TAG ?=
 
+# Set COVERAGE=true on any of the test-* targets to attach the JaCoCo agent to the forked test
+# JVMs; `make coverage-report` then aggregates whatever execution data is on disk.
+COVERAGE ?= false
+COVERAGE_LOWER := $(shell printf '%s' '$(COVERAGE)' | tr '[:upper:]' '[:lower:]')
+# An exported but empty COVERAGE means off: the `?=` above does not apply to a variable that is
+# defined and empty, and aborting every unrelated target over it would be absurd.
+ifeq ($(strip $(COVERAGE_LOWER)),)
+COVERAGE_LOWER := false
+endif
+# A misspelled value is rejected rather than ignored: it used to produce a normal-looking run with
+# no coverage in it, and in CI that silently drops one lane out of the aggregate.
+ifeq ($(filter true 1 false 0,$(COVERAGE_LOWER)),)
+$(error COVERAGE must be true or false, got '$(COVERAGE)')
+endif
+ifeq ($(filter true 1,$(COVERAGE_LOWER)),)
+	MVN_COVERAGE =
+else
+	MVN_COVERAGE = -Pcoverage -Dcoverage.lane=$(COVERAGE_LANE)
+endif
+# Names this lane's execution data file, so that no two lanes ever write to one file. The default
+# is set per target below; CI overrides it with the matrix entry its uploaded artifact is named
+# after. That override has to be a make command-line variable, as in
+# `make test-unit COVERAGE_LANE=unit-8`: a target-specific assignment beats the environment, so
+# passing it as `env:` would quietly do nothing and put several lanes back on one file name.
+COVERAGE_LANE = local
+COVERAGE_REPORT_DIR := driver-coverage-report/target/site/jacoco-aggregate
+# Must stay in step with driver-coverage-report's dependencies: jacoco:report-aggregate reads
+# target/*.exec from those modules and nowhere else, so data anywhere else is not a report.
+COVERAGE_EXEC_DIRS := driver-core/target driver-mapping/target driver-extras/target
+
 ifeq (${CCM_CONFIG_DIR},)
 	CCM_CONFIG_DIR = ~/.ccm
 endif
@@ -66,6 +96,18 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 	else \
   		$(MAKE) install-cassandra-ccm
 	fi
+
+# JaCoCo appends to its execution data files by default, which is what lets a single lane
+# accumulate coverage across several forks. The flip side is that data from an earlier run
+# survives a recompile, and classes that changed in between are then reported as uncovered
+# because their checksum no longer matches. Truncating before a run is the fix.
+#
+# Only this lane's file is removed, and only this lane ever writes it: another lane's results are
+# never in the way, and never left to go stale behind this one's back. Expanded inside each test
+# recipe rather than made a prerequisite of them, because make builds a prerequisite once per
+# invocation: `make test-unit test-integration-scylla COVERAGE=true` would then truncate the
+# first lane's file only, and let the second lane append to whatever it found.
+CLEAN_COVERAGE_DATA = $(if $(MVN_COVERAGE),find . -name 'jacoco-$(COVERAGE_LANE).exec' -delete,:)
 
 .prepare-environment-update-aio-max-nr:
 	@if (( $$(< /proc/sys/fs/aio-max-nr) < 2097152 )); then
@@ -240,9 +282,12 @@ check:
 fix:
 	$(MVNCMD) fmt:format
 
+test-unit: COVERAGE_LANE = unit
 test-unit:
-	$(MVNCMD) test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	$(CLEAN_COVERAGE_DATA)
+	$(MVNCMD) test $(MVN_COVERAGE) -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
+test-integration-scylla: COVERAGE_LANE = scylla-$(SCYLLA_VERSION)
 test-integration-scylla: .prepare-scylla-ccm resolve-scylla-version .prepare-environment-update-aio-max-nr
 	@if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]]; then
 		SCYLLA_VERSION_RESOLVED=`cat '${SCYLLA_VERSION_FILE}'`
@@ -251,8 +296,10 @@ test-integration-scylla: .prepare-scylla-ccm resolve-scylla-version .prepare-env
 		echo "ScyllaDB version ${SCYLLA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B verify -Pshort -Dscylla.version=$${SCYLLA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	$(CLEAN_COVERAGE_DATA)
+	mvn -B verify -Pshort $(MVN_COVERAGE) -Dscylla.version=$${SCYLLA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
+test-integration-cassandra: COVERAGE_LANE = cassandra-$(CASSANDRA_VERSION)
 test-integration-cassandra: .prepare-scylla-ccm resolve-cassandra-version
 	@if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		CASSANDRA_VERSION_RESOLVED=`cat '${CASSANDRA_VERSION_FILE}'`
@@ -261,7 +308,62 @@ test-integration-cassandra: .prepare-scylla-ccm resolve-cassandra-version
 		echo "Cassandra version ${CASSANDRA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B verify -Pshort -Dcassandra.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	$(CLEAN_COVERAGE_DATA)
+	mvn -B verify -Pshort $(MVN_COVERAGE) -Dcassandra.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+
+# Aggregates the execution data left behind by any COVERAGE=true test run into a single report.
+# Tests are skipped here on purpose: this only reads what is already on disk, so the same target
+# works for one local lane and for execution data collected from several CI jobs. Only test
+# execution is skipped, not test compilation: -Dmaven.test.skip=true would also suppress
+# driver-core's test-jar, which driver-mapping and driver-extras resolve at test scope, and
+# nothing in this build or in CI installs that jar for them to fall back on.
+#
+# mvn is called directly rather than through MVNCMD, whose -X default would tee a debug log
+# measured in hundreds of megabytes into the temp file this target then greps.
+coverage-report:
+	@set -eo pipefail
+	exec_files=$$(find $(COVERAGE_EXEC_DIRS) -maxdepth 1 -name '*.exec' 2>/dev/null | sort || true)
+	if [[ -z "$$exec_files" ]]; then
+		echo 'No JaCoCo execution data found in $(COVERAGE_EXEC_DIRS).'
+		echo "Run the tests with COVERAGE=true first, e.g. 'make test-unit COVERAGE=true'."
+		exit 1
+	fi
+	rm -rf '${COVERAGE_REPORT_DIR}'
+	maven_log=$$(mktemp)
+	trap 'rm -f "$$maven_log"' EXIT
+	mvn -B -ntp -Pcoverage-report -DskipTests verify -pl driver-coverage-report -am -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true 2>&1 | tee "$$maven_log"
+	if [[ ! -f '${COVERAGE_REPORT_DIR}/jacoco.xml' ]]; then
+		echo 'Maven produced no report at ${COVERAGE_REPORT_DIR}/jacoco.xml.'
+		exit 1
+	fi
+	# The report's own LINE counter, not a sum over jacoco.csv: the CSV has a row per class, and
+	# classes that share a source file share its lines, so adding the rows up counts those lines
+	# once per class. On this tree that alone moved the figure by 46 lines. This is the number
+	# JaCoCo puts in the HTML report, and it needs no assumption about column positions.
+	summary=$$(python3 -c 'import sys, xml.etree.ElementTree as ET; c = next(x for x in ET.parse(sys.argv[1]).getroot().findall("counter") if x.get("type") == "LINE"); missed, covered = int(c.get("missed")), int(c.get("covered")); total = missed + covered; print(covered, total, "{:.2f}%".format(100.0 * covered / total) if total else "n/a")' '${COVERAGE_REPORT_DIR}/jacoco.xml')
+	read -r covered total percentage <<< "$$summary"
+	mismatched=$$(grep -c 'does not match' "$$maven_log" || true)
+	# Which lanes went into the number is part of the number. A lane that was skipped or whose
+	# upload failed lowers the percentage, and on its own a lower percentage reads as a regression.
+	{
+		echo "Line coverage: $$covered/$$total ($$percentage)"
+		echo 'Aggregated from:'
+		printf '%s\n' "$$exec_files" | sed 's/^/  /'
+		if (( mismatched > 0 )); then
+			echo "WARNING: $$mismatched classes were dropped because their execution data was recorded"
+			echo "against differently compiled bytecode, so real coverage is higher than reported."
+		fi
+	} | tee -a "$${GITHUB_STEP_SUMMARY:-/dev/null}"
+	echo 'HTML report: ${COVERAGE_REPORT_DIR}/index.html'
+	if (( covered == 0 )); then
+		echo 'Nothing is recorded as covered: the execution data does not match these classes.' >&2
+		exit 1
+	fi
+
+
+clean-coverage:
+	@find . -name 'jacoco*.exec' -delete
+	rm -rf '${COVERAGE_REPORT_DIR}'
 
 check-no-compile-warnings:
 	@$(MAKE) compile-all | grep WARNING >/tmp/all-compile-warnings.log || true
