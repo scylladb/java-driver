@@ -1,0 +1,40 @@
+name: Collect coverage execution data
+description: >
+  Uploads the JaCoCo execution data a COVERAGE=true test lane left behind. Factored out because
+  every instrumented lane needs it verbatim, and because the layout it produces has to stay in
+  step with the step that reverses it in the coverage-report job.
+
+inputs:
+  artifact-name:
+    description: >
+      Name of the artifact to upload. Has to start with coverage-exec- for the coverage-report
+      job's download pattern to match it.
+    required: true
+
+runs:
+  using: composite
+
+  steps:
+
+    # Kept under <module>/target/ so the coverage-report job can put the tree straight back where
+    # it came from; which lane produced the data is already part of the file name. Only the
+    # top-level modules are collected, which is all jacoco:report-aggregate reads. The
+    # "Place execution data next to the classes it was recorded against" step reverses exactly
+    # this layout -- the two have to be changed together.
+    - name: Copy execution data into an artifact tree
+      shell: bash
+      run: |
+        shopt -s nullglob
+        mkdir -p coverage-exec
+        for exec_file in */target/jacoco-*.exec; do
+          mkdir -p "coverage-exec/$(dirname "$exec_file")"
+          cp "$exec_file" "coverage-exec/$exec_file"
+        done
+        find coverage-exec -name '*.exec' -printf '%p\t%s bytes\n'
+
+    - name: Upload execution data
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: coverage-exec/
+        if-no-files-found: warn

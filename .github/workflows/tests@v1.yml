@@ -128,8 +128,17 @@ jobs:
           path: ~/.m2/repository
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
+      # COVERAGE and the lane name are passed as make variables rather than through env: a
+      # target-specific COVERAGE_LANE assignment in the Makefile beats the environment, so an
+      # env: entry would quietly leave every lane of this matrix writing one file name.
       - name: Run unit tests
-        run: make test-unit
+        run: make test-unit COVERAGE=true COVERAGE_LANE=unit-${{ matrix.java-version }}
+
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/collect-coverage-exec
+        with:
+          artifact-name: coverage-exec-unit-${{ matrix.java-version }}
 
       - name: Copy test results
         if: always()
@@ -233,11 +242,20 @@ jobs:
           path: ~/.ccm/repository
           key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
 
+      # COVERAGE and the lane name are passed as make variables rather than through env: a
+      # target-specific COVERAGE_LANE assignment in the Makefile beats the environment, so an
+      # env: entry would quietly leave every lane of this matrix writing one file name.
       - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }})
         id: run-integration-tests
         env:
           CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
-        run: make test-integration-cassandra
+        run: make test-integration-cassandra COVERAGE=true COVERAGE_LANE=cassandra-${{ matrix.cassandra-version }}
+
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/collect-coverage-exec
+        with:
+          artifact-name: coverage-exec-cassandra-${{ matrix.cassandra-version }}
 
       - name: Copy test results
         if: steps.run-integration-tests.outcome == 'failure'
@@ -332,11 +350,20 @@ jobs:
           path: ~/.ccm/scylla-repository
           key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
 
+      # COVERAGE and the lane name are passed as make variables rather than through env: a
+      # target-specific COVERAGE_LANE assignment in the Makefile beats the environment, so an
+      # env: entry would quietly leave every lane of this matrix writing one file name.
       - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }})
         id: run-integration-tests
         env:
           SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
-        run: make test-integration-scylla
+        run: make test-integration-scylla COVERAGE=true COVERAGE_LANE=scylla-${{ matrix.scylla-version }}
+
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/collect-coverage-exec
+        with:
+          artifact-name: coverage-exec-scylla-${{ matrix.scylla-version }}
 
       - name: Copy test results
         if: steps.run-integration-tests.outcome == 'failure'
@@ -370,3 +397,82 @@ jobs:
           detailed_summary: true
           updateComment: false
           skip_annotations: true
+
+  coverage-report:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    needs: [unit-tests, cassandra-integration-tests, scylla-integration-tests]
+    # Runs even when a test lane failed: partial coverage data is still worth reporting, and
+    # continue-on-error keeps a flaky integration test from turning this metric into a second
+    # failure on the pull request.
+    if: ${{ !cancelled() }}
+    continue-on-error: true
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          java-version: 8
+          distribution: 'temurin'
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-8-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Download coverage execution data
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: coverage-exec-*
+          path: coverage-exec
+
+      # Each artifact holds <module>/target/jacoco-<lane>.exec, and jacoco:report-aggregate reads
+      # target/*.exec from every module it reports on, so the files only have to go back to where
+      # the lane wrote them.
+      - name: Place execution data next to the classes it was recorded against
+        run: |
+          shopt -s nullglob
+          for exec_file in coverage-exec/*/*/target/jacoco-*.exec; do
+            dest="${exec_file#coverage-exec/*/}"
+            mkdir -p "$(dirname "$dest")"
+            cp "$exec_file" "$dest"
+          done
+          find driver-* -maxdepth 2 -name 'jacoco-*.exec' -printf '%p\t%s bytes\n'
+
+      # A lane that produced nothing fails nothing on its own: the upload only warns, and this
+      # job is continue-on-error. It just lowers the percentage, and a lower percentage published
+      # on an otherwise green run reads as a regression caused by the pull request. Checked per
+      # kind rather than per matrix entry on purpose: a hard-coded count would rot silently.
+      - name: Check that every kind of test lane contributed
+        run: |
+          missing=()
+          for kind in unit cassandra scylla; do
+            if [[ -z "$(find coverage-exec -maxdepth 1 -type d -name "coverage-exec-$kind-*" -print -quit 2>/dev/null)" ]]; then
+              missing+=("$kind")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "No coverage execution data from: ${missing[*]}." >&2
+            echo 'Those lanes did not run, so any number produced here would understate coverage.' >&2
+            exit 1
+          fi
+
+      - name: Aggregate coverage
+        run: make coverage-report
+
+      # Kept even on failure: `make coverage-report` exits non-zero when nothing is recorded as
+      # covered, and the report is what shows which bundles came out empty.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-report
+          path: driver-coverage-report/target/site/jacoco-aggregate
+          if-no-files-found: error
