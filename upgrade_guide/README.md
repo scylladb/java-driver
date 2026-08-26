@@ -3,6 +3,27 @@
 The purpose of this guide is to detail changes made by successive
 versions of the Java driver.
 
+### 3.11.5.19
+
+1.  `ColumnDefinitions` now reports a double-quoted name whose case matches no definition as absent,
+    rather than as present with no indexes. This affects only a name that survives the
+    case-insensitive lookup but matches nothing exactly, for example `"\"in(v)\""` against a
+    definition named `IN(v)`. For such a name:
+
+    * `contains()` returns `false` where it returned `true`;
+    * `getIndexOf()` returns `-1` where it threw `ArrayIndexOutOfBoundsException`;
+    * the name-based getters and setters on `Row` and `BoundStatement` throw
+        `IllegalArgumentException`, where a getter threw `ArrayIndexOutOfBoundsException` and a setter
+        silently did nothing — leaving the variable unset, which the server then rejected with
+        `Unexpected unset value for bind variable N`;
+    * the object mapper leaves the corresponding property unset instead of failing with
+        `ArrayIndexOutOfBoundsException`. Watch for this if you use `@Column(caseSensitive = true)`
+        with a name whose case does not match the column: the mismatch is now silent, in the same way
+        it already was for an unquoted name that matches nothing.
+
+    An unquoted name that matches no definition already behaved this way; this change makes the
+    quoted form consistent with it.
+
 ### 3.6.0
 
 1.  `ConsistencyLevel.LOCAL_SERIAL.isDCLocal()` now returns true. In driver

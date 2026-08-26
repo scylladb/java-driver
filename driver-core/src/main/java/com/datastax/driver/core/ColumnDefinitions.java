@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -73,13 +74,17 @@ public class ColumnDefinitions implements Iterable<ColumnDefinitions.Definition>
     this.byName = new HashMap<String, int[]>(defs.length);
 
     for (int i = 0; i < defs.length; i++) {
+      // Fold with ROOT rather than the default locale: a name such as IN(v) would be indexed as
+      // ın(v) in a Turkish JVM, and no lookup for in(v) could then find it. Computed once so that
+      // the two puts below cannot drift apart.
+      String key = defs[i].name.toLowerCase(Locale.ROOT);
       // Be optimistic, 99% of the time, previous will be null.
-      int[] previous = this.byName.put(defs[i].name.toLowerCase(), new int[] {i});
+      int[] previous = this.byName.put(key, new int[] {i});
       if (previous != null) {
         int[] indexes = new int[previous.length + 1];
         System.arraycopy(previous, 0, indexes, 0, previous.length);
         indexes[indexes.length - 1] = i;
-        this.byName.put(defs[i].name.toLowerCase(), indexes);
+        this.byName.put(key, indexes);
       }
     }
   }
@@ -247,7 +252,7 @@ public class ColumnDefinitions implements Iterable<ColumnDefinitions.Definition>
       caseSensitive = true;
     }
 
-    int[] indexes = byName.get(name.toLowerCase());
+    int[] indexes = byName.get(name.toLowerCase(Locale.ROOT));
     if (!caseSensitive || indexes == null) return indexes;
 
     // First, optimistic and assume all are matching
@@ -255,6 +260,9 @@ public class ColumnDefinitions implements Iterable<ColumnDefinitions.Definition>
     for (int i = 0; i < indexes.length; i++) if (name.equals(byIdx[indexes[i]].name)) nbMatch++;
 
     if (nbMatch == indexes.length) return indexes;
+    // Report the name as absent rather than returning an empty array: callers distinguish "no such
+    // name" by a null return, and an unquoted name that matches nothing already lands there.
+    if (nbMatch == 0) return null;
 
     int[] result = new int[nbMatch];
     int j = 0;

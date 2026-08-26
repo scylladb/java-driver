@@ -15,8 +15,12 @@
  */
 package com.datastax.driver.core;
 
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
+import java.util.Locale;
 import org.testng.annotations.Test;
 
 public class ColumnDefinitionsTest {
@@ -77,5 +81,91 @@ public class ColumnDefinitionsTest {
             CodecRegistry.DEFAULT_INSTANCE);
 
     assertTrue(defs.getType("column").equals(DataType.text()));
+  }
+
+  /**
+   * A hand-built lookup fixture, not a real server response: a server names the marker of an IN
+   * relation after the operator and the column, as in "SELECT * FROM t WHERE pk = ? AND v IN ?",
+   * and the definition is repeated here so that a name matching more than one variable is
+   * reachable. (No server would send both at once — CQL rejects a column restricted by two IN
+   * relations.)
+   *
+   * <p>The synthesized spelling differs between ScyllaDB release lines rather than along a single
+   * version sequence: 2024.1 emits in(v), 2026.1.8 emits IN(v), and the lowercase spelling is
+   * restored in 2026.1.12 and 2026.2.6 (CUSTOMER-583 / SCYLLADB-3454). An application must
+   * therefore not depend on either spelling.
+   */
+  private static ColumnDefinitions synthesizedInMarkerDefinitions() {
+    return new ColumnDefinitions(
+        new ColumnDefinitions.Definition[] {
+          new ColumnDefinitions.Definition("ks", "cf", "pk", DataType.cint()),
+          new ColumnDefinitions.Definition("ks", "cf", "IN(v)", DataType.list(DataType.cint())),
+          new ColumnDefinitions.Definition("ks", "cf", "IN(v)", DataType.list(DataType.cint())),
+        },
+        CodecRegistry.DEFAULT_INSTANCE);
+  }
+
+  @Test(groups = "unit")
+  public void synthesizedMarkerNameIsMatchedWhateverTheServerSpelling() {
+    ColumnDefinitions defs = synthesizedInMarkerDefinitions();
+
+    assertTrue(defs.contains("IN(v)"));
+    assertTrue(defs.contains("in(v)"));
+    assertTrue(defs.contains("In(V)"));
+    assertEquals(defs.getFirstIdx("in(v)"), 1);
+  }
+
+  /**
+   * The letter that flipped in CUSTOMER-583 is {@code I}, and lowercasing it in the Turkish locale
+   * yields a dotless {@code ı}. Matching must not depend on the JVM's default locale, or a Turkish
+   * deployment would fail to resolve the name that works everywhere else.
+   */
+  @Test(groups = "unit")
+  public void synthesizedMarkerNameIsMatchedInAnyDefaultLocale() {
+    Locale def = Locale.getDefault();
+    try {
+      Locale.setDefault(new Locale("tr", "TR"));
+      ColumnDefinitions defs = synthesizedInMarkerDefinitions();
+      // Probe both spellings. The definitions are built inside the locale override, so the
+      // lowercase probe covers the fold applied while indexing; but "in(v)" is left alone by every
+      // locale, so it would not catch a lookup that stopped pinning ROOT — the uppercase probe
+      // covers that side.
+      assertTrue(defs.contains("in(v)"));
+      assertEquals(defs.getFirstIdx("in(v)"), 1);
+      assertTrue(defs.contains("IN(v)"));
+      assertEquals(defs.getFirstIdx("IN(v)"), 1);
+    } finally {
+      Locale.setDefault(def);
+    }
+  }
+
+  /** A named setter writes every matching variable, so repeating a column makes names ambiguous. */
+  @Test(groups = "unit")
+  public void synthesizedMarkerNameMatchesEveryOccurrence() {
+    assertEquals(synthesizedInMarkerDefinitions().getAllIdx("in(v)"), new int[] {1, 2});
+  }
+
+  /**
+   * Double-quoting opts into exact matching, which the synthesized spelling can then break. A name
+   * that survives the case-insensitive lookup but no exact comparison must be reported absent, the
+   * same way an unquoted name that matches nothing is — otherwise contains() claims the name is
+   * there, getIndexOf() throws instead of returning -1, and a setter silently leaves the variable
+   * unset, which the server then rejects with "Unexpected unset value for bind variable N".
+   */
+  @Test(groups = "unit")
+  public void doubleQuotedSynthesizedMarkerNameOfDifferentCaseIsNotMatched() {
+    ColumnDefinitions defs = synthesizedInMarkerDefinitions();
+
+    assertTrue(defs.contains("\"IN(v)\""));
+    assertEquals(defs.getIndexOf("\"IN(v)\""), 1);
+
+    assertFalse(defs.contains("\"in(v)\""));
+    assertEquals(defs.getIndexOf("\"in(v)\""), -1);
+    try {
+      defs.getType("\"in(v)\"");
+      fail("expected an IllegalArgumentException");
+    } catch (IllegalArgumentException e) {
+      // expected
+    }
   }
 }
