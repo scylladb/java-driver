@@ -123,6 +123,16 @@ separately:
         .build();
     ```
 
+Unlike a prepared statement, a simple statement is not parsed by the driver, so there is no local
+variable metadata to match the names against: the driver sends them with the query, and the
+**coordinator** resolves them. Name your markers yourself with `:name`, and fill anonymous `?`
+markers positionally — the names the server synthesizes for anonymous markers (see [prepared
+statements](../prepared/#anonymous-markers-and-server-synthesized-names)) are even less usable
+here. The `String`-keyed methods do put each name through `CqlIdentifier.fromCql`, which
+lower-cases it and rejects a parenthesised one outright; past that check the driver has nothing to
+compare against, so a name that is merely wrong is only rejected by the coordinator, at execution
+time. Mixing positional and named values in one statement is rejected outright.
+
 This syntax has a few advantages:
 
 * if the values come from some other part of your code, it looks cleaner than doing the 

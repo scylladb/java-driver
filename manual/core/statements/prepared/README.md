@@ -202,18 +202,54 @@ BoundStatement bound =
       .build();
 ```
 
-You can use named setters even if the query uses anonymous parameters; Cassandra names the
-parameters after the column they apply to:
+#### Anonymous markers and server-synthesized names
+
+Named setters also work when the query uses anonymous `?` markers: the server synthesizes a name for
+each one, usually after the column it applies to.
 
 ```java
+// Works, but relies on a name the server made up:
 BoundStatement bound = ps1.bind()
   .setString("sku", "324378")
   .setString("description", "LCD screen");
 ```
 
-This can be ambiguous if the query uses the same column multiple times, like in `select * from sales
-where sku = ? and date > ? and date < ?`. In these situations, use positional setters or named
-parameters.
+**Avoid relying on this.** Synthesized names are not part of any API contract, and their
+spelling differs between server release lines, not just between successive versions. For
+`SELECT ... WHERE application_id IN ?`, ScyllaDB's 2024.1 releases name the marker
+`in(application_id)`, while 2026.1.8 names it `IN(application_id)`; the lowercase spelling is
+restored in 2026.1.12 and 2026.2.6. Apache Cassandra names it `in(application_id)`. The regression
+was reported against a driver that matches these names exactly: the hardcoded lowercase spelling
+stopped resolving, the variable went out unset, and the server rejected the request with
+`Unexpected unset value for bind variable 1`. This driver is more forgiving, but only on some of its
+lookup paths — see below. The spelling can even vary from node to node during a rolling upgrade,
+because the driver keeps whichever metadata the node that served the `PREPARE` sent back.
+
+The rule of thumb: **bind `?` markers positionally, and use named setters only for markers you named
+yourself with `:name`.**
+
+If you address a synthesized name anyway, be aware of what the driver does and does not shield you
+from:
+
+* the `String` setters match **case-insensitively** (see [AccessibleByName]), so
+  `setList("in(pk)", ...)` still finds a variable that the server called `IN(pk)`. A change of case
+  alone is survivable;
+* the [CqlIdentifier] setters do **not** — they match exactly, so
+  `setList(CqlIdentifier.fromInternal("in(pk)"), ...)` does not resolve against a variable the
+  server called `IN(pk)`, and throws `IllegalArgumentException` rather than quietly leaving it
+  unset. Nor can you build the identifier from its CQL form: `CqlIdentifier.fromCql("IN(pk)")`
+  throws outright, because the parentheses would have to be double-quoted;
+* a double-quoted `String` name such as `setList("\"in(pk)\"", ...)` also forces an exact match,
+  and throws in the same way.
+
+Note that the exception comes from the setter. Querying the metadata directly reports the same miss
+without throwing: `getVariableDefinitions().firstIndexOf(...)` returns `-1`, and `allIndicesOf(...)`
+returns an empty list.
+
+Finally, a named setter writes **every** variable that matches the name, not just the first one.
+Names are therefore ambiguous whenever a query mentions the same column more than once, as in
+`select * from sales where sku = ? and date > ? and date < ?` or `... where a in ? and a in ?`. Bind
+those markers positionally, or name them apart yourself — `... and date > :from and date < :to`.
 
 #### Unset values
 
@@ -233,6 +269,9 @@ bound = bound.unset("description");
 // Positional:
 bound = bound.unset(1);
 ```
+
+For brevity this example addresses `ps1`'s anonymous markers by their synthesized names; in
+application code, prefer the positional form for the reasons given above.
 
 A bound statement also has getters to retrieve the values. Note that this has a small performance
 overhead, since values are stored in their serialized form.
@@ -350,6 +389,8 @@ new version with the response; the driver updates its local cache transparently,
 observe the new columns in the result set.
 
 [BoundStatement]:  https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/BoundStatement.html
+[AccessibleByName]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/data/AccessibleByName.html
+[CqlIdentifier]:   https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/CqlIdentifier.html
 [Session.prepare]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/CqlSession.html#prepare-com.datastax.oss.driver.api.core.cql.SimpleStatement-
 [CASSANDRA-10786]: https://issues.apache.org/jira/browse/CASSANDRA-10786
 [CASSANDRA-10813]: https://issues.apache.org/jira/browse/CASSANDRA-10813
