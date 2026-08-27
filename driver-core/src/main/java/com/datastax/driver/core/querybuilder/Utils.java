@@ -29,6 +29,7 @@ import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -55,7 +56,10 @@ abstract class Utils {
     // Shouldn't really happen for this method, but no reason to fail here
     if (id == null) return null;
 
-    if (alphanumeric.matcher(id).matches()) return id.toLowerCase();
+    // ROOT, not the default locale: only ASCII-alphanumeric ids reach this branch, which is exactly
+    // where a Turkish JVM would fold I to the dotless ı. maybeAddRoutingKey compares the result
+    // against the partition key name, so a locale-dependent fold silently drops the routing key.
+    if (alphanumeric.matcher(id).matches()) return id.toLowerCase(Locale.ROOT);
 
     // Check if it's enclosed in quotes. If it is, remove them and unescape internal double quotes
     if (!id.isEmpty() && id.charAt(0) == '"' && id.charAt(id.length() - 1) == '"')

@@ -46,6 +46,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -391,8 +392,11 @@ public class DefaultPropertyMapper implements PropertyMapper {
     if (setter == null) {
       // JAVA-984: look for a "relaxed" setter, ie. a setter whose return type may be anything
       String propertyName = property.getName();
+      // ROOT, not the default locale: this builds a Java method name, and in a Turkish JVM a
+      // property named id would yield setId spelled with a dotted I. getMethod would then miss and
+      // the NoSuchMethodException below is swallowed, so the setter would go silently undetected.
       String setterName =
-          "set" + propertyName.substring(0, 1).toUpperCase() + propertyName.substring(1);
+          "set" + propertyName.substring(0, 1).toUpperCase(Locale.ROOT) + propertyName.substring(1);
       try {
         Method m = mappedClass.getMethod(setterName, property.getPropertyType());
         if (!Modifier.isStatic(m.getModifiers())) setter = m;
@@ -447,7 +451,10 @@ public class DefaultPropertyMapper implements PropertyMapper {
       if (!udtMappedField.name().isEmpty()) mappedName = udtMappedField.name();
     }
     if (mappedName != null) {
-      return caseSensitive ? Metadata.quote(mappedName) : mappedName.toLowerCase();
+      // ROOT, not the default locale: this is the column name the mapper reads and writes, so
+      // @Column(name = "ID") would fold to a dotless id in a Turkish JVM and the property would
+      // silently fail to bind against a column the server calls id.
+      return caseSensitive ? Metadata.quote(mappedName) : mappedName.toLowerCase(Locale.ROOT);
     }
 
     // Otherwise delegate to the naming strategy

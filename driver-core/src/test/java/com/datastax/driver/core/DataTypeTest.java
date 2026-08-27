@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -405,6 +406,30 @@ public class DataTypeTest {
       fail("This should not have worked");
     } catch (InvalidTypeException e) {
       /* That's what we want */
+    }
+  }
+
+  /**
+   * {@code Name.toString()} lower-cases the enum constant, and the schema builder splices the
+   * result straight into generated CQL — {@code Alter.type()} and {@code NativeColumnType}, so
+   * every ALTER TYPE, ADD column and CREATE TABLE column. Every type name holding an I is affected,
+   * so an unpinned fold makes a Turkish JVM emit {@code TYPE ınt} and the server reject the
+   * statement.
+   */
+  @Test(groups = "unit")
+  public void toStringIsIndependentOfDefaultLocaleTest() {
+    Locale def = Locale.getDefault();
+    try {
+      Locale.setDefault(new Locale("tr", "TR"));
+      assertThat(DataType.cint().toString()).isEqualTo("int");
+      assertThat(DataType.ascii().toString()).isEqualTo("ascii");
+      assertThat(DataType.timestamp().toString()).isEqualTo("timestamp");
+      // The collection name and its arguments each fold separately.
+      assertThat(DataType.list(DataType.cint()).toString()).isEqualTo("list<int>");
+      assertThat(DataType.map(DataType.text(), DataType.timestamp()).toString())
+          .isEqualTo("map<text, timestamp>");
+    } finally {
+      Locale.setDefault(def);
     }
   }
 }

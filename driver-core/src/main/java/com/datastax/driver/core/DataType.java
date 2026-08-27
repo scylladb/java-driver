@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -115,7 +116,10 @@ public abstract class DataType {
 
     @Override
     public String toString() {
-      return super.toString().toLowerCase();
+      // ROOT, not the default locale: this string is spliced into generated CQL by the schema
+      // builder, so in a Turkish JVM INT would render as ınt, spelled with a dotless i, and the
+      // server would reject the statement as a syntax error.
+      return super.toString().toLowerCase(Locale.ROOT);
     }
   }
 

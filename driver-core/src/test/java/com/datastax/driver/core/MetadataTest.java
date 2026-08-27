@@ -20,6 +20,7 @@ import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;
 import static com.datastax.driver.core.TestUtils.waitForUp;
 
 import com.google.common.collect.Maps;
+import java.util.Locale;
 import java.util.Map;
 import org.testng.annotations.Test;
 
@@ -125,6 +126,23 @@ public class MetadataTest extends CCMTestsSupport {
     assertThat(Metadata.handleId("FooBar1")).isEqualTo("foobar1");
     assertThat(Metadata.handleId("Foo_Bar_1")).isEqualTo("foo_bar_1");
     assertThat(Metadata.handleId("foo_bar_1")).isEqualTo("foo_bar_1");
+  }
+
+  /**
+   * Identifier folding must not depend on the JVM's default locale: in a Turkish locale {@code I}
+   * lowercases to the dotless {@code ı}, so {@code getTable("ID_TABLE")} would look up {@code
+   * ıd_table} and never match the {@code id_table} the server reported.
+   */
+  @Test(groups = "unit")
+  public void handleId_should_lowercase_unquoted_alphanumeric_identifiers_in_any_default_locale() {
+    Locale def = Locale.getDefault();
+    try {
+      Locale.setDefault(new Locale("tr", "TR"));
+      assertThat(Metadata.handleId("ID_TABLE")).isEqualTo("id_table");
+      assertThat(Metadata.handleId("FooBar1")).isEqualTo("foobar1");
+    } finally {
+      Locale.setDefault(def);
+    }
   }
 
   @Test(groups = "unit")

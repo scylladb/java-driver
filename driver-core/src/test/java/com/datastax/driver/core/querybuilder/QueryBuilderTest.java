@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -1635,6 +1636,27 @@ public class QueryBuilderTest {
         .isEqualTo("SELECT * FROM foo ALLOW FILTERING;");
     assertThat(select().all().from("foo").where(eq("x", 42)).allowFiltering().toString())
         .isEqualTo("SELECT * FROM foo WHERE x=42 ALLOW FILTERING;");
+  }
+
+  /**
+   * The query builder folds a column name before comparing it with the partition key name, in
+   * {@code BuiltStatement.maybeAddRoutingKey}. That fold must not depend on the JVM's default
+   * locale: in a Turkish locale {@code I} lowercases to the dotless {@code ı}, so a clause on
+   * {@code ID} would stop matching a partition key called {@code id} and the statement would
+   * silently lose its routing key, costing it token-aware routing.
+   *
+   * @test_category queries:builder
+   */
+  @Test(groups = "unit")
+  public void should_handle_id_in_any_default_locale() {
+    Locale def = Locale.getDefault();
+    try {
+      Locale.setDefault(new Locale("tr", "TR"));
+      assertThat(Utils.handleId("ID")).isEqualTo("id");
+      assertThat(Utils.handleId("Id_1")).isEqualTo("id_1");
+    } finally {
+      Locale.setDefault(def);
+    }
   }
 
   /** @test_category queries:builder */

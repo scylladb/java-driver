@@ -17,6 +17,7 @@ package com.datastax.driver.mapping;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Locale;
 import org.testng.annotations.Test;
 
 /** Test for JAVA-1316 - test combinations of different {@link NamingConventions} implementation. */
@@ -481,6 +482,61 @@ public class NamingConventionsTest {
         new NamingConventions.LowerCamelCase(true),
         "MyXMLParser",
         "myXMLParser");
+  }
+
+  /**
+   * The conventions fold case to produce a CQL identifier, so the JVM's default locale must not
+   * decide the result. In a Turkish locale a lower-case i upper-cases to a dotted I and an
+   * upper-case I lower-cases to a dotless one, so every name below would come out unmatchable
+   * against the column the server actually holds. Each input deliberately carries an i.
+   *
+   * <p>The abbreviation branches of the two camel-case joins are pinned as well, but no input
+   * discriminates them, which was checked by reverting each one in turn: the splitter only marks an
+   * all-upper-case word as an abbreviation, so the fold applied there is a no-op in any locale.
+   */
+  @Test(groups = "unit")
+  public void should_apply_conventions_in_any_default_locale() {
+    Locale def = Locale.getDefault();
+    try {
+      Locale.setDefault(new Locale("tr", "TR"));
+      test(NamingConventions.LOWER_CAMEL_CASE, NamingConventions.UPPER_CASE, "id", "ID");
+      test(NamingConventions.LOWER_CAMEL_CASE, NamingConventions.LOWER_CASE, "ID", "id");
+      test(
+          NamingConventions.LOWER_CAMEL_CASE,
+          NamingConventions.UPPER_SNAKE_CASE,
+          "minPrice",
+          "MIN_PRICE");
+      test(
+          NamingConventions.LOWER_CAMEL_CASE,
+          NamingConventions.UPPER_CAMEL_CASE,
+          "itemId",
+          "ItemId");
+      // The three below drive the lower-camel join, one per fold it applies: the first word, the
+      // leading letter of a later word, and that word's tail.
+      test(
+          NamingConventions.UPPER_SNAKE_CASE,
+          NamingConventions.LOWER_CAMEL_CASE,
+          "ITEM_ID",
+          "itemId");
+      test(
+          NamingConventions.LOWER_SNAKE_CASE,
+          NamingConventions.LOWER_CAMEL_CASE,
+          "item_id",
+          "itemId");
+      test(
+          NamingConventions.UPPER_SNAKE_CASE,
+          NamingConventions.LOWER_CAMEL_CASE,
+          "ITEM_XID",
+          "itemXid");
+      // Drives the upper-camel join's tail fold, which the itemId case above leaves untouched.
+      test(
+          NamingConventions.UPPER_SNAKE_CASE,
+          NamingConventions.UPPER_CAMEL_CASE,
+          "ITEM_XID",
+          "ItemXid");
+    } finally {
+      Locale.setDefault(def);
+    }
   }
 
   private void test(
