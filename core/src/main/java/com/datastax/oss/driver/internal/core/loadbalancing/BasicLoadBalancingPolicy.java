@@ -69,6 +69,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -177,7 +178,9 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
       return RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
     }
     try {
-      return RequestRoutingMethod.valueOf(methodString.toUpperCase());
+      // ROOT, not the default locale: in a Turkish JVM the i of "preserve_replica_order" folds
+      // to a dotted capital, so a valid setting would be warned about and silently dropped.
+      return RequestRoutingMethod.valueOf(methodString.toUpperCase(Locale.ROOT));
     } catch (IllegalArgumentException e) {
       LOG.warn(
           "[{}] Unknown request routing method '{}', defaulting to PRESERVE_REPLICA_ORDER",
