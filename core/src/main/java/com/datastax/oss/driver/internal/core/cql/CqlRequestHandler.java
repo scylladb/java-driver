@@ -25,7 +25,6 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
 
-import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
@@ -406,7 +405,8 @@ public class CqlRequestHandler implements Throttled {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
         // We're the last execution so fail the result
-        setFinalError(statement, AllNodesFailedException.fromErrors(this.errors), null, -1);
+        setFinalError(
+            statement, DefaultSession.queryPlanExhaustedError(session, this.errors), null, -1);
       }
     } else {
       boolean writeSubmitted = false;

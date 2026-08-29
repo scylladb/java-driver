@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
 
-import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
@@ -227,7 +226,7 @@ public class CqlPrepareHandler implements Throttled {
       }
     }
     if (channel == null) {
-      setFinalError(AllNodesFailedException.fromErrors(this.errors));
+      setFinalError(DefaultSession.queryPlanExhaustedError(session, this.errors));
     } else {
       boolean writeSubmitted = false;
       try {
