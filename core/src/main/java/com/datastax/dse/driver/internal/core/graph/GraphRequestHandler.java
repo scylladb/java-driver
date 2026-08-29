@@ -25,7 +25,6 @@ import com.datastax.dse.driver.api.core.graph.GraphStatement;
 import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
 import com.datastax.dse.driver.api.core.metrics.DseSessionMetric;
 import com.datastax.dse.driver.internal.core.graph.binary.GraphBinaryModule;
-import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
@@ -297,7 +296,7 @@ public class GraphRequestHandler implements Throttled {
         // We're the last execution so fail the result
         setFinalError(
             statement,
-            AllNodesFailedException.fromErrors(this.errors),
+            DefaultSession.queryPlanExhaustedError(session, this.errors),
             null,
             NO_SUCCESSFUL_EXECUTION);
       }
