@@ -44,6 +44,7 @@
         <module>driver-examples</module>
         <module>driver-tests</module>
         <module>driver-dist</module>
+        <module>driver-coverage-report</module>
     </modules>
 
     <properties>
@@ -93,6 +94,12 @@
              updated. -->
         <json-schema-validator.version>1.5.9</json-schema-validator.version>
         <surefire.version>3.5.4</surefire.version>
+        <jacoco.version>0.8.14</jacoco.version>
+        <!-- Always defined, so that surefire's late-replaced @{jacoco.argline} always
+             resolves. The 'coverage' profile overwrites it with the JaCoCo agent argument via
+             jacoco:prepare-agent; without that profile (or with -Djacoco.skip=true) it stays
+             empty instead of leaking a literal @{...} token into the forked test JVM. -->
+        <jacoco.argline />
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
@@ -735,12 +742,18 @@
                 </plugin>
 
                 <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
+                </plugin>
+
+                <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${surefire.version}</version>
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
-                        <argLine>-Djdk.attach.allowAttachSelf=true</argLine>
+                        <argLine>-Djdk.attach.allowAttachSelf=true @{jacoco.argline}</argLine>
                         <runOrder>alphabetical</runOrder>
                         <systemPropertyVariables>
                             <cassandra.version>${cassandra.version}</cassandra.version>
@@ -869,7 +882,7 @@
                 <extensions>true</extensions>
                 <configuration>
                     <publishingServerId>central</publishingServerId>
-                    <excludeArtifacts>scylla-driver-tests-parent,scylla-driver-tests-osgi,scylla-driver-tests-osgi-common,scylla-driver-tests-osgi-shaded,scylla-driver-tests-shading,scylla-driver-tests-shading-shaded,scylla-driver-tests-shading-unshaded,scylla-driver-tests-osgi-unshaded,scylla-driver-tests-stress,scylla-driver-dist,scylla-driver-examples</excludeArtifacts>
+                    <excludeArtifacts>scylla-driver-coverage-report,scylla-driver-tests-parent,scylla-driver-tests-osgi,scylla-driver-tests-osgi-common,scylla-driver-tests-osgi-shaded,scylla-driver-tests-shading,scylla-driver-tests-shading-shaded,scylla-driver-tests-shading-unshaded,scylla-driver-tests-osgi-unshaded,scylla-driver-tests-stress,scylla-driver-dist,scylla-driver-examples</excludeArtifacts>
                     <autoPublish>${release.autopublish}</autoPublish>
                     <waitUntil>validated</waitUntil>
                 </configuration>
@@ -936,6 +949,51 @@
                                  have the isolated group. -->
                             <includes />
                         </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- Opt-in code coverage. Kept out of the default build on purpose: the JaCoCo agent slows
+             every forked test JVM down, and the existing test lanes must stay able to run without
+             it. Enable with -Pcoverage (see `make ... COVERAGE=true`). -->
+        <profile>
+            <id>coverage</id>
+            <properties>
+                <!-- Every lane writes execution data under a name of its own, so two lanes can
+                     leave their results side by side in one target directory without either
+                     truncating the other. jacoco:report-aggregate scans target/*.exec, so all of
+                     them are read. `make ... COVERAGE=true` names the lane; a bare -Pcoverage
+                     falls back to a generic name. -->
+                <coverage.lane>local</coverage.lane>
+                <jacoco.destFile>${project.build.directory}/jacoco-${coverage.lane}.exec</jacoco.destFile>
+                <!-- The agent is attached only by the modules the aggregate reports on, which
+                     switch this back off for themselves. Everywhere else it would slow every
+                     forked test JVM down to record execution data that jacoco:report-aggregate
+                     never reads: it reads target/*.exec from driver-coverage-report's own
+                     dependencies and nowhere else. -->
+                <jacoco.skip>true</jacoco.skip>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>prepare-agent</id>
+                                <goals>
+                                    <goal>prepare-agent</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Do not use the default 'argLine' property name: the
+                                         surefire argLine already carries
+                                         -Djdk.attach.allowAttachSelf=true, and a dedicated
+                                         property lets us give it an empty default. -->
+                                    <propertyName>jacoco.argline</propertyName>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
