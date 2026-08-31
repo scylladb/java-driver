@@ -3,6 +3,47 @@
 The purpose of this guide is to detail changes made by successive
 versions of the Java driver.
 
+### 3.11.5.19
+
+1.  `ColumnDefinitions` now reports a double-quoted name whose case matches no definition as absent,
+    rather than as present with no indexes. This affects only a name that survives the
+    case-insensitive lookup but matches nothing exactly, for example `"\"in(v)\""` against a
+    definition named `IN(v)`. For such a name:
+
+    * `contains()` returns `false` where it returned `true`;
+    * `getIndexOf()` returns `-1` where it threw `ArrayIndexOutOfBoundsException`;
+    * the name-based getters on `Row`, and the getters and setters on `BoundStatement`, throw
+        `IllegalArgumentException`. A getter previously threw `ArrayIndexOutOfBoundsException`; a
+        setter silently did nothing — leaving the variable unset, which the server then rejected
+        with `Unexpected unset value for bind variable N`;
+    * the object mapper leaves the corresponding property unset instead of failing with
+        `ArrayIndexOutOfBoundsException`. Watch for this if you use `@Column(caseSensitive = true)`
+        with a name whose case does not match the column: the mismatch is now silent, in the
+        same way it already was for an unquoted name that matches nothing.
+
+    An unquoted name that matches no definition already behaved this way; this change makes the
+    quoted form consistent with it.
+
+2.  Identifier case folding now pins `Locale.ROOT`, so it no longer depends on the JVM's default
+    locale. This affects bind-variable names, schema metadata lookups such as
+    `KeyspaceMetadata.getTable()`, the column names the query builder matches against a table's
+    partition key, and the type names the schema builder renders. Previously an unquoted ASCII
+    identifier containing an uppercase `I` was folded with the default locale, so on a
+    Turkish-locale JVM it became the dotless `ı`: `getTable("ID_TABLE")` looked up `ıd_table` and
+    found nothing; a query-builder clause on `ID` no longer matched a partition key named `id`,
+    silently costing the statement its routing key and with it token-aware routing; and
+    `DataType.cint()` rendered itself as `ınt`, so a `CREATE TABLE`, `CREATE TYPE`,
+    `ALTER ... TYPE` or `ADD` clause naming a type that contains an `I` produced CQL the server
+    rejected outright.
+
+    The object mapper is affected in the same way: an explicit `@Table`, `@UDT`, `@Column` or
+    `@Field` name, and every name the built-in `NamingConventions` derive, are now folded with
+    `Locale.ROOT`. A custom `NamingStrategy` is unaffected: the mapper never folded its result, it
+    only passes it to `Metadata.quoteIfNecessary()`, so choosing a locale remains the strategy's own
+    business. Two further consequences were mapper-specific — `@Table(writeConsistency = "serial")`
+    failed to parse as a `ConsistencyLevel`, and the relaxed-setter lookup searched for a method
+    name spelled with a dotted `I` and silently found none, leaving the property without a setter.
+
 ### 3.6.0
 
 1.  `ConsistencyLevel.LOCAL_SERIAL.isDCLocal()` now returns true. In driver

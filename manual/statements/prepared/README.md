@@ -96,18 +96,54 @@ BoundStatement bound = ps2.bind()
   .setString("d", "LCD screen");
 ```
 
-You can use named setters even if the query uses anonymous parameters;
-Cassandra will name the parameters after the column they apply to:
+#### Anonymous markers and server-synthesized names
+
+Named setters also work when the query uses anonymous `?` markers: the
+server synthesizes a name for each one, usually after the column it
+applies to.
 
 ```java
+// Works, but relies on a name the server made up:
 BoundStatement bound = ps1.bind()
   .setString("sku", "324378")
   .setString("description", "LCD screen");
 ```
 
-This can be ambiguous if the query uses the same column multiple times,
-for example: `select * from sales where sku = ? and date > ? and date <
-?`. In these situations, use positional setters or named parameters.
+**Avoid relying on this.** Synthesized names are not part of any API
+contract, and their spelling differs between server release lines, not
+just between successive versions. For
+`SELECT ... WHERE application_id IN ?`, ScyllaDB's 2024.1 releases name
+the marker `in(application_id)`, while 2026.1.8 names it
+`IN(application_id)`; the lowercase spelling is restored in 2026.1.12 and
+2026.2.6. Apache Cassandra names it `in(application_id)`. The regression
+was reported against a driver that matches these names exactly: the
+hardcoded lowercase spelling stopped resolving, the variable went out
+unset, and the server rejected the request with `Unexpected unset value
+for bind variable 1`. This driver is more forgiving, but only on some of
+its lookup paths — see below. The spelling can even vary from node to
+node during a rolling upgrade, because the driver keeps whichever
+metadata the node that served the `PREPARE` sent back.
+
+The rule of thumb: **bind `?` markers positionally, and use named setters
+only for markers you named yourself with `:name`.**
+
+If you address a synthesized name anyway, note that the name setters match
+case-insensitively, so `setList("in(pk)", ...)` still finds a variable the
+server called `IN(pk)` — a change of case alone is survivable. Double
+quoting the name, as in `setList("\"in(pk)\"", ...)`, opts into an exact
+match instead: it does not resolve, and the setter throws
+`IllegalArgumentException` rather than quietly leaving the variable unset.
+Note that the exception comes from the setter — querying the metadata
+directly, with `ps.getVariables().getIndexOf(...)`, reports the same miss
+as `-1`.
+
+Finally, a named setter writes **every** variable that matches the name,
+not just the first one. Names are therefore ambiguous whenever a query
+mentions the same column more than once, for example: `select * from sales
+where sku = ? and date > ? and date < ?`, where both range markers are
+named `date`. Use positional setters in those cases.
+
+#### Unset values
 
 For native protocol V3 or below, all variables must be bound.  With native
 protocol V4 or above, variables can be left unset, in which case they
@@ -127,6 +163,8 @@ bound.unset(1);
 // Named setter:
 bound.unset("description");
 ```
+
+#### Reading and reusing bound statements
 
 A bound statement also has getters to retrieve the values. Note that
 this has a small performance overhead since values are stored in their

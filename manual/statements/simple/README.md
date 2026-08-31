@@ -64,6 +64,14 @@ Instead of sending a raw query string, you can use bind markers and provide valu
         ImmutableMap.<String, Object>of("n", paramName));
     ```
 
+Unlike a prepared statement, a simple statement is not parsed by the driver, so named values are
+resolved by the **coordinator**, not locally: the driver sends the names along with the query and
+does not check them against anything. Name them yourself with `:name` markers, and fill anonymous
+`?` markers positionally. Leaning on the names the server synthesizes for anonymous markers (see
+[prepared statements](../prepared/#anonymous-markers-and-server-synthesized-names)) is an even worse
+idea here than with a prepared statement: nothing on the client side can tell you the name is wrong,
+so the query simply fails on the coordinator.
+
 This syntax has a few advantages:
 
 * if the values already come from some other part of your code, it looks cleaner than doing the concatenation yourself;

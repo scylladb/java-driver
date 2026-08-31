@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -295,7 +296,9 @@ public class Metadata {
       return id;
     }
     if (isAlphanumeric) {
-      return id.toLowerCase();
+      // ROOT, not the default locale: this branch is only reached for ASCII-alphanumeric ids, which
+      // is exactly where a Turkish JVM would fold I to the dotless ı and make the id unmatchable.
+      return id.toLowerCase(Locale.ROOT);
     }
 
     // Check if it's enclosed in quotes. If it is, remove them and unescape internal double quotes

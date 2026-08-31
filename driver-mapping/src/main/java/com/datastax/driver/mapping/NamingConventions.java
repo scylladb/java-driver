@@ -19,9 +19,17 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
-/** Implementations of industry common naming conventions. */
+/**
+ * Implementations of industry common naming conventions.
+ *
+ * <p>Every case fold below pins {@link Locale#ROOT} rather than using the JVM default locale. The
+ * result becomes a CQL identifier (see {@code DefaultPropertyMapper#getMappedName}), so under a
+ * Turkish default locale a property named {@code id} would map to a column spelled with a dotless
+ * {@code ı} or a dotted {@code İ}, and every lookup for {@code id} would miss.
+ */
 public class NamingConventions {
 
   /**
@@ -142,13 +150,13 @@ public class NamingConventions {
         Word word = input.get(i);
         String value;
         if (i == 0) {
-          value = word.getValue().toLowerCase();
+          value = word.getValue().toLowerCase(Locale.ROOT);
         } else if (upperCaseAbbreviations && word.isAbbreviation()) {
-          value = word.getValue().toUpperCase();
+          value = word.getValue().toUpperCase(Locale.ROOT);
         } else {
           value =
-              word.getValue().substring(0, 1).toUpperCase()
-                  + word.getValue().substring(1).toLowerCase();
+              word.getValue().substring(0, 1).toUpperCase(Locale.ROOT)
+                  + word.getValue().substring(1).toLowerCase(Locale.ROOT);
         }
         builder.append(value);
       }
@@ -213,11 +221,11 @@ public class NamingConventions {
       for (Word word : input) {
         String value;
         if (upperCaseAbbreviations && word.isAbbreviation()) {
-          value = word.getValue().toUpperCase();
+          value = word.getValue().toUpperCase(Locale.ROOT);
         } else {
           value =
-              word.getValue().substring(0, 1).toUpperCase()
-                  + word.getValue().substring(1).toLowerCase();
+              word.getValue().substring(0, 1).toUpperCase(Locale.ROOT)
+                  + word.getValue().substring(1).toLowerCase(Locale.ROOT);
         }
         builder.append(value);
       }
@@ -303,7 +311,7 @@ public class NamingConventions {
         builder.append(input.get(i).getValue());
       }
       String result = builder.toString();
-      return isUpperCase ? result.toUpperCase() : result.toLowerCase();
+      return isUpperCase ? result.toUpperCase(Locale.ROOT) : result.toLowerCase(Locale.ROOT);
     }
   }
 
@@ -329,7 +337,7 @@ public class NamingConventions {
         builder.append(word.getValue());
       }
       String result = builder.toString();
-      return isUpperCase ? result.toUpperCase() : result.toLowerCase();
+      return isUpperCase ? result.toUpperCase(Locale.ROOT) : result.toLowerCase(Locale.ROOT);
     }
   }
 }

@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -78,17 +79,23 @@ class AnnotationParser {
               entityClass));
     }
 
+    // ROOT, not the default locale: this name is handed to the schema metadata lookup below, so
+    // @Table(name = "ID_TABLE") would fold to a dotless id_table in a Turkish JVM and never match.
     String tableName =
-        table.caseSensitiveTable() ? Metadata.quote(table.name()) : table.name().toLowerCase();
+        table.caseSensitiveTable()
+            ? Metadata.quote(table.name())
+            : table.name().toLowerCase(Locale.ROOT);
 
+    // ROOT, not the default locale: a Turkish JVM upper-cases "serial" to SERIAL with a dotted I,
+    // which is not a ConsistencyLevel constant, so valueOf would throw.
     ConsistencyLevel writeConsistency =
         table.writeConsistency().isEmpty()
             ? null
-            : ConsistencyLevel.valueOf(table.writeConsistency().toUpperCase());
+            : ConsistencyLevel.valueOf(table.writeConsistency().toUpperCase(Locale.ROOT));
     ConsistencyLevel readConsistency =
         table.readConsistency().isEmpty()
             ? null
-            : ConsistencyLevel.valueOf(table.readConsistency().toUpperCase());
+            : ConsistencyLevel.valueOf(table.readConsistency().toUpperCase(Locale.ROOT));
 
     KeyspaceMetadata keyspaceMetadata =
         mappingManager.getSession().getCluster().getMetadata().getKeyspace(keyspaceName);
@@ -178,8 +185,10 @@ class AnnotationParser {
               udtClass));
     }
 
+    // ROOT, not the default locale: keyspaceMetadata.getUserType below matches on this name, so
+    // @UDT(name = "ID_TYPE") would fold to a dotless id_type in a Turkish JVM and never resolve.
     String udtName =
-        udt.caseSensitiveType() ? Metadata.quote(udt.name()) : udt.name().toLowerCase();
+        udt.caseSensitiveType() ? Metadata.quote(udt.name()) : udt.name().toLowerCase(Locale.ROOT);
 
     KeyspaceMetadata keyspaceMetadata =
         mappingManager.getSession().getCluster().getMetadata().getKeyspace(keyspaceName);
@@ -277,7 +286,7 @@ class AnnotationParser {
         cl =
             options.consistency().isEmpty()
                 ? null
-                : ConsistencyLevel.valueOf(options.consistency().toUpperCase());
+                : ConsistencyLevel.valueOf(options.consistency().toUpperCase(Locale.ROOT));
         fetchSize = options.fetchSize();
         tracing = options.tracing();
         if (options.idempotent().length > 1) {
