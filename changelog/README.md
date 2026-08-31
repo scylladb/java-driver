@@ -23,6 +23,7 @@ under the License.
 
 ### 4.19.2.2
 
+- [improvement] Remove unused DSE metadata and query-builder extensions (#1031)
 - [breaking] Remove DSE Graph execution support and TinkerPop integration; deprecated Graph API
   shells and legacy configuration remain temporarily for migration (#1028)
 
