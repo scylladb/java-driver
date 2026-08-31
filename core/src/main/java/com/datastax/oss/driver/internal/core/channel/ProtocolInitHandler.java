@@ -33,6 +33,7 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ConnectionInitException;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
 import com.datastax.oss.driver.internal.core.context.DriverConfigReporter.TlsInfo;
@@ -44,6 +45,10 @@ import com.datastax.oss.driver.internal.core.protocol.FrameToSegmentEncoder;
 import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
+import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
+import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
+import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.util.ProtocolUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.protocol.internal.Message;
@@ -63,6 +68,7 @@ import com.datastax.oss.protocol.internal.response.Ready;
 import com.datastax.oss.protocol.internal.response.Supported;
 import com.datastax.oss.protocol.internal.response.result.Rows;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
@@ -94,6 +100,8 @@ class ProtocolInitHandler extends ConnectInitHandler {
   private final String expectedClusterName;
   private final EndPoint endPoint;
   private final HeartbeatHandler heartbeatHandler;
+  @Nullable private final SslHandler installedSslHandler;
+  private final boolean installedSslHandlerHasKnownHostnameVerificationSemantics;
   private String logPrefix;
   private ChannelHandlerContext ctx;
   private final boolean querySupportedOptions;
@@ -112,6 +120,28 @@ class ProtocolInitHandler extends ConnectInitHandler {
       DriverChannelOptions options,
       HeartbeatHandler heartbeatHandler,
       boolean querySupportedOptions) {
+    this(
+        context,
+        protocolVersion,
+        expectedClusterName,
+        endPoint,
+        options,
+        heartbeatHandler,
+        querySupportedOptions,
+        null,
+        false);
+  }
+
+  ProtocolInitHandler(
+      InternalDriverContext context,
+      ProtocolVersion protocolVersion,
+      String expectedClusterName,
+      EndPoint endPoint,
+      DriverChannelOptions options,
+      HeartbeatHandler heartbeatHandler,
+      boolean querySupportedOptions,
+      @Nullable SslHandler installedSslHandler,
+      boolean installedSslHandlerHasKnownHostnameVerificationSemantics) {
 
     this.context = context;
     this.endPoint = endPoint;
@@ -125,6 +155,9 @@ class ProtocolInitHandler extends ConnectInitHandler {
     this.options = options;
     this.heartbeatHandler = heartbeatHandler;
     this.querySupportedOptions = querySupportedOptions;
+    this.installedSslHandler = installedSslHandler;
+    this.installedSslHandlerHasKnownHostnameVerificationSemantics =
+        installedSslHandlerHasKnownHostnameVerificationSemantics;
     this.logPrefix = options.ownerLogPrefix + "|connecting...";
   }
 
@@ -220,7 +253,8 @@ class ProtocolInitHandler extends ConnectInitHandler {
 
     private TlsInfo currentTlsInfo() {
       try {
-        return tlsInfo(channel);
+        return tlsInfo(
+            channel, installedSslHandler, installedSslHandlerHasKnownHostnameVerificationSemantics);
       } catch (RuntimeException e) {
         // Configuration reporting is best-effort and must never prevent a connection. TLS presence
         // is still assumed because the failure came while inspecting its handler, but the schema
@@ -436,7 +470,10 @@ class ProtocolInitHandler extends ConnectInitHandler {
     }
   }
 
-  static TlsInfo tlsInfo(Channel channel) {
+  static TlsInfo tlsInfo(
+      Channel channel,
+      @Nullable SslHandler installedSslHandler,
+      boolean installedSslHandlerHasKnownHostnameVerificationSemantics) {
     // SslHandlerFactory always returns SslHandler, and this reads the pipeline after
     // NettyOptions.afterChannelInitialized() has had a chance to add, replace, remove, or
     // reconfigure it. A hook that implements encryption with a handler unrelated to SslHandler
@@ -445,10 +482,30 @@ class ProtocolInitHandler extends ConnectInitHandler {
     if (sslHandler == null) {
       return TlsInfo.disabled();
     }
+    // Endpoint-identification parameters are authoritative only for the exact handler installed
+    // from a recognized driver factory. A replacement handler or custom trust manager may ignore
+    // those parameters, so either true or false would be a guess.
+    if (sslHandler != installedSslHandler
+        || !installedSslHandlerHasKnownHostnameVerificationSemantics) {
+      return TlsInfo.enabledWithUnknownHostnameVerification();
+    }
     String endpointIdentificationAlgorithm =
         sslHandler.engine().getSSLParameters().getEndpointIdentificationAlgorithm();
     return TlsInfo.enabled(
         endpointIdentificationAlgorithm != null && !endpointIdentificationAlgorithm.isEmpty());
+  }
+
+  static boolean hasKnownHostnameVerificationSemantics(SslHandlerFactory handlerFactory) {
+    // Exact class deliberately: a subclass can override newSslHandler() and ignore the wrapped
+    // engine factory.
+    if (handlerFactory.getClass() != JdkSslHandlerFactory.class) {
+      return false;
+    }
+    SslEngineFactory engineFactory = ((JdkSslHandlerFactory) handlerFactory).getSslEngineFactory();
+    // ProgrammaticSslEngineFactory is deliberately not recognized: its arbitrary SSLContext can
+    // contain an X509ExtendedTrustManager that ignores endpoint-identification parameters.
+    return engineFactory.getClass() == DefaultSslEngineFactory.class
+        || engineFactory.getClass() == SniSslEngineFactory.class;
   }
 
   /**

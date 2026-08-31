@@ -38,7 +38,10 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ConnectionInitException;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.ssl.ProgrammaticSslEngineFactory;
+import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.internal.core.DefaultProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.TestResponses;
@@ -48,6 +51,9 @@ import com.datastax.oss.driver.internal.core.context.DriverConfigReporter.TlsInf
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
+import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
+import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.Frame;
@@ -213,25 +219,89 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   }
 
   @Test
-  public void should_read_tls_from_the_replacement_ssl_engine() throws Exception {
+  public void should_preserve_unknown_hostname_verification_for_replacement_ssl_engine()
+      throws Exception {
     EmbeddedChannel sslChannel = new EmbeddedChannel();
     try {
-      sslChannel
-          .pipeline()
-          .addLast(ChannelFactory.SSL_HANDLER_NAME, sslHandler(/* hostnameVerification= */ true));
+      SslHandler installedSslHandler = sslHandler(/* hostnameVerification= */ false);
+      sslChannel.pipeline().addLast(ChannelFactory.SSL_HANDLER_NAME, installedSslHandler);
       sslChannel
           .pipeline()
           .replace(
               ChannelFactory.SSL_HANDLER_NAME,
               ChannelFactory.SSL_HANDLER_NAME,
-              sslHandler(/* hostnameVerification= */ false));
+              sslHandler(/* hostnameVerification= */ true));
 
-      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel);
+      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel, installedSslHandler, true);
       assertThat(tlsInfo.isEnabled()).isTrue();
-      assertThat(tlsInfo.getHostnameVerification()).contains(false);
+      assertThat(tlsInfo.getHostnameVerification()).isEmpty();
     } finally {
       sslChannel.finishAndReleaseAll();
     }
+  }
+
+  @Test
+  public void should_report_hostname_verification_for_recognized_installed_ssl_engine()
+      throws Exception {
+    EmbeddedChannel sslChannel = new EmbeddedChannel();
+    try {
+      SslHandler installedSslHandler = sslHandler(/* hostnameVerification= */ true);
+      sslChannel.pipeline().addLast(ChannelFactory.SSL_HANDLER_NAME, installedSslHandler);
+
+      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel, installedSslHandler, true);
+      assertThat(tlsInfo.isEnabled()).isTrue();
+      assertThat(tlsInfo.getHostnameVerification()).contains(true);
+    } finally {
+      sslChannel.finishAndReleaseAll();
+    }
+  }
+
+  @Test
+  public void should_preserve_unknown_hostname_verification_for_custom_engine_factory()
+      throws Exception {
+    EmbeddedChannel sslChannel = new EmbeddedChannel();
+    try {
+      SslHandler installedSslHandler = sslHandler(/* hostnameVerification= */ true);
+      sslChannel.pipeline().addLast(ChannelFactory.SSL_HANDLER_NAME, installedSslHandler);
+
+      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel, installedSslHandler, false);
+      assertThat(tlsInfo.isEnabled()).isTrue();
+      assertThat(tlsInfo.getHostnameVerification()).isEmpty();
+    } finally {
+      sslChannel.finishAndReleaseAll();
+    }
+  }
+
+  @Test
+  public void should_recognize_only_driver_owned_jdk_ssl_factories() throws Exception {
+    DriverContext driverContext = mock(DriverContext.class);
+    DriverConfig driverConfig = mock(DriverConfig.class);
+    DriverExecutionProfile profile = mock(DriverExecutionProfile.class);
+    when(driverContext.getConfig()).thenReturn(driverConfig);
+    when(driverConfig.getDefaultProfile()).thenReturn(profile);
+
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                new JdkSslHandlerFactory(new DefaultSslEngineFactory(driverContext))))
+        .isTrue();
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                new JdkSslHandlerFactory(mock(SslEngineFactory.class))))
+        .isFalse();
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                mock(SslHandlerFactory.class)))
+        .isFalse();
+  }
+
+  @Test
+  public void should_not_assume_programmatic_ssl_context_has_known_hostname_validator()
+      throws Exception {
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                new JdkSslHandlerFactory(
+                    new ProgrammaticSslEngineFactory(SSLContext.getDefault()))))
+        .isFalse();
   }
 
   private static SslHandler sslHandler(boolean hostnameVerification) throws Exception {

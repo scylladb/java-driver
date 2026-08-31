@@ -44,6 +44,7 @@ import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
@@ -54,6 +55,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.ssl.SslHandler;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -424,14 +426,27 @@ public class ChannelFactory {
                 options.eventCallback,
                 options.ownerLogPrefix);
         HeartbeatHandler heartbeatHandler = new HeartbeatHandler(defaultConfig);
+        Optional<SslHandlerFactory> sslHandlerFactory = context.getSslHandlerFactory();
+        SslHandler installedSslHandler =
+            sslHandlerFactory.map(f -> f.newSslHandler(channel, endPoint)).orElse(null);
         ProtocolInitHandler initHandler =
             new ProtocolInitHandler(
-                context, protocolVersion, clusterName, endPoint, options, heartbeatHandler, true);
+                context,
+                protocolVersion,
+                clusterName,
+                endPoint,
+                options,
+                heartbeatHandler,
+                true,
+                installedSslHandler,
+                sslHandlerFactory
+                    .map(ProtocolInitHandler::hasKnownHostnameVerificationSemantics)
+                    .orElse(false));
 
         ChannelPipeline pipeline = channel.pipeline();
-        context
-            .getSslHandlerFactory()
-            .ifPresent(f -> pipeline.addLast(SSL_HANDLER_NAME, f.newSslHandler(channel, endPoint)));
+        if (installedSslHandler != null) {
+          pipeline.addLast(SSL_HANDLER_NAME, installedSslHandler);
+        }
 
         // Only add meter handlers on the pipeline if metrics are enabled.
         SessionMetricUpdater sessionMetricUpdater = context.getMetricsFactory().getSessionUpdater();
