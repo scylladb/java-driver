@@ -1,12 +1,18 @@
 # Scylla Java Driver for Scylla and Apache Cassandra®
 
+> **Deprecation Notice:** Scylla Java Driver 3.x is now **deprecated** and has
+> entered **maintenance mode**. Only critical bug fixes will be accepted.
+> For new projects and active development, please migrate to
+> [Scylla Java Driver 4.x](https://github.com/scylladb/java-driver/tree/scylla-4.x)
+> ([documentation](https://java-driver.docs.scylladb.com/stable/)).
+
 *If you're reading this on github.com, please note that this is the readme
 for the development version and that some features described here might
 not yet have been released. You can find the documentation for the latest
 version through the [Java driver
 docs](https://docs.scylladb.com/using-scylla/scylla-java-driver/) or via the release tags,
 [e.g.
-3.11.5.0](https://github.com/scylladb/java-driver/releases/tag/3.11.5.0).*
+3.11.5.17](https://github.com/scylladb/java-driver/releases/tag/3.11.5.17).*
 
 A modern, [feature-rich](manual/) and highly tunable Java client
 library for Apache Cassandra (2.1+) and using exclusively Cassandra's binary protocol 
@@ -73,7 +79,7 @@ it in your application using the following Maven dependency
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-core</artifactId>
-  <version>3.11.5.0</version>
+  <version>3.11.5.17</version>
 </dependency>
 ```
 
@@ -83,7 +89,7 @@ Note that the object mapper is published as a separate artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-mapping</artifactId>
-  <version>3.11.5.0</version>
+  <version>3.11.5.17</version>
 </dependency>
 ```
 
@@ -93,7 +99,7 @@ The 'extras' module is also published as a separate artifact:
 <dependency>
   <groupId>com.scylladb</groupId>
   <artifactId>scylla-driver-extras</artifactId>
-  <version>3.11.5.0</version>
+  <version>3.11.5.17</version>
 </dependency>
 ```
 
@@ -107,7 +113,7 @@ by running `dnf -y install libxcrypt-compat`
 
 ## Compatibility
 
-The Java client driver 3.11.5.0 ([branch scylla-3.x](https://github.com/scylladb/java-driver/tree/scylla-3.x)) is compatible with 
+The Java client driver 3.11.5.17 ([branch scylla-3.x](https://github.com/scylladb/java-driver/tree/scylla-3.x)) is compatible with 
 Scylla and Apache Cassandra 2.1, 2.2, 3.0+.
 
 UDT and tuple support is available only when using Apache Cassandra 2.1 or higher.
