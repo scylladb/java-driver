@@ -34,8 +34,8 @@ public class VersionAssert extends AbstractComparableAssert<VersionAssert, Versi
     return this;
   }
 
-  public VersionAssert hasDsePatch(int dsePatch) {
-    assertThat(actual.getDSEPatch()).isEqualTo(dsePatch);
+  public VersionAssert hasRevision(int revision) {
+    assertThat(actual.getRevision()).isEqualTo(revision);
     return this;
   }
 

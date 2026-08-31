@@ -90,7 +90,6 @@ public class QueryTraceIT {
     InetAddress nodeAddress = ((InetSocketAddress) contactPoint.resolve()).getAddress();
     boolean expectPorts =
         CCM_RULE.getCassandraVersion().nextStable().compareTo(Version.V4_0_0) >= 0
-            && !CCM_RULE.isDistributionOf(BackendType.DSE)
             && !CCM_RULE.isDistributionOf(BackendType.SCYLLA);
 
     QueryTrace queryTrace = executionInfo.getQueryTrace();

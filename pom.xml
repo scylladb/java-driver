@@ -59,19 +59,11 @@
     <hdrhistogram.version>2.2.2</hdrhistogram.version>
     <metrics.version>4.2.38</metrics.version>
     <netty.version>4.1.136.Final</netty.version>
-    <esri.version>1.2.1</esri.version>
-    <!--
-    When upgrading TinkerPop please upgrade the version matrix in
-    manual/core/integration/README.md
-    -->
-    <tinkerpop.version>3.5.6</tinkerpop.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <slf4j.version>2.0.18</slf4j.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <reactive-streams.version>1.0.4</reactive-streams.version>
-    <json.version>20250517</json.version>
     <jackson.version>2.22.1</jackson.version>
-    <legacy-jackson.version>1.9.12</legacy-jackson.version>
     <!-- optional dependencies -->
     <snappy.version>1.1.10.8</snappy.version>
     <lz4.version>1.11.1</lz4.version>
@@ -93,7 +85,6 @@
     <rxjava.version>2.2.21</rxjava.version>
     <awaitility.version>4.3.0</awaitility.version>
     <json-schema-validator.version>1.5.9</json-schema-validator.version>
-    <apacheds.version>2.0.0-M19</apacheds.version>
     <surefire.version>3.5.5</surefire.version>
     <graalapi.version>22.0.0.2</graalapi.version>
     <skipTests>false</skipTests>
@@ -232,44 +223,6 @@
         <groupId>org.hdrhistogram</groupId>
         <artifactId>HdrHistogram</artifactId>
         <version>${hdrhistogram.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.esri.geometry</groupId>
-        <artifactId>esri-geometry-api</artifactId>
-        <version>${esri.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
-        <version>${json.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tinkerpop</groupId>
-        <artifactId>gremlin-core</artifactId>
-        <version>${tinkerpop.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.carrotsearch</groupId>
-            <artifactId>hppc</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.jcabi</groupId>
-            <artifactId>*</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>net.objecthunter</groupId>
-            <artifactId>exp4j</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.tinkerpop</groupId>
-        <artifactId>tinkergraph-gremlin</artifactId>
-        <version>${tinkerpop.version}</version>
       </dependency>
       <dependency>
         <groupId>org.reactivestreams</groupId>
@@ -445,47 +398,6 @@
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
         <version>7.12.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.directory.server</groupId>
-        <artifactId>apacheds-core</artifactId>
-        <version>${apacheds.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.directory.server</groupId>
-        <artifactId>apacheds-protocol-kerberos</artifactId>
-        <version>${apacheds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.directory.server</groupId>
-        <artifactId>apacheds-interceptor-kerberos</artifactId>
-        <version>${apacheds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.directory.server</groupId>
-        <artifactId>apacheds-protocol-ldap</artifactId>
-        <version>${apacheds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.directory.server</groupId>
-        <artifactId>apacheds-ldif-partition</artifactId>
-        <version>${apacheds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.directory.server</groupId>
-        <artifactId>apacheds-jdbm-partition</artifactId>
-        <version>${apacheds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.directory.api</groupId>
-        <artifactId>api-ldap-codec-standalone</artifactId>
-        <version>2.1.7</version>
       </dependency>
       <dependency>
         <groupId>com.github.tomakehurst</groupId>
@@ -892,6 +804,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <!-- API types do not leak internal types -->
                 <additionalparam>-preventleak</additionalparam>
                 <additionalparam>com.datastax.oss.driver.internal</additionalparam>
+                <!-- All remaining classes under this prefix implement generic reactive APIs. -->
                 <additionalparam>com.datastax.dse.driver.internal</additionalparam>
                 <!-- Shaded dependencies (Guava, Netty, etc.) -->
                 <additionalparam>-preventleak</additionalparam>

@@ -94,21 +94,6 @@ public class CustomCcmRule extends BaseCcmRule {
       return this;
     }
 
-    public Builder withDseConfiguration(String key, Object value) {
-      bridgeBuilder.withDseConfiguration(key, value);
-      return this;
-    }
-
-    public Builder withDseConfiguration(String rawYaml) {
-      bridgeBuilder.withDseConfiguration(rawYaml);
-      return this;
-    }
-
-    public Builder withDseWorkloads(String... workloads) {
-      bridgeBuilder.withDseWorkloads(workloads);
-      return this;
-    }
-
     public Builder withJvmArgs(String... jvmArgs) {
       bridgeBuilder.withJvmArgs(jvmArgs);
       return this;

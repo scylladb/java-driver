@@ -27,7 +27,6 @@ import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfigLoader;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import com.typesafe.config.ConfigFactory;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.After;
@@ -236,25 +235,6 @@ public class ClientRoutesConfigFromFileTest {
                 + ".PassThroughAddressTranslator");
 
     assertThat(ctx.getTopologyMonitor()).isInstanceOf(ClientRoutesTopologyMonitor.class);
-  }
-
-  @Test
-  public void should_throw_when_secure_connect_bundle_and_client_routes_both_configured() {
-    ProgrammaticArguments args =
-        ProgrammaticArguments.builder()
-            .withCloudProxyAddress(new InetSocketAddress("127.0.0.1", 9042))
-            .build();
-    DefaultDriverContext ctx =
-        contextFromHocon(
-            "advanced.client-routes.endpoints = ["
-                + "  { connection-id = \"11111111-1111-1111-1111-111111111111\" }"
-                + "]",
-            args);
-
-    assertThatThrownBy(ctx::getTopologyMonitor)
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("secure connect bundle")
-        .hasMessageContaining("client routes");
   }
 
   @Test

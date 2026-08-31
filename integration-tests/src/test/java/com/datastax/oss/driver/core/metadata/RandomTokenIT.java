@@ -40,7 +40,6 @@ import org.junit.rules.TestRule;
 
 @ScyllaSkip(description = "scylladb/java-driver#568 - fails to start scylla")
 @BackendRequirement(type = BackendType.CASSANDRA)
-@BackendRequirement(type = BackendType.DSE)
 public class RandomTokenIT extends TokenITBase {
 
   private static final CustomCcmRule CCM_RULE =

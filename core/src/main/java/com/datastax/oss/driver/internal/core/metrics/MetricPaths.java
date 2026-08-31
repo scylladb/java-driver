@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.metrics;
 
-import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
-import com.datastax.dse.driver.api.core.metrics.DseSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.NodeMetric;
@@ -40,11 +38,7 @@ public class MetricPaths {
       try {
         result.add(DefaultSessionMetric.fromPath(path));
       } catch (IllegalArgumentException e) {
-        try {
-          result.add(DseSessionMetric.fromPath(path));
-        } catch (IllegalArgumentException e1) {
-          LOG.warn("[{}] Unknown session metric {}, skipping", logPrefix, path);
-        }
+        LOG.warn("[{}] Unknown session metric {}, skipping", logPrefix, path);
       }
     }
     return Collections.unmodifiableSet(result);
@@ -56,11 +50,7 @@ public class MetricPaths {
       try {
         result.add(DefaultNodeMetric.fromPath(path));
       } catch (IllegalArgumentException e) {
-        try {
-          result.add(DseNodeMetric.fromPath(path));
-        } catch (IllegalArgumentException e1) {
-          LOG.warn("[{}] Unknown node metric {}, skipping", logPrefix, path);
-        }
+        LOG.warn("[{}] Unknown node metric {}, skipping", logPrefix, path);
       }
     }
     return Collections.unmodifiableSet(result);

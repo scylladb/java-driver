@@ -129,7 +129,7 @@ public class DefaultKeyspaceIT {
               mapper.productDaoDefaultKsNotSet();
             })
         .isInstanceOf(InvalidQueryException.class);
-    // don't check the error message, as it's not consistent across Cassandra/DSE versions
+    // Don't check the error message because it varies across server versions.
   }
 
   @Test

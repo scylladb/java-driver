@@ -43,11 +43,6 @@ import org.junit.rules.TestRule;
 
 @Category(ParallelizableTests.class)
 @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-// Use next version -- not sure if it will be in by then, but as a reminder to check
-@BackendRequirement(
-    type = BackendType.DSE,
-    minInclusive = "7.0",
-    description = "Feature not available in DSE yet")
 @ScyllaSkip(description = "scylladb/java-driver#573 - to be enabled")
 public class NowInSecondsIT {
 

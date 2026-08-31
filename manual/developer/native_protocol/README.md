@@ -84,8 +84,7 @@ creating a message instance.
 
 The code makes very few assumptions about how the messages will be used. Data is often represented
 in the most simple way. For example, `ProtocolConstants` uses simple integer constants to represent
-protocol codes (enums wouldn't work at that level, because we need to add new codes in the DSE
-driver); the driver generally rewraps them in more type-safe structures before exposing them to
+protocol codes; the driver generally rewraps them in more type-safe structures before exposing them to
 higher-level layers.
 
 #### Encoding/decoding

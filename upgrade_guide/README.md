@@ -19,6 +19,19 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.2
+
+#### DataStax-only APIs removed
+
+This release removes the untested Astra, Insights, and DSE feature surface. Applications should use
+`CqlSession`, `DriverConfigLoader`, `DefaultDriverOption`, and the standard load-balancing and
+authentication implementations directly. DSE protocol versions, continuous paging, Graph,
+geometry/DateRange types, metadata extensions, and query-builder extensions are no longer present.
+
+Reactive CQL and mapper APIs are retained. Their public types remain under the historical
+`com.datastax.dse` namespace for compatibility, but they are generic and supported with Cassandra
+and Scylla.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time
@@ -510,37 +523,6 @@ token map for these keyspaces, you now must modify the following configuration o
 [Metadata.getKeyspaces()]: https://docs.datastax.com/en/drivers/java/4.11/com/datastax/oss/driver/api/core/metadata/Metadata.html#getKeyspaces--
 [TokenMap]: https://docs.datastax.com/en/drivers/java/4.11/com/datastax/oss/driver/api/core/metadata/TokenMap.html
 
-#### DSE Graph dependencies are now optional
-
-Until driver 4.9.0, the driver declared a mandatory dependency to Apache TinkerPop, a library
-required only when connecting to DSE Graph. The vast majority of Apache Cassandra users did not need
-that library, but were paying the price of having that heavy-weight library in their application's
-classpath. 
-
-_Starting with driver 4.10.0, TinkerPop is now considered an optional dependency_. 
-
-Regular users of Apache Cassandra that do not use DSE Graph will not notice any disruption.
-
-DSE Graph users, however, will now have to explicitly declare a dependency to Apache TinkerPop. This
-can be achieved with Maven by adding the following dependencies to the `<dependencies>` section of
-your POM file:
-
-```xml
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>gremlin-core</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>tinkergraph-gremlin</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-```
-
-See the [integration](../manual/core/integration/#tinker-pop) section in the manual for more details
-as well as a driver vs. TinkerPop version compatibility matrix.
-
 ### 4.5.x - 4.6.0
 
 These versions are subject to [JAVA-2676](https://datastax-oss.atlassian.net/browse/JAVA-2676), a
@@ -557,13 +539,9 @@ separate DSE driver.
 The great news is that [reactive execution](../manual/core/reactive/) is now available for everyone.
 See the `CqlSession.executeReactive` methods.
 
-Apart from that, the only visible change is that DSE-specific features are now exposed in the API: 
-
-* new execution methods: `CqlSession.executeGraph`, `CqlSession.executeContinuously*`. They all
-  have default implementations so this doesn't break binary compatibility. You can just ignore them.
-* new driver dependencies: TinkerPop, ESRI, Reactive Streams. If you want to keep your classpath
-  lean, you can exclude some dependencies when you don't use the corresponding DSE features; see the 
-  [Integration>Driver dependencies](../manual/core/integration/#driver-dependencies) section.
+The main visible change is the Reactive Streams dependency. If you want to keep your classpath
+lean, you can exclude it when you don't use reactive execution; see the
+[Integration>Driver dependencies](../manual/core/integration/#driver-dependencies) section.
 
 #### For DataStax Enterprise users
 

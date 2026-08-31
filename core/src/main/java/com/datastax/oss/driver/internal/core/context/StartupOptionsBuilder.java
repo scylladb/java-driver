@@ -17,7 +17,7 @@
  */
 package com.datastax.oss.driver.internal.core.context;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
@@ -115,7 +115,7 @@ public class StartupOptionsBuilder {
     builder.put(DRIVER_NAME_KEY, getDriverName()).put(DRIVER_VERSION_KEY, getDriverVersion());
 
     // Identifier of this session, sent on every connection so the server can group them. Not
-    // derived from the (user-settable, Insights-oriented) CLIENT_ID below, so that it is guaranteed
+    // derived from the user-settable CLIENT_ID below, so that it is guaranteed
     // unique per session as the grouping key requires. Generated lazily here rather than eagerly in
     // a field initializer, mirroring clientId; DefaultDriverContext builds the startup options
     // exactly once per session (LazyReference), which is what makes the value stable across all of
@@ -125,19 +125,19 @@ public class StartupOptionsBuilder {
     }
     builder.put(SESSION_ID_KEY, sessionId.toString());
 
-    // Add Insights entries, falling back to generation / config if no programmatic values provided:
+    // Add client and application metadata, falling back to configuration when needed:
     if (clientId == null) {
       clientId = Uuids.random();
     }
     builder.put(CLIENT_ID_KEY, clientId.toString());
     if (applicationName == null) {
-      applicationName = config.getString(DseDriverOption.APPLICATION_NAME, null);
+      applicationName = config.getString(DefaultDriverOption.APPLICATION_NAME, null);
     }
     if (applicationName != null) {
       builder.put(APPLICATION_NAME_KEY, applicationName);
     }
     if (applicationVersion == null) {
-      applicationVersion = config.getString(DseDriverOption.APPLICATION_VERSION, null);
+      applicationVersion = config.getString(DefaultDriverOption.APPLICATION_VERSION, null);
     }
     if (applicationVersion != null) {
       builder.put(APPLICATION_VERSION_KEY, applicationVersion);

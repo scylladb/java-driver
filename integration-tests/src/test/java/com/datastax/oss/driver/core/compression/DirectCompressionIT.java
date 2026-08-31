@@ -77,8 +77,7 @@ public class DirectCompressionIT {
     Assume.assumeTrue(
         "Snappy is not supported in OSS C* 4.0+ with protocol v5",
         !CCM_RULE.isDistributionOf(BackendType.HCD)
-            && (CCM_RULE.isDistributionOf(BackendType.DSE)
-                || CCM_RULE.getCassandraVersion().nextStable().compareTo(Version.V4_0_0) < 0));
+            && CCM_RULE.getCassandraVersion().nextStable().compareTo(Version.V4_0_0) < 0);
     createAndCheckCluster("snappy");
   }
 

@@ -55,7 +55,7 @@ public class InsertReactiveIT extends InventoryITBase {
 
   @ClassRule public static TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
 
-  private static DseProductDao dao;
+  private static ProductDao dao;
 
   @BeforeClass
   public static void setup() {
@@ -66,9 +66,8 @@ public class InsertReactiveIT extends InventoryITBase {
           SimpleStatement.builder(query).setExecutionProfile(sessionRule.slowProfile()).build());
     }
 
-    DseInventoryMapper dseInventoryMapper =
-        new InsertReactiveIT_DseInventoryMapperBuilder(session).build();
-    dao = dseInventoryMapper.productDao(sessionRule.keyspace());
+    InventoryMapper inventoryMapper = new InsertReactiveIT_InventoryMapperBuilder(session).build();
+    dao = inventoryMapper.productDao(sessionRule.keyspace());
   }
 
   @Before
@@ -116,15 +115,15 @@ public class InsertReactiveIT extends InventoryITBase {
   }
 
   @Mapper
-  public interface DseInventoryMapper {
+  public interface InventoryMapper {
 
     @DaoFactory
-    DseProductDao productDao(@DaoKeyspace CqlIdentifier keyspace);
+    ProductDao productDao(@DaoKeyspace CqlIdentifier keyspace);
   }
 
   @Dao
   @DefaultNullSavingStrategy(NullSavingStrategy.SET_TO_NULL)
-  public interface DseProductDao {
+  public interface ProductDao {
 
     @Insert
     ReactiveResultSet saveReactive(Product product);

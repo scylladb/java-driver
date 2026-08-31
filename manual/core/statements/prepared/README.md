@@ -29,7 +29,7 @@ queries that are used often.
   statements.
 * the session has a built-in cache, it's OK to prepare the same string twice.
 * values: `?` or `:name`, fill with `setXxx(int, ...)` or `setXxx(String, ...)` respectively.
-* some values can be left unset with Cassandra 2.2+ / DSE 5+.   
+* some values can be left unset with Cassandra 2.2+ and Scylla.
 * built-in implementation is **immutable**. Setters always return a new object, don't ignore the
   result.
 
@@ -254,7 +254,7 @@ those markers positionally, or name them apart yourself — `... and date > :fro
 #### Unset values
 
 With [native protocol](../../native_protocol/) V3, all variables must be bound. With native protocol
-V4 (Cassandra 2.2 / DSE 5) or above, variables can be left unset, in which case they will be ignored
+V4 (Cassandra 2.2) or above, variables can be left unset, in which case they will be ignored
 (no tombstones will be generated). If you're reusing a bound statement, you can use the `unset`
 method to unset variables that were previously set:
 

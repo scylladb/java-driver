@@ -62,8 +62,8 @@ public class Version implements Comparable<Version>, Serializable {
   private final int major;
   private final int minor;
   private final int patch;
+  // Keep the legacy name to preserve the serialized form used by previous driver releases.
   private final int dsePatch;
-
   private final String[] preReleases;
   private final String build;
 
@@ -112,12 +112,11 @@ public class Version implements Comparable<Version>, Serializable {
               : Integer.parseInt(
                   pa.substring(1)); // dropping the initial '.' since it's included this time
 
-      String dse = matcher.group(4);
-      int dsePatch =
-          dse == null || dse.isEmpty()
+      String revisionGroup = matcher.group(4);
+      int revision =
+          revisionGroup == null || revisionGroup.isEmpty()
               ? -1
-              : Integer.parseInt(
-                  dse.substring(1)); // dropping the initial '.' since it's included this time
+              : Integer.parseInt(revisionGroup.substring(1));
 
       String pr = matcher.group(5);
       String[] preReleases =
@@ -131,7 +130,7 @@ public class Version implements Comparable<Version>, Serializable {
       String bl = matcher.group(6);
       String build = bl == null || bl.isEmpty() ? null : bl.substring(1); // drop the initial '+'
 
-      return new Version(major, minor, patch, dsePatch, preReleases, build);
+      return new Version(major, minor, patch, revision, preReleases, build);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException("Invalid version number: " + version);
     }
@@ -165,16 +164,11 @@ public class Version implements Comparable<Version>, Serializable {
   }
 
   /**
-   * The DSE patch version number (will only be present for version of Cassandra in DSE).
+   * The optional fourth version component.
    *
-   * <p>DataStax Entreprise (DSE) adds a fourth number to the version number to track potential hot
-   * fixes and/or DSE specific patches that may have been applied to the Cassandra version. In that
-   * case, this method returns that fourth number.
-   *
-   * @return the DSE patch version number, i.e. D in X.Y.Z.D, or -1 if the version number is not
-   *     from DSE.
+   * @return the revision, i.e. R in X.Y.Z.R, or -1 if it is absent.
    */
-  public int getDSEPatch() {
+  public int getRevision() {
     return dsePatch;
   }
 
@@ -234,22 +228,11 @@ public class Version implements Comparable<Version>, Serializable {
       return 1;
     }
 
-    if (dsePatch < 0) {
-      if (other.dsePatch >= 0) {
-        return -1;
-      }
-    } else {
-      if (other.dsePatch < 0) {
-        return 1;
-      }
-
-      // Both are >= 0
-      if (dsePatch < other.dsePatch) {
-        return -1;
-      }
-      if (dsePatch > other.dsePatch) {
-        return 1;
-      }
+    if (dsePatch < other.dsePatch) {
+      return -1;
+    }
+    if (dsePatch > other.dsePatch) {
+      return 1;
     }
 
     if (preReleases == null) {

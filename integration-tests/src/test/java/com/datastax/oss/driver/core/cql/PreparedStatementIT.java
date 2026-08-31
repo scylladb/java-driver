@@ -590,12 +590,6 @@ public class PreparedStatementIT {
     }
   }
 
-  // Add version bounds to the DSE requirement if there is a version containing fix for
-  // CASSANDRA-15252
-
-  @BackendRequirement(
-      type = BackendType.DSE,
-      description = "No DSE version contains fix for CASSANDRA-15252")
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "3.0.0", maxExclusive = "3.0.26")
   @BackendRequirement(
       type = BackendType.CASSANDRA,

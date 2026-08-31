@@ -66,7 +66,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
   long nanoTime;
   int diceRoll;
 
-  private DefaultLoadBalancingPolicy dsePolicy;
+  private DefaultLoadBalancingPolicy defaultPolicy;
 
   @Before
   @Override
@@ -88,10 +88,11 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(metadataManager.getContactPoints()).willReturn(ImmutableSet.of(node1));
     given(metadata.getTokenMap()).willAnswer(invocation -> Optional.of(tokenMap));
     super.setup();
-    dsePolicy = (DefaultLoadBalancingPolicy) policy;
-    // Note: this assertion relies on the fact that policy.getLiveNodes() implementation preserves
+    defaultPolicy = (DefaultLoadBalancingPolicy) super.policy;
+    // Note: this assertion relies on the fact that defaultPolicy.getLiveNodes() implementation
+    // preserves
     // insertion order.
-    assertThat(dsePolicy.getLiveNodes().dc("dc1"))
+    assertThat(defaultPolicy.getLiveNodes().dc("dc1"))
         .containsExactly(node1, node2, node3, node4, node5);
   }
 
@@ -104,9 +105,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
         .willReturn(ImmutableList.of(node3, node5));
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan3 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan3 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // node3 and node5 always first, round-robin on the rest
@@ -114,9 +115,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan2).containsExactly(node3, node5, node2, node4, node1);
     assertThat(plan3).containsExactly(node3, node5, node4, node1, node2);
 
-    then(dsePolicy).should(times(3)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(never()).nanoTime();
-    then(dsePolicy).should(never()).randomNextInt(4);
+    then(defaultPolicy).should(times(3)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(never()).nanoTime();
+    then(defaultPolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -126,15 +127,15 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
         .willReturn(ImmutableList.of(node1, node3, node5));
-    dsePolicy.upTimes.put(node1, T1);
-    dsePolicy.upTimes.put(node3, T2);
-    dsePolicy.upTimes.put(node5, T3); // newest up replica
+    defaultPolicy.upTimes.put(node1, T1);
+    defaultPolicy.upTimes.put(node3, T2);
+    defaultPolicy.upTimes.put(node5, T3); // newest up replica
     given(pool1.getInFlight()).willReturn(0);
     given(pool3.getInFlight()).willReturn(0);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -142,9 +143,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -155,14 +156,14 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
         .willReturn(ImmutableList.of(node1, node3, node5));
-    dsePolicy.upTimes.put(node1, T2); // newest up replica
-    dsePolicy.upTimes.put(node3, T1);
+    defaultPolicy.upTimes.put(node1, T2); // newest up replica
+    defaultPolicy.upTimes.put(node3, T1);
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -170,9 +171,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node3, node5, node1, node2, node4);
     assertThat(plan2).containsExactly(node3, node5, node1, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(times(2)).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(times(2)).randomNextInt(4);
   }
 
   @Test
@@ -183,15 +184,15 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
         .willReturn(ImmutableList.of(node1, node3, node5));
-    dsePolicy.upTimes.put(node1, T2); // newest up replica
-    dsePolicy.upTimes.put(node3, T1);
+    defaultPolicy.upTimes.put(node1, T2); // newest up replica
+    defaultPolicy.upTimes.put(node3, T1);
     given(pool1.getInFlight()).willReturn(0);
     given(pool3.getInFlight()).willReturn(0);
     diceRoll = 1;
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -199,9 +200,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(times(2)).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(times(2)).randomNextInt(4);
   }
 
   @Test
@@ -215,14 +216,14 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
-    dsePolicy.responseTimes.put(
+    defaultPolicy.responseTimes.put(
         node1,
-        dsePolicy
+        defaultPolicy
         .new NodeResponseRateSample(new AtomicLongArray(new long[] {T0, T0}))); // unhealthy
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -230,9 +231,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node3, node5, node1, node2, node4);
     assertThat(plan2).containsExactly(node3, node5, node1, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -247,13 +248,14 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
-    dsePolicy.responseTimes.put(
+    defaultPolicy.responseTimes.put(
         node1,
-        dsePolicy.new NodeResponseRateSample(new AtomicLongArray(new long[] {T1, T1}))); // healthy
+        defaultPolicy
+        .new NodeResponseRateSample(new AtomicLongArray(new long[] {T1, T1}))); // healthy
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -261,9 +263,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node3, node1, node5, node2, node4);
     assertThat(plan2).containsExactly(node3, node1, node5, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -278,8 +280,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool5.getInFlight()).willReturn(100); // unhealthy
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -287,9 +289,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -304,8 +306,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool5.getInFlight()).willReturn(0);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -313,9 +315,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -329,8 +331,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool3.getInFlight()).willReturn(100);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -338,9 +340,9 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     assertThat(plan1).containsExactly(node3, node1, node5, node2, node4);
     assertThat(plan2).containsExactly(node3, node1, node5, node4, node2);
 
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).randomNextInt(4);
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).nanoTime();
+    then(defaultPolicy).should(never()).randomNextInt(4);
   }
 
   @Test
@@ -351,15 +353,15 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
         .willReturn(ImmutableList.of(node1, node3, node5));
     String localRack = "rack1";
-    given(dsePolicy.getLocalRack()).willReturn(localRack);
+    given(defaultPolicy.getLocalRack()).willReturn(localRack);
     given(node1.getRack()).willReturn(localRack);
     given(pool1.getInFlight()).willReturn(0);
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
@@ -375,7 +377,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
         .willReturn(ImmutableList.of(node1, node3, node5));
     String localRack = "rack1";
-    given(dsePolicy.getLocalRack()).willReturn(localRack);
+    given(defaultPolicy.getLocalRack()).willReturn(localRack);
     given(node3.getRack()).willReturn(localRack);
     given(node5.getRack()).willReturn(localRack);
     given(pool1.getInFlight()).willReturn(0);
@@ -383,8 +385,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool5.getInFlight()).willReturn(10);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then
     assertThat(plan1).containsExactly(node5, node3, node1, node2, node4);
@@ -401,7 +403,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
         .willReturn(ImmutableList.of(node1, node3, node5));
 
     String localRack = "rack1";
-    given(dsePolicy.getLocalRack()).willReturn(localRack);
+    given(defaultPolicy.getLocalRack()).willReturn(localRack);
     // Only node1 is in the local rack
     given(node1.getRack()).willReturn(localRack);
     given(node3.getRack()).willReturn("rack2");
@@ -412,15 +414,15 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool5.getInFlight()).willReturn(0);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
-    // Then - for LWT requests (RequestRoutingType.LWT) the policy should ignore local rack
+    // Then - for LWT requests (RequestRoutingType.LWT) the defaultPolicy should ignore local rack
     // prioritization and preserve the replica order returned by the token map.
     // The shuffle methods are still invoked for the non-replica range, so only the non-replica
     // nodes (node2 and node4) are permuted between successive plans.
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).shuffleInRange(any(), anyInt(), anyInt());
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).shuffleInRange(any(), anyInt(), anyInt());
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
   }
@@ -436,7 +438,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
         .willReturn(ImmutableList.of(node1, node3, node5));
 
     String localRack = "rack1";
-    given(dsePolicy.getLocalRack()).willReturn(localRack);
+    given(defaultPolicy.getLocalRack()).willReturn(localRack);
     // node1 is in the local rack
     given(node1.getRack()).willReturn(localRack);
     given(node3.getRack()).willReturn("rack2");
@@ -447,20 +449,20 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool5.getInFlight()).willReturn(0);
 
     // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan1 = defaultPolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = defaultPolicy.newQueryPlan(request, session);
 
     // Then - local rack replica prioritized and shuffled separately from others
     // Verify that local rack replicas and non-local-rack replicas are shuffled separately
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).shuffleInRange(any(), anyInt(), anyInt());
+    then(defaultPolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(defaultPolicy).should(times(2)).shuffleInRange(any(), anyInt(), anyInt());
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
   }
 
   @Override
   protected DefaultLoadBalancingPolicy createAndInitPolicy() {
-    DefaultLoadBalancingPolicy policy =
+    DefaultLoadBalancingPolicy defaultPolicy =
         spy(
             new DefaultLoadBalancingPolicy(context, DEFAULT_NAME) {
               @Override
@@ -479,7 +481,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
                 return diceRoll;
               }
             });
-    policy.init(
+    defaultPolicy.init(
         ImmutableMap.of(
             UUID.randomUUID(), node1,
             UUID.randomUUID(), node2,
@@ -487,6 +489,6 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
             UUID.randomUUID(), node4,
             UUID.randomUUID(), node5),
         distanceReporter);
-    return policy;
+    return defaultPolicy;
   }
 }

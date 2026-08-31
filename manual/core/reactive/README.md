@@ -30,8 +30,8 @@ Notes:
   all, it is possible to exclude it to minimize the number of runtime dependencies. If the library
   cannot be found at runtime, reactive queries won't be available, and a warning will be logged, but
   the driver will otherwise operate normally (this is also valid for OSGi deployments).
-* For historical reasons, reactive-related driver types reside in a package prefixed with `dse`;
-  however, reactive queries also work with regular Cassandra.
+* Reactive-related driver types keep their historical `dse` package prefix for API compatibility;
+  they are generic and supported with Cassandra and Scylla.
 * The reactive execution model is implemented in a non-blocking fashion: see the manual page on 
   [non-blocking programming](../non_blocking) for details.
 

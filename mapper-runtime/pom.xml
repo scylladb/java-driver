@@ -192,26 +192,9 @@
                   optional for dependencies declared as non-optional in the pom files.
                   -->org.reactivestreams.*;resolution:=optional, *
                 </Import-Package>
-                <Export-Package>com.datastax.*.driver.*.mapper.*</Export-Package>
+                <!-- The DSE-namespaced packages contain generic reactive mapper APIs retained for compatibility. -->
+                <Export-Package>com.datastax.oss.driver.*.mapper.*, com.datastax.dse.driver.api.mapper.reactive, com.datastax.dse.driver.internal.mapper.reactive</Export-Package>
               </instructions>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>generate-dependency-list</id>
-            <goals>
-              <goal>list</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <includeScope>runtime</includeScope>
-              <outputScope>true</outputScope>
-              <excludeGroupIds>com.datastax.cassandra,com.datastax.dse</excludeGroupIds>
-              <outputFile>${project.build.outputDirectory}/com/datastax/dse/driver/internal/mapper/deps.txt</outputFile>
             </configuration>
           </execution>
         </executions>

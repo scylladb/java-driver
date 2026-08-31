@@ -19,12 +19,6 @@ package com.datastax.oss.driver.internal.core.context;
 
 import static com.datastax.oss.driver.internal.core.util.Dependency.JACKSON;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.internal.core.InsightsClientLifecycleListener;
-import com.datastax.dse.driver.internal.core.type.codec.DseTypeCodecsRegistrar;
-import com.datastax.dse.protocol.internal.DseProtocolV1ClientCodecs;
-import com.datastax.dse.protocol.internal.DseProtocolV2ClientCodecs;
-import com.datastax.dse.protocol.internal.ProtocolV4ClientCodecsForDse;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
@@ -62,7 +56,6 @@ import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
-import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
@@ -105,6 +98,7 @@ import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.FrameCodec;
 import com.datastax.oss.protocol.internal.PrimitiveCodec;
 import com.datastax.oss.protocol.internal.ProtocolV3ClientCodecs;
+import com.datastax.oss.protocol.internal.ProtocolV4ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV5ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
 import com.datastax.oss.protocol.internal.SegmentCodec;
@@ -114,7 +108,6 @@ import com.typesafe.config.ConfigObject;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.buffer.ByteBuf;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -254,7 +247,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final Map<String, Predicate<Node>> nodeFiltersFromBuilder;
   private final Map<String, NodeDistanceEvaluator> nodeDistanceEvaluatorsFromBuilder;
   private final ClassLoader classLoader;
-  private final InetSocketAddress cloudProxyAddress;
   private final ClientRoutesConfig clientRoutesConfigFromBuilder;
   private final LazyReference<RequestLogFormatter> requestLogFormatterRef =
       new LazyReference<>("requestLogFormatter", this::buildRequestLogFormatter, cycleDetector);
@@ -262,9 +254,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final String startupApplicationName;
   private final String startupApplicationVersion;
   private final Object metricRegistry;
-  // A stack trace captured in the constructor. Used to extract information about the client
-  // application.
-  private final StackTraceElement[] initStackTrace;
 
   public DefaultDriverContext(
       DriverConfigLoader configLoader, ProgrammaticArguments programmaticArguments) {
@@ -315,19 +304,10 @@ public class DefaultDriverContext implements InternalDriverContext {
     this.nodeFiltersFromBuilder = nodeFilters;
     this.nodeDistanceEvaluatorsFromBuilder = programmaticArguments.getNodeDistanceEvaluators();
     this.classLoader = programmaticArguments.getClassLoader();
-    this.cloudProxyAddress = programmaticArguments.getCloudProxyAddress();
     this.clientRoutesConfigFromBuilder = programmaticArguments.getClientRoutesConfig();
     this.startupClientId = programmaticArguments.getStartupClientId();
     this.startupApplicationName = programmaticArguments.getStartupApplicationName();
     this.startupApplicationVersion = programmaticArguments.getStartupApplicationVersion();
-    StackTraceElement[] stackTrace;
-    try {
-      stackTrace = Thread.currentThread().getStackTrace();
-    } catch (Exception ex) {
-      // ignore and use empty
-      stackTrace = new StackTraceElement[] {};
-    }
-    this.initStackTrace = stackTrace;
     this.metricRegistry = programmaticArguments.getMetricRegistry();
   }
 
@@ -395,9 +375,8 @@ public class DefaultDriverContext implements InternalDriverContext {
     if (DefaultDependencyChecker.isPresent(JACKSON)) {
       return new DefaultDriverConfigReporter(this);
     }
-    // Logged unconditionally, unlike the Insights equivalent in #buildLifecycleListeners: reporting
-    // ships enabled, so someone who trimmed Jackson never opted out of it and would otherwise have
-    // no signal that it is off.
+    // Reporting ships enabled, so someone who trimmed Jackson never opted out of it and would
+    // otherwise have no signal that it is off.
     LOG.info(
         "Could not initialize driver configuration reporting; "
             + "this is normal if Jackson was explicitly excluded from classpath");
@@ -410,8 +389,7 @@ public class DefaultDriverContext implements InternalDriverContext {
         DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS,
         DefaultDriverOption.LOAD_BALANCING_POLICY,
         LoadBalancingPolicy.class,
-        "com.datastax.oss.driver.internal.core.loadbalancing",
-        "com.datastax.dse.driver.internal.core.loadbalancing");
+        "com.datastax.oss.driver.internal.core.loadbalancing");
   }
 
   protected Map<String, RetryPolicy> buildRetryPolicies() {
@@ -630,11 +608,9 @@ public class DefaultDriverContext implements InternalDriverContext {
         getPrimitiveCodec(),
         getCompressor(),
         new ProtocolV3ClientCodecs(),
-        new ProtocolV4ClientCodecsForDse(),
+        new ProtocolV4ClientCodecs(),
         new ProtocolV5ClientCodecs(),
-        new ProtocolV6ClientCodecs(),
-        new DseProtocolV1ClientCodecs(),
-        new DseProtocolV2ClientCodecs());
+        new ProtocolV6ClientCodecs());
   }
 
   protected SegmentCodec<ByteBuf> buildSegmentCodec() {
@@ -677,9 +653,6 @@ public class DefaultDriverContext implements InternalDriverContext {
     ClientRoutesConfig clientRoutesConfig = resolveClientRoutesConfig();
     validateClientRoutesConfiguration(clientRoutesConfig);
 
-    if (cloudProxyAddress != null) {
-      return new CloudTopologyMonitor(this, cloudProxyAddress);
-    }
     if (clientRoutesConfig != null) {
       return new ClientRoutesTopologyMonitor(this, clientRoutesConfig);
     }
@@ -689,12 +662,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   private void validateClientRoutesConfiguration(ClientRoutesConfig clientRoutesConfig) {
     if (clientRoutesConfig == null) {
       return;
-    }
-    if (cloudProxyAddress != null) {
-      throw new IllegalStateException(
-          "Both a secure connect bundle and client routes configuration were provided. "
-              + "They are mutually exclusive. Please use either a secure connect bundle OR "
-              + "client routes configuration, but not both.");
     }
     DriverExecutionProfile defaultProfile = getConfig().getDefaultProfile();
     if (defaultProfile.isDefined(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)) {
@@ -747,7 +714,6 @@ public class DefaultDriverContext implements InternalDriverContext {
       registry = new DefaultCodecRegistry(this.sessionName);
     }
     registry.register(arguments.getTypeCodecs());
-    DseTypeCodecsRegistrar.registerDseCodecs(registry);
     return registry;
   }
 
@@ -955,21 +921,11 @@ public class DefaultDriverContext implements InternalDriverContext {
             this,
             DefaultDriverOption.AUTH_PROVIDER_CLASS,
             AuthProvider.class,
-            "com.datastax.oss.driver.internal.core.auth",
-            "com.datastax.dse.driver.internal.core.auth");
+            "com.datastax.oss.driver.internal.core.auth");
   }
 
   protected List<LifecycleListener> buildLifecycleListeners() {
-    if (DefaultDependencyChecker.isPresent(JACKSON)) {
-      return Collections.singletonList(new InsightsClientLifecycleListener(this, initStackTrace));
-    } else {
-      if (config.getDefaultProfile().getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED)) {
-        LOG.info(
-            "Could not initialize Insights monitoring; "
-                + "this is normal if Jackson was explicitly excluded from classpath");
-      }
-      return Collections.emptyList();
-    }
+    return Collections.emptyList();
   }
 
   @NonNull

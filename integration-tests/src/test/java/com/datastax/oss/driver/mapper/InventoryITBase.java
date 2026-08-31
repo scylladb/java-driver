@@ -82,7 +82,7 @@ public abstract class InventoryITBase {
                 "CREATE TABLE product_sale(id uuid, day text, ts uuid, customer_id int, price "
                     + "double, count int, PRIMARY KEY ((id, day), customer_id, ts))");
 
-    if (requiresSasiIndex && supportsSASI(ccmRule) && !isSasiBroken(ccmRule)) {
+    if (requiresSasiIndex && supportsSASI(ccmRule)) {
       builder.add(
           "CREATE CUSTOM INDEX product_description ON product(description) "
               + "USING 'org.apache.cassandra.index.sasi.SASIIndex' "
@@ -102,13 +102,6 @@ public abstract class InventoryITBase {
 
   private static final Version MINIMUM_SASI_VERSION =
       Objects.requireNonNull(Version.parse("3.4.0"));
-  private static final Version BROKEN_SASI_VERSION = Objects.requireNonNull(Version.parse("6.8.0"));
-
-  protected static boolean isSasiBroken(BaseCcmRule ccmRule) {
-    // creating SASI indexes is broken in DSE 6.8.0
-    return ccmRule.isDistributionOf(
-        BackendType.DSE, (dist, cass) -> dist.compareTo(BROKEN_SASI_VERSION) == 0);
-  }
 
   protected static boolean supportsSASI(BaseCcmRule ccmRule) {
     return ccmRule.getCassandraVersion().compareTo(MINIMUM_SASI_VERSION) >= 0
