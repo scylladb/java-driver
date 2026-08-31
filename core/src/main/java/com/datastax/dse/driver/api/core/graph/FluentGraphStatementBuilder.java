@@ -17,7 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.DefaultFluentGraphStatement;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import net.jcip.annotations.NotThreadSafe;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
@@ -26,39 +26,27 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
  * A builder to create a fluent graph statement.
  *
  * <p>This class is mutable and not thread-safe.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
 @NotThreadSafe
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public class FluentGraphStatementBuilder
     extends GraphStatementBuilderBase<FluentGraphStatementBuilder, FluentGraphStatement> {
 
-  private GraphTraversal<?, ?> traversal;
-
   public FluentGraphStatementBuilder(@NonNull GraphTraversal<?, ?> traversal) {
-    this.traversal = traversal;
+    throw GraphSupportRemoved.exception();
   }
 
   public FluentGraphStatementBuilder(@NonNull FluentGraphStatement template) {
     super(template);
-    this.traversal = template.getTraversal();
+    throw GraphSupportRemoved.exception();
   }
 
   @NonNull
   @Override
   public FluentGraphStatement build() {
-    return new DefaultFluentGraphStatement(
-        this.traversal,
-        isIdempotent,
-        timeout,
-        node,
-        timestamp,
-        executionProfile,
-        executionProfileName,
-        buildCustomPayload(),
-        graphName,
-        traversalSource,
-        subProtocol,
-        consistencyLevel,
-        readConsistencyLevel,
-        writeConsistencyLevel);
+    throw GraphSupportRemoved.exception();
   }
 }

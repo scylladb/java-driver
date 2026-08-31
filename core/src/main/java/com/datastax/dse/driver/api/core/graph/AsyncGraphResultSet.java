@@ -17,7 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.GraphExecutionInfoConverter;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -34,13 +34,16 @@ import java.util.concurrent.CompletionStage;
  * concurrently).
  *
  * @see GraphResultSet
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface AsyncGraphResultSet {
 
   /** The execution information for this page of results. */
   @NonNull
   default ExecutionInfo getRequestExecutionInfo() {
-    return GraphExecutionInfoConverter.convert(getExecutionInfo());
+    throw GraphSupportRemoved.exception();
   }
 
   /**

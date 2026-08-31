@@ -25,7 +25,11 @@ import java.util.Map;
 /** See {@code reference.conf} for a description of each metric. */
 public enum DseSessionMetric implements SessionMetric {
   CONTINUOUS_CQL_REQUESTS("continuous-cql-requests"),
+  /** @deprecated DSE Graph is no longer supported; this metric is ignored. */
+  @Deprecated
   GRAPH_REQUESTS("graph-requests"),
+  /** @deprecated DSE Graph is no longer supported; this metric is ignored. */
+  @Deprecated
   GRAPH_CLIENT_TIMEOUTS("graph-client-timeouts"),
   ;
 

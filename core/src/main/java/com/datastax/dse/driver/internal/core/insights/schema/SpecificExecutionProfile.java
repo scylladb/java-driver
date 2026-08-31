@@ -20,7 +20,6 @@ package com.datastax.dse.driver.internal.core.insights.schema;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Map;
 import java.util.Objects;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -40,23 +39,18 @@ public class SpecificExecutionProfile {
   @JsonProperty("serialConsistency")
   private final String serialConsistency;
 
-  @JsonProperty("graphOptions")
-  private Map<String, Object> graphOptions;
-
   @JsonCreator
   public SpecificExecutionProfile(
       @JsonProperty("readTimeout") Integer readTimeoutMillis,
       @JsonProperty("loadBalancing") LoadBalancingInfo loadBalancing,
       @JsonProperty("speculativeExecution") SpeculativeExecutionInfo speculativeExecutionInfo,
       @JsonProperty("consistency") String consistency,
-      @JsonProperty("serialConsistency") String serialConsistency,
-      @JsonProperty("graphOptions") Map<String, Object> graphOptions) {
+      @JsonProperty("serialConsistency") String serialConsistency) {
     readTimeout = readTimeoutMillis;
     this.loadBalancing = loadBalancing;
     this.speculativeExecution = speculativeExecutionInfo;
     this.consistency = consistency;
     this.serialConsistency = serialConsistency;
-    this.graphOptions = graphOptions;
   }
 
   public Integer getReadTimeout() {
@@ -79,10 +73,6 @@ public class SpecificExecutionProfile {
     return serialConsistency;
   }
 
-  public Map<String, Object> getGraphOptions() {
-    return graphOptions;
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -96,19 +86,13 @@ public class SpecificExecutionProfile {
         && Objects.equals(loadBalancing, that.loadBalancing)
         && Objects.equals(speculativeExecution, that.speculativeExecution)
         && Objects.equals(consistency, that.consistency)
-        && Objects.equals(serialConsistency, that.serialConsistency)
-        && Objects.equals(graphOptions, that.graphOptions);
+        && Objects.equals(serialConsistency, that.serialConsistency);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        readTimeout,
-        loadBalancing,
-        speculativeExecution,
-        consistency,
-        serialConsistency,
-        graphOptions);
+        readTimeout, loadBalancing, speculativeExecution, consistency, serialConsistency);
   }
 
   @Override
@@ -126,8 +110,6 @@ public class SpecificExecutionProfile {
         + ", serialConsistency='"
         + serialConsistency
         + '\''
-        + ", graphOptions="
-        + graphOptions
         + '}';
   }
 }

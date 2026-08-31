@@ -17,7 +17,6 @@
  */
 package com.datastax.oss.driver.internal.metrics.microprofile;
 
-import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
@@ -73,7 +72,6 @@ public class MicroProfileNodeMetricUpdater extends MicroProfileMetricUpdater<Nod
     initializeCounter(DefaultNodeMetric.AUTHENTICATION_ERRORS, profile);
 
     initializeTimer(DefaultNodeMetric.CQL_MESSAGES, profile);
-    initializeTimer(DseNodeMetric.GRAPH_MESSAGES, profile);
   }
 
   @Override

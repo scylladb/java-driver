@@ -19,6 +19,44 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.2
+
+#### DSE Graph before and after 4.19.2.2
+
+##### Before 4.19.2.2
+
+The driver exposed DSE Graph execution APIs through `CqlSession`, including synchronous,
+asynchronous, and reactive execution. TinkerPop was an optional dependency starting with driver
+4.10.0. Applications using those APIs also configured requests through the `basic.graph` and
+`advanced.graph` trees and could enable the `graph-requests`, `graph-client-timeouts`, and
+`graph-messages` metrics.
+
+##### Starting with 4.19.2.2
+
+DSE Graph execution is no longer supported. Graph request processors, serializers, and the
+TinkerPop integration were removed. Public Graph API types remain temporarily for binary and source
+compatibility, but are deprecated. Creating or executing Graph requests throws an
+`UnsupportedOperationException` with migration guidance. Applications that still execute DSE Graph
+requests must remain on 4.19.2.1 or migrate that workload before upgrading.
+
+Legacy configuration remains compatible during the transition:
+
+* `DseDriverOption` and `TypedDriverOption` Graph constants remain available but are deprecated.
+* Graph statement, result, session, predicate, and remote-connection APIs remain available but are
+  deprecated and fail fast when used.
+* `basic.graph`, `advanced.graph`, and Graph metric settings are accepted and ignored. The driver
+  logs a deprecation warning when an application explicitly configures them.
+* Legacy Graph defaults remain readable from `reference.conf` and `OptionsMap.driverDefaults()`.
+* Serialized `OptionsMap` instances created by older driver versions remain deserializable.
+* `DseNodeMetric.GRAPH_MESSAGES`, `DseSessionMetric.GRAPH_REQUESTS`, and
+  `DseSessionMetric.GRAPH_CLIENT_TIMEOUTS` remain available but are deprecated. Enabling their metric
+  names produces no metrics.
+
+The TinkerPop runtime integration and JavaTuples dependency are removed. `gremlin-core` remains an
+optional, signature-only build dependency while the deprecated API shells exist; it is not supplied
+transitively to applications. Applications compiling against those signatures must continue to
+declare their own TinkerPop dependency.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time
@@ -515,9 +553,9 @@ token map for these keyspaces, you now must modify the following configuration o
 Until driver 4.9.0, the driver declared a mandatory dependency to Apache TinkerPop, a library
 required only when connecting to DSE Graph. The vast majority of Apache Cassandra users did not need
 that library, but were paying the price of having that heavy-weight library in their application's
-classpath. 
+classpath.
 
-_Starting with driver 4.10.0, TinkerPop is now considered an optional dependency_. 
+_Starting with driver 4.10.0, TinkerPop is now considered an optional dependency._
 
 Regular users of Apache Cassandra that do not use DSE Graph will not notice any disruption.
 
@@ -538,8 +576,8 @@ your POM file:
 </dependency>
 ```
 
-See the [integration](../manual/core/integration/#tinker-pop) section in the manual for more details
-as well as a driver vs. TinkerPop version compatibility matrix.
+This requirement applies through driver 4.19.2.1. DSE Graph execution is removed starting with
+4.19.2.2, as described above.
 
 ### 4.5.x - 4.6.0
 
@@ -557,12 +595,12 @@ separate DSE driver.
 The great news is that [reactive execution](../manual/core/reactive/) is now available for everyone.
 See the `CqlSession.executeReactive` methods.
 
-Apart from that, the only visible change is that DSE-specific features are now exposed in the API: 
+Apart from that, the only visible change is that DSE-specific features are now exposed in the API:
 
 * new execution methods: `CqlSession.executeGraph`, `CqlSession.executeContinuously*`. They all
   have default implementations so this doesn't break binary compatibility. You can just ignore them.
 * new driver dependencies: TinkerPop, ESRI, Reactive Streams. If you want to keep your classpath
-  lean, you can exclude some dependencies when you don't use the corresponding DSE features; see the 
+  lean, you can exclude some dependencies when you don't use the corresponding DSE features; see the
   [Integration>Driver dependencies](../manual/core/integration/#driver-dependencies) section.
 
 #### For DataStax Enterprise users

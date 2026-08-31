@@ -21,6 +21,11 @@ under the License.
 
 <!-- Note: contrary to 3.x, insert new entries *first* in their section -->
 
+### 4.19.2.2
+
+- [breaking] Remove DSE Graph execution support and TinkerPop integration; deprecated Graph API
+  shells and legacy configuration remain temporarily for migration (#1028)
+
 ### 4.19.2
 
 - [bug] CASSJAVA-116: Retry or Speculative Execution with RequestIdGenerator throws "Duplicate Key"

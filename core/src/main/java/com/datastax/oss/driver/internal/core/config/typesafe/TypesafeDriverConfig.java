@@ -184,6 +184,13 @@ public class TypesafeDriverConfig implements DriverConfig {
     return null;
   }
 
+  /** Returns whether an option's effective value comes from the driver's reference.conf. */
+  public static boolean isDefault(
+      @NonNull DriverExecutionProfile profile, @NonNull DriverOption option) {
+    Config config = getRawConfig(profile);
+    return config != null && isDefault(config, option.getPath());
+  }
+
   /**
    * Replace the given options, <em>only if the original values came from {@code
    * reference.conf}</em>: if the option was set explicitly in {@code application.conf}, then the
