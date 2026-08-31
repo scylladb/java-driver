@@ -19,12 +19,17 @@ package com.datastax.oss.driver.internal.core.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.internal.core.protocol.Lz4Compressor;
 import com.datastax.oss.driver.internal.core.protocol.SnappyCompressor;
+import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.NoopCompressor;
 import com.tngtech.java.junit.dataprovider.DataProvider;
@@ -78,5 +83,54 @@ public class DefaultDriverContextTest {
   public void should_create_noop_compressor_if_defined_as_none(String name) {
 
     doCreateCompressorTest(Optional.of(name), NoopCompressor.class);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_warn_when_removed_insights_monitoring_is_enabled() {
+    DriverExecutionProfile defaultProfile = mock(DriverExecutionProfile.class);
+    when(defaultProfile.isDefined(DefaultDriverOption.SESSION_NAME)).thenReturn(true);
+    when(defaultProfile.getString(DefaultDriverOption.SESSION_NAME)).thenReturn("test");
+    when(defaultProfile.getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED, false))
+        .thenReturn(true);
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      MockedDriverContextFactory.defaultDriverContext(Optional.of(defaultProfile));
+
+      verify(logger.appender).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue())
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .isEqualTo(
+              "[test] Configuration option advanced.monitor-reporting.enabled is deprecated and "
+                  + "ignored; DataStax Insights monitoring is no longer supported");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_ignore_invalid_removed_insights_monitoring_option() {
+    DriverExecutionProfile defaultProfile = mock(DriverExecutionProfile.class);
+    when(defaultProfile.isDefined(DefaultDriverOption.SESSION_NAME)).thenReturn(true);
+    when(defaultProfile.getString(DefaultDriverOption.SESSION_NAME)).thenReturn("test");
+    when(defaultProfile.getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED, false))
+        .thenThrow(new IllegalArgumentException("wrong type"));
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      MockedDriverContextFactory.defaultDriverContext(Optional.of(defaultProfile));
+
+      verify(logger.appender).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue())
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .isEqualTo(
+              "[test] Could not read deprecated configuration option "
+                  + "advanced.monitor-reporting.enabled; it will be ignored "
+                  + "(IllegalArgumentException: wrong type)");
+    } finally {
+      logger.close();
+    }
   }
 }

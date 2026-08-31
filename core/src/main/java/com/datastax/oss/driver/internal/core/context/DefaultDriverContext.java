@@ -20,7 +20,6 @@ package com.datastax.oss.driver.internal.core.context;
 import static com.datastax.oss.driver.internal.core.util.Dependency.JACKSON;
 
 import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.internal.core.InsightsClientLifecycleListener;
 import com.datastax.dse.driver.internal.core.type.codec.DseTypeCodecsRegistrar;
 import com.datastax.dse.protocol.internal.DseProtocolV1ClientCodecs;
 import com.datastax.dse.protocol.internal.DseProtocolV2ClientCodecs;
@@ -98,6 +97,7 @@ import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
 import com.datastax.oss.driver.internal.core.tracker.RequestLogFormatter;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
 import com.datastax.oss.driver.internal.core.util.DefaultDependencyChecker;
+import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.internal.core.util.Reflection;
 import com.datastax.oss.driver.internal.core.util.concurrent.CycleDetector;
 import com.datastax.oss.driver.internal.core.util.concurrent.LazyReference;
@@ -262,9 +262,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final String startupApplicationName;
   private final String startupApplicationVersion;
   private final Object metricRegistry;
-  // A stack trace captured in the constructor. Used to extract information about the client
-  // application.
-  private final StackTraceElement[] initStackTrace;
 
   public DefaultDriverContext(
       DriverConfigLoader configLoader, ProgrammaticArguments programmaticArguments) {
@@ -275,6 +272,25 @@ public class DefaultDriverContext implements InternalDriverContext {
       this.sessionName = defaultProfile.getString(DefaultDriverOption.SESSION_NAME);
     } else {
       this.sessionName = "s" + SESSION_NAME_COUNTER.getAndIncrement();
+    }
+    try {
+      @SuppressWarnings("deprecation")
+      boolean insightsMonitoringRequested =
+          defaultProfile.getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED, false);
+      if (insightsMonitoringRequested) {
+        LOG.warn(
+            "[{}] Configuration option {} is deprecated and ignored; "
+                + "DataStax Insights monitoring is no longer supported",
+            sessionName,
+            DseDriverOption.MONITOR_REPORTING_ENABLED.getPath());
+      }
+    } catch (RuntimeException e) {
+      Loggers.warnWithException(
+          LOG,
+          "[{}] Could not read deprecated configuration option {}; it will be ignored",
+          sessionName,
+          DseDriverOption.MONITOR_REPORTING_ENABLED.getPath(),
+          e);
     }
     this.localDatacentersFromBuilder = programmaticArguments.getLocalDatacenters();
     this.codecRegistry = buildCodecRegistry(programmaticArguments);
@@ -320,14 +336,6 @@ public class DefaultDriverContext implements InternalDriverContext {
     this.startupClientId = programmaticArguments.getStartupClientId();
     this.startupApplicationName = programmaticArguments.getStartupApplicationName();
     this.startupApplicationVersion = programmaticArguments.getStartupApplicationVersion();
-    StackTraceElement[] stackTrace;
-    try {
-      stackTrace = Thread.currentThread().getStackTrace();
-    } catch (Exception ex) {
-      // ignore and use empty
-      stackTrace = new StackTraceElement[] {};
-    }
-    this.initStackTrace = stackTrace;
     this.metricRegistry = programmaticArguments.getMetricRegistry();
   }
 
@@ -395,9 +403,8 @@ public class DefaultDriverContext implements InternalDriverContext {
     if (DefaultDependencyChecker.isPresent(JACKSON)) {
       return new DefaultDriverConfigReporter(this);
     }
-    // Logged unconditionally, unlike the Insights equivalent in #buildLifecycleListeners: reporting
-    // ships enabled, so someone who trimmed Jackson never opted out of it and would otherwise have
-    // no signal that it is off.
+    // Reporting ships enabled, so someone who trimmed Jackson never opted out of it and would
+    // otherwise have no signal that it is off.
     LOG.info(
         "Could not initialize driver configuration reporting; "
             + "this is normal if Jackson was explicitly excluded from classpath");
@@ -960,16 +967,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected List<LifecycleListener> buildLifecycleListeners() {
-    if (DefaultDependencyChecker.isPresent(JACKSON)) {
-      return Collections.singletonList(new InsightsClientLifecycleListener(this, initStackTrace));
-    } else {
-      if (config.getDefaultProfile().getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED)) {
-        LOG.info(
-            "Could not initialize Insights monitoring; "
-                + "this is normal if Jackson was explicitly excluded from classpath");
-      }
-      return Collections.emptyList();
-    }
+    return Collections.emptyList();
   }
 
   @NonNull

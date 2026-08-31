@@ -817,7 +817,13 @@ public class TypedDriverOption<ValueT> {
   /** How long the driver waits for a graph request to complete. */
   public static final TypedDriverOption<Duration> GRAPH_TIMEOUT =
       new TypedDriverOption<>(DseDriverOption.GRAPH_TIMEOUT, GenericType.DURATION);
-  /** Whether to send events for Insights monitoring. */
+  /**
+   * Legacy no-op option that controlled DataStax Insights monitoring.
+   *
+   * @deprecated DataStax Insights monitoring is no longer supported; there is no replacement. This
+   *     constant is retained for source and binary compatibility.
+   */
+  @Deprecated
   public static final TypedDriverOption<Boolean> MONITOR_REPORTING_ENABLED =
       new TypedDriverOption<>(DseDriverOption.MONITOR_REPORTING_ENABLED, GenericType.BOOLEAN);
   /** Whether to enable paging for Graph queries. */
