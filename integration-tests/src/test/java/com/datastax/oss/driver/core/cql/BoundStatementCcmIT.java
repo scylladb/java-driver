@@ -73,7 +73,9 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
@@ -431,6 +433,66 @@ public class BoundStatementCcmIT {
 
     should_set_all_occurrences_of_variable(ps.bind().setInt(id, 12));
     should_set_all_occurrences_of_variable(ps.boundStatementBuilder().setInt(id, 12).build());
+  }
+
+  /**
+   * The driver resolves prepared-statement variable names locally, so it must not depend on the
+   * name the server synthesizes for an anonymous marker. That name differs between ScyllaDB release
+   * lines rather than along a single version sequence: 2024.1 spells the marker of an IN relation
+   * {@code in(v)}, 2026.1.8 spells it {@code IN(v)}, and the lowercase spelling is restored in
+   * 2026.1.12 and 2026.2.6 (CUSTOMER-583 / SCYLLADB-3454); Apache Cassandra spells it {@code
+   * in(v)}. This test therefore reads the name back from the metadata instead of hardcoding a
+   * spelling, and asserts that both cases of it resolve to the same variable — as well as the
+   * positional binding that the manual recommends applications use instead.
+   */
+  @Test
+  public void should_bind_anonymous_in_marker_by_position_and_by_either_synthesized_case() {
+    CqlSession session = sessionRule.session();
+    PreparedStatement ps = session.prepare("SELECT v FROM test WHERE k = ? AND v IN ?");
+
+    ColumnDefinitions variables = ps.getVariableDefinitions();
+    assertThat(variables).hasSize(2);
+    String synthesized = variables.get(1).getName().asInternal();
+
+    // Skip rather than fail if the server ever names the marker plainly "v": everything below
+    // still passes then, but it no longer covers the synthesized-name mechanism at all, and the
+    // spelling is precisely what this test refuses to treat as a contract.
+    assumeThat(synthesized).as("synthesized marker name").isNotEqualTo("v").contains("(");
+
+    // Whatever the server sent, the case of the name must not decide whether it resolves.
+    assertThat(variables.firstIndexOf(synthesized)).isEqualTo(1);
+    assertThat(variables.firstIndexOf(synthesized.toLowerCase(Locale.ROOT))).isEqualTo(1);
+    assertThat(variables.firstIndexOf(synthesized.toUpperCase(Locale.ROOT))).isEqualTo(1);
+
+    List<Integer> in = ImmutableList.of(1, 2, 3);
+
+    // What applications should do: fill anonymous markers by position.
+    assertThat(selectedValues(session, ps.bind().setString(0, KEY).setList(1, in, Integer.class)))
+        .containsExactlyElementsOf(in);
+
+    // What CUSTOMER-583 did. It works here because the String setters ignore case, but the manual
+    // steers applications away from it: the spelling is not part of any contract. Only the IN
+    // marker is addressed by name -- the marker of "k = ?" is bound by position, so the case under
+    // test is not mixed with a second synthesized name the server could also respell.
+    for (String spelling :
+        ImmutableList.of(
+            synthesized,
+            synthesized.toLowerCase(Locale.ROOT),
+            synthesized.toUpperCase(Locale.ROOT))) {
+      assertThat(
+              selectedValues(
+                  session, ps.bind().setString(0, KEY).setList(spelling, in, Integer.class)))
+          .as("bound by name %s", spelling)
+          .containsExactlyElementsOf(in);
+    }
+  }
+
+  private static List<Integer> selectedValues(CqlSession session, BoundStatement bound) {
+    List<Integer> values = new ArrayList<>();
+    for (Row row : session.execute(bound)) {
+      values.add(row.getInt("v"));
+    }
+    return values;
   }
 
   @DataProvider

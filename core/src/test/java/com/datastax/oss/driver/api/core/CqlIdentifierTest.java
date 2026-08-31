@@ -67,6 +67,17 @@ public class CqlIdentifierTest {
     CqlIdentifier.fromCql("Create");
   }
 
+  /**
+   * Servers synthesize names like {@code IN(ck)} for anonymous markers of an IN relation. They can
+   * only be turned into an identifier through {@link CqlIdentifier#fromInternal} or a double-quoted
+   * CQL form, which is one of the reasons applications should bind such markers positionally
+   * instead. See the prepared-statements manual page.
+   */
+  @Test(expected = IllegalArgumentException.class)
+  public void should_fail_to_build_from_valid_cql_if_synthesized_marker_name() {
+    CqlIdentifier.fromCql("IN(ck)");
+  }
+
   @Test
   public void should_format_as_cql() {
     assertThat(CqlIdentifier.fromInternal("foo").asCql(false)).isEqualTo("\"foo\"");
