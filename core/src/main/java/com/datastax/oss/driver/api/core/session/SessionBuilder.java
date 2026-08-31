@@ -30,7 +30,6 @@ import com.datastax.oss.driver.api.core.auth.PlainTextAuthProviderBase;
 import com.datastax.oss.driver.api.core.auth.ProgrammaticPlainTextAuthProvider;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -48,24 +47,16 @@ import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.api.core.type.codec.registry.MutableCodecRegistry;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.datastax.oss.driver.internal.core.ContactPoints;
-import com.datastax.oss.driver.internal.core.config.cloud.CloudConfig;
-import com.datastax.oss.driver.internal.core.config.cloud.CloudConfigFactory;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultDriverConfigLoader;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
-import com.datastax.oss.driver.internal.core.tracker.W3CContextRequestIdGenerator;
 import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -73,7 +64,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
 import javax.net.ssl.SSLContext;
@@ -92,8 +82,6 @@ import org.slf4j.LoggerFactory;
 @NotThreadSafe
 public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
 
-  public static final String ASTRA_PAYLOAD_KEY = "traceparent";
-
   private static final Logger LOG = LoggerFactory.getLogger(SessionBuilder.class);
 
   @SuppressWarnings("unchecked")
@@ -102,11 +90,8 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   protected DriverConfigLoader configLoader;
   protected Set<EndPoint> programmaticContactPoints = new HashSet<>();
   protected CqlIdentifier keyspace;
-  protected Callable<InputStream> cloudConfigInputStream;
   protected ProgrammaticArguments.Builder programmaticArgumentsBuilder =
       ProgrammaticArguments.builder();
-  private boolean programmaticSslFactory = false;
-  private boolean programmaticLocalDatacenter = false;
 
   /**
    * Sets the configuration loader to use.
@@ -427,7 +412,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    */
   @NonNull
   public SelfT withSslEngineFactory(@Nullable SslEngineFactory sslEngineFactory) {
-    this.programmaticSslFactory = true;
     this.programmaticArgumentsBuilder.withSslEngineFactory(sslEngineFactory);
     return self;
   }
@@ -465,7 +449,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * if you use a third-party implementation, refer to their documentation.
    */
   public SelfT withLocalDatacenter(@NonNull String profileName, @NonNull String localDatacenter) {
-    this.programmaticLocalDatacenter = true;
     this.programmaticArgumentsBuilder.withLocalDatacenter(profileName, localDatacenter);
     return self;
   }
@@ -648,31 +631,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   }
 
   /**
-   * Configures this SessionBuilder for Cloud deployments by retrieving connection information from
-   * the provided {@link Path}.
-   *
-   * <p>To connect to a Cloud database, you must first download the secure database bundle from the
-   * DataStax Astra console that contains the connection information, then instruct the driver to
-   * read its contents using either this method or one if its variants.
-   *
-   * <p>For more information, please refer to the DataStax Astra documentation.
-   *
-   * @param cloudConfigPath Path to the secure connect bundle zip file.
-   * @see #withCloudSecureConnectBundle(URL)
-   * @see #withCloudSecureConnectBundle(InputStream)
-   */
-  @NonNull
-  public SelfT withCloudSecureConnectBundle(@NonNull Path cloudConfigPath) {
-    try {
-      URL cloudConfigUrl = cloudConfigPath.toAbsolutePath().normalize().toUri().toURL();
-      this.cloudConfigInputStream = cloudConfigUrl::openStream;
-    } catch (MalformedURLException e) {
-      throw new IllegalArgumentException("Incorrect format of cloudConfigPath", e);
-    }
-    return self;
-  }
-
-  /**
    * Registers a CodecRegistry to use for the session.
    *
    * <p>When both this and {@link #addTypeCodecs(TypeCodec[])} are called, the added type codecs
@@ -681,72 +639,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   @NonNull
   public SelfT withCodecRegistry(@Nullable MutableCodecRegistry codecRegistry) {
     this.programmaticArgumentsBuilder.withCodecRegistry(codecRegistry);
-    return self;
-  }
-
-  /**
-   * Configures this SessionBuilder for Cloud deployments by retrieving connection information from
-   * the provided {@link URL}.
-   *
-   * <p>To connect to a Cloud database, you must first download the secure database bundle from the
-   * DataStax Astra console that contains the connection information, then instruct the driver to
-   * read its contents using either this method or one if its variants.
-   *
-   * <p>For more information, please refer to the DataStax Astra documentation.
-   *
-   * @param cloudConfigUrl URL to the secure connect bundle zip file.
-   * @see #withCloudSecureConnectBundle(Path)
-   * @see #withCloudSecureConnectBundle(InputStream)
-   */
-  @NonNull
-  public SelfT withCloudSecureConnectBundle(@NonNull URL cloudConfigUrl) {
-    this.cloudConfigInputStream = cloudConfigUrl::openStream;
-    return self;
-  }
-
-  /**
-   * Configures this SessionBuilder for Cloud deployments by retrieving connection information from
-   * the provided {@link InputStream}.
-   *
-   * <p>To connect to a Cloud database, you must first download the secure database bundle from the
-   * DataStax Astra console that contains the connection information, then instruct the driver to
-   * read its contents using either this method or one if its variants.
-   *
-   * <p>For more information, please refer to the DataStax Astra documentation.
-   *
-   * <p>Note that the provided stream will be consumed <em>and closed</em> when either {@link
-   * #build()} or {@link #buildAsync()} are called; attempting to reuse it afterwards will result in
-   * an error being thrown.
-   *
-   * @param cloudConfigInputStream A stream containing the secure connect bundle zip file.
-   * @see #withCloudSecureConnectBundle(Path)
-   * @see #withCloudSecureConnectBundle(URL)
-   */
-  @NonNull
-  public SelfT withCloudSecureConnectBundle(@NonNull InputStream cloudConfigInputStream) {
-    this.cloudConfigInputStream = () -> cloudConfigInputStream;
-    return self;
-  }
-
-  /**
-   * Configures this SessionBuilder to use the provided Cloud proxy endpoint.
-   *
-   * <p>Normally, this method should not be called directly; the normal and easiest way to configure
-   * the driver for Cloud deployments is through a {@linkplain #withCloudSecureConnectBundle(URL)
-   * secure connect bundle}.
-   *
-   * <p>Setting this option to any non-null address will make the driver use a special topology
-   * monitor tailored for Cloud deployments. This topology monitor assumes that the target cluster
-   * should be contacted through the proxy specified here, using SNI routing.
-   *
-   * <p>For more information, please refer to the DataStax Astra documentation.
-   *
-   * @param cloudProxyAddress The address of the Cloud proxy to use.
-   * @see <a href="https://en.wikipedia.org/wiki/Server_Name_Indication">Server Name Indication</a>
-   */
-  @NonNull
-  public SelfT withCloudProxyAddress(@Nullable InetSocketAddress cloudProxyAddress) {
-    this.programmaticArgumentsBuilder.withCloudProxyAddress(cloudProxyAddress);
     return self;
   }
 
@@ -910,52 +802,8 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
               : defaultConfigLoader(programmaticArguments.getClassLoader());
 
       DriverExecutionProfile defaultConfig = configLoader.getInitialConfig().getDefaultProfile();
-      if (cloudConfigInputStream == null) {
-        String configUrlString =
-            defaultConfig.getString(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE, null);
-        if (configUrlString != null) {
-          cloudConfigInputStream = () -> getURL(configUrlString).openStream();
-        }
-      }
       List<String> configContactPoints =
           defaultConfig.getStringList(DefaultDriverOption.CONTACT_POINTS, Collections.emptyList());
-      if (cloudConfigInputStream != null) {
-        // override request id generator, unless user has already set it
-        if (programmaticArguments.getRequestIdGenerator() == null) {
-          programmaticArgumentsBuilder.withRequestIdGenerator(
-              new W3CContextRequestIdGenerator(ASTRA_PAYLOAD_KEY));
-          LOG.debug(
-              "A secure connect bundle is provided, using W3CContextRequestIdGenerator as request ID generator.");
-        }
-        if (!programmaticContactPoints.isEmpty() || !configContactPoints.isEmpty()) {
-          LOG.info(
-              "Both a secure connect bundle and contact points were provided. These are mutually exclusive. The contact points from the secure bundle will have priority.");
-          // clear the contact points provided in the setting file and via addContactPoints
-          configContactPoints = Collections.emptyList();
-          programmaticContactPoints = new HashSet<>();
-        }
-
-        if (programmaticSslFactory
-            || defaultConfig.isDefined(DefaultDriverOption.SSL_ENGINE_FACTORY_CLASS)) {
-          LOG.info(
-              "Both a secure connect bundle and SSL options were provided. They are mutually exclusive. The SSL options from the secure bundle will have priority.");
-        }
-        CloudConfig cloudConfig =
-            new CloudConfigFactory().createCloudConfig(cloudConfigInputStream.call());
-        addContactEndPoints(cloudConfig.getEndPoints());
-
-        boolean localDataCenterDefined =
-            anyProfileHasDatacenterDefined(configLoader.getInitialConfig());
-        if (programmaticLocalDatacenter || localDataCenterDefined) {
-          LOG.info(
-              "Both a secure connect bundle and a local datacenter were provided. They are mutually exclusive. The local datacenter from the secure bundle will have priority.");
-          programmaticArgumentsBuilder.clearDatacenters();
-        }
-        withLocalDatacenter(cloudConfig.getLocalDatacenter());
-        withSslEngineFactory(cloudConfig.getSslEngineFactory());
-        withCloudProxyAddress(cloudConfig.getProxyAddress());
-        programmaticArguments = programmaticArgumentsBuilder.build();
-      }
 
       boolean resolveAddresses =
           defaultConfig.getBoolean(DefaultDriverOption.RESOLVE_CONTACT_POINTS, false);
@@ -977,36 +825,6 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
       // We construct the session synchronously (until the init() call), but async clients expect a
       // failed future if anything goes wrong. So wrap any error from that synchronous part.
       return CompletableFutures.failedFuture(t);
-    }
-  }
-
-  private boolean anyProfileHasDatacenterDefined(DriverConfig driverConfig) {
-    for (DriverExecutionProfile driverExecutionProfile : driverConfig.getProfiles().values()) {
-      if (driverExecutionProfile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Returns URL based on the configUrl setting. If the configUrl has no protocol provided, the
-   * method will fallback to file:// protocol and return URL that has file protocol specified.
-   *
-   * @param configUrl url to config secure bundle
-   * @return URL with file protocol if there was not explicit protocol provided in the configUrl
-   *     setting
-   */
-  private URL getURL(String configUrl) throws MalformedURLException {
-    try {
-      return new URL(configUrl);
-    } catch (MalformedURLException e1) {
-      try {
-        return Paths.get(configUrl).toAbsolutePath().normalize().toUri().toURL();
-      } catch (MalformedURLException e2) {
-        e2.addSuppressed(e1);
-        throw e2;
-      }
     }
   }
 
