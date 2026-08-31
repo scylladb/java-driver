@@ -28,7 +28,6 @@ import static org.ops4j.pax.exam.CoreOptions.vmOption;
 import org.ops4j.pax.exam.CoreOptions;
 import org.ops4j.pax.exam.options.CompositeOption;
 import org.ops4j.pax.exam.options.UrlProvisionOption;
-import org.ops4j.pax.exam.options.WrappedUrlProvisionOption;
 
 public class BundleOptions {
 
@@ -126,20 +125,6 @@ public class BundleOptions {
         options(
             mavenBundle("org.xerial.snappy", "snappy-java").versionAsInProject(),
             systemProperty("cassandra.compression").value("SNAPPY"));
-  }
-
-  public static CompositeOption esriBundles() {
-    return () ->
-        options(
-            CoreOptions.wrappedBundle(
-                    mavenBundle("com.esri.geometry", "esri-geometry-api").versionAsInProject())
-                .exports("com.esri.core.geometry.*")
-                .imports("org.json", "org.codehaus.jackson")
-                .bundleSymbolicName("com.esri.core.geometry")
-                .overwriteManifest(WrappedUrlProvisionOption.OverwriteMode.FULL),
-            mavenBundle("org.json", "json").versionAsInProject(),
-            mavenBundle("org.codehaus.jackson", "jackson-core-asl").versionAsInProject(),
-            systemProperty("cassandra.geo").value("true"));
   }
 
   public static CompositeOption reactiveBundles() {

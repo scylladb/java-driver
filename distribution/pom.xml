@@ -131,11 +131,6 @@
                   <version>3.0.2</version>
                 </additionalDependency>
                 <additionalDependency>
-                  <groupId>com.esri.geometry</groupId>
-                  <artifactId>esri-geometry-api</artifactId>
-                  <version>${esri.version}</version>
-                </additionalDependency>
-                <additionalDependency>
                   <groupId>at.yawk.lz4</groupId>
                   <artifactId>lz4-java</artifactId>
                   <version>${lz4.version}</version>

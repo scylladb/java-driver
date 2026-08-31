@@ -59,14 +59,11 @@
     <hdrhistogram.version>2.2.2</hdrhistogram.version>
     <metrics.version>4.2.38</metrics.version>
     <netty.version>4.1.136.Final</netty.version>
-    <esri.version>1.2.1</esri.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <slf4j.version>2.0.18</slf4j.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <reactive-streams.version>1.0.4</reactive-streams.version>
-    <json.version>20250517</json.version>
     <jackson.version>2.22.1</jackson.version>
-    <legacy-jackson.version>1.9.12</legacy-jackson.version>
     <!-- optional dependencies -->
     <snappy.version>1.1.10.8</snappy.version>
     <lz4.version>1.11.1</lz4.version>
@@ -227,16 +224,6 @@
         <groupId>org.hdrhistogram</groupId>
         <artifactId>HdrHistogram</artifactId>
         <version>${hdrhistogram.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.esri.geometry</groupId>
-        <artifactId>esri-geometry-api</artifactId>
-        <version>${esri.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
-        <version>${json.version}</version>
       </dependency>
       <dependency>
         <groupId>org.reactivestreams</groupId>

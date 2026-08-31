@@ -28,7 +28,6 @@ under the License.
   * When using [Jackson](../integration#Jackson);
   * When using LZ4 [compression](../compression/);
   * Depending on the [logging backend](../logging) in use.
-* DSE geospatial types require additional configuration.
 * The [shaded jar](../shaded_jar) is not officially supported, although it may work.
 
 -----
@@ -248,33 +247,6 @@ The driver performs a few [native calls](../integration#native-libraries) using
 
 Starting with driver 4.7.0, native calls are also possible in a GraalVM native image, without any
 extra configuration.
-
-### Using DataStax Enterprise (DSE) features
-
-#### DSE Geospatial types
-
-DSE [Geospatial types](../dse/geotypes) are supported on GraalVM native images; the following
-configurations must be added:
-
-1. Create the following reflection.json file, or add the entry to an existing file:
-
-```json
-[
-  { "name": "com.esri.core.geometry.ogc.OGCGeometry" }
-]
-```
-
-**Important**: when using the shaded jar – which is not officially supported on GraalVM native 
-images, as stated above – replace the above entry with the below one:
-
-```json
-[
-  { "name": "com.datastax.oss.driver.shaded.esri.core.geometry.ogc.OGCGeometry" }
-]
-```
-
-2. When invoking the native image builder, add a `-H:ReflectionConfigurationFiles=reflection.json`
-   flag and point it to the file created above.
 
 ### Using the shaded jar
 

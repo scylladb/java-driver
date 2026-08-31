@@ -21,7 +21,6 @@ import static com.datastax.oss.driver.internal.core.util.Dependency.JACKSON;
 
 import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.dse.driver.internal.core.InsightsClientLifecycleListener;
-import com.datastax.dse.driver.internal.core.type.codec.DseTypeCodecsRegistrar;
 import com.datastax.dse.protocol.internal.DseProtocolV1ClientCodecs;
 import com.datastax.dse.protocol.internal.DseProtocolV2ClientCodecs;
 import com.datastax.dse.protocol.internal.ProtocolV4ClientCodecsForDse;
@@ -747,7 +746,6 @@ public class DefaultDriverContext implements InternalDriverContext {
       registry = new DefaultCodecRegistry(this.sessionName);
     }
     registry.register(arguments.getTypeCodecs());
-    DseTypeCodecsRegistrar.registerDseCodecs(registry);
     return registry;
   }
 
