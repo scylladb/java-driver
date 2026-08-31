@@ -23,6 +23,7 @@ under the License.
 
 ### 4.19.2
 
+- [improvement] Remove unused DSE protocol and continuous paging support (#1032)
 - [improvement] Remove unused DSE Graph support and TinkerPop integration (#1028)
 - [bug] CASSJAVA-116: Retry or Speculative Execution with RequestIdGenerator throws "Duplicate Key"
 

@@ -526,13 +526,9 @@ separate DSE driver.
 The great news is that [reactive execution](../manual/core/reactive/) is now available for everyone.
 See the `CqlSession.executeReactive` methods.
 
-Apart from that, the only visible change is that DSE-specific features are now exposed in the API: 
-
-* new execution methods: `CqlSession.executeContinuously*`. They have default implementations so
-  this doesn't break binary compatibility. You can just ignore them.
-* new driver dependencies: ESRI and Reactive Streams. If you want to keep your classpath
-  lean, you can exclude some dependencies when you don't use the corresponding DSE features; see the 
-  [Integration>Driver dependencies](../manual/core/integration/#driver-dependencies) section.
+The main visible change is the Reactive Streams dependency. If you want to keep your classpath
+lean, you can exclude it when you don't use reactive execution; see the
+[Integration>Driver dependencies](../manual/core/integration/#driver-dependencies) section.
 
 #### For DataStax Enterprise users
 

@@ -249,9 +249,6 @@ public class OptionsMap implements Serializable {
     Duration initQueryTimeout = Duration.ofSeconds(5);
     Duration requestTimeout = Duration.ofSeconds(2);
     int requestPageSize = 5000;
-    int continuousMaxPages = 0;
-    int continuousMaxPagesPerSecond = 0;
-    int continuousMaxEnqueuedPages = 4;
 
     // Sorted by order of appearance in reference.conf:
 
@@ -298,13 +295,6 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.REQUEST_TRACE_INTERVAL, Duration.ofMillis(3));
     map.put(TypedDriverOption.REQUEST_TRACE_CONSISTENCY, "ONE");
     map.put(TypedDriverOption.REQUEST_LOG_WARNINGS, true);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_PAGE_SIZE, requestPageSize);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_PAGE_SIZE_BYTES, false);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_PAGES, continuousMaxPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, continuousMaxPagesPerSecond);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, continuousMaxEnqueuedPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE, Duration.ofSeconds(2));
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES, Duration.ofSeconds(1));
     map.put(TypedDriverOption.MONITOR_REPORTING_ENABLED, true);
     map.put(TypedDriverOption.METRICS_SESSION_ENABLED, Collections.emptyList());
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST, Duration.ofSeconds(3));
@@ -315,16 +305,6 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_INTERVAL, Duration.ofMinutes(5));
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST,
-        Duration.ofMinutes(2));
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST,
-        Duration.ofMillis(10));
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS, 3);
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL,
-        Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_FACTORY_CLASS, "DefaultMetricsFactory");
     map.put(TypedDriverOption.METRICS_ID_GENERATOR_CLASS, "DefaultMetricIdGenerator");
     map.put(TypedDriverOption.METRICS_NODE_ENABLED, Collections.emptyList());

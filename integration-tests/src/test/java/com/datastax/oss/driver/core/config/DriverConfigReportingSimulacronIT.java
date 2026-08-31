@@ -66,9 +66,9 @@ import org.junit.experimental.categories.Category;
  * <p>Assertions are scoped to the session's real connections, identified by the {@code CLIENT_ID}
  * startup option that the driver always sends (independently of config reporting). This excludes
  * the short-lived connections opened by protocol-version negotiation: when the protocol version is
- * not pinned (the default), the driver first tries higher versions (DSE_V2, DSE_V1, V5) that
- * ScyllaDB rejects before the handshake completes, and Simulacron records each such rejected
- * attempt as a bare {@code STARTUP} ({@code CQL_VERSION} only) that carries no driver identity.
+ * not pinned (the default), the driver first tries V5, which ScyllaDB rejects before the handshake
+ * completes, and Simulacron records each such rejected attempt as a bare {@code STARTUP} ({@code
+ * CQL_VERSION} only) that carries no driver identity.
  */
 @Category(ParallelizableTests.class)
 public class DriverConfigReportingSimulacronIT {

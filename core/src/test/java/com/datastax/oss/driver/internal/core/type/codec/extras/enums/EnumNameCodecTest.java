@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core.type.codec.extras.enums;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.datastax.dse.driver.api.core.DseProtocolVersion;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.type.codec.ExtraTypeCodecs;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
@@ -87,6 +86,5 @@ public class EnumNameCodecTest extends CodecTestBase<DefaultProtocolVersion> {
   @Test
   public void should_accept_object() {
     assertThat(codec.accepts(DefaultProtocolVersion.V3)).isTrue();
-    assertThat(codec.accepts(DseProtocolVersion.DSE_V1)).isFalse();
   }
 }

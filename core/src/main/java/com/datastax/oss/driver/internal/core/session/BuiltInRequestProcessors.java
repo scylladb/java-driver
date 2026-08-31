@@ -19,9 +19,6 @@ package com.datastax.oss.driver.internal.core.session;
 
 import static com.datastax.oss.driver.internal.core.util.Dependency.REACTIVE_STREAMS;
 
-import com.datastax.dse.driver.internal.core.cql.continuous.ContinuousCqlRequestAsyncProcessor;
-import com.datastax.dse.driver.internal.core.cql.continuous.ContinuousCqlRequestSyncProcessor;
-import com.datastax.dse.driver.internal.core.cql.continuous.reactive.ContinuousCqlRequestReactiveProcessor;
 import com.datastax.dse.driver.internal.core.cql.reactive.CqlRequestReactiveProcessor;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
@@ -67,22 +64,11 @@ public class BuiltInRequestProcessors {
         new CqlPrepareSyncProcessor(cqlPrepareAsyncProcessor);
     processors.add(cqlPrepareAsyncProcessor);
     processors.add(cqlPrepareSyncProcessor);
-
-    // continuous requests (sync and async)
-    ContinuousCqlRequestAsyncProcessor continuousCqlRequestAsyncProcessor =
-        new ContinuousCqlRequestAsyncProcessor();
-    ContinuousCqlRequestSyncProcessor continuousCqlRequestSyncProcessor =
-        new ContinuousCqlRequestSyncProcessor(continuousCqlRequestAsyncProcessor);
-    processors.add(continuousCqlRequestAsyncProcessor);
-    processors.add(continuousCqlRequestSyncProcessor);
   }
 
   public static void addReactiveProcessors(List<RequestProcessor<?, ?>> processors) {
     CqlRequestReactiveProcessor cqlRequestReactiveProcessor =
         new CqlRequestReactiveProcessor(new CqlRequestAsyncProcessor());
-    ContinuousCqlRequestReactiveProcessor continuousCqlRequestReactiveProcessor =
-        new ContinuousCqlRequestReactiveProcessor(new ContinuousCqlRequestAsyncProcessor());
     processors.add(cqlRequestReactiveProcessor);
-    processors.add(continuousCqlRequestReactiveProcessor);
   }
 }

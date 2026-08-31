@@ -17,7 +17,6 @@
  */
 package com.datastax.dse.driver;
 
-import com.datastax.dse.driver.api.core.DseProtocolVersion;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -27,18 +26,8 @@ import java.util.stream.Stream;
 public class DseTestDataProviders {
 
   @DataProvider
-  public static Object[][] allDseProtocolVersions() {
-    return concat(DseProtocolVersion.values());
-  }
-
-  @DataProvider
   public static Object[][] allOssProtocolVersions() {
     return concat(DefaultProtocolVersion.values());
-  }
-
-  @DataProvider
-  public static Object[][] allDseAndOssProtocolVersions() {
-    return concat(DefaultProtocolVersion.values(), DseProtocolVersion.values());
   }
 
   @NonNull
