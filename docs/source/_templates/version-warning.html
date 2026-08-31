@@ -1,0 +1,28 @@
+{# Deprecated versions (see DEPRECATED_VERSIONS in conf.py) get a single combined
+   notice that both marks the deprecation and points at the migration guide, in
+   place of the theme's generic "previous version" banner. Every other version
+   falls through to the theme's own template, unchanged.
+
+   This file lives on the publishing branch on purpose: sphinx-multiversion builds
+   every version with `-c <publishing tree>/docs/source`, and Sphinx resolves
+   templates_path against the confdir, so this reaches the frozen scylla-3.*.x
+   branches too -- none of which need to be touched.
+
+   The migration link deliberately points at the guide's root rather than at
+   upgrade_guide/from_3x/. Page *content* does come from each version's own ref,
+   and /stable/ is built from the newest release branch in BRANCHES, not from
+   this one -- so from_3x/ only exists at /stable/ once a release branch is cut
+   that contains it. Repoint this href then. #}
+{% if versions and current_version and latest_version and current_version.name in theme_versions_deprecated %}
+    <div class="admonition caution">
+        <p class="admonition-title">Caution</p>
+        <p>
+            Java Driver 3.x is deprecated and in maintenance mode &mdash; it receives critical
+            bug fixes only. New projects and active development should use
+            <a href="{{ vpathto(latest_version.name) }}">Java Driver 4.x</a>; see the
+            <a href="{{ html_baseurl }}/stable/upgrade_guide/">migration guide</a>.
+        </p>
+    </div>
+{% else %}
+    {% include "!version-warning.html" %}
+{% endif %}
