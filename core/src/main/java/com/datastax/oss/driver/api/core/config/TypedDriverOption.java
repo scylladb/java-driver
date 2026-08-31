@@ -793,111 +793,149 @@ public class TypedDriverOption<ValueT> {
           new TypedDriverOption<>(
               DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL,
               GenericType.DURATION);
-  /** The read consistency level to use for graph statements. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<String> GRAPH_READ_CONSISTENCY_LEVEL =
       new TypedDriverOption<>(DseDriverOption.GRAPH_READ_CONSISTENCY_LEVEL, GenericType.STRING);
-  /** The write consistency level to use for graph statements. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<String> GRAPH_WRITE_CONSISTENCY_LEVEL =
       new TypedDriverOption<>(DseDriverOption.GRAPH_WRITE_CONSISTENCY_LEVEL, GenericType.STRING);
-  /** The traversal source to use for graph statements. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<String> GRAPH_TRAVERSAL_SOURCE =
       new TypedDriverOption<>(DseDriverOption.GRAPH_TRAVERSAL_SOURCE, GenericType.STRING);
-  /**
-   * The sub-protocol the driver will use to communicate with DSE Graph, on top of the Cassandra
-   * native protocol.
-   */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<String> GRAPH_SUB_PROTOCOL =
       new TypedDriverOption<>(DseDriverOption.GRAPH_SUB_PROTOCOL, GenericType.STRING);
-  /** Whether a script statement represents a system query. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Boolean> GRAPH_IS_SYSTEM_QUERY =
       new TypedDriverOption<>(DseDriverOption.GRAPH_IS_SYSTEM_QUERY, GenericType.BOOLEAN);
-  /** The name of the graph targeted by graph statements. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<String> GRAPH_NAME =
       new TypedDriverOption<>(DseDriverOption.GRAPH_NAME, GenericType.STRING);
-  /** How long the driver waits for a graph request to complete. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Duration> GRAPH_TIMEOUT =
       new TypedDriverOption<>(DseDriverOption.GRAPH_TIMEOUT, GenericType.DURATION);
+
   /** Whether to send events for Insights monitoring. */
   public static final TypedDriverOption<Boolean> MONITOR_REPORTING_ENABLED =
       new TypedDriverOption<>(DseDriverOption.MONITOR_REPORTING_ENABLED, GenericType.BOOLEAN);
-  /** Whether to enable paging for Graph queries. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<String> GRAPH_PAGING_ENABLED =
       new TypedDriverOption<>(DseDriverOption.GRAPH_PAGING_ENABLED, GenericType.STRING);
-  /** The page size for Graph continuous paging. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_PAGE_SIZE =
       new TypedDriverOption<>(
           DseDriverOption.GRAPH_CONTINUOUS_PAGING_PAGE_SIZE, GenericType.INTEGER);
-  /** The maximum number of Graph continuous pages to return. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_PAGES =
       new TypedDriverOption<>(
           DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES, GenericType.INTEGER);
-  /** The maximum number of Graph continuous pages per second. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND =
       new TypedDriverOption<>(
           DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, GenericType.INTEGER);
-  /** The maximum number of Graph continuous pages that can be stored in the local queue. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES =
       new TypedDriverOption<>(
           DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, GenericType.INTEGER);
-  /** The largest latency that we expect to record for graph requests. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_HIGHEST =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_HIGHEST, GenericType.DURATION);
-  /** The shortest latency that we expect to record for graph requests. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_LOWEST =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_LOWEST, GenericType.DURATION);
-  /** Optional service-level objectives to meet, as a list of latencies to track. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<List<Duration>> METRICS_SESSION_GRAPH_REQUESTS_SLO =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_SLO,
           GenericType.listOf(GenericType.DURATION));
-  /** Optional pre-defined percentile of graph requests to publish, as a list of percentiles . */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<List<Double>>
       METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES =
           new TypedDriverOption<>(
               DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES,
               GenericType.listOf(GenericType.DOUBLE));
-  /**
-   * The number of significant decimal digits to which internal structures will maintain for graph
-   * requests.
-   */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Integer> METRICS_SESSION_GRAPH_REQUESTS_DIGITS =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS, GenericType.INTEGER);
-  /** The interval at which percentile data is refreshed for graph requests. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_INTERVAL =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_INTERVAL, GenericType.DURATION);
-  /** The largest latency that we expect to record for graph requests. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_HIGHEST =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST, GenericType.DURATION);
-  /** The shortest latency that we expect to record for graph requests. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_LOWEST =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_LOWEST, GenericType.DURATION);
-  /** Optional service-level objectives to meet, as a list of latencies to track. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<List<Duration>> METRICS_NODE_GRAPH_MESSAGES_SLO =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_SLO,
           GenericType.listOf(GenericType.DURATION));
-  /**
-   * Optional pre-defined percentile of node graph requests to publish, as a list of percentiles .
-   */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<List<Double>>
       METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES =
           new TypedDriverOption<>(
               DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES,
               GenericType.listOf(GenericType.DOUBLE));
-  /**
-   * The number of significant decimal digits to which internal structures will maintain for graph
-   * requests.
-   */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Integer> METRICS_NODE_GRAPH_MESSAGES_DIGITS =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS, GenericType.INTEGER);
-  /** The interval at which percentile data is refreshed for graph requests. */
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
   public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_INTERVAL =
       new TypedDriverOption<>(
           DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_INTERVAL, GenericType.DURATION);

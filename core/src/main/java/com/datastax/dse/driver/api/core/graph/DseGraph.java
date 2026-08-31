@@ -17,7 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.DefaultDseRemoteConnectionBuilder;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.CqlSession;
 import org.apache.tinkerpop.gremlin.process.traversal.AnonymousTraversalSource;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
@@ -26,7 +26,11 @@ import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph;
 /**
  * General purpose utility class for interaction with DSE Graph via the DataStax Enterprise Java
  * driver.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public class DseGraph {
 
   /**
@@ -70,7 +74,7 @@ public class DseGraph {
    * connect to DSE Graph using the {@link CqlSession} in parameter.
    */
   public static DseGraphRemoteConnectionBuilder remoteConnectionBuilder(CqlSession dseSession) {
-    return new DefaultDseRemoteConnectionBuilder(dseSession);
+    throw GraphSupportRemoved.exception();
   }
 
   private DseGraph() {

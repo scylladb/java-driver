@@ -50,6 +50,10 @@
               <exclude>com.scylladb:java-driver-query-builder</exclude>
               <exclude>com.scylladb:java-driver-mapper-runtime</exclude>
               <exclude>com.scylladb:java-driver-mapper-processor</exclude>
+              <!-- Deprecated Graph API signatures compile against TinkerPop, but no Graph runtime
+                   implementation remains, so don't ship those optional dependencies. -->
+              <exclude>org.apache.tinkerpop:*</exclude>
+              <exclude>org.javatuples:javatuples</exclude>
             </excludes>
             <useTransitiveFiltering>true</useTransitiveFiltering>
           </dependencySet>

@@ -30,21 +30,12 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 /**
  * The default session type built by the driver.
  *
- * <p>It provides user-friendly execution methods for:
+ * <p>It provides user-friendly execution methods for synchronous, asynchronous, reactive, and
+ * continuous-paging CQL requests.
  *
- * <ul>
- *   <li>CQL requests: synchronous, asynchronous or reactive mode;
- *   <li>requests specific to DataStax Enterprise: graph and continuous paging.
- * </ul>
- *
- * Client applications can use this interface even if they don't need all the features. In
+ * <p>Client applications can use this interface even if they don't need all the features. In
  * particular, it can be used with a regular Apache Cassandra &reg; cluster, as long as you don't
- * call any of the DSE-specific execute methods. If you're in that situation, you might also want to
- * exclude certain dependencies from your classpath (see the "Integration" page in the user manual).
- *
- * <p>Note that the name "CQL session" is no longer really accurate since this interface can now
- * execute other request types; but it was preserved for backward compatibility with previous driver
- * versions.
+ * call continuous-paging methods.
  */
 public interface CqlSession
     extends Session,

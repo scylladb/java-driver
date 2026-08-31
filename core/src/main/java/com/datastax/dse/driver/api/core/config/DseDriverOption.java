@@ -126,47 +126,53 @@ public enum DseDriverOption implements DriverOption {
       "advanced.metrics.session.continuous-cql-requests.refresh-interval"),
 
   /**
-   * The read consistency level to use for graph statements.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link String}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_READ_CONSISTENCY_LEVEL("basic.graph.read-consistency-level"),
   /**
-   * The write consistency level to use for graph statements.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link String}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_WRITE_CONSISTENCY_LEVEL("basic.graph.write-consistency-level"),
   /**
-   * The traversal source to use for graph statements.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link String}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_TRAVERSAL_SOURCE("basic.graph.traversal-source"),
   /**
-   * The sub-protocol the driver will use to communicate with DSE Graph, on top of the Cassandra
-   * native protocol.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link String}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_SUB_PROTOCOL("advanced.graph.sub-protocol"),
   /**
-   * Whether a script statement represents a system query.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: boolean
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_IS_SYSTEM_QUERY("basic.graph.is-system-query"),
   /**
-   * The name of the graph targeted by graph statements.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link String}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_NAME("basic.graph.name"),
   /**
-   * How long the driver waits for a graph request to complete.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_TIMEOUT("basic.graph.timeout"),
 
   /**
@@ -177,77 +183,84 @@ public enum DseDriverOption implements DriverOption {
   MONITOR_REPORTING_ENABLED("advanced.monitor-reporting.enabled"),
 
   /**
-   * Whether to enable paging for Graph queries.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link String}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_PAGING_ENABLED("advanced.graph.paging-enabled"),
-
   /**
-   * The page size for Graph continuous paging.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: int
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_CONTINUOUS_PAGING_PAGE_SIZE("advanced.graph.paging-options.page-size"),
-
   /**
-   * The maximum number of Graph continuous pages to return.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: int
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_CONTINUOUS_PAGING_MAX_PAGES("advanced.graph.paging-options.max-pages"),
   /**
-   * The maximum number of Graph continuous pages per second.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: int
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND(
       "advanced.graph.paging-options.max-pages-per-second"),
   /**
-   * The maximum number of Graph continuous pages that can be stored in the local queue.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: int
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES("advanced.graph.paging-options.max-enqueued-pages"),
   /**
-   * The largest latency that we expect to record for graph requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_SESSION_GRAPH_REQUESTS_HIGHEST("advanced.metrics.session.graph-requests.highest-latency"),
   /**
-   * The number of significant decimal digits to which internal structures will maintain for graph
-   * requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: int
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_SESSION_GRAPH_REQUESTS_DIGITS(
       "advanced.metrics.session.graph-requests.significant-digits"),
   /**
-   * The interval at which percentile data is refreshed for graph requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_SESSION_GRAPH_REQUESTS_INTERVAL(
       "advanced.metrics.session.graph-requests.refresh-interval"),
   /**
-   * The largest latency that we expect to record for graph requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_NODE_GRAPH_MESSAGES_HIGHEST("advanced.metrics.node.graph-messages.highest-latency"),
   /**
-   * The number of significant decimal digits to which internal structures will maintain for graph
-   * requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: int
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_NODE_GRAPH_MESSAGES_DIGITS("advanced.metrics.node.graph-messages.significant-digits"),
   /**
-   * The interval at which percentile data is refreshed for graph requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_NODE_GRAPH_MESSAGES_INTERVAL("advanced.metrics.node.graph-messages.refresh-interval"),
 
   /**
@@ -266,48 +279,50 @@ public enum DseDriverOption implements DriverOption {
       "advanced.metrics.session.continuous-cql-requests.slo"),
 
   /**
-   * The shortest latency that we expect to record for graph requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_SESSION_GRAPH_REQUESTS_LOWEST("advanced.metrics.session.graph-requests.lowest-latency"),
   /**
-   * Optional service-level objectives to meet, as a list of latencies to track.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_SESSION_GRAPH_REQUESTS_SLO("advanced.metrics.session.graph-requests.slo"),
-
   /**
-   * The shortest latency that we expect to record for graph requests.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_NODE_GRAPH_MESSAGES_LOWEST("advanced.metrics.node.graph-messages.lowest-latency"),
   /**
-   * Optional service-level objectives to meet, as a list of latencies to track.
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value-type: {@link java.time.Duration Duration}
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_NODE_GRAPH_MESSAGES_SLO("advanced.metrics.node.graph-messages.slo"),
   /**
-   * Optional list of percentiles to publish for graph-requests metric. Produces an additional time
-   * series for each requested percentile. This percentile is computed locally, and so can't be
-   * aggregated with percentiles computed across other dimensions (e.g. in a different instance).
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link java.util.List List}&#60;{@link Double}&#62;
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES(
       "advanced.metrics.session.graph-requests.publish-percentiles"),
   /**
-   * Optional list of percentiles to publish for node graph-messages metric. Produces an additional
-   * time series for each requested percentile. This percentile is computed locally, and so can't be
-   * aggregated with percentiles computed across other dimensions (e.g. in a different instance).
+   * This option is ignored because DSE Graph support has been removed.
    *
-   * <p>Value type: {@link java.util.List List}&#60;{@link Double}&#62;
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES(
       "advanced.metrics.node.graph-messages.publish-percentiles"),
+
   /**
    * Optional list of percentiles to publish for continuous paging requests metric. Produces an
    * additional time series for each requested percentile. This percentile is computed locally, and

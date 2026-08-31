@@ -17,12 +17,9 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.DefaultScriptGraphStatement;
-import com.datastax.oss.driver.api.core.cql.Statement;
-import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -40,29 +37,17 @@ import java.util.Map;
  *
  * GraphResultSet graphResultSet = dseSession.execute(statement);
  * }</pre>
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface ScriptGraphStatement extends GraphStatement<ScriptGraphStatement> {
 
   /** Create a new instance from the given script. */
   @NonNull
   static ScriptGraphStatement newInstance(@NonNull String script) {
-    return new DefaultScriptGraphStatement(
-        script,
-        NullAllowingImmutableMap.of(),
-        null,
-        null,
-        null,
-        null,
-        Statement.NO_DEFAULT_TIMESTAMP,
-        null,
-        null,
-        Collections.emptyMap(),
-        null,
-        null,
-        null,
-        null,
-        null,
-        null);
+    throw GraphSupportRemoved.exception();
   }
 
   /**

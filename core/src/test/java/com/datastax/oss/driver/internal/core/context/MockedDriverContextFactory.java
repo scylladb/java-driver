@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.internal.core.context;
 
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +31,7 @@ import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Optional;
 
 public class MockedDriverContextFactory {
@@ -65,6 +67,9 @@ public class MockedDriverContextFactory {
     final DriverConfigLoader configLoader = mock(DriverConfigLoader.class);
     when(configLoader.getInitialConfig()).thenReturn(driverConfig);
     when(driverConfig.getDefaultProfile()).thenReturn(profile);
+    doReturn(Collections.singletonMap(DriverExecutionProfile.DEFAULT_NAME, profile))
+        .when(driverConfig)
+        .getProfiles();
     ProgrammaticArguments args =
         ProgrammaticArguments.builder()
             .withNodeStateListener(mock(NodeStateListener.class))
