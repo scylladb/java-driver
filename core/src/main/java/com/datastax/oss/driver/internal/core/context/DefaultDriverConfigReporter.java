@@ -41,7 +41,6 @@ import com.datastax.oss.driver.internal.core.specex.ConstantSpeculativeExecution
 import com.datastax.oss.driver.internal.core.specex.NoSpeculativeExecutionPolicy;
 import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
-import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
 import com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator;
@@ -1137,10 +1136,6 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     } else if (engineFactory instanceof ProgrammaticSslEngineFactory) {
       return Optional.of(
           ((ProgrammaticSslEngineFactory) engineFactory).isHostnameValidationRequired());
-    } else if (engineFactory instanceof SniSslEngineFactory) {
-      // No accessor to read: SniSslEngineFactory sets the "HTTPS" endpoint identification algorithm
-      // on every engine it builds, unconditionally.
-      return Optional.of(true);
     }
     return Optional.empty();
   }

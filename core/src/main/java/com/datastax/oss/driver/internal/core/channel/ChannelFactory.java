@@ -23,11 +23,9 @@
  */
 package com.datastax.oss.driver.internal.core.channel;
 
-import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
@@ -35,7 +33,6 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeShardingInfo;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
-import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
@@ -46,7 +43,6 @@ import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -75,12 +71,6 @@ import org.slf4j.LoggerFactory;
 public class ChannelFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChannelFactory.class);
-
-  /**
-   * A value for {@link #productType} that indicates that we are connected to DataStax Cloud. This
-   * value matches the one defined at DSE DB server side at {@code ProductType.java}.
-   */
-  private static final String DATASTAX_CLOUD_PRODUCT_TYPE = "DATASTAX_APOLLO";
 
   private static final AtomicBoolean LOGGED_ORPHAN_WARNING = new AtomicBoolean();
 
@@ -304,15 +294,6 @@ public class ChannelFactory {
                       ? productTypes.get(0)
                       : UNKNOWN_PRODUCT_TYPE;
               ChannelFactory.this.productType = productType;
-              DriverConfig driverConfig = context.getConfig();
-              if (driverConfig instanceof TypesafeDriverConfig
-                  && productType.equals(DATASTAX_CLOUD_PRODUCT_TYPE)) {
-                ((TypesafeDriverConfig) driverConfig)
-                    .overrideDefaults(
-                        ImmutableMap.of(
-                            DefaultDriverOption.REQUEST_CONSISTENCY,
-                            ConsistencyLevel.LOCAL_QUORUM.name()));
-              }
             }
             resultFuture.complete(driverChannel);
           } else {
