@@ -107,8 +107,8 @@ datastax-java-driver {
 
 Key points:
 
-- **Mutually exclusive** with a custom `AddressTranslator` and with cloud secure connect bundles —
-  providing both throws `IllegalStateException` at session build time.
+- **Mutually exclusive** with a custom `AddressTranslator` — providing both throws
+  `IllegalStateException` at session build time.
 - **Requires ScyllaDB Enterprise ≥ 2026.1** (scylladb/scylladb#27323). The feature is not
   available on ScyllaDB OSS or Apache Cassandra.
 
