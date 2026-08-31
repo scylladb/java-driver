@@ -134,16 +134,6 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>gremlin-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>tinkergraph-gremlin</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.apache.directory.server</groupId>
       <artifactId>apacheds-core</artifactId>
       <scope>test</scope>
@@ -236,18 +226,13 @@
         <configuration>
           <compilerArgs combine.children="append">
             <compilerArg>-processor</compilerArg>
-            <compilerArg>com.datastax.oss.driver.internal.mapper.processor.MapperProcessor,com.datastax.oss.driver.internal.gremlin.PatchedGremlinDslProcessor</compilerArg>
+            <compilerArg>com.datastax.oss.driver.internal.mapper.processor.MapperProcessor</compilerArg>
           </compilerArgs>
           <annotationProcessorPaths>
             <path>
               <groupId>com.google.errorprone</groupId>
               <artifactId>error_prone_core</artifactId>
               <version>2.31.0</version>
-            </path>
-            <path>
-              <groupId>com.scylladb</groupId>
-              <artifactId>java-driver-test-infra</artifactId>
-              <version>${project.version}</version>
             </path>
             <path>
               <groupId>com.scylladb</groupId>
@@ -258,11 +243,6 @@
               <groupId>com.scylladb</groupId>
               <artifactId>java-driver-mapper-runtime</artifactId>
               <version>${project.version}</version>
-            </path>
-            <path>
-              <groupId>org.apache.tinkerpop</groupId>
-              <artifactId>gremlin-core</artifactId>
-              <version>${tinkerpop.version}</version>
             </path>
           </annotationProcessorPaths>
         </configuration>

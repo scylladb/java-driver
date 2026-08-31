@@ -190,10 +190,9 @@ public class InsightsClientTest {
                         ImmutableMap.of("maxSpeculativeExecutions", 100, "delay", 20),
                         DEFAULT_SPECULATIVE_EXECUTION_PACKAGE),
                     "LOCAL_ONE",
-                    "SERIAL",
-                    ImmutableMap.of("source", "src-graph")),
+                    "SERIAL"),
                 "non-default",
-                new SpecificExecutionProfile(50, null, null, null, null, null)));
+                new SpecificExecutionProfile(50, null, null, null, null)));
     assertThat(insightData.getPoolSizeByHostDistance())
         .isEqualTo(new PoolSizeByHostDistance(2, 1, 0));
     assertThat(insightData.getHeartbeatInterval()).isEqualTo(100);
