@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<!--
+    Copyright (C) 2026 ScyllaDB
+
+    Modified by ScyllaDB
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.scylladb</groupId>
+    <artifactId>java-driver-parent</artifactId>
+    <version>4.19.2.2-SNAPSHOT</version>
+  </parent>
+  <artifactId>java-driver-coverage-report</artifactId>
+  <packaging>pom</packaging>
+  <name>Java driver for Scylla and Apache Cassandra(R) - coverage report</name>
+  <!--
+      Not a real artifact: this module exists only to run jacoco:report-aggregate
+      over its dependencies below. The parent pom's default prepare-agent/report
+      executions are disabled below (not via jacoco.skip, which would also
+      disable report-aggregate itself) since this module has no tests or
+      classes of its own for them to act on.
+
+      scope=compile is explicit on mapper-runtime/mapper-processor/metrics-*
+      below because the root pom's dependencyManagement pins them to
+      scope=test (correct for their other consumers, like integration-tests,
+      which only need them for testing); report-aggregate only aggregates
+      compile/runtime-scoped reactor dependencies, so without this override
+      these 4 modules' classes are silently excluded from the aggregate
+      report even though their jacoco.exec data is loaded (confirmed by
+      comparing the loaded-execution-data-file log lines against the
+      Analyzed-bundle log lines: all 7 files load, only 3 modules get
+      analyzed). That's real, substantial coverage lost from these modules'
+      own integration tests (MicrometerMetricsIT, MicroProfileMetricsIT).
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>com.scylladb</groupId>
+      <artifactId>java-driver-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.scylladb</groupId>
+      <artifactId>java-driver-query-builder</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.scylladb</groupId>
+      <artifactId>java-driver-mapper-runtime</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.scylladb</groupId>
+      <artifactId>java-driver-mapper-processor</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.scylladb</groupId>
+      <artifactId>java-driver-metrics-micrometer</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.scylladb</groupId>
+      <artifactId>java-driver-metrics-microprofile</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.scylladb</groupId>
+      <artifactId>java-driver-integration-tests</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <!-- Override the parent's default prepare-agent/report executions: this
+               module has nothing of its own for them to do. -->
+          <execution>
+            <id>default</id>
+            <phase>none</phase>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>none</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-install-plugin</artifactId>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <profiles>
+    <!--
+        report-aggregate is bound inside the "coverage" profile rather than
+        the default build: this module sits in the default reactor (root
+        pom's <modules>), so an unconditional binding would render a report
+        during any plain `mvn install` / `mvn verify` across the whole
+        reactor, before any test had run. A bare `jacoco:report-aggregate`
+        goal on the command line was the other option, but that runs
+        against every project an -am reactor pulls in (all eleven here,
+        including a report over guava-shaded's relocated classes) and never
+        sees this execution's own configuration.
+    -->
+    <profile>
+      <id>coverage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>report-aggregate</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>report-aggregate</goal>
+                </goals>
+                <configuration>
+                  <title>Java Driver for Scylla and Apache Cassandra 4.x</title>
+                  <formats>
+                    <format>HTML</format>
+                    <format>XML</format>
+                    <format>CSV</format>
+                  </formats>
+                  <outputDirectory>${project.build.directory}/site/jacoco-aggregate</outputDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>
