@@ -23,8 +23,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -39,6 +42,7 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
+import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
@@ -50,6 +54,7 @@ import com.datastax.oss.driver.api.core.servererrors.UnavailableException;
 import com.datastax.oss.driver.api.core.servererrors.WriteTimeoutException;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
+import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Error;
 import com.datastax.oss.protocol.internal.response.error.ReadTimeout;
@@ -67,6 +72,115 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 
 public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_contain_failure_while_building_retry_request() {
+    HeartbeatException requestFailure = mock(HeartbeatException.class);
+    RuntimeException setupFailure = new RuntimeException("mock failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    when(verdict.getRetryDecision()).thenReturn(RetryDecision.RETRY_NEXT);
+    when(verdict.getRetryRequest(any(Statement.class))).thenThrow(setupFailure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    harnessBuilder.withResponseFailure(node1, requestFailure);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      RequestTracker requestTracker = mock(RequestTracker.class);
+      when(harness.getContext().getRequestTracker()).thenReturn(requestTracker);
+      when(harness
+              .getContext()
+              .getRetryPolicy(anyString())
+              .onRequestAbortedVerdict(any(), eq(requestFailure), eq(0)))
+          .thenReturn(verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(setupFailure));
+      verify(verdict).getRetryDecision();
+      verify(requestTracker, times(1))
+          .onNodeError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(requestFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              eq(node1),
+              anyString());
+      verify(requestTracker, never())
+          .onNodeError(
+              any(),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              any(),
+              anyString());
+      verify(requestTracker)
+          .onError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              isNull(),
+              anyString());
+      verifyNoMoreInteractions(requestTracker);
+    }
+  }
+
+  @Test
+  public void should_contain_failure_while_reading_retry_decision() {
+    HeartbeatException requestFailure = mock(HeartbeatException.class);
+    RuntimeException setupFailure = new RuntimeException("mock failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    when(verdict.getRetryDecision()).thenThrow(setupFailure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    harnessBuilder.withResponseFailure(node1, requestFailure);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      RequestTracker requestTracker = mock(RequestTracker.class);
+      when(harness.getContext().getRequestTracker()).thenReturn(requestTracker);
+      when(harness
+              .getContext()
+              .getRetryPolicy(anyString())
+              .onRequestAbortedVerdict(any(), eq(requestFailure), eq(0)))
+          .thenReturn(verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(setupFailure));
+      verify(verdict).getRetryDecision();
+      verify(requestTracker, times(1))
+          .onNodeError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(requestFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              eq(node1),
+              anyString());
+      verify(requestTracker, never())
+          .onNodeError(
+              any(),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              any(),
+              anyString());
+      verify(requestTracker)
+          .onError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              isNull(),
+              anyString());
+      verifyNoMoreInteractions(requestTracker);
+    }
+  }
 
   @Test
   @UseDataProvider("allIdempotenceConfigs")
