@@ -108,8 +108,17 @@ resolve-cassandra-version: .prepare-get-version
 		CASSANDRA_VERSION_RESOLVED=$$(get-version -source github-tag -repo apache/cassandra -prefix "cassandra-" -out-no-prefix -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and 4.LAST.LAST" | tr -d '\"')
 	elif [[ "${CASSANDRA_VERSION}" == "3-LATEST" ]]; then
 		CASSANDRA_VERSION_RESOLVED=$$(get-version -source github-tag -repo apache/cassandra -prefix "cassandra-" -out-no-prefix -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and 3.LAST.LAST" | tr -d '\"')
-	elif echo "${CASSANDRA_VERSION}" | grep -P '^[0-9\.]+'; then
+	elif [[ "${CASSANDRA_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
 		CASSANDRA_VERSION_RESOLVED=${CASSANDRA_VERSION}
+	elif [[ "${CASSANDRA_VERSION}" =~ ^[0-9]+\.[0-9]+$$ ]]; then
+		# Complete a two-component version to its newest patch. See the comment in
+		# resolve-scylla-version for why a partial version must not reach CCM.
+		CASSANDRA_VERSION_RESOLVED=$$(get-version -source github-tag -repo apache/cassandra -prefix "cassandra-" -out-no-prefix -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and ${CASSANDRA_VERSION}.LAST" | tr -d '\"')
+	elif echo "${CASSANDRA_VERSION}" | grep -qP '^[0-9]+\.[0-9]+'; then
+		# Pre-release and other suffixed forms (4.0-alpha1, 5.0-beta1) already name one
+		# exact build, so pass them through and skip the check below.
+		CASSANDRA_VERSION_RESOLVED=${CASSANDRA_VERSION}
+		CASSANDRA_VERSION_EXACT=1
 	else
 		echo "Unknown Cassandra version name '${CASSANDRA_VERSION}'"
 		exit 1
@@ -117,6 +126,11 @@ resolve-cassandra-version: .prepare-get-version
 
 	if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		echo "Failed to resolve Cassandra ${CASSANDRA_VERSION}"
+		exit 1
+	fi
+
+	if [[ -z "$${CASSANDRA_VERSION_EXACT}" ]] && [[ ! "$${CASSANDRA_VERSION_RESOLVED}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
+		echo "Resolved Cassandra version '$${CASSANDRA_VERSION_RESOLVED}' is not fully qualified, expected MAJOR.MINOR.PATCH"
 		exit 1
 	fi
 
@@ -145,8 +159,23 @@ resolve-scylla-version: .prepare-get-version
 		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]{4}$$.^[0-9]+$$.^[0-9]+$$ and LAST.LAST.LAST" | tr -d '\"')
 	elif [[ "${SCYLLA_VERSION}" == "PRIOR" ]]; then
 		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]{4}$$.^[0-9]+$$.^[0-9]+$$ and LAST.LAST.LAST-1" | tr -d '\"')
-	elif echo "${SCYLLA_VERSION}" | grep -P '^[0-9\.]+'; then
+	elif [[ "${SCYLLA_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
 		SCYLLA_VERSION_RESOLVED=${SCYLLA_VERSION}
+	elif [[ "${SCYLLA_VERSION}" =~ ^[0-9]+\.[0-9]+$$ ]]; then
+		# A two-component version such as 2026.2 is accepted by CCM, but CCM then stores
+		# the downloaded release under its full version while looking it up under the
+		# partial one, so the lookup never hits the cache: every single 'ccm create'
+		# re-queries S3 for the newest patch and the integration tests take several
+		# times longer. Resolve it here, once, so the tests get a cache hit instead.
+		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and ${SCYLLA_VERSION}.LAST" | tr -d '\"')
+		if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]]; then
+			SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla-enterprise -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and ${SCYLLA_VERSION}.LAST" | tr -d '\"')
+		fi
+	elif echo "${SCYLLA_VERSION}" | grep -qP '^[0-9]+\.[0-9]+'; then
+		# Pre-release and other suffixed forms (2022.2.0-rc0, 5.0.rc3) already name one
+		# exact build, so pass them through and skip the check below.
+		SCYLLA_VERSION_RESOLVED=${SCYLLA_VERSION}
+		SCYLLA_VERSION_EXACT=1
 	else
 		echo "Unknown ScyllaDB version name '${SCYLLA_VERSION}'"
 		exit 1
@@ -154,6 +183,13 @@ resolve-scylla-version: .prepare-get-version
 
 	if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]]; then
 		echo "Failed to resolve ScyllaDB '${SCYLLA_VERSION}'"
+		exit 1
+	fi
+
+	if [[ -z "$${SCYLLA_VERSION_EXACT}" ]] && [[ ! "$${SCYLLA_VERSION_RESOLVED}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
+		echo "Resolved ScyllaDB version '$${SCYLLA_VERSION_RESOLVED}' is not fully qualified, expected MAJOR.MINOR.PATCH"
+		echo "A partial version makes every 'ccm create' query S3 for the newest patch,"
+		echo "which makes the integration tests several times slower."
 		exit 1
 	fi
 
