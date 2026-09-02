@@ -33,8 +33,10 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ConnectionInitException;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
+import com.datastax.oss.driver.internal.core.context.DriverConfigReporter.TlsInfo;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.protocol.BytesToSegmentDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
@@ -43,6 +45,10 @@ import com.datastax.oss.driver.internal.core.protocol.FrameToSegmentEncoder;
 import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
+import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
+import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
+import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.util.ProtocolUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.protocol.internal.Message;
@@ -62,8 +68,11 @@ import com.datastax.oss.protocol.internal.response.Ready;
 import com.datastax.oss.protocol.internal.response.Supported;
 import com.datastax.oss.protocol.internal.response.result.Rows;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
+import edu.umd.cs.findbugs.annotations.Nullable;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
+import io.netty.handler.ssl.SslHandler;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
@@ -91,6 +100,8 @@ class ProtocolInitHandler extends ConnectInitHandler {
   private final String expectedClusterName;
   private final EndPoint endPoint;
   private final HeartbeatHandler heartbeatHandler;
+  @Nullable private final SslHandler installedSslHandler;
+  private final boolean installedSslHandlerHasKnownHostnameVerificationSemantics;
   private String logPrefix;
   private ChannelHandlerContext ctx;
   private final boolean querySupportedOptions;
@@ -109,6 +120,28 @@ class ProtocolInitHandler extends ConnectInitHandler {
       DriverChannelOptions options,
       HeartbeatHandler heartbeatHandler,
       boolean querySupportedOptions) {
+    this(
+        context,
+        protocolVersion,
+        expectedClusterName,
+        endPoint,
+        options,
+        heartbeatHandler,
+        querySupportedOptions,
+        null,
+        false);
+  }
+
+  ProtocolInitHandler(
+      InternalDriverContext context,
+      ProtocolVersion protocolVersion,
+      String expectedClusterName,
+      EndPoint endPoint,
+      DriverChannelOptions options,
+      HeartbeatHandler heartbeatHandler,
+      boolean querySupportedOptions,
+      @Nullable SslHandler installedSslHandler,
+      boolean installedSslHandlerHasKnownHostnameVerificationSemantics) {
 
     this.context = context;
     this.endPoint = endPoint;
@@ -122,6 +155,9 @@ class ProtocolInitHandler extends ConnectInitHandler {
     this.options = options;
     this.heartbeatHandler = heartbeatHandler;
     this.querySupportedOptions = querySupportedOptions;
+    this.installedSslHandler = installedSslHandler;
+    this.installedSslHandlerHasKnownHostnameVerificationSemantics =
+        installedSslHandlerHasKnownHostnameVerificationSemantics;
     this.logPrefix = options.ownerLogPrefix + "|connecting...";
   }
 
@@ -192,12 +228,14 @@ class ProtocolInitHandler extends ConnectInitHandler {
         case STARTUP:
           Map<String, String> startupOptions = new HashMap<>(context.getStartupOptions());
           featureStore.populateStartupOptions(startupOptions);
-          // The DRIVER_CONFIG blob describes the whole session, so only the control connection
-          // carries it (options.reportConfig); the other connections are correlated to it by the
-          // SESSION_ID that every connection already carries from context.getStartupOptions().
-          // No-op when driver config reporting is disabled.
+          // Most of DRIVER_CONFIG describes the whole session; its TLS group describes the control
+          // connection carrying it. Other connections are correlated to it by the SESSION_ID that
+          // every connection already carries from context.getStartupOptions(). No-op when driver
+          // config reporting is disabled.
           if (options.reportConfig) {
-            context.getDriverConfigReporter().populateControlConnectionOptions(startupOptions);
+            context
+                .getDriverConfigReporter()
+                .populateControlConnectionOptions(startupOptions, currentTlsInfo());
           }
           return request = new Startup(startupOptions);
         case GET_CLUSTER_NAME:
@@ -210,6 +248,22 @@ class ProtocolInitHandler extends ConnectInitHandler {
           return request = new Register(registerEventTypes);
         default:
           throw new AssertionError("unhandled step: " + step);
+      }
+    }
+
+    private TlsInfo currentTlsInfo() {
+      try {
+        return tlsInfo(
+            channel, installedSslHandler, installedSslHandlerHasKnownHostnameVerificationSemantics);
+      } catch (RuntimeException e) {
+        // Configuration reporting is best-effort and must never prevent a connection. TLS presence
+        // is still assumed because the failure came while inspecting its handler, but the schema
+        // permits hostname-verification to be omitted when unknown.
+        LOG.warn(
+            "[{}] Could not inspect hostname verification on the active SSL engine; omitting it",
+            logPrefix,
+            e);
+        return TlsInfo.enabledWithUnknownHostnameVerification();
       }
     }
 
@@ -414,6 +468,44 @@ class ProtocolInitHandler extends ConnectInitHandler {
     public String toString() {
       return "init query " + step;
     }
+  }
+
+  static TlsInfo tlsInfo(
+      Channel channel,
+      @Nullable SslHandler installedSslHandler,
+      boolean installedSslHandlerHasKnownHostnameVerificationSemantics) {
+    // SslHandlerFactory always returns SslHandler, and this reads the pipeline after
+    // NettyOptions.afterChannelInitialized() has had a chance to add, replace, remove, or
+    // reconfigure it. A hook that implements encryption with a handler unrelated to SslHandler
+    // cannot be identified generically and is therefore reported as TLS-disabled.
+    SslHandler sslHandler = channel.pipeline().get(SslHandler.class);
+    if (sslHandler == null) {
+      return TlsInfo.disabled();
+    }
+    // Endpoint-identification parameters are authoritative only for the exact handler installed
+    // from a recognized driver factory. A replacement handler or custom trust manager may ignore
+    // those parameters, so either true or false would be a guess.
+    if (sslHandler != installedSslHandler
+        || !installedSslHandlerHasKnownHostnameVerificationSemantics) {
+      return TlsInfo.enabledWithUnknownHostnameVerification();
+    }
+    String endpointIdentificationAlgorithm =
+        sslHandler.engine().getSSLParameters().getEndpointIdentificationAlgorithm();
+    return TlsInfo.enabled(
+        endpointIdentificationAlgorithm != null && !endpointIdentificationAlgorithm.isEmpty());
+  }
+
+  static boolean hasKnownHostnameVerificationSemantics(SslHandlerFactory handlerFactory) {
+    // Exact class deliberately: a subclass can override newSslHandler() and ignore the wrapped
+    // engine factory.
+    if (handlerFactory.getClass() != JdkSslHandlerFactory.class) {
+      return false;
+    }
+    SslEngineFactory engineFactory = ((JdkSslHandlerFactory) handlerFactory).getSslEngineFactory();
+    // ProgrammaticSslEngineFactory is deliberately not recognized: its arbitrary SSLContext can
+    // contain an X509ExtendedTrustManager that ignores endpoint-identification parameters.
+    return engineFactory.getClass() == DefaultSslEngineFactory.class
+        || engineFactory.getClass() == SniSslEngineFactory.class;
   }
 
   /**

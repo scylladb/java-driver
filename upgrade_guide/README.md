@@ -32,8 +32,9 @@ a client's connections and inspect its driver settings while investigating an in
   turn it off. It is not derived from `CLIENT_ID`, which remains user-settable and unchanged.
 * `DRIVER_CONFIG` — a compact JSON description of the effective configuration of the session's
   default execution profile (connection/socket settings, timeouts,
-  retry/reconnection/speculative-execution/load-balancing policies, connection pooling, query
-  defaults, and TLS). Only the control connection sends it, since it describes the whole session.
+  retry/reconnection/speculative-execution/load-balancing policies, connection pooling, and query
+  defaults), plus the effective TLS state of the control connection carrying it. Only the control
+  connection sends it.
   It reports settings only — never credentials, statements or data — and identifies non-built-in
   policies by class name: the simple name, or the fully-qualified name when the policy is an
   anonymous class (which has no simple name). Reporting it is best-effort: if the report cannot be
