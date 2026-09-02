@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -36,6 +35,7 @@ import org.junit.runner.RunWith;
 
 @RunWith(DataProviderRunner.class)
 public class InsightsSupportVerifierTest {
+  private static final String DSE_VERSION = "DSE_VERSION";
 
   @Test
   @UseDataProvider(value = "dseHostsProvider")
@@ -51,20 +51,15 @@ public class InsightsSupportVerifierTest {
   @DataProvider
   public static Object[][] dseHostsProvider() {
     Node dse605 = mock(Node.class);
-    when(dse605.getExtras())
-        .thenReturn(ImmutableMap.of(DseNodeProperties.DSE_VERSION, Version.parse("6.0.5")));
+    when(dse605.getExtras()).thenReturn(ImmutableMap.of(DSE_VERSION, Version.parse("6.0.5")));
     Node dse604 = mock(Node.class);
-    when(dse604.getExtras())
-        .thenReturn(ImmutableMap.of(DseNodeProperties.DSE_VERSION, Version.parse("6.0.4")));
+    when(dse604.getExtras()).thenReturn(ImmutableMap.of(DSE_VERSION, Version.parse("6.0.4")));
     Node dse600 = mock(Node.class);
-    when(dse600.getExtras())
-        .thenReturn(ImmutableMap.of(DseNodeProperties.DSE_VERSION, Version.parse("6.0.0")));
+    when(dse600.getExtras()).thenReturn(ImmutableMap.of(DSE_VERSION, Version.parse("6.0.0")));
     Node dse5113 = mock(Node.class);
-    when(dse5113.getExtras())
-        .thenReturn(ImmutableMap.of(DseNodeProperties.DSE_VERSION, Version.parse("5.1.13")));
+    when(dse5113.getExtras()).thenReturn(ImmutableMap.of(DSE_VERSION, Version.parse("5.1.13")));
     Node dse500 = mock(Node.class);
-    when(dse500.getExtras())
-        .thenReturn(ImmutableMap.of(DseNodeProperties.DSE_VERSION, Version.parse("5.0.0")));
+    when(dse500.getExtras()).thenReturn(ImmutableMap.of(DSE_VERSION, Version.parse("5.0.0")));
     Node nodeWithoutExtras = mock(Node.class);
     when(nodeWithoutExtras.getExtras()).thenReturn(Collections.emptyMap());
 
