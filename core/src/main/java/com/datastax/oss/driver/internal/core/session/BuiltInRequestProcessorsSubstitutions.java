@@ -18,7 +18,6 @@
 package com.datastax.oss.driver.internal.core.session;
 
 import static com.datastax.oss.driver.internal.core.util.Dependency.REACTIVE_STREAMS;
-import static com.datastax.oss.driver.internal.core.util.Dependency.TINKERPOP;
 
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.util.GraalDependencyChecker;
@@ -31,8 +30,8 @@ import java.util.function.BooleanSupplier;
 @SuppressWarnings("unused")
 public class BuiltInRequestProcessorsSubstitutions {
 
-  @TargetClass(value = BuiltInRequestProcessors.class, onlyWith = GraphMissingReactiveMissing.class)
-  public static final class BuiltInRequestProcessorsGraphMissingReactiveMissing {
+  @TargetClass(value = BuiltInRequestProcessors.class, onlyWith = ReactiveMissing.class)
+  public static final class BuiltInRequestProcessorsReactiveMissing {
 
     @Substitute
     public static List<RequestProcessor<?, ?>> createDefaultProcessors(
@@ -43,8 +42,8 @@ public class BuiltInRequestProcessorsSubstitutions {
     }
   }
 
-  @TargetClass(value = BuiltInRequestProcessors.class, onlyWith = GraphMissingReactivePresent.class)
-  public static final class BuiltInRequestProcessorsGraphMissingReactivePresent {
+  @TargetClass(value = BuiltInRequestProcessors.class, onlyWith = ReactivePresent.class)
+  public static final class BuiltInRequestProcessorsReactivePresent {
 
     @Substitute
     public static List<RequestProcessor<?, ?>> createDefaultProcessors(
@@ -56,40 +55,17 @@ public class BuiltInRequestProcessorsSubstitutions {
     }
   }
 
-  @TargetClass(value = BuiltInRequestProcessors.class, onlyWith = GraphPresentReactiveMissing.class)
-  public static final class BuiltInRequestProcessorsGraphPresentReactiveMissing {
-
-    @Substitute
-    public static List<RequestProcessor<?, ?>> createDefaultProcessors(
-        DefaultDriverContext context) {
-      List<RequestProcessor<?, ?>> processors = new ArrayList<>();
-      BuiltInRequestProcessors.addBasicProcessors(processors, context);
-      BuiltInRequestProcessors.addGraphProcessors(context, processors);
-      return processors;
+  public static class ReactiveMissing implements BooleanSupplier {
+    @Override
+    public boolean getAsBoolean() {
+      return !GraalDependencyChecker.isPresent(REACTIVE_STREAMS);
     }
   }
 
-  public static class GraphMissingReactiveMissing implements BooleanSupplier {
+  public static class ReactivePresent implements BooleanSupplier {
     @Override
     public boolean getAsBoolean() {
-      return !GraalDependencyChecker.isPresent(TINKERPOP)
-          && !GraalDependencyChecker.isPresent(REACTIVE_STREAMS);
-    }
-  }
-
-  public static class GraphMissingReactivePresent implements BooleanSupplier {
-    @Override
-    public boolean getAsBoolean() {
-      return !GraalDependencyChecker.isPresent(TINKERPOP)
-          && GraalDependencyChecker.isPresent(REACTIVE_STREAMS);
-    }
-  }
-
-  public static class GraphPresentReactiveMissing implements BooleanSupplier {
-    @Override
-    public boolean getAsBoolean() {
-      return GraalDependencyChecker.isPresent(TINKERPOP)
-          && !GraalDependencyChecker.isPresent(REACTIVE_STREAMS);
+      return GraalDependencyChecker.isPresent(REACTIVE_STREAMS);
     }
   }
 }

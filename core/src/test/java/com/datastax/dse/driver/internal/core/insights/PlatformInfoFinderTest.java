@@ -58,7 +58,6 @@ public class PlatformInfoFinderTest {
         withUnverifiedRuntimeVersionOptional("4.0.56.Final"));
     expected.put("org.slf4j:slf4j-api", withUnverifiedRuntimeVersion("1.7.25"));
     expected.put("org.ow2.asm:asm", withUnverifiedRuntimeVersion("5.0.3"));
-    expected.put("com.esri.geometry:esri-geometry-api", withUnverifiedRuntimeVersion("1.2.1"));
     expected.put("io.netty:netty-transport", withUnverifiedRuntimeVersion("4.0.56.Final"));
     expected.put("com.github.jnr:jnr-x86asm", withUnverifiedRuntimeVersion("1.0.2"));
     expected.put("org.ow2.asm:asm-analysis", withUnverifiedRuntimeVersion("5.0.3"));
@@ -69,7 +68,6 @@ public class PlatformInfoFinderTest {
     expected.put("io.dropwizard.metrics:metrics-core", withUnverifiedRuntimeVersion("3.2.2"));
     expected.put("org.ow2.asm:asm-tree", withUnverifiedRuntimeVersion("5.0.3"));
     expected.put("com.github.jnr:jnr-posix", withUnverifiedRuntimeVersion("3.0.44"));
-    expected.put("org.codehaus.jackson:jackson-core-asl", withUnverifiedRuntimeVersion("1.9.12"));
     expected.put(
         "com.fasterxml.jackson.core:jackson-databind", withUnverifiedRuntimeVersion("2.7.9.3"));
     expected.put("io.netty:netty-codec", withUnverifiedRuntimeVersion("4.0.56.Final"));
@@ -82,7 +80,6 @@ public class PlatformInfoFinderTest {
     expected.put("com.github.jnr:jffi", withUnverifiedRuntimeVersion("1.2.16"));
     expected.put("io.netty:netty-buffer", withUnverifiedRuntimeVersion("4.0.56.Final"));
     expected.put("org.ow2.asm:asm-commons", withUnverifiedRuntimeVersion("5.0.3"));
-    expected.put("org.json:json", withUnverifiedRuntimeVersion("20090211"));
     expected.put("org.ow2.asm:asm-util", withUnverifiedRuntimeVersion("5.0.3"));
     expected.put("com.github.jnr:jnr-ffi", withUnverifiedRuntimeVersion("2.1.7"));
 
@@ -91,7 +88,7 @@ public class PlatformInfoFinderTest {
         new PlatformInfoFinder(this::nullUrlProvider).fetchDependenciesFromFile(inputStream);
 
     // then
-    assertThat(stringStringMap).hasSize(28);
+    assertThat(stringStringMap).hasSize(25);
     assertThat(stringStringMap).isEqualTo(expected);
   }
 

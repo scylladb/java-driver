@@ -23,8 +23,8 @@ The default `java-driver-core` JAR depends on a number of [third party
 libraries](../integration/#driver-dependencies). This can create conflicts if your application
 already uses other versions of those same dependencies.
 
-To avoid this, we provide an alternative core artifact that shades [Netty](../integration/#netty),
-[Jackson](../integration/#jackson) and [ESRI](../integration/#esri). To use it, replace the
+To avoid this, we provide an alternative core artifact that shades [Netty](../integration/#netty)
+and [Jackson](../integration/#jackson). To use it, replace the
 dependency to `java-driver-core` by:
 
 ```xml
@@ -82,5 +82,5 @@ Notes:
     </dependency>
     ```
   
-    This only works with Netty: for Jackson and ESRI, only the exact version declared in the driver POM
-    is supported.
+    This only works with Netty: for Jackson, only the exact version declared in the driver POM is
+    supported.

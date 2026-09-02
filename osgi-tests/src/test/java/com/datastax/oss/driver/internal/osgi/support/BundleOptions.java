@@ -28,7 +28,6 @@ import static org.ops4j.pax.exam.CoreOptions.vmOption;
 import org.ops4j.pax.exam.CoreOptions;
 import org.ops4j.pax.exam.options.CompositeOption;
 import org.ops4j.pax.exam.options.UrlProvisionOption;
-import org.ops4j.pax.exam.options.WrappedUrlProvisionOption;
 
 public class BundleOptions {
 
@@ -126,67 +125,6 @@ public class BundleOptions {
         options(
             mavenBundle("org.xerial.snappy", "snappy-java").versionAsInProject(),
             systemProperty("cassandra.compression").value("SNAPPY"));
-  }
-
-  public static CompositeOption tinkerpopBundles() {
-    return () ->
-        options(
-            CoreOptions.wrappedBundle(
-                    mavenBundle("org.apache.tinkerpop", "gremlin-core").versionAsInProject())
-                .exports(
-                    // avoid exporting 'org.apache.tinkerpop.gremlin.*' as other Tinkerpop jars have
-                    // this root package as well
-                    "org.apache.tinkerpop.gremlin.jsr223.*",
-                    "org.apache.tinkerpop.gremlin.process.*",
-                    "org.apache.tinkerpop.gremlin.structure.*",
-                    "org.apache.tinkerpop.gremlin.util.*")
-                .bundleSymbolicName("org.apache.tinkerpop.gremlin-core")
-                .overwriteManifest(WrappedUrlProvisionOption.OverwriteMode.FULL),
-            CoreOptions.wrappedBundle(
-                    mavenBundle("org.apache.tinkerpop", "tinkergraph-gremlin").versionAsInProject())
-                .exports("org.apache.tinkerpop.gremlin.tinkergraph.*")
-                .bundleSymbolicName("org.apache.tinkerpop.tinkergraph-gremlin")
-                .overwriteManifest(WrappedUrlProvisionOption.OverwriteMode.FULL),
-            CoreOptions.wrappedBundle(
-                    mavenBundle("org.apache.tinkerpop", "gremlin-shaded").versionAsInProject())
-                .exports("org.apache.tinkerpop.shaded.*")
-                .bundleSymbolicName("org.apache.tinkerpop.gremlin-shaded")
-                .overwriteManifest(WrappedUrlProvisionOption.OverwriteMode.FULL),
-            // Note: the versions below are hard-coded because they shouldn't change very often,
-            // but if the tests fail because of them, we should consider parameterizing them
-            mavenBundle("com.sun.activation", "jakarta.activation", "2.0.1"),
-            mavenBundle("com.sun.mail", "mailapi", "2.0.1"),
-            mavenBundle("org.apache.commons", "commons-text", "1.8"),
-            mavenBundle("org.apache.commons", "commons-configuration2", "2.9.0"),
-            CoreOptions.wrappedBundle(mavenBundle("commons-logging", "commons-logging", "1.1.1"))
-                .exports("org.apache.commons.logging.*")
-                .bundleVersion("1.1.1")
-                .bundleSymbolicName("org.apache.commons.commons-logging")
-                .overwriteManifest(WrappedUrlProvisionOption.OverwriteMode.FULL),
-            mavenBundle("commons-collections", "commons-collections", "3.2.2"),
-            mavenBundle("org.apache.commons", "commons-lang3", "3.8.1"),
-            mavenBundle("commons-lang", "commons-lang", "2.6"),
-            CoreOptions.wrappedBundle(mavenBundle("org.javatuples", "javatuples", "1.2"))
-                .exports("org.javatuples.*")
-                .bundleVersion("1.2")
-                .bundleSymbolicName("org.javatuples")
-                .overwriteManifest(WrappedUrlProvisionOption.OverwriteMode.FULL),
-            systemProperty("cassandra.graph").value("true"),
-            systemProperty("cassandra.graph.name").value("test_osgi_graph"));
-  }
-
-  public static CompositeOption esriBundles() {
-    return () ->
-        options(
-            CoreOptions.wrappedBundle(
-                    mavenBundle("com.esri.geometry", "esri-geometry-api").versionAsInProject())
-                .exports("com.esri.core.geometry.*")
-                .imports("org.json", "org.codehaus.jackson")
-                .bundleSymbolicName("com.esri.core.geometry")
-                .overwriteManifest(WrappedUrlProvisionOption.OverwriteMode.FULL),
-            mavenBundle("org.json", "json").versionAsInProject(),
-            mavenBundle("org.codehaus.jackson", "jackson-core-asl").versionAsInProject(),
-            systemProperty("cassandra.geo").value("true"));
   }
 
   public static CompositeOption reactiveBundles() {

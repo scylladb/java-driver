@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.osgi;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.internal.core.graph.GraphProtocol;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.CqlSessionBuilder;
@@ -27,8 +25,6 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.ProgrammaticDriverConfigLoaderBuilder;
 import com.datastax.oss.driver.api.osgi.service.MailboxService;
 import com.datastax.oss.driver.internal.osgi.service.MailboxServiceImpl;
-import com.datastax.oss.driver.internal.osgi.service.geo.GeoMailboxServiceImpl;
-import com.datastax.oss.driver.internal.osgi.service.graph.GraphMailboxServiceImpl;
 import com.datastax.oss.driver.internal.osgi.service.reactive.ReactiveMailboxServiceImpl;
 import java.net.InetSocketAddress;
 import java.util.Dictionary;
@@ -49,7 +45,6 @@ public class MailboxActivator implements BundleActivator {
 
   private CqlSession session;
   private CqlIdentifier keyspace;
-  private String graphName;
 
   @Override
   public void start(BundleContext context) {
@@ -128,16 +123,6 @@ public class MailboxActivator implements BundleActivator {
       LOGGER.info("Compression: NONE");
     }
 
-    graphName = context.getProperty("cassandra.graph.name");
-    if (graphName != null) {
-      LOGGER.info("Graph name: {}", graphName);
-      configLoaderBuilder.withString(DseDriverOption.GRAPH_NAME, graphName);
-      configLoaderBuilder.withString(
-          DseDriverOption.GRAPH_SUB_PROTOCOL, GraphProtocol.GRAPH_BINARY_1_0.toInternalCode());
-    } else {
-      LOGGER.info("Graph: NONE");
-    }
-
     builder.withConfigLoader(configLoaderBuilder.build());
 
     LOGGER.info("Initializing session");
@@ -149,10 +134,6 @@ public class MailboxActivator implements BundleActivator {
     MailboxServiceImpl mailbox;
     if ("true".equalsIgnoreCase(context.getProperty("cassandra.reactive"))) {
       mailbox = new ReactiveMailboxServiceImpl(session, keyspace);
-    } else if ("true".equalsIgnoreCase(context.getProperty("cassandra.geo"))) {
-      mailbox = new GeoMailboxServiceImpl(session, keyspace);
-    } else if ("true".equalsIgnoreCase(context.getProperty("cassandra.graph"))) {
-      mailbox = new GraphMailboxServiceImpl(session, keyspace, graphName);
     } else {
       mailbox = new MailboxServiceImpl(session, keyspace);
     }
