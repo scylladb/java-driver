@@ -170,10 +170,17 @@ public enum DseDriverOption implements DriverOption {
   GRAPH_TIMEOUT("basic.graph.timeout"),
 
   /**
-   * Whether to send events for Insights monitoring.
+   * Legacy option that controlled DataStax Insights monitoring.
+   *
+   * <p>This option is retained for source and binary compatibility. Insights monitoring has been
+   * removed, so the value has no effect. Configuring it to {@code true} causes the driver to log a
+   * warning when the session is created.
    *
    * <p>Value type: boolean
+   *
+   * @deprecated DataStax Insights monitoring is no longer supported; there is no replacement.
    */
+  @Deprecated
   MONITOR_REPORTING_ENABLED("advanced.monitor-reporting.enabled"),
 
   /**

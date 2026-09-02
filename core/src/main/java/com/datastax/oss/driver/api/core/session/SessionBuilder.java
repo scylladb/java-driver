@@ -790,9 +790,8 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * A unique identifier for the created session.
    *
    * <p>It will be sent in the {@code STARTUP} protocol message, under the key {@code CLIENT_ID},
-   * for each new connection established by the driver. Currently, this information is used by
-   * Insights monitoring (if the target cluster does not support Insights, the entry will be ignored
-   * by the server).
+   * for each new connection established by the driver. Servers that do not recognize this option
+   * ignore it.
    *
    * <p>If you don't call this method, the driver will generate an identifier with {@link
    * Uuids#random()}.
@@ -807,9 +806,8 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * The name of the application using the created session.
    *
    * <p>It will be sent in the {@code STARTUP} protocol message, under the key {@code
-   * APPLICATION_NAME}, for each new connection established by the driver. Currently, this
-   * information is used by Insights monitoring (if the target cluster does not support Insights,
-   * the entry will be ignored by the server).
+   * APPLICATION_NAME}, for each new connection established by the driver. Servers that do not
+   * recognize this option ignore it.
    *
    * <p>This can also be defined in the driver configuration with the option {@code
    * basic.application.name}; if you specify both, this method takes precedence and the
@@ -826,9 +824,8 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * The version of the application using the created session.
    *
    * <p>It will be sent in the {@code STARTUP} protocol message, under the key {@code
-   * APPLICATION_VERSION}, for each new connection established by the driver. Currently, this
-   * information is used by Insights monitoring (if the target cluster does not support Insights,
-   * the entry will be ignored by the server).
+   * APPLICATION_VERSION}, for each new connection established by the driver. Servers that do not
+   * recognize this option ignore it.
    *
    * <p>This can also be defined in the driver configuration with the option {@code
    * basic.application.version}; if you specify both, this method takes precedence and the

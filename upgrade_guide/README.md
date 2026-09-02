@@ -19,6 +19,15 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.2
+
+#### DataStax Insights monitoring has been removed
+
+The driver no longer sends DataStax Insights startup or status events. The legacy
+`advanced.monitor-reporting.enabled` option and its public constants remain deprecated no-ops for
+source and binary compatibility. The option now defaults to `false`; setting it to `true` logs a
+warning and has no other effect.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time

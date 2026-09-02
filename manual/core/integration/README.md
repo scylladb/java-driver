@@ -472,7 +472,6 @@ dependency:
 
 [Jackson](https://github.com/FasterXML/jackson) is used:
 
-* when Insights monitoring is enabled;
 * when [Json codecs](../custom_codecs) are being used;
 * when driver configuration reporting is enabled — `advanced.driver-config-reporting.enabled`, which
   **defaults to true**. The report is serialized to JSON with Jackson.
