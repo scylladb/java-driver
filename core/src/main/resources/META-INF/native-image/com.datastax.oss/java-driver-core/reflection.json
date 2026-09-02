@@ -88,10 +88,6 @@
     "methods": [ { "name": "<init>", "parameterTypes": [ "com.datastax.oss.driver.api.core.context.DriverContext" ] } ]
   },
   {
-    "name": "com.datastax.dse.driver.internal.core.auth.DseGssApiAuthProvider",
-    "methods": [ { "name": "<init>", "parameterTypes": [ "com.datastax.oss.driver.api.core.context.DriverContext" ] } ]
-  },
-  {
     "name": "com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory",
     "methods": [ { "name": "<init>", "parameterTypes": [ "com.datastax.oss.driver.api.core.context.DriverContext" ] } ]
   },

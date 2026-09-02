@@ -708,21 +708,6 @@ public class TypedDriverOption<ValueT> {
   /** The version of the application using the session. */
   public static final TypedDriverOption<String> APPLICATION_VERSION =
       new TypedDriverOption<>(DseDriverOption.APPLICATION_VERSION, GenericType.STRING);
-  /** Proxy authentication for GSSAPI authentication: allows to login as another user or role. */
-  public static final TypedDriverOption<String> AUTH_PROVIDER_AUTHORIZATION_ID =
-      new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID, GenericType.STRING);
-  /** Service name for GSSAPI authentication. */
-  public static final TypedDriverOption<String> AUTH_PROVIDER_SERVICE =
-      new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_SERVICE, GenericType.STRING);
-  /** Login configuration for GSSAPI authentication. */
-  public static final TypedDriverOption<String> AUTH_PROVIDER_LOGIN_CONFIGURATION =
-      new TypedDriverOption<>(
-          DseDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION, GenericType.STRING);
-  /** Internal SASL properties, if any, such as QOP, for GSSAPI authentication. */
-  public static final TypedDriverOption<Map<String, String>> AUTH_PROVIDER_SASL_PROPERTIES =
-      new TypedDriverOption<>(
-          DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES,
-          GenericType.mapOf(GenericType.STRING, GenericType.STRING));
   /** The page size for continuous paging. */
   public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_PAGE_SIZE =
       new TypedDriverOption<>(DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE, GenericType.INTEGER);
