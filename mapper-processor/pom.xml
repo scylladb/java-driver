@@ -192,24 +192,6 @@
           <skip>true</skip>
         </configuration>
       </plugin>
-      <plugin>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>generate-dependency-list</id>
-            <goals>
-              <goal>list</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <includeScope>runtime</includeScope>
-              <outputScope>true</outputScope>
-              <excludeGroupIds>com.datastax.cassandra,com.datastax.dse</excludeGroupIds>
-              <outputFile>${project.build.outputDirectory}/com/datastax/dse/driver/internal/mapper/processor/deps.txt</outputFile>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 </project>

@@ -25,7 +25,6 @@ package com.datastax.oss.driver.mapper;
 
 import static com.datastax.oss.driver.assertions.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assume.assumeFalse;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -73,10 +72,6 @@ public class SelectCustomWhereClauseIT extends InventoryITBase {
 
   @BeforeClass
   public static void setup() {
-    // SASI index creation is broken in DSE 6.8.0
-    // All tests in this class require SASI, so ensure it's working
-    assumeFalse(InventoryITBase.isSasiBroken(CCM_RULE));
-
     CqlSession session = SESSION_RULE.session();
 
     SchemaChangeSynchronizer.withLock(

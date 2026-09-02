@@ -15,31 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.api.core;
+package com.datastax.dse.driver.internal.core.cql.reactive;
 
-import com.datastax.dse.driver.api.core.cql.reactive.ReactiveSession;
-import com.datastax.oss.driver.api.core.cql.AsyncCqlSession;
-import com.datastax.oss.driver.api.core.cql.SyncCqlSession;
-import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.tngtech.java.junit.dataprovider.DataProvider;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
-/**
- * The default session type built by the driver.
- *
- * <p>It provides user-friendly execution methods for synchronous, asynchronous, and reactive CQL
- * requests.
- */
-public interface CqlSession extends Session, SyncCqlSession, AsyncCqlSession, ReactiveSession {
+public class ReactiveTestDataProviders {
 
-  /**
-   * Returns a builder to create a new instance.
-   *
-   * <p>Note that this builder is mutable and not thread-safe.
-   *
-   * @return {@code CqlSessionBuilder} to create a new instance.
-   */
+  @DataProvider
+  public static Object[][] allOssProtocolVersions() {
+    return concat(DefaultProtocolVersion.values());
+  }
+
   @NonNull
-  static CqlSessionBuilder builder() {
-    return new CqlSessionBuilder();
+  private static Object[][] concat(Object[]... values) {
+    return Stream.of(values)
+        .flatMap(Arrays::stream)
+        .map(o -> new Object[] {o})
+        .toArray(Object[][]::new);
   }
 }

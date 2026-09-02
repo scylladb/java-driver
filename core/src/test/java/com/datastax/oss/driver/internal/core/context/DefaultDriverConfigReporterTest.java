@@ -21,8 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.datastax.dse.driver.internal.core.loadbalancing.DseDcInferringLoadBalancingPolicy;
-import com.datastax.dse.driver.internal.core.loadbalancing.DseLoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
@@ -51,7 +49,6 @@ import com.datastax.oss.driver.internal.core.specex.ConstantSpeculativeExecution
 import com.datastax.oss.driver.internal.core.specex.NoSpeculativeExecutionPolicy;
 import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
-import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
 import com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator;
@@ -693,45 +690,6 @@ public class DefaultDriverConfigReporterTest {
             mock(NoSpeculativeExecutionPolicy.class),
             loadBalancing(
                 DcInferringLoadBalancingPolicy.class), // extends DefaultLoadBalancingPolicy
-            clientSideGenerator(),
-            Optional.empty());
-    assertBuiltInLoadBalancingPolicy(
-        report(r).get("query").get("load-balancing").get("policy"), /* adaptiveOrdering= */ true);
-  }
-
-  @Test
-  public void should_report_dse_load_balancing_policy_as_a_built_in() throws Exception {
-    // DseLoadBalancingPolicy is a deprecated, behavior-identical alias of
-    // DefaultLoadBalancingPolicy; must not fall through to "custom". Note: a real (non-mocked)
-    // instance of this class requires a resolvable local DC (it uses MandatoryLocalDcHelper) and
-    // would fail to construct with no DC configured, unlike DcInferringLoadBalancingPolicy above;
-    // the mock here bypasses that constructor validation, same as
-    // should_report_default_configuration.
-    DefaultDriverConfigReporter r =
-        reporterWith(
-            defaults(map -> {}),
-            exponentialReconnection(),
-            mock(DefaultRetryPolicy.class),
-            mock(NoSpeculativeExecutionPolicy.class),
-            loadBalancing(DseLoadBalancingPolicy.class),
-            clientSideGenerator(),
-            Optional.empty());
-    assertBuiltInLoadBalancingPolicy(
-        report(r).get("query").get("load-balancing").get("policy"), /* adaptiveOrdering= */ true);
-  }
-
-  @Test
-  public void should_report_dse_dc_inferring_load_balancing_policy_as_a_built_in()
-      throws Exception {
-    // DseDcInferringLoadBalancingPolicy is a deprecated, behavior-identical alias of
-    // DcInferringLoadBalancingPolicy; must not fall through to "custom".
-    DefaultDriverConfigReporter r =
-        reporterWith(
-            defaults(map -> {}),
-            exponentialReconnection(),
-            mock(DefaultRetryPolicy.class),
-            mock(NoSpeculativeExecutionPolicy.class),
-            loadBalancing(DseDcInferringLoadBalancingPolicy.class),
             clientSideGenerator(),
             Optional.empty());
     assertBuiltInLoadBalancingPolicy(
@@ -1534,7 +1492,6 @@ public class DefaultDriverConfigReporterTest {
     // configured one, to the whole option-to-field-to-report chain.
     assertThat(hostnameVerificationOf(new DefaultSslEngineFactory(policyConstructionContext())))
         .isTrue();
-    assertThat(hostnameVerificationOf(new SniSslEngineFactory(SSLContext.getDefault()))).isTrue();
     assertThat(hostnameVerificationOf(new ProgrammaticSslEngineFactory(SSLContext.getDefault())))
         .isFalse();
     assertThat(

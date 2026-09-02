@@ -51,7 +51,6 @@ import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
-import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Error;
@@ -549,72 +548,6 @@ public class DefaultTopologyMonitorTest {
             });
   }
 
-  // Confirm the base case of extracting peer info from DSE peers table, no SSL involved
-  @Test
-  public void should_get_peer_address_info_peers_dse() {
-    // Given
-    AdminRow local = mockLocalRow(1, node1.getHostId());
-    AdminRow peer2 = mockPeersRowDse(3, node2.getHostId());
-    AdminRow peer1 = mockPeersRowDse(2, node1.getHostId());
-    topologyMonitor.isSchemaV2 = true;
-    topologyMonitor.stubQueries(
-        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult(local)),
-        new StubbedQuery("SELECT * FROM system.peers_v2", Maps.newHashMap(), null, true),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(peer2, peer1)));
-    when(context.getSslEngineFactory()).thenReturn(Optional.empty());
-
-    // When
-    CompletionStage<Iterable<NodeInfo>> futureInfos = topologyMonitor.refreshNodeList();
-
-    // Then
-    assertThatStage(futureInfos)
-        .isSuccess(
-            infos -> {
-              Iterator<NodeInfo> iterator = infos.iterator();
-              // First NodeInfo is for local, skip past that
-              iterator.next();
-              NodeInfo peer2nodeInfo = iterator.next();
-              assertThat(peer2nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.3", 9042));
-              NodeInfo peer1nodeInfo = iterator.next();
-              assertThat(peer1nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.2", 9042));
-            });
-  }
-
-  // Confirm the base case of extracting peer info from DSE peers table, this time with SSL
-  @Test
-  public void should_get_peer_address_info_peers_dse_with_ssl() {
-    // Given
-    AdminRow local = mockLocalRow(1, node1.getHostId());
-    AdminRow peer2 = mockPeersRowDseWithSsl(3, node2.getHostId());
-    AdminRow peer1 = mockPeersRowDseWithSsl(2, node1.getHostId());
-    topologyMonitor.isSchemaV2 = true;
-    topologyMonitor.stubQueries(
-        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult(local)),
-        new StubbedQuery("SELECT * FROM system.peers_v2", Maps.newHashMap(), null, true),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(peer2, peer1)));
-    when(context.getSslEngineFactory()).thenReturn(Optional.of(sslEngineFactory));
-
-    // When
-    CompletionStage<Iterable<NodeInfo>> futureInfos = topologyMonitor.refreshNodeList();
-
-    // Then
-    assertThatStage(futureInfos)
-        .isSuccess(
-            infos -> {
-              Iterator<NodeInfo> iterator = infos.iterator();
-              // First NodeInfo is for local, skip past that
-              iterator.next();
-              NodeInfo peer2nodeInfo = iterator.next();
-              assertThat(peer2nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.3", 9043));
-              NodeInfo peer1nodeInfo = iterator.next();
-              assertThat(peer1nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.2", 9043));
-            });
-  }
-
   @Test
   public void should_use_projected_query_on_second_refresh_node_list_call() {
     // Given — first call uses SELECT * and teaches the monitor the available columns
@@ -763,9 +696,7 @@ public class DefaultTopologyMonitorTest {
       assertThat(nextQuery.parameters).isEqualTo(parameters);
       if (nextQuery.error) {
         Message error =
-            new Error(
-                ProtocolConstants.ErrorCode.SERVER_ERROR,
-                "Unknown keyspace/cf pair (system.peers_v2)");
+            new Error(ProtocolConstants.ErrorCode.INVALID, "Unknown table system.peers_v2");
         return CompletableFutures.failedFuture(new UnexpectedResponseException(queryString, error));
       }
       return CompletableFuture.completedFuture(nextQuery.result);
@@ -879,43 +810,6 @@ public class DefaultTopologyMonitorTest {
       fail("unexpected", e);
       return null;
     }
-  }
-
-  // Mock row for DSE ~6.8
-  private AdminRow mockPeersRowDse(int i, UUID hostId) {
-    try {
-      AdminRow row = mock(AdminRow.class);
-      when(row.contains("peer")).thenReturn(true);
-      when(row.isNull("data_center")).thenReturn(false);
-      when(row.getString("data_center")).thenReturn("dc" + i);
-      when(row.getString("dse_version")).thenReturn("6.8.30");
-      when(row.contains("graph")).thenReturn(true);
-      when(row.isNull("host_id")).thenReturn(hostId == null);
-      when(row.getUuid("host_id")).thenReturn(hostId);
-      when(row.getInetAddress("peer")).thenReturn(InetAddress.getByName("127.0.0." + i));
-      when(row.isNull("rack")).thenReturn(false);
-      when(row.getString("rack")).thenReturn("rack" + i);
-      when(row.isNull("native_transport_address")).thenReturn(false);
-      when(row.getInetAddress("native_transport_address"))
-          .thenReturn(InetAddress.getByName("127.0.0." + i));
-      when(row.isNull("native_transport_port")).thenReturn(false);
-      when(row.getInteger("native_transport_port")).thenReturn(9042);
-      when(row.isNull("tokens")).thenReturn(false);
-      when(row.getSetOfString("tokens")).thenReturn(ImmutableSet.of("token" + i));
-      when(row.isNull("rpc_address")).thenReturn(false);
-
-      return row;
-    } catch (UnknownHostException e) {
-      fail("unexpected", e);
-      return null;
-    }
-  }
-
-  private AdminRow mockPeersRowDseWithSsl(int i, UUID hostId) {
-    AdminRow row = mockPeersRowDse(i, hostId);
-    when(row.isNull("native_transport_port_ssl")).thenReturn(false);
-    when(row.getInteger("native_transport_port_ssl")).thenReturn(9043);
-    return row;
   }
 
   private AdminResult mockResult(AdminRow... rows) {

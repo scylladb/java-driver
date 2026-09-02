@@ -19,7 +19,6 @@ package com.datastax.oss.driver.api.testinfra.requirement;
 
 public enum BackendType {
   CASSANDRA("Apache Cassandra"),
-  DSE("DSE"),
   HCD("HCD"),
   SCYLLA("ScyllaDB");
 

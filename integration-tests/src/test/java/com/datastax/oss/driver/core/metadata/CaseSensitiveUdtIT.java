@@ -57,7 +57,6 @@ import org.junit.rules.TestRule;
 @Category(ParallelizableTests.class)
 @ScyllaSkip(description = "java-based UDFs are not supported")
 @BackendRequirement(type = BackendType.CASSANDRA)
-@BackendRequirement(type = BackendType.DSE)
 public class CaseSensitiveUdtIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();

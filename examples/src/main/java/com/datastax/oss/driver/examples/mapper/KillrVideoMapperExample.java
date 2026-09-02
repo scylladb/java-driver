@@ -112,8 +112,7 @@ public class KillrVideoMapperExample {
 
       Video video = new Video();
       video.setUserid(user.getUserid());
-      video.setName(
-          "Getting Started with DataStax Apache Cassandra as a Service on DataStax Astra");
+      video.setName("Getting Started with ScyllaDB");
       video.setLocation("https://www.youtube.com/watch?v=68xzKpcZURA");
       Set<String> tags = new HashSet<>();
       tags.add("apachecassandra");
@@ -146,8 +145,7 @@ public class KillrVideoMapperExample {
       // Update the existing video:
       Video template = new Video();
       template.setVideoid(video.getVideoid());
-      template.setName(
-          "Getting Started with DataStax Apache Cassandra® as a Service on DataStax Astra");
+      template.setName("Getting Started with ScyllaDB using the Java driver");
       videoDao.update(template);
       // Reload the whole entity and check the fields
       video = videoDao.get(video.getVideoid());

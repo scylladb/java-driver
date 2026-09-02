@@ -44,6 +44,18 @@ public enum DefaultDriverOption implements DriverOption {
    */
   SESSION_KEYSPACE("basic.session-keyspace"),
   /**
+   * The name of the application using the session.
+   *
+   * <p>Value-type: {@link String}
+   */
+  APPLICATION_NAME("basic.application.name"),
+  /**
+   * The version of the application using the session.
+   *
+   * <p>Value-type: {@link String}
+   */
+  APPLICATION_VERSION("basic.application.version"),
+  /**
    * How often the driver tries to reload the configuration.
    *
    * <p>Value-type: {@link java.time.Duration Duration}
@@ -868,14 +880,6 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: boolean
    */
   NETTY_DAEMON("advanced.netty.daemon"),
-
-  /**
-   * The location of the cloud secure bundle used to connect to DataStax Apache Cassandra as a
-   * service.
-   *
-   * <p>Value-type: {@link String}
-   */
-  CLOUD_SECURE_CONNECT_BUNDLE("basic.cloud.secure-connect-bundle"),
 
   /**
    * Whether the slow replica avoidance should be enabled in the default LBP.

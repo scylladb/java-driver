@@ -22,7 +22,7 @@ under the License.
 ### Quick overview
 
 * `advanced.auth-provider` in the configuration.
-* disabled by default. Also available: plain-text credentials, GSSAPI (DSE only), or write your own.
+* disabled by default. Use plain-text credentials or write a custom provider.
 * can also be defined programmatically:
   [CqlSession.builder().withAuthCredentials][SessionBuilder.withAuthCredentials] or
   [CqlSession.builder().withAuthProvider][SessionBuilder.withAuthProvider].
@@ -64,44 +64,6 @@ datastax-java-driver {
 }
 ```
 
-When connecting to DSE, an optional `authorization-id` can also be specified. It will be used for
-proxy authentication (logging in as another user or role). If you try to use this feature with an
-authenticator that doesn't support it, the authorization id will be ignored.
-
-```
-datastax-java-driver {
-  advanced.auth-provider {
-    class = PlainTextAuthProvider
-    username = user
-    password = pass
-    authorization-id = otherUserOrRole
-  }
-}
-```
-
-Note that, for backward compatibility with previous driver versions, you can also use the class name
-`DsePlainTextAuthProvider` to enable this provider.
-
-#### GSSAPI (DSE only)
-
-`DseGssApiAuthProvider` supports GSSAPI authentication against a DSE cluster secured with Kerberos:
-
-```
-datastax-java-driver {
-  advanced.auth-provider {
-      class = DseGssApiAuthProvider
-      login-configuration {
-          principal = "user principal here ex cassandra@DATASTAX.COM"
-          useKeyTab = "true"
-          refreshKrb5Config = "true"
-          keyTab = "Path to keytab file here"
-      }
-   }
- }
-```
-
-See the comments in [reference.conf] for more details.
-
 #### Custom
 
 You can also write your own provider; it must implement [AuthProvider] and declare a public
@@ -140,18 +102,12 @@ CqlSession session =
         .build();
 ```
 
-For convenience, there are shortcuts that take the credentials directly:
+For convenience, the credentials can be passed directly:
 
 ```java
 CqlSession session =
     CqlSession.builder()
         .withAuthCredentials("user", "pass")
-        .build();
-
-// With proxy authentication (DSE only)
-CqlSession session =
-    CqlSession.builder()
-        .withAuthCredentials("user", "pass", "otherUserOrRole")
         .build();
 ```
 
@@ -160,99 +116,12 @@ clear text in memory; this means they are vulnerable to an attacker who is able 
 dumps. If this is not acceptable for you, consider writing your own [AuthProvider] implementation;
 [PlainTextAuthProviderBase] is a good starting point.
 
-Similarly, [ProgrammaticDseGssApiAuthProvider] lets you configure GSSAPI programmatically:
-
-```java
-import com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions;
-
-javax.security.auth.Subject subject = ...; // do your Kerberos configuration here
-
-GssApiOptions options = GssApiOptions.builder().withSubject(subject).build();
-CqlSession session = CqlSession.builder()
-    .withAuthProvider(new ProgrammaticDseGssApiAuthProvider(options))
-    .build();
-```
-
-For more complex needs (e.g. if building the options once and reusing them doesn't work for you),
-you can subclass [DseGssApiAuthProviderBase].
-
-### Proxy authentication
-
-DSE allows a user to connect as another user or role:
-
-```
--- Allow bob to connect as alice:
-GRANT PROXY.LOGIN ON ROLE 'alice' TO 'bob'
-```
-
-Once connected, all authorization checks will be performed against the proxy role (alice in this
-example).
-
-To use proxy authentication with the driver, you need to provide the **authorization-id**, in other
-words the name of the role you want to connect as.
-
-Example for plain text authentication:
-
-```
-datastax-java-driver {
-  advanced.auth-provider {
-      class = PlainTextAuthProvider
-      username = bob
-      password = bob's password
-      authorization-id = alice
-   }
- }
-```
-
-With the GSSAPI (Kerberos) provider:
-
-```
-datastax-java-driver {
-  advanced.auth-provider {
-      class = DseGssApiAuthProvider
-      authorization-id = alice
-      login-configuration {
-          principal = "user principal here ex bob@DATASTAX.COM"
-          useKeyTab = "true"
-          refreshKrb5Config = "true"
-          keyTab = "Path to keytab file here"
-      }
-   }
- }
-```
-
-### Proxy execution
-
-Proxy execution is similar to proxy authentication, but it applies to a single query, not the whole
-session.
-
-```
--- Allow bob to execute queries as alice:
-GRANT PROXY.EXECUTE ON ROLE 'alice' TO 'bob'
-```
-
-For this scenario, you would **not** add the `authorization-id = alice` to your configuration.
-Instead, use [ProxyAuthentication.executeAs] to wrap your query with the correct authorization for
-the execution:
-
-```java
-import com.datastax.dse.driver.api.core.auth.ProxyAuthentication;
-
-SimpleStatement statement = SimpleStatement.newInstance("some query");
-// executeAs returns a new instance, you need to re-assign
-statement = ProxyAuthentication.executeAs("alice", statement);
-session.execute(statement);
-``` 
-
 [SASL]: https://en.wikipedia.org/wiki/Simple_Authentication_and_Security_Layer
 
 [AuthProvider]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/auth/AuthProvider.html
 [DriverContext]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/context/DriverContext.html
 [PlainTextAuthProviderBase]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/auth/PlainTextAuthProviderBase.html
 [ProgrammaticPlainTextAuthProvider]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/auth/ProgrammaticPlainTextAuthProvider.html
-[DseGssApiAuthProviderBase]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/auth/DseGssApiAuthProviderBase.html
-[ProgrammaticDseGssApiAuthProvider]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/auth/ProgrammaticDseGssApiAuthProvider.html
-[ProxyAuthentication.executeAs]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/auth/ProxyAuthentication.html#executeAs-java.lang.String-StatementT-
 [SessionBuilder.withAuthCredentials]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/SessionBuilder.html#withAuthCredentials-java.lang.String-java.lang.String-
 [SessionBuilder.withAuthProvider]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/SessionBuilder.html#withAuthProvider-com.datastax.oss.driver.api.core.auth.AuthProvider-
 [reference.conf]: ../configuration/reference/

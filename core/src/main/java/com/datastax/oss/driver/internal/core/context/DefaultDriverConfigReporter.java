@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.context;
 
-import com.datastax.dse.driver.internal.core.loadbalancing.DseDcInferringLoadBalancingPolicy;
-import com.datastax.dse.driver.internal.core.loadbalancing.DseLoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
@@ -41,7 +39,6 @@ import com.datastax.oss.driver.internal.core.specex.ConstantSpeculativeExecution
 import com.datastax.oss.driver.internal.core.specex.NoSpeculativeExecutionPolicy;
 import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
-import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
 import com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator;
@@ -684,19 +681,14 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     // (not instanceof) so an actual user subclass of any of them still falls through to "custom".
     //
     // DcInferringLoadBalancingPolicy extends DefaultLoadBalancingPolicy, overriding only how the
-    // local DC is discovered; DseLoadBalancingPolicy/DseDcInferringLoadBalancingPolicy are
-    // deprecated, behavior-identical aliases of the two ("equivalent to DefaultLoadBalancingPolicy,
-    // which should now be used instead" per their own javadoc). All of them extend
-    // BasicLoadBalancingPolicy, from which they inherit an unconditional shuffle of the replica
-    // head
+    // local DC is discovered. Both extend BasicLoadBalancingPolicy, from which they inherit an
+    // unconditional shuffle of the replica head
     // and the same DC-failover option; only slow-replica avoidance differs, so it is resolved per
     // class below and the shared fields are written once.
     Class<?> policyClass = policy.getClass();
     boolean avoidsSlowReplicas;
     if (policyClass == DefaultLoadBalancingPolicy.class
-        || policyClass == DcInferringLoadBalancingPolicy.class
-        || policyClass == DseLoadBalancingPolicy.class
-        || policyClass == DseDcInferringLoadBalancingPolicy.class) {
+        || policyClass == DcInferringLoadBalancingPolicy.class) {
       // Off the running instance, not the profile: DefaultLoadBalancingPolicy latches this flag in
       // its constructor and never re-reads it, so after a configuration reload the profile can say
       // one thing while the policy keeps reordering (or not) according to the other. Same reason
@@ -900,9 +892,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
   private static boolean infersLocalDatacenter(LoadBalancingPolicy policy) {
     Class<?> policyClass = policy.getClass();
     return policyClass == DefaultLoadBalancingPolicy.class
-        || policyClass == DcInferringLoadBalancingPolicy.class
-        || policyClass == DseLoadBalancingPolicy.class
-        || policyClass == DseDcInferringLoadBalancingPolicy.class;
+        || policyClass == DcInferringLoadBalancingPolicy.class;
   }
 
   /**
@@ -1137,10 +1127,6 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     } else if (engineFactory instanceof ProgrammaticSslEngineFactory) {
       return Optional.of(
           ((ProgrammaticSslEngineFactory) engineFactory).isHostnameValidationRequired());
-    } else if (engineFactory instanceof SniSslEngineFactory) {
-      // No accessor to read: SniSslEngineFactory sets the "HTTPS" endpoint identification algorithm
-      // on every engine it builds, unconditionally.
-      return Optional.of(true);
     }
     return Optional.empty();
   }

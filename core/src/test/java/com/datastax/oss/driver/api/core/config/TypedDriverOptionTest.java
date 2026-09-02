@@ -19,7 +19,6 @@ package com.datastax.oss.driver.api.core.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.util.HashSet;
 import java.util.Set;
@@ -50,10 +49,7 @@ public class TypedDriverOptionTest {
             DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS);
 
     for (DriverOption option :
-        ImmutableSet.<DriverOption>builder()
-            .add(DefaultDriverOption.values())
-            .add(DseDriverOption.values())
-            .build()) {
+        ImmutableSet.<DriverOption>builder().add(DefaultDriverOption.values()).build()) {
       if (!exclusions.contains(option)) {
         assertThat(optionsThatHaveATypedEquivalent)
             .as(
