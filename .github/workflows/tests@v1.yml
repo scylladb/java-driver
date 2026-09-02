@@ -2,7 +2,7 @@ name: 'Tests (Driver 4.x)'
 
 on:
   push:
-    branches: [ scylla-4.*x ]
+    branches: [ rs ]
     paths-ignore:
       - "docs/**"
       - .github/workflows/docs-pages.yml
@@ -14,7 +14,7 @@ on:
       - ".snyk"
       - ".gitignore"
   pull_request:
-    branches: [ scylla-4.*x ]
+    branches: [ rs ]
     paths-ignore:
       - "docs/**"
       - .github/workflows/docs-pages.yml
