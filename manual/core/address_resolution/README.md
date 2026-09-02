@@ -130,9 +130,8 @@ Note that `OptionsMap`-based configuration does not support client routes — us
 API (`SessionBuilder.withClientRoutesConfig()`) instead, which can be combined with `OptionsMap`
 for all other driver options.
 
-Client routes are **mutually exclusive** with:
-- A custom `AddressTranslator` (if both are provided, an `IllegalStateException` is thrown)
-- Cloud secure connect bundles (if both are provided, an `IllegalStateException` is thrown)
+Client routes are **mutually exclusive** with a custom `AddressTranslator`; if both are provided,
+an `IllegalStateException` is thrown.
 
 #### Quick start (programmatic)
 
@@ -203,7 +202,7 @@ the JVM DNS cache TTL via the `networkaddress.cache.ttl` security property (e.g.
 - Requires ScyllaDB Enterprise ≥ 2026.1 with `system.client_routes` support
   (scylladb/scylladb#27323). Not yet available on ScyllaDB OSS.
 - Not supported on Apache Cassandra.
-- Mutually exclusive with custom `AddressTranslator` and with cloud secure connect bundles.
+- Mutually exclusive with a custom `AddressTranslator`.
 ### Fixed proxy hostname
 
 If your client applications access Cassandra through some kind of proxy (eg. with AWS PrivateLink when all Cassandra

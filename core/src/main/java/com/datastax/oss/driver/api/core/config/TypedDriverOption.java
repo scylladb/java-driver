@@ -685,12 +685,6 @@ public class TypedDriverOption<ValueT> {
   /** Whether the threads created by the driver should be daemon threads. */
   public static final TypedDriverOption<Boolean> NETTY_DAEMON =
       new TypedDriverOption<>(DefaultDriverOption.NETTY_DAEMON, GenericType.BOOLEAN);
-  /**
-   * The location of the cloud secure bundle used to connect to DataStax Apache Cassandra as a
-   * service.
-   */
-  public static final TypedDriverOption<String> CLOUD_SECURE_CONNECT_BUNDLE =
-      new TypedDriverOption<>(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE, GenericType.STRING);
   /** Whether the slow replica avoidance should be enabled in the default LBP. */
   public static final TypedDriverOption<Boolean> LOAD_BALANCING_POLICY_SLOW_AVOIDANCE =
       new TypedDriverOption<>(

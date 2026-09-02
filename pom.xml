@@ -488,11 +488,6 @@
         <version>2.1.7</version>
       </dependency>
       <dependency>
-        <groupId>com.github.tomakehurst</groupId>
-        <artifactId>wiremock</artifactId>
-        <version>2.25.0</version>
-      </dependency>
-      <dependency>
         <groupId>org.graalvm.sdk</groupId>
         <artifactId>graal-sdk</artifactId>
         <version>${graalapi.version}</version>

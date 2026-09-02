@@ -19,6 +19,33 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.2
+
+#### DataStax Astra secure-connect-bundle support was removed
+
+This release intentionally removes the DataStax Astra secure-connect-bundle integration and its
+public API. The following members are no longer available:
+
+- `SessionBuilder.withCloudSecureConnectBundle(Path)`
+- `SessionBuilder.withCloudSecureConnectBundle(URL)`
+- `SessionBuilder.withCloudSecureConnectBundle(InputStream)`
+- `SessionBuilder.withCloudProxyAddress(InetSocketAddress)`
+- `ProgrammaticArguments.getCloudProxyAddress()`
+- `ProgrammaticArguments.Builder.withCloudProxyAddress(InetSocketAddress)`
+- `SessionBuilder.ASTRA_PAYLOAD_KEY`
+- `DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
+- `TypedDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
+
+The old `datastax-java-driver.basic.cloud.secure-connect-bundle` configuration key is now an
+unknown option and no longer supplies connection information. If that was the only connection
+setting, the resulting configuration contains no contact points, so the driver falls back to its
+default contact point, `127.0.0.1:9042`.
+
+This is an intentional binary- and source-compatibility break. Applications must replace secure
+connect bundles with explicit `basic.contact-points` configuration or programmatic contact points.
+For supported ScyllaDB private-endpoint deployments, use
+[client routes](../manual/core/address_resolution/) together with an explicit contact point.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time
@@ -107,8 +134,8 @@ datastax-java-driver {
 
 Key points:
 
-- **Mutually exclusive** with a custom `AddressTranslator` and with cloud secure connect bundles —
-  providing both throws `IllegalStateException` at session build time.
+- **Mutually exclusive** with a custom `AddressTranslator` — providing both throws
+  `IllegalStateException` at session build time.
 - **Requires ScyllaDB Enterprise ≥ 2026.1** (scylladb/scylladb#27323). The feature is not
   available on ScyllaDB OSS or Apache Cassandra.
 
