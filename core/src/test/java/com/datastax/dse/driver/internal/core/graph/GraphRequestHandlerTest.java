@@ -24,14 +24,15 @@ import static com.datastax.dse.driver.internal.core.graph.GraphTestUtils.createG
 import static com.datastax.dse.driver.internal.core.graph.GraphTestUtils.defaultDseFrameOf;
 import static com.datastax.dse.driver.internal.core.graph.GraphTestUtils.serialize;
 import static com.datastax.dse.driver.internal.core.graph.GraphTestUtils.singleGraphRow;
+import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static com.datastax.oss.driver.api.core.type.codec.TypeCodecs.BIGINT;
 import static com.datastax.oss.driver.api.core.type.codec.TypeCodecs.TEXT;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.matches;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -58,6 +59,8 @@ import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
 import com.datastax.oss.driver.internal.core.cql.Conversions;
@@ -585,28 +588,37 @@ public class GraphRequestHandlerTest {
     ScriptGraphStatement graphStatement =
         Mockito.spy(ScriptGraphStatement.newInstance("mock query"));
     doThrow(failure).when(graphStatement).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
 
     GraphRequestHandlerTestHarness.Builder builder = GraphRequestHandlerTestHarness.builder();
     PoolBehavior nodeBehavior = builder.customBehavior(node);
     try (GraphRequestHandlerTestHarness harness = builder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
       GraphSupportChecker graphSupportChecker = mock(GraphSupportChecker.class);
       when(graphSupportChecker.inferGraphProtocol(any(), any(), any()))
           .thenReturn(GRAPH_BINARY_1_0);
       GraphBinaryModule module = createGraphBinaryModule(harness.getContext());
 
-      assertThatThrownBy(
-              () ->
-                  new GraphRequestHandler(
-                      graphStatement,
-                      harness.getSession(),
-                      harness.getContext(),
-                      "test",
-                      module,
-                      graphSupportChecker))
-          .isSameAs(failure);
+      GraphRequestHandler handler =
+          new GraphRequestHandler(
+              graphStatement,
+              harness.getSession(),
+              harness.getContext(),
+              "test",
+              module,
+              graphSupportChecker);
 
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
       nodeBehavior.verifyNoWrite();
       nodeBehavior.verifyPreAcquireCancelled();
+      verify(throttler).signalError(handler, failure);
     }
   }
 

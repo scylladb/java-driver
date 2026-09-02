@@ -51,18 +51,21 @@ import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
 import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.internal.core.ProtocolFeature;
 import com.datastax.oss.driver.internal.core.cql.PoolBehavior;
 import com.datastax.oss.driver.internal.core.cql.RequestHandlerTestHarness;
+import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.util.Iterator;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -231,7 +234,7 @@ public class ContinuousCqlRequestHandlerTest extends ContinuousCqlRequestHandler
               statement, harness.getSession(), harness.getContext(), "test");
       CompletionStage<ContinuousAsyncResultSet> resultSetFuture = handler.handle();
 
-      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+      handler.onThrottleReady(false);
 
       assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(failure));
       assertThat(handler.getActiveExecutionsCount()).isZero();
@@ -239,6 +242,66 @@ public class ContinuousCqlRequestHandlerTest extends ContinuousCqlRequestHandler
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
       verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_release_permit_if_delayed_throttling_metric_update_fails() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestHandlerTestHarness.Builder builder =
+        continuousHarnessBuilder().withProtocolVersion(DSE_V2);
+    PoolBehavior node1Behavior = builder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = builder.build()) {
+      SessionMetricUpdater metricUpdater = harness.getSession().getMetricUpdater();
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(metricUpdater.isEnabled(
+              DefaultSessionMetric.THROTTLING_DELAY, DriverExecutionProfile.DEFAULT_NAME))
+          .thenReturn(true);
+      doThrow(failure)
+          .when(metricUpdater)
+          .updateTimer(
+              eq(DefaultSessionMetric.THROTTLING_DELAY),
+              eq(DriverExecutionProfile.DEFAULT_NAME),
+              anyLong(),
+              eq(TimeUnit.NANOSECONDS));
+      ContinuousCqlRequestHandler handler =
+          new ContinuousCqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+      CompletionStage<ContinuousAsyncResultSet> resultSetFuture = handler.handle();
+
+      handler.onThrottleReady(true);
+
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(handler.getActiveExecutionsCount()).isZero();
+      node1Behavior.verifyNoWrite();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_release_cancelled_request_only_once() {
+    CancellationException failure = new CancellationException("mock cancellation");
+    SimpleStatement statement = Mockito.spy(SimpleStatement.newInstance("mock query"));
+    doThrow(failure).when(statement).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestHandlerTestHarness.Builder builder =
+        continuousHarnessBuilder().withProtocolVersion(DSE_V2);
+    builder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = builder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      ContinuousCqlRequestHandler handler =
+          new ContinuousCqlRequestHandler(
+              statement, harness.getSession(), harness.getContext(), "test");
+      CompletionStage<ContinuousAsyncResultSet> resultSetFuture = handler.handle();
+
+      handler.onThrottleReady(false);
+
+      assertThat(resultSetFuture.toCompletableFuture()).isCancelled();
+      verify(throttler).signalCancel(handler);
+      verify(throttler, never()).signalError(eq(handler), any());
     }
   }
 

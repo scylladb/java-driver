@@ -22,6 +22,8 @@ import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -35,6 +37,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
+import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Error;
@@ -46,6 +49,48 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
 public class CqlRequestHandlerSpeculativeExecutionTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_keep_initial_execution_running_if_speculative_setup_fails() throws Exception {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RuntimeException setupFailure = new RuntimeException("mock failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node1", "node2");
+    doReturn(IDEMPOTENT_STATEMENT)
+        .doThrow(setupFailure)
+        .when(requestIdGenerator)
+        .getDecoratedStatement(any(), any());
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      SpeculativeExecutionPolicy speculativeExecutionPolicy =
+          harness.getContext().getSpeculativeExecutionPolicy(DriverExecutionProfile.DEFAULT_NAME);
+      when(speculativeExecutionPolicy.nextExecution(
+              any(Node.class), eq(null), eq(IDEMPOTENT_STATEMENT), eq(1)))
+          .thenReturn(100L);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+      node1Behavior.setWriteSuccess();
+
+      harness.nextScheduledTimeout(); // Discard the request timeout.
+      CapturedTimeout speculativeExecution = harness.nextScheduledTimeout();
+      speculativeExecution.task().run(speculativeExecution);
+
+      node2Behavior.verifyNoWrite();
+      node2Behavior.verifyPreAcquireCancelled();
+      assertThatStage(result).isNotDone();
+
+      node1Behavior.setResponseSuccess(defaultFrameOf(singleRow()));
+      assertThatStage(result).isSuccess();
+    }
+  }
 
   @Test
   @UseDataProvider("nonIdempotentConfig")
