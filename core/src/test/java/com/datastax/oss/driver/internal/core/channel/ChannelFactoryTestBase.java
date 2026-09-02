@@ -272,7 +272,7 @@ public abstract class ChannelFactoryTestBase {
                     endPoint,
                     options,
                     heartbeatHandler,
-                    productType == null);
+                    true);
             channel
                 .pipeline()
                 .addLast(ChannelFactory.INFLIGHT_HANDLER_NAME, inFlightHandler)

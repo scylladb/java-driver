@@ -32,7 +32,7 @@ import org.junit.Test;
 public class ChannelFactorySupportedOptionsTest extends ChannelFactoryTestBase {
 
   @Test
-  public void should_query_supported_options_on_first_channel() throws Throwable {
+  public void should_query_supported_options_on_every_channel() throws Throwable {
     // Given
     when(defaultProfile.isDefined(DefaultDriverOption.PROTOCOL_VERSION)).thenReturn(false);
     when(protocolVersionRegistry.highestNonBeta()).thenReturn(DefaultProtocolVersion.V4);
@@ -65,12 +65,15 @@ public class ChannelFactorySupportedOptionsTest extends ChannelFactoryTestBase {
             null,
             DriverChannelOptions.DEFAULT,
             NoopNodeMetricUpdater.INSTANCE);
+    writeInboundFrame(
+        readOutboundFrame(), TestResponses.supportedResponse("mock_key", "mock_value"));
     writeInboundFrame(readOutboundFrame(), new Ready());
     writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("mockClusterName"));
 
     // Then
     assertThatStage(channelFuture2).isSuccess();
     DriverChannel channel2 = channelFuture2.toCompletableFuture().get();
-    assertThat(channel2.getOptions()).isNull();
+    assertThat(channel2.getOptions()).containsKey("mock_key");
+    assertThat(channel2.getOptions().get("mock_key")).containsOnly("mock_value");
   }
 }

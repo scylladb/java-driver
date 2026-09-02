@@ -77,7 +77,6 @@
     <lz4.version>1.11.1</lz4.version>
     <!-- test dependencies -->
     <assertj.version>3.27.7</assertj.version>
-    <commons-codec.version>1.22.1</commons-codec.version>
     <commons-exec.version>1.6.0</commons-exec.version>
     <junit.version>4.13.2</junit.version>
     <logback.version>1.5.32</logback.version>
@@ -336,11 +335,6 @@
         <groupId>com.scylladb.oss.simulacron</groupId>
         <artifactId>simulacron-native-server</artifactId>
         <version>${simulacron.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-codec</groupId>
-        <artifactId>commons-codec</artifactId>
-        <version>${commons-codec.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>

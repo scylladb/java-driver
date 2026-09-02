@@ -55,7 +55,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -73,12 +72,6 @@ public class ChannelFactory {
   private static final Logger LOG = LoggerFactory.getLogger(ChannelFactory.class);
 
   private static final AtomicBoolean LOGGED_ORPHAN_WARNING = new AtomicBoolean();
-
-  /**
-   * A value for {@link #productType} that indicates that the server does not report any product
-   * type.
-   */
-  private static final String UNKNOWN_PRODUCT_TYPE = "UNKNOWN";
 
   // The names of the handlers on the pipeline:
   public static final String SSL_HANDLER_NAME = "ssl";
@@ -121,14 +114,6 @@ public class ChannelFactory {
   @VisibleForTesting volatile ProtocolVersion protocolVersion;
 
   private volatile String clusterName;
-
-  /**
-   * The value of the {@code PRODUCT_TYPE} option reported by the first channel we opened, in
-   * response to a {@code SUPPORTED} request.
-   *
-   * <p>If the server does not return that option, the value will be {@link #UNKNOWN_PRODUCT_TYPE}.
-   */
-  @VisibleForTesting volatile String productType;
 
   public ChannelFactory(InternalDriverContext context) {
     this.logPrefix = context.getSessionName();
@@ -285,15 +270,6 @@ public class ChannelFactory {
             }
             if (ChannelFactory.this.clusterName == null) {
               ChannelFactory.this.clusterName = driverChannel.getClusterName();
-            }
-            Map<String, List<String>> supportedOptions = driverChannel.getOptions();
-            if (ChannelFactory.this.productType == null && supportedOptions != null) {
-              List<String> productTypes = supportedOptions.get("PRODUCT_TYPE");
-              String productType =
-                  productTypes != null && !productTypes.isEmpty()
-                      ? productTypes.get(0)
-                      : UNKNOWN_PRODUCT_TYPE;
-              ChannelFactory.this.productType = productType;
             }
             resultFuture.complete(driverChannel);
           } else {
