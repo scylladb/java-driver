@@ -24,6 +24,20 @@ MAVEN_OPTS ?=
 
 RELEASE_SKIP_TESTS ?=
 
+# Set COVERAGE=true on any of the test-* targets to attach the JaCoCo agent to
+# the forked test JVMs; `make coverage-report` then aggregates whatever
+# execution data is on disk. Off by default: the agent slows every fork down,
+# and the existing test lanes have to stay able to run without it.
+COVERAGE ?= false
+ifeq ($(filter true 1,$(COVERAGE)),)
+	MVN_COVERAGE :=
+	COVERAGE_PREREQ :=
+else
+	MVN_COVERAGE := -Pcoverage
+	COVERAGE_PREREQ := .clean-coverage-data
+endif
+COVERAGE_REPORT_DIR := coverage-report/target/site/jacoco-aggregate
+
 ifeq (${CCM_CONFIG_DIR},)
 	CCM_CONFIG_DIR = ~/.ccm
 endif
@@ -32,6 +46,18 @@ CCM_CONFIG_DIR := $(shell readlink --canonicalize ${CCM_CONFIG_DIR})
 export SCYLLA_EXT_OPTS
 export SCYLLA_VERSION
 export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
+
+# JaCoCo appends to its execution data by default, which is what lets one lane
+# accumulate coverage across several forks (integration-tests alone runs three).
+# The flip side is that data from an earlier run survives a recompile, and a
+# class that changed in between is then reported uncovered because its checksum
+# no longer matches. Truncating before a run is the fix.
+#
+# Only jacoco.exec is removed -- the file the agent is about to write. Data
+# renamed out of the way to keep one lane's results while another runs (as the
+# CI coverage job does) is left alone.
+.clean-coverage-data:
+	@find . -name 'jacoco.exec' -delete
 
 .install-guava-shaded:
 	$(MVNCMD) install -pl guava-shaded
@@ -290,10 +316,10 @@ check:
 fix:
 	$(MVNCMD) fmt:format xml-format:xml-format
 
-test-unit: .install-guava-shaded
-	$(MVNCMD) test -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+test-unit: .install-guava-shaded $(COVERAGE_PREREQ)
+	$(MVNCMD) test $(MVN_COVERAGE) -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
-test-integration-scylla: .install-all-modules .prepare-scylla-ccm resolve-scylla-version .prepare-environment-update-aio-max-nr
+test-integration-scylla: .install-all-modules .prepare-scylla-ccm resolve-scylla-version .prepare-environment-update-aio-max-nr $(COVERAGE_PREREQ)
 	@if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]]; then
 		SCYLLA_VERSION_RESOLVED=`cat '${SCYLLA_VERSION_FILE}'`
 	fi
@@ -301,9 +327,9 @@ test-integration-scylla: .install-all-modules .prepare-scylla-ccm resolve-scylla
 		echo "ScyllaDB version ${SCYLLA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B -e verify -pl integration-tests -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
+	mvn -B -e verify $(MVN_COVERAGE) -pl integration-tests -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
-test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cassandra-version
+test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cassandra-version $(COVERAGE_PREREQ)
 	@if [[ -z "$${CASSANDRA_VERSION_RESOLVED}" ]]; then
 		CASSANDRA_VERSION_RESOLVED=`cat '${CASSANDRA_VERSION_FILE}'`
 	fi
@@ -311,7 +337,51 @@ test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cas
 		echo "Cassandra version ${CASSANDRA_VERSION} was not resolved"
 		exit 1
 	fi
-	mvn -B -e verify -pl integration-tests -Dccm.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
+	mvn -B -e verify $(MVN_COVERAGE) -pl integration-tests -Dccm.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
+
+# Aggregates the execution data left behind by any COVERAGE=true test run into
+# a single cross-module report -- most importantly attributing the coverage
+# core gets *through* the integration suite back to core's own source, which
+# each module's own report cannot see. Tests are skipped here on purpose: this
+# only reads what is already on disk, so the same target serves one local lane
+# and execution data collected from several CI jobs.
+#
+# report-aggregate is bound to `verify` inside the "coverage" profile (see
+# coverage-report/pom.xml) rather than requested as a bare CLI goal: a CLI goal
+# runs against every project the -am reactor pulls in, which rendered a stray
+# report in all eleven of them (one of those over guava-shaded's relocated
+# classes), and it never sees the execution's own configuration. Keeping the
+# binding inside the profile still leaves a plain `mvn verify`/`mvn install`
+# rendering nothing.
+#
+# .PHONY here (unlike the rest of this file) because these target names
+# collide with real paths -- coverage-report/ is the module's own directory --
+# so make would otherwise treat the target as already up to date and skip it.
+.PHONY: coverage-report clean-coverage
+coverage-report: .install-guava-shaded
+	@if [[ -z "$$(find . -name 'jacoco*.exec' -not -path './coverage-report/*' -print -quit)" ]]; then
+		echo 'No JaCoCo execution data found.'
+		echo "Run the tests with COVERAGE=true first, e.g. 'make test-unit COVERAGE=true'."
+		exit 1
+	fi
+	rm -rf '${COVERAGE_REPORT_DIR}'
+	$(MVNCMD) verify -Pcoverage -pl coverage-report -am -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	if [[ ! -f '${COVERAGE_REPORT_DIR}/jacoco.xml' ]]; then
+		echo 'Maven produced no report at ${COVERAGE_REPORT_DIR}/jacoco.xml.'
+		exit 1
+	fi
+	echo 'HTML report: ${COVERAGE_REPORT_DIR}/index.html'
+	# Read the report-level LINE counter rather than the sibling csv, whose
+	# fields are unquoted and so shift on any class name containing a comma.
+	# Zero covered lines means the execution data did not match these classes
+	# (look for a checksum mismatch in the log), which is worth failing on:
+	# the alternative is a confident-looking 0%.
+	python3 -c 'import sys, xml.etree.ElementTree as ET; r = ET.parse(sys.argv[1]).getroot(); c = next(x for x in r.findall("counter") if x.get("type") == "LINE"); missed, covered = int(c.get("missed")), int(c.get("covered")); total = missed + covered; print("Line coverage: {}/{} ({:.2f}%)".format(covered, total, 100.0 * covered / total if total else 0.0)); sys.exit("No lines are recorded as covered: the execution data is either missing or does not match these classes. Look for a checksum mismatch warning in the Maven log.") if covered == 0 else None' '${COVERAGE_REPORT_DIR}/jacoco.xml' | tee -a "$${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+clean-coverage:
+	find . -name 'jacoco*.exec' -delete
+	find . -type d -path '*/target/site/jacoco*' -exec rm -rf {} +
+	rm -rf coverage-report/target/site
 
 check-no-compile-warnings:
 	@$(MAKE) compile-all | grep WARNING >/tmp/all-compile-warnings.log || true

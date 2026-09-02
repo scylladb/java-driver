@@ -50,10 +50,20 @@
     <module>distribution-tests</module>
     <module>examples</module>
     <module>bom</module>
+    <module>coverage-report</module>
   </modules>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!--
+        Must be declared even though only the "coverage" profile's
+        jacoco:prepare-agent ever gives it a real value: surefire/failsafe
+        configs that combine it via @{argLine} (core, integration-tests)
+        need Maven to resolve that reference to something, or it is left
+        as the literal string "@{argLine}", which the forked JVM then
+        rejects as an option.
+    -->
+    <argLine/>
     <config.version>1.4.8</config.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <hdrhistogram.version>2.2.2</hdrhistogram.version>
@@ -101,6 +111,17 @@
     <release.autopublish>false</release.autopublish>
     <pushChanges>false</pushChanges>
     <mockitoopens.argline/>
+    <!--
+        Declared empty for the same reason as argLine above: the JDK
+        profiles below only set this from JDK 14 onwards, so on JDK 11 it
+        is otherwise undefined, and integration-tests' failsafe argLine
+        combines it with @{argLine} rather than referencing it alone. A
+        lone ${...} to an undefined property resolves to nothing, but in a
+        composite value Maven leaves the literal text, which the forked
+        JVM then rejects ("Could not find or load main class
+        ${blockhound.argline}").
+    -->
+    <blockhound.argline/>
     <api.plumber.skip>false</api.plumber.skip>
   </properties>
   <dependencyManagement>
@@ -712,7 +733,7 @@
         <extensions>true</extensions>
         <configuration>
           <publishingServerId>central</publishingServerId>
-          <excludeArtifacts>java-driver-distribution-source,java-driver-distribution-tests,java-driver-distribution,java-driver-examples,java-driver-integration-tests,java-driver-osgi-tests</excludeArtifacts>
+          <excludeArtifacts>java-driver-distribution-source,java-driver-distribution-tests,java-driver-distribution,java-driver-examples,java-driver-integration-tests,java-driver-osgi-tests,java-driver-coverage-report</excludeArtifacts>
           <autoPublish>${release.autopublish}</autoPublish>
           <waitUntil>validated</waitUntil>
         </configuration>
@@ -770,24 +791,16 @@
           </excludes>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
+      <!--
+          jacoco-maven-plugin's prepare-agent/report executions live in the
+          "coverage" profile below, not here. Bound unconditionally, they
+          instrumented every module's build (all IT lanes across every CI
+          job, not just the coverage workflow), with no way to opt out:
+          -Djacoco.skip=true skipped prepare-agent but left the modules
+          that combine argLine via @{argLine} (core, integration-tests)
+          trying to fork with that literal, unresolved string as a JVM
+          argument.
+      -->
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
@@ -1033,6 +1046,39 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
                 <phase>verify</phase>
                 <goals>
                   <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <!--
+          Opt-in instrumentation/reporting for code coverage measurement
+          (see Makefile's test-unit-coverage/test-integration-scylla/
+          coverage-report targets and .github/workflows/coverage.yml).
+          Kept out of the default build so it doesn't add -javaagent
+          overhead, or a jacoco.skip escape hatch, to every other build and
+          test job.
+      -->
+      <id>coverage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>report</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>report</goal>
                 </goals>
               </execution>
             </executions>

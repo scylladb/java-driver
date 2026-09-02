@@ -261,7 +261,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <jvm>${testing.jvm}/bin/java</jvm>
-          <argLine>${mockitoopens.argline}</argLine>
+          <argLine>@{argLine} ${mockitoopens.argline}</argLine>
           <threadCount>1</threadCount>
           <properties>
             <property>
