@@ -23,7 +23,6 @@ under the License.
 
 ### 4.19.2
 
-- [improvement] Remove unused DataStax Astra secure-connect-bundle support (#1026)
 - [bug] CASSJAVA-116: Retry or Speculative Execution with RequestIdGenerator throws "Duplicate Key"
 
 ### 4.19.1
