@@ -39,14 +39,26 @@ public class SniSslEngineFactory implements SslEngineFactory {
   private final SSLContext sslContext;
   private final CopyOnWriteArrayList<String> fakePorts = new CopyOnWriteArrayList<>();
   private final boolean allowDnsReverseLookupSan;
+  private final boolean hostnameValidationKnown;
 
   public SniSslEngineFactory(SSLContext sslContext) {
-    this(sslContext, true);
+    this(sslContext, true, false);
   }
 
   public SniSslEngineFactory(SSLContext sslContext, boolean allowDnsReverseLookupSan) {
+    this(sslContext, allowDnsReverseLookupSan, false);
+  }
+
+  private SniSslEngineFactory(
+      SSLContext sslContext, boolean allowDnsReverseLookupSan, boolean hostnameValidationKnown) {
     this.sslContext = sslContext;
     this.allowDnsReverseLookupSan = allowDnsReverseLookupSan;
+    this.hostnameValidationKnown = hostnameValidationKnown;
+  }
+
+  /** Builds the factory for a cloud-bundle context whose trust managers the driver created. */
+  public static SniSslEngineFactory forCloudBundle(SSLContext sslContext) {
+    return new SniSslEngineFactory(sslContext, true, true);
   }
 
   @NonNull
@@ -85,6 +97,11 @@ public class SniSslEngineFactory implements SslEngineFactory {
     parameters.setEndpointIdentificationAlgorithm("HTTPS");
     engine.setSSLParameters(parameters);
     return engine;
+  }
+
+  /** Whether the trust-manager path is known to interpret the engine's parameters. */
+  boolean isHostnameValidationKnown() {
+    return hostnameValidationKnown;
   }
 
   private int getFakePort(String sniServerName) {

@@ -70,12 +70,16 @@ public class DefaultSslEngineFactory implements SslEngineFactory {
   private final SSLContext sslContext;
   private final String[] cipherSuites;
   private final boolean requireHostnameValidation;
+  private final boolean hostnameValidationKnown;
   private final boolean allowDnsReverseLookupSan;
   private ReloadingKeyManagerFactory kmf;
 
   /** Builds a new instance from the driver configuration. */
   public DefaultSslEngineFactory(DriverContext driverContext) {
     DriverExecutionProfile config = driverContext.getConfig().getDefaultProfile();
+    this.hostnameValidationKnown =
+        config.isDefined(DefaultDriverOption.SSL_KEYSTORE_PATH)
+            || config.isDefined(DefaultDriverOption.SSL_TRUSTSTORE_PATH);
     try {
       this.sslContext = buildContext(config);
     } catch (Exception e) {
@@ -137,18 +141,9 @@ public class DefaultSslEngineFactory implements SslEngineFactory {
     return engine;
   }
 
-  /**
-   * Whether {@link #newSslEngine} configures the engine to validate the server certificate against
-   * the node's host name, from {@code advanced.ssl-engine-factory.hostname-validation}.
-   *
-   * <p>A diagnostic accessor, read by the driver-configuration report sent to the server at
-   * connection time. Deliberately not on {@link SslEngineFactory}: an arbitrary factory can neither
-   * be assumed to validate host names nor be assumed not to, and a default answer on the interface
-   * would misdescribe a security control for every implementation that never considered the
-   * question. The report names the factories it recognizes and says nothing about the rest.
-   */
-  public boolean isHostnameValidationRequired() {
-    return requireHostnameValidation;
+  /** Whether this factory built the trust-manager path that interprets the engine's parameters. */
+  boolean isHostnameValidationKnown() {
+    return hostnameValidationKnown;
   }
 
   protected SSLContext buildContext(DriverExecutionProfile config) throws Exception {
