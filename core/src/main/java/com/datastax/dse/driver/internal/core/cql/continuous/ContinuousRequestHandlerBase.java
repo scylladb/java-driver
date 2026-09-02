@@ -25,7 +25,6 @@ import com.datastax.dse.driver.internal.core.DseProtocolFeature;
 import com.datastax.dse.driver.internal.core.cql.DseConversions;
 import com.datastax.dse.protocol.internal.request.Revise;
 import com.datastax.dse.protocol.internal.response.result.DseRowsMetadata;
-import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
@@ -366,7 +365,7 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
       // We've reached the end of the query plan without finding any node to write to; abort the
       // continuous paging session.
       if (activeExecutionsCount.decrementAndGet() == 0) {
-        abortGlobalRequestOrChosenCallback(AllNodesFailedException.fromErrors(errors));
+        abortGlobalRequestOrChosenCallback(DefaultSession.queryPlanExhaustedError(session, errors));
       }
     } else if (!chosenCallback.isDone()) {
       boolean writeSubmitted = false;
