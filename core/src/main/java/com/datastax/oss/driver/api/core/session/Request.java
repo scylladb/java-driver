@@ -99,8 +99,11 @@ public interface Request {
   CqlIdentifier getRoutingKeyspace();
 
   /**
-   * The table to use for tablet-aware routing. Infers the table from available ColumnDefinitions or
-   * {@code null} if it is not possible.
+   * The table to use for tablet-aware routing.
+   *
+   * <p>If an explicit value was set (see {@code Statement.setRoutingTable}), that value is
+   * returned. Otherwise the driver infers the table from prepared metadata when possible, or {@code
+   * null} if it cannot.
    *
    * @return The table to use for tablet-aware routing, or {@code null} if not set.
    */

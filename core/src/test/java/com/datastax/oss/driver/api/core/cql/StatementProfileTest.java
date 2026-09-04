@@ -180,6 +180,7 @@ public class StatementProfileTest {
         null,
         null,
         null,
+        null,
         Collections.emptyMap(),
         null,
         false,

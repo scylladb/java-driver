@@ -23,12 +23,16 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.data.TupleValue;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.metadata.KeyspaceTableNamePair;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.Tablet;
+import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
+import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.core.type.TupleType;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
@@ -304,6 +308,12 @@ public class MetadataManager implements AsyncAutoCloseable {
     return future;
   }
 
+  public CompletionStage<List<Tablet>> refreshTablets(CqlIdentifier keyspace, CqlIdentifier table) {
+    CompletableFuture<List<Tablet>> future = new CompletableFuture<>();
+    RunOrSchedule.on(adminExecutor, () -> singleThreaded.refreshTablets(keyspace, table, future));
+    return future;
+  }
+
   public static class RefreshSchemaResult {
     private final Metadata metadata;
     private final boolean isSchemaInAgreement;
@@ -378,6 +388,8 @@ public class MetadataManager implements AsyncAutoCloseable {
     // (and the ones after that are merged with the queued one).
     private CompletableFuture<RefreshSchemaResult> currentSchemaRefresh;
     private CompletableFuture<RefreshSchemaResult> queuedSchemaRefresh;
+    private final Map<KeyspaceTableNamePair, CompletableFuture<List<Tablet>>>
+        currentTabletRefreshes = new HashMap<>();
 
     private boolean didFirstNodeListRefresh;
 
@@ -575,6 +587,82 @@ public class MetadataManager implements AsyncAutoCloseable {
       apply(new AddTabletRefresh(keyspace, table, tablet));
     }
 
+    private void refreshTablets(
+        CqlIdentifier keyspace, CqlIdentifier table, CompletableFuture<List<Tablet>> future) {
+      if (closeWasCalled) {
+        future.completeExceptionally(new IllegalStateException("Session is closed"));
+        return;
+      }
+
+      KeyspaceTableNamePair key = new KeyspaceTableNamePair(keyspace, table);
+      try {
+        KeyspaceMetadata keyspaceMetadata =
+            metadata
+                .getKeyspace(keyspace)
+                .orElseThrow(
+                    () -> new IllegalArgumentException("Unknown keyspace " + keyspace.asCql(true)));
+        if (!keyspaceMetadata.isUsingTablets()) {
+          future.completeExceptionally(
+              new IllegalArgumentException(
+                  "Keyspace " + keyspace.asCql(true) + " does not use tablets"));
+          return;
+        }
+        TableMetadata tableMetadata =
+            keyspaceMetadata
+                .getTable(table)
+                .orElseThrow(
+                    () ->
+                        new IllegalArgumentException(
+                            "Unknown table " + keyspace.asCql(true) + "." + table.asCql(true)));
+        UUID tableId =
+            tableMetadata
+                .getId()
+                .orElseThrow(
+                    () ->
+                        new IllegalStateException(
+                            "Table "
+                                + keyspace.asCql(true)
+                                + "."
+                                + table.asCql(true)
+                                + " has no schema ID"));
+
+        CompletableFuture<List<Tablet>> currentRefresh = currentTabletRefreshes.get(key);
+        if (currentRefresh != null) {
+          CompletableFutures.completeFrom(currentRefresh, future);
+          return;
+        }
+
+        DriverChannel channel = controlConnection.channel();
+        if (channel == null || channel.closeFuture().isDone()) {
+          future.completeExceptionally(
+              new IllegalStateException("Control channel not available, aborting tablet refresh"));
+          return;
+        }
+
+        CompletableFuture<List<Tablet>> operation = new CompletableFuture<>();
+        CompletionStage<List<Tablet>> query =
+            new TabletsQuery(channel, () -> metadata.getNodes(), config, logPrefix)
+                .execute(tableId);
+        currentTabletRefreshes.put(key, operation);
+        CompletableFutures.completeFrom(operation, future);
+        query.whenCompleteAsync(
+            (tablets, error) -> {
+              currentTabletRefreshes.remove(key);
+              if (error != null) {
+                operation.completeExceptionally(error);
+              } else if (closeWasCalled) {
+                operation.completeExceptionally(new IllegalStateException("Session is closed"));
+              } else {
+                apply(new ReplaceTabletsRefresh(keyspace, table, tablets));
+                operation.complete(tablets);
+              }
+            },
+            adminExecutor);
+      } catch (Throwable error) {
+        future.completeExceptionally(error);
+      }
+    }
+
     private void close() {
       if (closeWasCalled) {
         return;
@@ -585,6 +673,10 @@ public class MetadataManager implements AsyncAutoCloseable {
       if (queuedSchemaRefresh != null) {
         queuedSchemaRefresh.completeExceptionally(new IllegalStateException("Cluster is closed"));
       }
+      for (CompletableFuture<List<Tablet>> tabletRefresh : currentTabletRefreshes.values()) {
+        tabletRefresh.completeExceptionally(new IllegalStateException("Session is closed"));
+      }
+      currentTabletRefreshes.clear();
       closeFuture.complete(null);
     }
   }

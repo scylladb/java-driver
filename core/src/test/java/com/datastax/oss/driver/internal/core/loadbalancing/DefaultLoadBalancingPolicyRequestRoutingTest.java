@@ -468,6 +468,7 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
         null,
         null,
         KEYSPACE,
+        null,
         ROUTING_KEY,
         null,
         Collections.emptyMap(),

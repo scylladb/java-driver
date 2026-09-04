@@ -173,6 +173,7 @@ public class StatementBuilderTest {
         null,
         null,
         null,
+        null,
         Collections.emptyMap(),
         null,
         false,
