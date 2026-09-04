@@ -14,6 +14,11 @@
             "com\\.datastax\\.(oss|dse)\\.driver\\.api\\.querybuilder(\\..+)?"
           ]
         }
+      },
+      "checks": {
+        "varargOverloadsOnlyDifferInVarargParameter": {
+          "reportUnchanged": false
+        }
       }
     },
     "ignore": [

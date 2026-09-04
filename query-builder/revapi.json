@@ -13,6 +13,11 @@
             "com\\.datastax\\.(oss|dse)\\.driver\\.api\\.core(\\..+)?"
           ]
         }
+      },
+      "checks": {
+        "varargOverloadsOnlyDifferInVarargParameter": {
+          "reportUnchanged": false
+        }
       }
     },
     "ignore": [
@@ -2780,10 +2785,6 @@
         "code": "java.method.addedToInterface",
         "new": "method com.datastax.oss.driver.api.querybuilder.select.Select com.datastax.oss.driver.api.querybuilder.select.Select::orderByAnnOf(com.datastax.oss.driver.api.core.CqlIdentifier, com.datastax.oss.driver.api.core.data.CqlVector<?>)",
         "justification": "JAVA-3118: Add support for vector data type in Schema Builder, QueryBuilder"
-      },
-      {
-        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
-        "justification": "CASSJAVA-102: Suppress newly-supported varargs check"
       }
     ]
   }
