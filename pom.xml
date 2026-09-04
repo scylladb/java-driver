@@ -60,10 +60,7 @@
     <metrics.version>4.2.38</metrics.version>
     <netty.version>4.1.136.Final</netty.version>
     <esri.version>1.2.1</esri.version>
-    <!--
-    When upgrading TinkerPop please upgrade the version matrix in
-    manual/core/integration/README.md
-    -->
+    <!-- Needed only to compile deprecated Graph compatibility signatures. -->
     <tinkerpop.version>3.5.6</tinkerpop.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <slf4j.version>2.0.18</slf4j.version>
@@ -239,11 +236,6 @@
         <version>${esri.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.json</groupId>
-        <artifactId>json</artifactId>
-        <version>${json.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.tinkerpop</groupId>
         <artifactId>gremlin-core</artifactId>
         <version>${tinkerpop.version}</version>
@@ -267,9 +259,9 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.apache.tinkerpop</groupId>
-        <artifactId>tinkergraph-gremlin</artifactId>
-        <version>${tinkerpop.version}</version>
+        <groupId>org.json</groupId>
+        <artifactId>json</artifactId>
+        <version>${json.version}</version>
       </dependency>
       <dependency>
         <groupId>org.reactivestreams</groupId>

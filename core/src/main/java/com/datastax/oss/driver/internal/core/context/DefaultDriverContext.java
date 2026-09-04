@@ -59,6 +59,8 @@ import com.datastax.oss.driver.internal.core.addresstranslation.PassThroughAddre
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
+import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
+import com.datastax.oss.driver.internal.core.config.DeprecatedGraphConfig;
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
@@ -120,6 +122,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -262,6 +265,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final String startupApplicationName;
   private final String startupApplicationVersion;
   private final Object metricRegistry;
+  private volatile Set<String> deprecatedGraphOptions = Collections.emptySet();
   // A stack trace captured in the constructor. Used to extract information about the client
   // application.
   private final StackTraceElement[] initStackTrace;
@@ -276,6 +280,7 @@ public class DefaultDriverContext implements InternalDriverContext {
     } else {
       this.sessionName = "s" + SESSION_NAME_COUNTER.getAndIncrement();
     }
+    warnIfDeprecatedGraphOptionsChanged();
     this.localDatacentersFromBuilder = programmaticArguments.getLocalDatacenters();
     this.codecRegistry = buildCodecRegistry(programmaticArguments);
     this.nodeStateListenerFromBuilder = programmaticArguments.getNodeStateListener();
@@ -611,7 +616,22 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   protected EventBus buildEventBus() {
-    return new EventBus(getSessionName());
+    EventBus eventBus = new EventBus(getSessionName());
+    eventBus.register(ConfigChangeEvent.class, event -> warnIfDeprecatedGraphOptionsChanged());
+    return eventBus;
+  }
+
+  private void warnIfDeprecatedGraphOptionsChanged() {
+    Set<String> configuredOptions = DeprecatedGraphConfig.findConfiguredOptions(config);
+    if (!configuredOptions.equals(deprecatedGraphOptions)) {
+      deprecatedGraphOptions = configuredOptions;
+      if (!configuredOptions.isEmpty()) {
+        LOG.warn(
+            "[{}] DSE Graph configuration is deprecated and ignored: {}",
+            getSessionName(),
+            configuredOptions);
+      }
+    }
   }
 
   protected Compressor<ByteBuf> buildCompressor() {

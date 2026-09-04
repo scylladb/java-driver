@@ -17,10 +17,8 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.DefaultFluentGraphStatement;
-import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import java.util.Collections;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 
 /**
@@ -37,7 +35,10 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
  * }</pre>
  *
  * @see DseGraph#g
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface FluentGraphStatement extends GraphStatement<FluentGraphStatement> {
 
   /**
@@ -48,21 +49,7 @@ public interface FluentGraphStatement extends GraphStatement<FluentGraphStatemen
    */
   @NonNull
   static FluentGraphStatement newInstance(@NonNull GraphTraversal<?, ?> traversal) {
-    return new DefaultFluentGraphStatement(
-        traversal,
-        null,
-        null,
-        null,
-        Statement.NO_DEFAULT_TIMESTAMP,
-        null,
-        null,
-        Collections.emptyMap(),
-        null,
-        null,
-        null,
-        null,
-        null,
-        null);
+    throw GraphSupportRemoved.exception();
   }
 
   /**

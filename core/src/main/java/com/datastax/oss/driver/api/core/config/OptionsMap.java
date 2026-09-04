@@ -245,6 +245,7 @@ public class OptionsMap implements Serializable {
     throw new InvalidObjectException("Proxy required");
   }
 
+  @SuppressWarnings("deprecation")
   protected static void fillWithDriverDefaults(OptionsMap map) {
     Duration initQueryTimeout = Duration.ofSeconds(5);
     Duration requestTimeout = Duration.ofSeconds(2);

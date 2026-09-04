@@ -17,11 +17,8 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.DefaultBatchGraphStatement;
-import com.datastax.oss.driver.api.core.cql.Statement;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import java.util.Collections;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 
 /**
@@ -54,7 +51,10 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
  * }</pre>
  *
  * @see DseGraph#g
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface BatchGraphStatement
     extends GraphStatement<BatchGraphStatement>, Iterable<GraphTraversal> {
 
@@ -65,47 +65,19 @@ public interface BatchGraphStatement
    */
   @NonNull
   static BatchGraphStatement newInstance() {
-    return new DefaultBatchGraphStatement(
-        ImmutableList.of(),
-        null,
-        null,
-        null,
-        Statement.NO_DEFAULT_TIMESTAMP,
-        null,
-        null,
-        Collections.emptyMap(),
-        null,
-        null,
-        null,
-        null,
-        null,
-        null);
+    throw GraphSupportRemoved.exception();
   }
 
   /** Create a new instance from the given list of traversals. */
   @NonNull
   static BatchGraphStatement newInstance(@NonNull Iterable<GraphTraversal> traversals) {
-    return new DefaultBatchGraphStatement(
-        traversals,
-        null,
-        null,
-        null,
-        Statement.NO_DEFAULT_TIMESTAMP,
-        null,
-        null,
-        Collections.emptyMap(),
-        null,
-        null,
-        null,
-        null,
-        null,
-        null);
+    throw GraphSupportRemoved.exception();
   }
 
   /** Create a new instance from the given list of traversals. */
   @NonNull
   static BatchGraphStatement newInstance(@NonNull GraphTraversal... traversals) {
-    return newInstance(ImmutableList.copyOf(traversals));
+    throw GraphSupportRemoved.exception();
   }
 
   /**
