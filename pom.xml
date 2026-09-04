@@ -662,9 +662,9 @@
           <version>0.15.1</version>
           <configuration>
             <outputNonIdentifyingDifferenceInfo>false</outputNonIdentifyingDifferenceInfo>
-            <versionFormat>\d+\.\d+\.\d+</versionFormat>
+            <versionFormat>\d+(?:\.\d+)+</versionFormat>
+            <failOnUnresolvedArtifacts>true</failOnUnresolvedArtifacts>
             <oldArtifacts>
-              <!-- The previous release used DataStax groupId, remove this after the next release -->
               <artifact>${project.groupId}:${project.artifactId}:RELEASE</artifact>
             </oldArtifacts>
             <analysisConfiguration>
@@ -988,6 +988,18 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </plugins>
   </build>
   <profiles>
+    <profile>
+      <id>skip-revapi-for-pom-packaging</id>
+      <activation>
+        <property>
+          <name>packaging</name>
+          <value>pom</value>
+        </property>
+      </activation>
+      <properties>
+        <revapi.skip>true</revapi.skip>
+      </properties>
+    </profile>
     <profile>
       <id>release-sign-artifacts</id>
       <activation>
