@@ -96,31 +96,72 @@ install-scylla-ccm:
 
 download-all-dependencies: compile-all .download-test-dependencies .download-verify-dependencies
 
+# A server version is usable only when it names one build: MAJOR.MINOR.PATCH, or an exact
+# pre-release build (2022.2.0-rc0, 5.0.rc3, 4.0-alpha1, 2022.1.3-dev-0.20220922.539a55e35).
+# A pre-release label must start with a letter and carry a numeric discriminator, so a bare
+# selector such as 6.2.0~rc or 6.2.0-dev is not one: CCM resolves it to whichever build is
+# newest today. Anything less - a bare MAJOR.MINOR above all - makes every 'ccm create'
+# re-query S3 for the newest patch instead of reusing the release it already installed.
+# Used by the resolvers below and by every target that hands a version to CCM, so that one
+# grammar decides all of them.
+SERVER_VERSION_RE = ^[0-9]+\.[0-9]+\.[0-9]+$$|^[0-9]+\.[0-9]+(\.[0-9]+)?[-~.][A-Za-z][A-Za-z._~-]*[0-9][A-Za-z0-9._~-]*$$
+
+# $(1) = name of the shell var to hold the cached value (e.g. CASSANDRA_VERSION_CACHED)
+# $(2) = cache file path (e.g. ${CASSANDRA_VERSION_FILE})
+define LOAD_CACHED_VERSION
+	version_re='$(SERVER_VERSION_RE)'
+
+	# The cache is shared and outlives a Makefile change, so an entry written before this
+	# check existed can hold a version that is not fully qualified. Drop any such entry
+	# and resolve again, rather than serve it and bypass the check below.
+	$(1)=
+	if [[ -f "$(2)" ]]; then
+		$(1)=$$(cat "$(2)")
+		if [[ ! "$$$(1)" =~ $$version_re ]]; then
+			rm -f "$(2)"
+			$(1)=
+		fi
+	fi
+endef
+
+# $(1) = name of the shell var holding the resolved version
+# $(2) = human label for the error message (e.g. Cassandra, ScyllaDB)
+define REQUIRE_FULLY_QUALIFIED_VERSION
+	version_re='$(SERVER_VERSION_RE)'
+	if [[ ! "$$$(1)" =~ $$version_re ]]; then
+		echo "$(2) version '$$$(1)' does not name one build, expected MAJOR.MINOR.PATCH or an"
+		echo "exact pre-release build such as 2022.2.0-rc0 - a bare '-rc'/'-dev' selector is not one"
+		exit 1
+	fi
+endef
+
 CASSANDRA_VERSION_FILE=/tmp/cassandra-version-${CASSANDRA_VERSION}.resolved
 resolve-cassandra-version: .prepare-get-version
 	@find "${CASSANDRA_VERSION_FILE}" -mtime +0 -delete 2>/dev/null 1>&1
-	if [[ -f "${CASSANDRA_VERSION_FILE}" ]]; then
-		echo "Resolved Cassandra ${CASSANDRA_VERSION} to $$(cat ${CASSANDRA_VERSION_FILE})"
-		exit 0
-	fi
+	# Set here as well as in the macros below, which set it for their own use: the
+	# pass-through branch matches against it directly, and bash treats an unset
+	# version_re as the empty regex, which every string matches.
+	version_re='$(SERVER_VERSION_RE)'
+	$(call LOAD_CACHED_VERSION,CASSANDRA_VERSION_CACHED,${CASSANDRA_VERSION_FILE})
 
-	if [[ "${CASSANDRA_VERSION}" == "4-LATEST" ]]; then
+	if [[ -n "$${CASSANDRA_VERSION_CACHED}" ]]; then
+		CASSANDRA_VERSION_RESOLVED=$${CASSANDRA_VERSION_CACHED}
+	elif [[ "${CASSANDRA_VERSION}" == "4-LATEST" ]]; then
 		CASSANDRA_VERSION_RESOLVED=$$(get-version -source github-tag -repo apache/cassandra -prefix "cassandra-" -out-no-prefix -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and 4.LAST.LAST" | tr -d '\"')
 	elif [[ "${CASSANDRA_VERSION}" == "3-LATEST" ]]; then
 		CASSANDRA_VERSION_RESOLVED=$$(get-version -source github-tag -repo apache/cassandra -prefix "cassandra-" -out-no-prefix -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and 3.LAST.LAST" | tr -d '\"')
-	elif [[ "${CASSANDRA_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
+	elif [[ "${CASSANDRA_VERSION}" =~ $$version_re ]]; then
+		# Already fully qualified, or a suffixed form (4.0-alpha1, 5.0-beta1) naming one exact
+		# build. Pass it through untouched, with no lookup.
 		CASSANDRA_VERSION_RESOLVED=${CASSANDRA_VERSION}
 	elif [[ "${CASSANDRA_VERSION}" =~ ^[0-9]+\.[0-9]+$$ ]]; then
 		# Complete a two-component version to its newest patch. See the comment in
 		# resolve-scylla-version for why a partial version must not reach CCM.
 		CASSANDRA_VERSION_RESOLVED=$$(get-version -source github-tag -repo apache/cassandra -prefix "cassandra-" -out-no-prefix -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and ${CASSANDRA_VERSION}.LAST" | tr -d '\"')
-	elif echo "${CASSANDRA_VERSION}" | grep -qP '^[0-9]+\.[0-9]+'; then
-		# Pre-release and other suffixed forms (4.0-alpha1, 5.0-beta1) already name one
-		# exact build, so pass them through and skip the check below.
-		CASSANDRA_VERSION_RESOLVED=${CASSANDRA_VERSION}
-		CASSANDRA_VERSION_EXACT=1
 	else
 		echo "Unknown Cassandra version name '${CASSANDRA_VERSION}'"
+		echo "Expected 3-LATEST, 4-LATEST, MAJOR.MINOR.PATCH, MAJOR.MINOR, or an exact pre-release"
+		echo "build such as 4.0-alpha1 - a bare '-rc'/'-dev' selector is not one"
 		exit 1
 	fi
 
@@ -129,26 +170,31 @@ resolve-cassandra-version: .prepare-get-version
 		exit 1
 	fi
 
-	if [[ -z "$${CASSANDRA_VERSION_EXACT}" ]] && [[ ! "$${CASSANDRA_VERSION_RESOLVED}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
-		echo "Resolved Cassandra version '$${CASSANDRA_VERSION_RESOLVED}' is not fully qualified, expected MAJOR.MINOR.PATCH"
-		exit 1
-	fi
+	$(call REQUIRE_FULLY_QUALIFIED_VERSION,CASSANDRA_VERSION_RESOLVED,Cassandra)
 
 	echo "Resolved Cassandra ${CASSANDRA_VERSION} to $${CASSANDRA_VERSION_RESOLVED}"
 	if [[ -n "${GITHUB_OUTPUT}" ]]; then
 		echo "value=$${CASSANDRA_VERSION_RESOLVED}" >>$${GITHUB_OUTPUT}
 	fi
-	echo "$${CASSANDRA_VERSION_RESOLVED}" >${CASSANDRA_VERSION_FILE}
+	# Only a fresh resolve writes the cache. Rewriting the file on a hit would refresh
+	# the mtime that the 'find -mtime +0' above expires on, so an alias used at least
+	# once a day would pin to the patch it first resolved to and never age out.
+	if [[ -z "$${CASSANDRA_VERSION_CACHED}" ]]; then
+		echo "$${CASSANDRA_VERSION_RESOLVED}" >${CASSANDRA_VERSION_FILE}
+	fi
 
 SCYLLA_VERSION_FILE=/tmp/scylla-version-${SCYLLA_VERSION}.resolved
 resolve-scylla-version: .prepare-get-version
 	@find "${SCYLLA_VERSION_FILE}" -mtime +0 -delete 2>/dev/null 1>&1
-	if [[ -f "${SCYLLA_VERSION_FILE}" ]]; then
-		echo "Resolved ScyllaDB ${SCYLLA_VERSION} to $$(cat ${SCYLLA_VERSION_FILE})"
-		exit 0
-	fi
+	# Set here as well as in the macros below, which set it for their own use: the
+	# pass-through branch matches against it directly, and bash treats an unset
+	# version_re as the empty regex, which every string matches.
+	version_re='$(SERVER_VERSION_RE)'
+	$(call LOAD_CACHED_VERSION,SCYLLA_VERSION_CACHED,${SCYLLA_VERSION_FILE})
 
-	if [[ "${SCYLLA_VERSION}" == "LTS-LATEST" ]]; then
+	if [[ -n "$${SCYLLA_VERSION_CACHED}" ]]; then
+		SCYLLA_VERSION_RESOLVED=$${SCYLLA_VERSION_CACHED}
+	elif [[ "${SCYLLA_VERSION}" == "LTS-LATEST" ]]; then
 		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]{4}$$.^[0-9]+$$.^[0-9]+$$ and LAST.1.LAST" | tr -d '\"')
 	elif [[ "${SCYLLA_VERSION}" == "LTS-PRIOR" ]]; then
 		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]{4}$$.^[0-9]+$$.^[0-9]+$$ and LAST-1.1.LAST" | tr -d '\"')
@@ -159,25 +205,26 @@ resolve-scylla-version: .prepare-get-version
 		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]{4}$$.^[0-9]+$$.^[0-9]+$$ and LAST.LAST.LAST" | tr -d '\"')
 	elif [[ "${SCYLLA_VERSION}" == "PRIOR" ]]; then
 		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]{4}$$.^[0-9]+$$.^[0-9]+$$ and LAST.LAST.LAST-1" | tr -d '\"')
-	elif [[ "${SCYLLA_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
+	elif [[ "${SCYLLA_VERSION}" =~ $$version_re ]]; then
+		# Already fully qualified, or a suffixed form (2022.2.0-rc0, 5.0.rc3) naming one exact
+		# build. Pass it through untouched, with no lookup.
 		SCYLLA_VERSION_RESOLVED=${SCYLLA_VERSION}
 	elif [[ "${SCYLLA_VERSION}" =~ ^[0-9]+\.[0-9]+$$ ]]; then
 		# A two-component version such as 2026.2 is accepted by CCM, but CCM then stores
 		# the downloaded release under its full version while looking it up under the
-		# partial one, so the lookup never hits the cache: every single 'ccm create'
-		# re-queries S3 for the newest patch and the integration tests take several
-		# times longer. Resolve it here, once, so the tests get a cache hit instead.
+		# partial one, so the lookup never hits its own entry: every single 'ccm create'
+		# re-queries S3 for the newest patch. Resolve it here, once, so that the cache
+		# entry CCM writes is the one it later looks up.
 		SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and ${SCYLLA_VERSION}.LAST" | tr -d '\"')
-		if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]]; then
+		# Releases before 2025.1 are in the scylla-enterprise repo, and only ever under a
+		# four-digit year, so an OSS line (6.2, 5.4) must not pay for a second lookup.
+		if [[ -z "$${SCYLLA_VERSION_RESOLVED}" ]] && [[ "${SCYLLA_VERSION}" =~ ^[0-9]{4}\. ]]; then
 			SCYLLA_VERSION_RESOLVED=$$(get-version --source dockerhub-imagetag --repo scylladb/scylla-enterprise -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and ${SCYLLA_VERSION}.LAST" | tr -d '\"')
 		fi
-	elif echo "${SCYLLA_VERSION}" | grep -qP '^[0-9]+\.[0-9]+'; then
-		# Pre-release and other suffixed forms (2022.2.0-rc0, 5.0.rc3) already name one
-		# exact build, so pass them through and skip the check below.
-		SCYLLA_VERSION_RESOLVED=${SCYLLA_VERSION}
-		SCYLLA_VERSION_EXACT=1
 	else
 		echo "Unknown ScyllaDB version name '${SCYLLA_VERSION}'"
+		echo "Expected LATEST, PRIOR, LTS-LATEST, LTS-PRIOR, MAJOR.MINOR.PATCH, MAJOR.MINOR, or an"
+		echo "exact pre-release build such as 2022.2.0-rc0 - a bare '-rc'/'-dev' selector is not one"
 		exit 1
 	fi
 
@@ -186,18 +233,18 @@ resolve-scylla-version: .prepare-get-version
 		exit 1
 	fi
 
-	if [[ -z "$${SCYLLA_VERSION_EXACT}" ]] && [[ ! "$${SCYLLA_VERSION_RESOLVED}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then
-		echo "Resolved ScyllaDB version '$${SCYLLA_VERSION_RESOLVED}' is not fully qualified, expected MAJOR.MINOR.PATCH"
-		echo "A partial version makes every 'ccm create' query S3 for the newest patch,"
-		echo "which makes the integration tests several times slower."
-		exit 1
-	fi
+	$(call REQUIRE_FULLY_QUALIFIED_VERSION,SCYLLA_VERSION_RESOLVED,ScyllaDB)
 
 	echo "Resolved ScyllaDB ${SCYLLA_VERSION} to $${SCYLLA_VERSION_RESOLVED}"
 	if [[ -n "${GITHUB_OUTPUT}" ]]; then
 		echo "value=$${SCYLLA_VERSION_RESOLVED}" >>$${GITHUB_OUTPUT}
 	fi
-	echo "$${SCYLLA_VERSION_RESOLVED}" >${SCYLLA_VERSION_FILE}
+	# Only a fresh resolve writes the cache. Rewriting the file on a hit would refresh
+	# the mtime that the 'find -mtime +0' above expires on, so an alias used at least
+	# once a day would pin to the patch it first resolved to and never age out.
+	if [[ -z "$${SCYLLA_VERSION_CACHED}" ]]; then
+		echo "$${SCYLLA_VERSION_RESOLVED}" >${SCYLLA_VERSION_FILE}
+	fi
 
 checkout-one-commit-before:
 	@if [[ "${RELEASE_TARGET_TAG}" == 4.* ]]; then
@@ -215,6 +262,9 @@ download-cassandra: .prepare-scylla-ccm resolve-cassandra-version
 		echo "Cassandra version ${CASSANDRA_VERSION} was not resolved"
 		exit 1
 	fi
+	# Check it here too, where the version is handed to CCM: this value can arrive from
+	# the environment, which is how CI passes it, so the resolver never saw it.
+	$(call REQUIRE_FULLY_QUALIFIED_VERSION,CASSANDRA_VERSION_RESOLVED,Cassandra)
 	rm -rf /tmp/download.ccm || true
 	mkdir /tmp/download.ccm || true
 	ccm create ccm_1 -i 127.0.254. -n 1:0 -v "$${CASSANDRA_VERSION_RESOLVED}" --config-dir=/tmp/download.ccm
@@ -228,6 +278,9 @@ download-scylla: .prepare-scylla-ccm resolve-scylla-version
 		echo "ScyllaDB version ${SCYLLA_VERSION} was not resolved"
 		exit 1
 	fi
+	# Check it here too, where the version is handed to CCM: this value can arrive from
+	# the environment, which is how CI passes it, so the resolver never saw it.
+	$(call REQUIRE_FULLY_QUALIFIED_VERSION,SCYLLA_VERSION_RESOLVED,ScyllaDB)
 	rm -rf /tmp/download.ccm || true
 	mkdir /tmp/download.ccm || true
 	ccm create ccm_1 -i 127.0.254. -n 1:0 -v "$${SCYLLA_VERSION_RESOLVED}" --scylla --config-dir=/tmp/download.ccm
@@ -301,6 +354,9 @@ test-integration-scylla: .install-all-modules .prepare-scylla-ccm resolve-scylla
 		echo "ScyllaDB version ${SCYLLA_VERSION} was not resolved"
 		exit 1
 	fi
+	# Check it here too, where the version is handed to CCM: this value can arrive from
+	# the environment, which is how CI passes it, so the resolver never saw it.
+	$(call REQUIRE_FULLY_QUALIFIED_VERSION,SCYLLA_VERSION_RESOLVED,ScyllaDB)
 	mvn -B -e verify -pl integration-tests -Dccm.version=$${SCYLLA_VERSION_RESOLVED} -Dccm.distribution=scylla -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
 test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cassandra-version
@@ -311,6 +367,9 @@ test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cas
 		echo "Cassandra version ${CASSANDRA_VERSION} was not resolved"
 		exit 1
 	fi
+	# Check it here too, where the version is handed to CCM: this value can arrive from
+	# the environment, which is how CI passes it, so the resolver never saw it.
+	$(call REQUIRE_FULLY_QUALIFIED_VERSION,CASSANDRA_VERSION_RESOLVED,Cassandra)
 	mvn -B -e verify -pl integration-tests -Dccm.version=$${CASSANDRA_VERSION_RESOLVED} -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true $(MAVEN_EXTRA_ARGS)
 
 check-no-compile-warnings:
