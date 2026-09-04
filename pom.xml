@@ -662,9 +662,10 @@
           <version>0.15.1</version>
           <configuration>
             <outputNonIdentifyingDifferenceInfo>false</outputNonIdentifyingDifferenceInfo>
-            <versionFormat>\d+\.\d+\.\d+</versionFormat>
+            <versionFormat>\d+(?:\.\d+)+</versionFormat>
+            <failOnUnresolvedArtifacts>true</failOnUnresolvedArtifacts>
+            <failOnUnresolvedDependencies>true</failOnUnresolvedDependencies>
             <oldArtifacts>
-              <!-- The previous release used DataStax groupId, remove this after the next release -->
               <artifact>${project.groupId}:${project.artifactId}:RELEASE</artifact>
             </oldArtifacts>
             <analysisConfiguration>

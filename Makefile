@@ -37,7 +37,7 @@ export PATH := $(MAKEFILE_PATH)/bin:$(PATH)
 	$(MVNCMD) install -pl guava-shaded
 
 .install-all-modules:
-	$(MVNCMD) install -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	$(MVNCMD) install -DskipTests -Drevapi.skip=true -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
 
 .download-test-dependencies:
 	$(MVNCMD) test -Dtest=TestThatDoesNotExists -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true || true
