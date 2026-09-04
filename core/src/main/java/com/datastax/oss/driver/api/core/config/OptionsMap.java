@@ -245,6 +245,9 @@ public class OptionsMap implements Serializable {
     throw new InvalidObjectException("Proxy required");
   }
 
+  // RESOLVE_CONTACT_POINTS is deprecated and has no effect, but it is still a driver option, so the
+  // defaults map stays complete by carrying its reference.conf value.
+  @SuppressWarnings("deprecation")
   protected static void fillWithDriverDefaults(OptionsMap map) {
     Duration initQueryTimeout = Duration.ofSeconds(5);
     Duration requestTimeout = Duration.ofSeconds(2);
@@ -276,6 +279,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONNECTION_POOL_INIT_BATCH_SIZE, 0);
     map.put(TypedDriverOption.CONNECTION_MAX_REQUESTS, 1024);
     map.put(TypedDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS, 256);
+    map.put(TypedDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES, 5);
     map.put(TypedDriverOption.CONNECTION_WARN_INIT_ERROR, true);
     map.put(TypedDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true);
     map.put(TypedDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, 10000);
@@ -369,7 +373,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_INTERVAL, Duration.ofMillis(200));
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_TIMEOUT, Duration.ofSeconds(10));
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, true);
-    map.put(TypedDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, false);
+    map.put(TypedDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, true);
     map.put(TypedDriverOption.PREPARE_ON_ALL_NODES, true);
     map.put(TypedDriverOption.REPREPARE_ENABLED, true);
     map.put(TypedDriverOption.REPREPARE_CHECK_SYSTEM_TABLE, false);

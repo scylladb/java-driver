@@ -27,6 +27,8 @@ import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.ReplayingEventFilter;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
@@ -147,7 +149,9 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
     switch (stateRef.get()) {
       case BEFORE_INIT:
       case DURING_INIT:
-        // The contact points are not stored in the metadata yet:
+        // The contact points are not stored in the metadata yet. Each unresolved hostname is
+        // expanded to all its DNS IPs at connection time by ChannelFactory, so one entry per
+        // contact point is enough here.
         List<Node> nodes = new ArrayList<>(context.getMetadataManager().getContactPoints());
         Collections.shuffle(nodes);
         return new ConcurrentLinkedQueue<>(nodes);
@@ -164,20 +168,80 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
 
   @NonNull
   public Queue<Node> newControlReconnectionQueryPlan() {
+    // Read the state once, before building the regular plan. State transitions are monotonic
+    // (BEFORE_INIT -> DURING_INIT -> RUNNING -> ...), so this captured value is <= the value
+    // newQueryPlan() reads internally; that guarantees we never both build the plan from the
+    // contact points (pre-RUNNING branch of newQueryPlan) and append them again below.
+    //
+    // Note: this is still two separate reads of stateRef (this one, and newQueryPlan()'s own
+    // internal read a moment later), so a transition landing exactly between them is possible: if
+    // state flips BEFORE_INIT/DURING_INIT -> RUNNING in that window, newQueryPlan() takes the
+    // RUNNING branch (a real LBP-built plan) while the state captured here is still pre-RUNNING,
+    // so the contact-point fallback below is skipped for this one call even though
+    // regularQueryPlan didn't come from the contact-point branch. This is benign: no crash, no
+    // duplicate entries, and it self-corrects on the very next reconnection attempt.
+    //
+    // Monotonicity leaves the other direction open, and it is worth naming: a RUNNING -> CLOSING
+    // flip in that same window makes newQueryPlan() take its default branch and return an empty
+    // plan, which passes both the RUNNING check below and the empty-plan exemption from the
+    // re-resolving-monitor rule, so the plan handed back is the contact points alone. Also benign:
+    // ControlConnection abandons a reconnection attempt on closeWasCalled, and every node in that
+    // plan is one it already had.
+    State state = stateRef.get();
     Queue<Node> regularQueryPlan = newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
 
-    if (context
-        .getConfig()
-        .getDefaultProfile()
-        .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)) {
-      Set<DefaultNode> originalNodes = context.getMetadataManager().getContactPoints();
-      List<Node> contactNodes = new ArrayList<>();
-      for (DefaultNode node : originalNodes) {
-        contactNodes.add(DefaultNode.newContactPoint(node.getEndPoint(), context));
-      }
+    // Only append the contact points as an explicit fallback once the LBP is RUNNING: before that
+    // (BEFORE_INIT/DURING_INIT), newQueryPlan() above already built regularQueryPlan directly from
+    // the contact points, so appending them again here would just duplicate every entry.
+    //
+    // Skipped when the topology monitor re-resolves node addresses on its own (e.g. proxy-based
+    // monitors such as client routes or the cloud SNI proxy): those keep addresses fresh without
+    // this fallback, and appending raw contact points could resurrect nodes the monitor has
+    // authoritatively removed. The exception is an empty regular plan: with no live node to try,
+    // reconnection cannot recover on its own, so the contact-point fallback is kept even for those
+    // monitors.
+    //
+    // isEmpty() is asked of a plan a load balancing policy built, which QueryPlan's contract used
+    // to say the driver never does -- so that contract now names this call, because it is what
+    // makes the "size() and iterator() never throw" guarantee load-bearing rather than merely
+    // documented. Nothing cheaper is available: isEmpty() is size() == 0 through
+    // AbstractCollection, size() reads LazyQueryPlan#getNodes(), and so does poll(), so asking
+    // through poll() and putting the node back would force the identical computation and allocate
+    // a wrapper to do it.
+    if (state == State.RUNNING
+        && context
+            .getConfig()
+            .getDefaultProfile()
+            .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)
+        && (!context.getTopologyMonitor().reresolvesNodeAddresses()
+            || regularQueryPlan.isEmpty())) {
+      // Append the original (unresolved) contact points so every IP their hostname resolves to is
+      // tried as a fallback: ChannelFactory expands each one at connection time, instead of the
+      // driver being stuck with whatever single IP a metadata node happens to hold.
+      //
+      // The retained instances, not fresh copies. MetadataManager holds the contact-point nodes for
+      // the session's lifetime and the pre-RUNNING branch of newQueryPlan() already hands out these
+      // very objects, so minting a copy per plan would give each reconnection round a distinct node
+      // firing its own controlConnectionFailed event -- one set per round, for as long as
+      // reconnection lasts. Shuffling a fresh list leaves the retained set itself untouched.
+      //
+      // Metrics are not a reason either way, and are worth stating because it looks as though they
+      // should be: DefaultNode.newContactPoint installs NoopNodeMetricUpdater, so a contact-point
+      // node records nothing, and a fresh copy would be no worse. What that costs is narrower than
+      // it looks, and narrower than this comment used to claim: errors.connection.auth is written
+      // in exactly two places, both in ChannelPool#handleError, and a contact-point node never
+      // reaches a pool -- only this query plan -- so that counter was never written on this path,
+      // before or after the flip. What is actually missing is every per-node metric for a
+      // contact-point plan entry; the only thing a reconnect through one reports is
+      // ChannelEvent.controlConnectionFailed, which NodeStateManager no-ops post-init. Giving these
+      // nodes real updaters would register metrics under names for ephemeral objects that are
+      // deliberately absent from metadata, so it is left as is.
+      List<Node> contactNodes = new ArrayList<>(context.getMetadataManager().getContactPoints());
       Collections.shuffle(contactNodes);
-      // Append contact points to the end of the regular query plan so they serve as a fallback
-      regularQueryPlan.addAll(contactNodes);
+      // Concatenate rather than mutate: the RUNNING-state regularQueryPlan is a built-in QueryPlan
+      // whose add()/addAll() throw UnsupportedOperationException (poll() is its only mutator).
+      // CompositeQueryPlan drains the regular plan first, then the contact-point fallback.
+      return new CompositeQueryPlan(regularQueryPlan, new SimpleQueryPlan(contactNodes.toArray()));
     }
 
     return regularQueryPlan;

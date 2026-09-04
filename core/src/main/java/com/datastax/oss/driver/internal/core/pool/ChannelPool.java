@@ -27,7 +27,6 @@ import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.InvalidKeyspaceException;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
-import com.datastax.oss.driver.api.core.auth.AuthenticationException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
@@ -555,24 +554,88 @@ public class ChannelPool implements AsyncAutoCloseable {
 
     private void handleError(
         Throwable error, Consumer<Throwable> onFatal, Consumer<Void> onKeyspaceError) {
+      // ChannelFactory.isAuthOnly, not a bare instanceof: one failure no longer means one address.
+      // A node whose endpoint is a name reports a single failure with the other addresses' failures
+      // attached as suppressed, and the factory promotes an authentication failure over transport
+      // ones -- so [refused, refused, auth] would otherwise count as errors.connection.auth alone,
+      // leaving errors.connection.init at zero while most of the node is unreachable, and tell the
+      // operator their credentials are wrong. The routing below is unaffected: which failure to act
+      // on is already decided by ChannelFactory#surfacedFailure.
+      boolean authOnly = ChannelFactory.isAuthOnly(error);
       ((DefaultNode) node)
           .getMetricUpdater()
           .incrementCounter(
-              error instanceof AuthenticationException
+              authOnly
                   ? DefaultNodeMetric.AUTHENTICATION_ERRORS
                   : DefaultNodeMetric.CONNECTION_INIT_ERRORS,
               null);
+      if (!authOnly && ChannelFactory.mentionsAuthentication(error)) {
+        // Mixed [refused, refused, auth]: both things really did happen, so both are counted.
+        // Routing the mixed case to errors.connection.init alone would be the opposite mistake to
+        // the one above -- this method is the driver's only writer of errors.connection.auth, so
+        // for any node whose endpoint is a name (SNI/cloud proxy, a client route, or a translator
+        // with resolve-addresses = false) that metric could never leave zero, however wrong the
+        // credentials are. An operator watching it would see nothing while every connect failed on
+        // authentication. Counting both keeps errors.connection.init honest about the unreachable
+        // addresses without making the auth signal unobservable.
+        //
+        // mentionsAuthentication, not `error instanceof AuthenticationException`: the surfaced
+        // failure is chosen by ChannelFactory#surfacedFailure, which ranks an invalid keyspace --
+        // and a node-wide failure -- above an authentication one. So [auth, no-such-keyspace]
+        // arrives as the keyspace error with the auth failure suppressed, and a test on the type
+        // of what arrived would leave errors.connection.auth at zero in exactly the case this
+        // branch exists for.
+        ((DefaultNode) node)
+            .getMetricUpdater()
+            .incrementCounter(DefaultNodeMetric.AUTHENTICATION_ERRORS, null);
+      }
+      // What the operator is told about credentials, decided *before* and separately from what the
+      // driver does about the failure. The two used to be one if/else chain, which meant the fatal
+      // types -- tested first, because they end the pool's loop -- swallowed the auth diagnosis
+      // whole: a node whose addresses went [auth, unsupported-protocol-version] surfaces the
+      // version rejection (node-wide, so ChannelFactory#surfacedFailure promotes it), got forced
+      // down permanently, and logged nothing at any level about the rejected login. The counter
+      // above had already moved, so errors.connection.auth climbed while every message named the
+      // protocol version, and the credential rejection was reachable only by reading
+      // getSuppressed()
+      // off the logged throwable.
+      boolean warnedAboutAuth = true;
+      if (authOnly) {
+        // Always warn because this is most likely something the operator needs to fix.
+        // Keep going to reconnect if it can be fixed without bouncing the client.
+        Loggers.warnWithException(LOG, "[{}] Authentication error", logPrefix, error);
+      } else if (ChannelFactory.mentionsAuthentication(error)) {
+        // Authentication on some addresses, something else on the others: the credentials are not
+        // the whole story, so the message says so -- but this still warns unconditionally, exactly
+        // like the auth-only branch above. advanced.connection.warn-on-init-error exists to mute
+        // the noise of nodes that cannot be reached; it was never a switch for "your credentials
+        // are wrong", and before multi-address support every AuthenticationException warned here
+        // regardless of it. Gating the mixed case on it would mean a name whose records fail
+        // [refused, refused, auth] logs at DEBUG, so the one part of the failure the operator can
+        // actually fix is the part they never see.
+        //
+        // mentionsAuthentication for the same reason the counter above uses it: surfacedFailure
+        // ranks an invalid keyspace, and a node-wide failure, above an authentication one, so the
+        // rejected login often arrives suppressed rather than as the throwable itself.
+        Loggers.warnWithException(
+            LOG,
+            "[{}] Error while opening new channel (authentication failed on some of the node's"
+                + " addresses, other addresses failed for other reasons)",
+            logPrefix,
+            error);
+      } else {
+        warnedAboutAuth = false;
+      }
+
+      // And what to do about it. Which failure of the set is acted on was already decided by
+      // ChannelFactory#surfacedFailure; this only routes it.
       if (error instanceof ClusterNameMismatchException
           || error instanceof UnsupportedProtocolVersionException) {
         // This will likely be thrown by all channels, but finish the loop cleanly
         onFatal.accept(error);
-      } else if (error instanceof AuthenticationException) {
-        // Always warn because this is most likely something the operator needs to fix.
-        // Keep going to reconnect if it can be fixed without bouncing the client.
-        Loggers.warnWithException(LOG, "[{}] Authentication error", logPrefix, error);
       } else if (error instanceof InvalidKeyspaceException) {
         onKeyspaceError.accept(null);
-      } else {
+      } else if (!warnedAboutAuth) {
         if (config.getDefaultProfile().getBoolean(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR)) {
           Loggers.warnWithException(LOG, "[{}]  Error while opening new channel", logPrefix, error);
         } else {

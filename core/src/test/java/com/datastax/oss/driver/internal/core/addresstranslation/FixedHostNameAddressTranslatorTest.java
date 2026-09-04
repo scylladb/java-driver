@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.addresstranslation;
 
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.ADDRESS_TRANSLATOR_ADVERTISED_HOSTNAME;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -44,5 +45,32 @@ public class FixedHostNameAddressTranslatorTest {
 
     assertThat(translator.translate(address))
         .isEqualTo(InetSocketAddress.createUnresolved("myaddress", 6061));
+  }
+
+  /**
+   * The sibling above cannot fail: {@code myaddress} does not resolve, so {@code new
+   * InetSocketAddress(String, int)} leaves it unresolved too and the two spellings compare equal. A
+   * name that <em>does</em> resolve is what tells them apart -- and telling them apart is the
+   * point, because a resolved address is never expanded to the proxy's other addresses.
+   */
+  @Test
+  public void should_not_resolve_a_hostname_that_would_resolve() {
+    assumeThat(new InetSocketAddress("localhost", 6061).isUnresolved())
+        .as("requires a host where localhost resolves; where it does not, both spellings agree")
+        .isFalse();
+
+    DriverExecutionProfile defaultProfile = mock(DriverExecutionProfile.class);
+    when(defaultProfile.getString(ADDRESS_TRANSLATOR_ADVERTISED_HOSTNAME)).thenReturn("localhost");
+    DefaultDriverContext defaultDriverContext =
+        MockedDriverContextFactory.defaultDriverContext(Optional.of(defaultProfile));
+
+    FixedHostNameAddressTranslator translator =
+        new FixedHostNameAddressTranslator(defaultDriverContext);
+
+    InetSocketAddress translated = translator.translate(new InetSocketAddress("192.0.2.5", 6061));
+
+    assertThat(translated.isUnresolved()).isTrue();
+    assertThat(translated.getHostString()).isEqualTo("localhost");
+    assertThat(translated.getPort()).isEqualTo(6061);
   }
 }

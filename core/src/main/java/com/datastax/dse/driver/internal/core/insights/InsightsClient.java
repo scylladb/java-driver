@@ -294,7 +294,32 @@ public class InsightsClient {
         .collect(
             Collectors.toMap(
                 entry -> AddressFormatter.nullSafeToString(entry.getKey().getEndPoint().resolve()),
-                this::constructSessionStateForNode));
+                this::constructSessionStateForNode,
+                InsightsClient::mergeNodeStates));
+  }
+
+  /**
+   * Combines the states of two nodes that report under the same address.
+   *
+   * <p>The key is not unique per node: behind an SNI proxy or a cloud client route, every node's
+   * endpoint resolves to the same proxy address, so any session with more than one node open
+   * produces duplicate keys. Without a merge function {@link Collectors#toMap} throws {@link
+   * IllegalStateException}, which propagates out of the status report and aborts it every interval.
+   * Summing matches what the shared key denotes in that deployment: the totals reached through that
+   * address.
+   */
+  private static SessionStateForNode mergeNodeStates(
+      SessionStateForNode first, SessionStateForNode second) {
+    return new SessionStateForNode(
+        sumNullable(first.getConnections(), second.getConnections()),
+        sumNullable(first.getInFlightQueries(), second.getInFlightQueries()));
+  }
+
+  private static Integer sumNullable(Integer first, Integer second) {
+    if (first == null) {
+      return second;
+    }
+    return second == null ? first : first + second;
   }
 
   private SessionStateForNode constructSessionStateForNode(Map.Entry<Node, ChannelPool> entry) {
@@ -363,6 +388,35 @@ public class InsightsClient {
     return TimeUnit.MILLISECONDS.toSeconds(insightsConfiguration.getStatusEventDelayMillis());
   }
 
+  /**
+   * Groups the contact points by host name, which for a hostname contact point now means grouping
+   * it with itself.
+   *
+   * <p>The field was name to list-of-addresses, and for a name with several A-records that list was
+   * the interesting part. Contact points are kept unresolved now ({@code SessionBuilder} merges
+   * them with resolution off), so {@code endPoint.resolve()} hands back one unresolved address per
+   * contact point and {@code AddressFormatter} renders it as the name again: {@code
+   * {"db.example.com": ["db.example.com:9042"]}} where it used to be {@code {"db.example.com":
+   * ["10.0.0.1:9042", "10.0.0.2:9042"]}}. A contact point given as an IP literal is unaffected in
+   * shape, though see below for what it used to be keyed on.
+   *
+   * <p>Not resolved here to restore the old shape, deliberately. This runs on the admin executor --
+   * {@code DefaultSession}'s single-threaded init calls {@code onSessionReady} there -- which is
+   * the thread the rest of this change went to some length to keep name lookups off (see issue
+   * #1006), and it is shared with the control connection. Paying a blocking lookup per contact
+   * point on it to fill in a telemetry field is the wrong trade; the addresses the session actually
+   * reached are still reported, one of them by {@code #getControlConnectionSocketAddress}.
+   *
+   * <p>Which is also why the key is {@link InetSocketAddress#getHostString()} and not {@code
+   * getHostName()}. The two agree on everything the paragraph above is about -- an unresolved
+   * address, and a resolved one built from a name, both carry the label and both return it -- but
+   * for a resolved address with no label {@code getHostName()} falls through to {@link
+   * java.net.InetAddress#getHostName()}, a reverse lookup, and that is exactly what {@code
+   * addContactPoints(new InetSocketAddress(InetAddress.getByAddress(...), port))} produces.
+   * Grouping on it would put the one blocking lookup this method refuses to make back on the admin
+   * executor, per such contact point, at each {@code advanced.monitor-reporting} interval, and key
+   * the map on a reverse-zone answer rather than on anything the operator configured.
+   */
   @VisibleForTesting
   static Map<String, List<String>> getResolvedContactPoints(Set<InetSocketAddress> contactPoints) {
     if (contactPoints == null) {
@@ -371,7 +425,7 @@ public class InsightsClient {
     return contactPoints.stream()
         .collect(
             Collectors.groupingBy(
-                InetSocketAddress::getHostName,
+                InetSocketAddress::getHostString,
                 Collectors.mapping(AddressFormatter::nullSafeToString, Collectors.toList())));
   }
 

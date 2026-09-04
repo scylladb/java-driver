@@ -115,8 +115,36 @@ public interface TopologyMonitor extends AsyncAutoCloseable {
 
   /**
    * Resolves the full identity and metadata of the node at the other end of the given channel by
-   * querying system.local. This is used by the control connection after establishing a channel to
-   * resolve the contact point's full identity (hostId, datacenter, rack, endpoint, etc.).
+   * querying system.local. This is used by the control connection to resolve the contact point's
+   * full identity (hostId, datacenter, rack, endpoint, etc.).
+   *
+   * <p>The control connection calls this from a {@code ConnectHook}, which constrains
+   * implementations in three ways:
+   *
+   * <ul>
+   *   <li><b>It runs on the channel's Netty event loop</b>, not on a driver admin thread.
+   *       Implementations must not block -- anything heavier than an asynchronous request on {@code
+   *       channel} itself should hop to another thread. Blocking here stalls a loop shared with
+   *       every other channel assigned to it.
+   *   <li><b>It must be reentrant.</b> A hook that has not completed by its timeout is abandoned
+   *       rather than cancelled, so the control connection can call this for the next candidate
+   *       address while a previous invocation, on a different channel, is still outstanding. Any
+   *       state kept across the call has to be per channel.
+   *   <li><b>The channel is not published yet</b>, and the candidate may still be rejected after
+   *       this stage completes -- for a missing host id, or for one the connection may not use. An
+   *       implementation must not treat being called as evidence that this channel will be kept.
+   *       Anything it caches from the response has to be discardable, and re-learnable: the control
+   *       connection calls {@link #resetLocalColumnCache()} before <b>every</b> one of these reads,
+   *       which is what keeps {@link DefaultTopologyMonitor}'s column projection a property of the
+   *       node it ends up talking to rather than of one it refused along the way. Re-learnable on
+   *       <b>every</b> response, not just the first after a reset: reentrancy means an abandoned
+   *       invocation can answer after a later one, so a cache that only fills when empty fills from
+   *       whichever channel happened to reply first.
+   * </ul>
+   *
+   * <p>It is also called directly, off the admin executor, as a fallback for a {@code
+   * ChannelFactory} that does not run the hook. Implementations therefore have to satisfy the
+   * stricter of the two, which is the list above.
    *
    * @param channel the channel to query system.local on.
    * @return a future that completes with the resolved node info.
@@ -141,4 +169,63 @@ public interface TopologyMonitor extends AsyncAutoCloseable {
    * {@link DefaultTopologyMonitor}) should override this method.
    */
   default void resetColumnCaches() {}
+
+  /**
+   * Resets only what {@link #getChannelNodeInfo} can have learned, leaving anything learned from
+   * the peer tables alone.
+   *
+   * <p>The connect-hook counterpart of {@link #resetColumnCaches()}, called before each candidate's
+   * read so that what the cache ends up holding belongs to the candidate the driver keeps. Narrow
+   * because it runs on every such read: the hook only ever queries {@code system.local}, so that is
+   * the only projection its answer can narrow, and clearing the peer caches with it would cost a
+   * {@code SELECT *} over every peer row -- every column of every node, token sets included -- once
+   * per connection attempt.
+   *
+   * <p>{@link #resetColumnCaches()} stays what a <b>reconnect</b> calls: there, the cluster itself
+   * may have changed while the driver was away, so no projection is trustworthy.
+   *
+   * <p>The default implementation is a no-op, for the same reason as {@link #resetColumnCaches()}.
+   */
+  default void resetLocalColumnCache() {}
+
+  /**
+   * Whether this monitor re-resolves node addresses dynamically on every connection attempt (for
+   * example by re-resolving a proxy hostname each time), rather than relying on an endpoint address
+   * captured once at node-registration time.
+   *
+   * <p>When this returns {@code true}, the control connection's reconnection query plan must not
+   * append the original contact points as a DNS re-resolution fallback (see {@code
+   * advanced.control-connection.reconnection.fallback-to-original-contact-points}): the monitor
+   * already keeps addresses fresh, and appending raw contact points could resurrect nodes that the
+   * monitor has authoritatively removed.
+   *
+   * <p>The default implementation returns {@code false}, which is correct for {@link
+   * DefaultTopologyMonitor}: the peer nodes it registers hold a {@code DefaultEndPoint} built from
+   * the broadcast RPC address in {@code system.peers}, an already-resolved physical IP that never
+   * needs re-resolving.
+   *
+   * <p>Unless the configured {@code AddressTranslator} hands back a name -- {@code
+   * SubnetAddressTranslator} does, since its {@code resolve-addresses} option defaults to {@code
+   * false}. Such a peer endpoint <b>is</b> re-expanded per connection attempt by {@code
+   * ChannelFactory}, and if that name maps to more than one host, one {@code Node}'s connections
+   * can land on different ones while routing, shard awareness and per-node metrics all attribute
+   * them to that single node. The candidate loop keeps such addresses in resolver order rather than
+   * shuffling them -- not because the node is identified, but because {@code DefaultEndPoint}
+   * reports its addresses as not interchangeable (see {@code
+   * PinnableEndPoint#addressesAreInterchangeable()} and {@code ChannelFactory#shuffleAndLimit}) --
+   * so a pool stays on one host in practice, but the driver has no way to verify the premise. That
+   * is a property of the translator's output, not of this monitor, so it does not change what this
+   * flag reports.
+   *
+   * <p>The connected node's own {@code EndPoint} is a different case again. It originates from the
+   * contact point the control connection used, and {@code ChannelFactory} binds it to the single
+   * address that connection reached (see {@code PinnableEndPoint}), so it does <b>not</b> re-expand
+   * on later connection attempts. Recovering from an address change for that node therefore depends
+   * on this flag being {@code false}, i.e. on the contact-point fallback described above.
+   *
+   * <p>Proxy-based monitors that re-resolve per call should override this to return {@code true}.
+   */
+  default boolean reresolvesNodeAddresses() {
+    return false;
+  }
 }

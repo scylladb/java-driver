@@ -53,12 +53,24 @@ public class FixedHostNameAddressTranslator implements AddressTranslator {
         context.getConfig().getDefaultProfile().getString(ADDRESS_TRANSLATOR_ADVERTISED_HOSTNAME);
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The advertised host name is returned {@linkplain InetSocketAddress#isUnresolved()
+   * unresolved}, so that {@link com.datastax.oss.driver.internal.core.channel.ChannelFactory}
+   * expands it per connect and can try every address it maps to. Resolving it here -- which {@code
+   * new InetSocketAddress(String, int)} does eagerly -- would freeze the whole cluster on whichever
+   * address the JDK happened to return first, and no other would ever be tried: the resolver
+   * reports an already-resolved address as nothing to do, so the expansion is skipped entirely.
+   * That matters precisely for the deployment this translator is for, where one name fronts a proxy
+   * or load balancer that is itself typically several addresses.
+   */
   @NonNull
   @Override
   public InetSocketAddress translate(@NonNull InetSocketAddress address) {
     final int port = address.getPort();
     LOG.debug("[{}] Resolved {}:{} to {}:{}", logPrefix, address, port, advertisedHostname, port);
-    return new InetSocketAddress(advertisedHostname, port);
+    return InetSocketAddress.createUnresolved(advertisedHostname, port);
   }
 
   @Override

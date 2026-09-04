@@ -27,6 +27,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedActionException;
@@ -319,13 +320,30 @@ public abstract class DseGssApiAuthProviderBase implements AuthProvider {
                 SUPPORTED_MECHANISMS,
                 options.getAuthorizationId(),
                 protocol,
-                ((InetSocketAddress) endPoint.resolve()).getAddress().getCanonicalHostName(),
+                serverName(endPoint),
                 options.getSaslProperties(),
                 null);
       } catch (LoginException | SaslException e) {
         throw new AuthenticationException(endPoint, e.getMessage());
       }
       this.endPoint = endPoint;
+    }
+
+    /**
+     * The host name to build the Kerberos service principal from.
+     *
+     * <p>Prefers the canonical name of the resolved address, which is what Kerberos expects. The
+     * driver's own endpoints always hand this a resolved address — the channel carries an endpoint
+     * bound to the address it connected to (see {@code PinnableEndPoint}) — but a custom {@link
+     * EndPoint} implementation may still yield an unresolved one, in which case {@code
+     * getAddress()} is null. Fall back to the host string rather than throwing a {@link
+     * NullPointerException}: the hostname is usually the right service name anyway, and a failed
+     * reverse lookup should not take authentication down.
+     */
+    private static String serverName(EndPoint endPoint) {
+      InetSocketAddress address = (InetSocketAddress) endPoint.resolve();
+      InetAddress inetAddress = address.getAddress();
+      return inetAddress != null ? inetAddress.getCanonicalHostName() : address.getHostString();
     }
 
     @NonNull

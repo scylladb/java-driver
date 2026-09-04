@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.internal.core.addresstranslation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -56,16 +57,54 @@ public class Ec2MultiRegionAddressTranslatorTest {
   }
 
   @Test
-  public void should_return_new_address_when_match_found() throws Exception {
-    InetSocketAddress expectedAddress = new InetSocketAddress("54.32.55.66", 9042);
+  public void should_return_same_address_when_the_domain_name_does_not_resolve() throws Exception {
+    // The third way this translator can fail, and the one the deferred forward lookup nearly took
+    // away: the PTR record answers, but the name it gives has no A record -- private DNS switched
+    // off on the VPC, split-horizon DNS that serves the reverse zone only, a stale PTR after an
+    // instance replacement. Handing that name over unchecked would strand the node for good, since
+    // the connect layer has nothing to fall back to and every refresh re-derives the same name.
+    // So the forward lookup still runs here, and its failure means the node keeps the raw
+    // broadcast address it was already reachable on.
+    assumeThat(new InetSocketAddress("node1.eu-west-1.example.com", 9042).isUnresolved())
+        .as("requires a host whose resolver does not answer for unregistered names")
+        .isTrue();
 
     InitialDirContext mock = mock(InitialDirContext.class);
     when(mock.getAttributes("5.2.0.192.in-addr.arpa", new String[] {"PTR"}))
-        .thenReturn(new BasicAttributes("PTR", expectedAddress.getHostName()));
+        .thenReturn(new BasicAttributes("PTR", "node1.eu-west-1.example.com"));
     Ec2MultiRegionAddressTranslator translator = new Ec2MultiRegionAddressTranslator(mock);
 
     InetSocketAddress address = new InetSocketAddress("192.0.2.5", 9042);
-    assertThat(translator.translate(address)).isEqualTo(expectedAddress);
+    assertThat(translator.translate(address)).isEqualTo(address);
+  }
+
+  @Test
+  public void should_not_resolve_a_domain_name_that_would_resolve() {
+    // The "match found" case, and it has to use a name that really resolves: an unresolvable one
+    // is answered with the original address (see above), and even without that, `new
+    // InetSocketAddress(String, int)` leaves it unresolved too, so the two spellings would compare
+    // equal on host string and port and this could not tell them apart.
+    assumeThat(new InetSocketAddress("localhost", 9042).isUnresolved())
+        .as("requires a host where localhost resolves; where it does not, both spellings agree")
+        .isFalse();
+
+    InitialDirContext mock = mock(InitialDirContext.class);
+    Ec2MultiRegionAddressTranslator translator;
+    try {
+      when(mock.getAttributes("5.2.0.192.in-addr.arpa", new String[] {"PTR"}))
+          .thenReturn(new BasicAttributes("PTR", "localhost"));
+      translator = new Ec2MultiRegionAddressTranslator(mock);
+    } catch (NamingException impossible) {
+      throw new AssertionError(impossible);
+    }
+
+    // The forward lookup belongs to ChannelFactory, which expands the name to every address it
+    // maps to. Doing it here keeps one and the rest are never tried, because the resolver reports
+    // an already-resolved address as nothing to do.
+    InetSocketAddress translated = translator.translate(new InetSocketAddress("192.0.2.5", 9042));
+    assertThat(translated.isUnresolved()).isTrue();
+    assertThat(translated.getHostString()).isEqualTo("localhost");
+    assertThat(translated.getPort()).isEqualTo(9042);
   }
 
   @Test

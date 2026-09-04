@@ -30,13 +30,77 @@ topologies, an address translation component can be plugged in.
 
 -----
 
-Each node in the Cassandra cluster is uniquely identified by an IP address that the driver will use
-to establish connections.
+Each node in the Cassandra cluster is uniquely identified by an address that the driver will use to
+establish connections.
 
 * for contact points, these are provided as part of configuring the `CqlSession` object;
 * for other nodes, addresses will be discovered dynamically, either by inspecting `system.peers` on
   already connected nodes, or via push notifications received on the control connection when new
   nodes are discovered by gossip.
+
+That address does not have to be an IP: see [multi-address resolution](#multi-address-resolution)
+below.
+
+
+### Multi-address resolution
+
+An address the driver holds as a **hostname** is resolved at connection time, and expanded to *every*
+address the name maps to; each one is tried in turn until a connection succeeds. So a single
+unreachable IP behind a multi-record name no longer fails the connection, and a DNS record change is
+picked up on the next connection attempt rather than requiring a restart.
+
+This applies wherever the driver holds a name rather than an IP:
+
+* **contact points** — kept as you wrote them, and re-resolved per connection attempt. (The
+  `advanced.resolve-contact-points` option, which used to resolve them once at startup and turn each
+  A-record into a separate `Node`, is deprecated and has no effect.) The exception is a contact point
+  you pass programmatically as an *already-resolved* `InetSocketAddress`: there is no name left in it
+  to re-resolve, so it stays bound to that one address. Use
+  `InetSocketAddress.createUnresolved(host, port)`, or configure the contact points as strings under
+  `basic.contact-points`, if you want the name expanded — see `SessionBuilder.addContactPoints`.
+* the **Cloud SNI proxy** address, and a **client route** hostname (see below);
+* whatever a custom [`AddressTranslator`](#driver-side-address-translation) hands back —
+  `SubnetAddressTranslator` returns a name by default, under `resolve-addresses = false`.
+
+Two configuration options matter:
+
+* `advanced.connection.max-candidate-addresses` (default `5`) caps how many addresses **one**
+  connection attempt tries. Each one costs a TCP connect plus the protocol handshake, and the
+  attempts are serial, so this bounds what a single attempt can cost in time. Set it to `1` to
+  restore the pre-multi-address behaviour of one address per attempt.
+* `advanced.control-connection.reconnection.fallback-to-original-contact-points` (default `true`)
+  appends the original contact points to the control connection's reconnection plan, after the live
+  nodes the load balancing policy offers. This is the driver's DNS re-resolution path: a node
+  discovered from `system.peers` holds an already-resolved address that is never re-resolved, and so
+  does the node the control connection is on — it is registered under the address it reached, not
+  under the contact point it was reached through — so falling back to the contact-point hostnames is
+  what lets a reconnect pick up new IPs. Turning it off therefore disables DNS re-resolution
+  altogether, rather than narrowing it.
+
+  Two exceptions, where the option is close to a no-op. Under an `AddressTranslator` that returns a
+  hostname, every node's endpoint stays unresolved and re-expands per attempt regardless. And in a
+  Cloud (SNI) session every endpoint is an `SniEndPoint`, which does the same — and there the append
+  is skipped altogether unless the live-node plan came back empty, because the topology monitor
+  re-resolves node addresses itself. Turning the option off in those deployments removes only that
+  empty-plan fallback.
+
+  A client-routes session is not a third exception. Its endpoints re-expand a route hostname per
+  attempt only while that node has a route; a node without one falls back to a static,
+  already-resolved address that is never re-resolved. The driver therefore reports such a session as
+  re-resolving its own addresses only while *every* known node has a live route. In a partially
+  routed cluster the contact points are appended as usual, and this option is the only DNS
+  re-resolution the route-less nodes get.
+
+Resolution goes through Netty's configured `AddressResolverGroup`, so a resolver installed via
+`NettyOptions.afterBootstrapInitialized()` is honoured — including `DnsAddressResolverGroup` for
+non-blocking lookups. With Netty's default resolver the lookup blocks the Netty I/O event loop it
+runs on (never the admin loop), which is the same behaviour an unresolved address had before, so the
+JVM DNS cache settings (`networkaddress.cache.ttl`) matter more than they used to.
+
+Custom `EndPoint` implementations take part in this: return an
+[unresolved](https://docs.oracle.com/javase/8/docs/api/java/net/InetSocketAddress.html#isUnresolved--)
+`InetSocketAddress` from `resolve()` and the driver expands it. Implementations must **not** resolve
+names themselves and must not block — see the `EndPoint.resolve()` javadoc.
 
 
 ### Cassandra-side configuration
@@ -183,13 +247,19 @@ datastax-java-driver {
 
 #### DNS resolution
 
-DNS is resolved at connection time (not at route discovery time). The driver delegates to
-`InetAddress.getByName()`, which is a blocking call that uses the JVM's built-in DNS cache
-(30 s default TTL in the JDK). Because this runs on Netty I/O threads, slow or unresponsive
-DNS can block connection establishment and impact driver throughput. To mitigate this, configure
-the JVM DNS cache TTL via the `networkaddress.cache.ttl` security property (e.g. in
-`$JAVA_HOME/conf/security/java.security` or programmatically with
-`java.security.Security.setProperty("networkaddress.cache.ttl", "60")`).
+DNS is resolved at connection time (not at route discovery time), and through the same mechanism as
+every other address the driver connects to: the route's hostname is handed to the connection layer
+unresolved, and Netty's configured `AddressResolverGroup` expands it. A custom resolver installed via
+`NettyOptions.afterBootstrapInitialized()` therefore applies to client routes as well, and a hostname
+that maps to several addresses has all of them tried in turn.
+
+With Netty's default (JDK) resolver the lookup is a blocking `InetAddress` call that uses the JVM's
+built-in DNS cache (30 s default TTL in the JDK). It runs on a Netty I/O event loop — never on the
+admin event loop that drives control-connection reconnects — so it delays the connection attempt
+itself. It is therefore worth configuring the JVM DNS cache TTL via the `networkaddress.cache.ttl`
+security property (e.g. in `$JAVA_HOME/conf/security/java.security` or programmatically with
+`java.security.Security.setProperty("networkaddress.cache.ttl", "60")`), or installing
+`DnsAddressResolverGroup` for non-blocking resolution.
 
 - **Route-map refresh** — the driver re-queries `system.client_routes` and atomically swaps the
   in-memory route map in two situations:
@@ -217,6 +287,12 @@ To use it, specify the following in the [configuration](../configuration):
 datastax-java-driver.advanced.address-translator.class = FixedHostNameAddressTranslator
 advertised-hostname = proxyhostname
 ```
+
+The advertised hostname is handed on unresolved, so it is expanded on every connection attempt like
+any other name (see [Multi-address resolution](#multi-address-resolution)): if the proxy is fronted by several A-records,
+all of them are tried, and a change to the records is picked up without restarting the session. The
+addresses are tried in the order the resolver returned them rather than shuffled, because a fixed
+proxy hostname says nothing about whether its addresses lead to the same place.
 
 ### Fixed proxy hostname per subnet
 

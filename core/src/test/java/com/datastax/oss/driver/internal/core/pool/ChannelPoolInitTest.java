@@ -31,7 +31,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.Appender;
+import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.InvalidKeyspaceException;
+import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
+import com.datastax.oss.driver.api.core.auth.AuthenticationException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
@@ -44,9 +51,14 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.slf4j.LoggerFactory;
 
 public class ChannelPoolInitTest extends ChannelPoolTestBase {
+
+  @Mock private Appender<ILoggingEvent> appender;
 
   @Test
   public void should_initialize_when_all_channels_succeed() throws Exception {
@@ -96,6 +108,142 @@ public class ChannelPoolInitTest extends ChannelPoolTestBase {
         .incrementCounter(DefaultNodeMetric.CONNECTION_INIT_ERRORS, null);
 
     factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_count_both_metrics_when_a_node_fails_on_auth_and_transport() {
+    // One endpoint, several addresses: ChannelFactory reports a single failure with the others
+    // attached as suppressed, and it promotes the authentication failure over the transport ones.
+    // isAuthOnly() is false for that mix, which is right for errors.connection.init -- most of the
+    // node really is unreachable -- but routing it there *alone* would make
+    // errors.connection.auth unreachable for any node whose endpoint is a name (SNI/cloud proxy,
+    // a client route, a translator with resolve-addresses = false), because this method is the
+    // driver's only writer of that counter. An operator watching it would see zero while every
+    // connect failed on credentials. Both happened, so both are counted.
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    AuthenticationException authError =
+        new AuthenticationException(node.getEndPoint(), "mock auth failure");
+    authError.addSuppressed(new Exception("mock connection refused"));
+
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).failure(node, authError).build();
+
+    CompletionStage<ChannelPool> poolFuture =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test");
+
+    factoryHelper.waitForCalls(node, 1);
+
+    assertThatStage(poolFuture).isSuccess();
+    verify(nodeMetricUpdater, VERIFY_TIMEOUT.times(1))
+        .incrementCounter(DefaultNodeMetric.CONNECTION_INIT_ERRORS, null);
+    verify(nodeMetricUpdater, VERIFY_TIMEOUT.times(1))
+        .incrementCounter(DefaultNodeMetric.AUTHENTICATION_ERRORS, null);
+  }
+
+  @Test
+  public void should_count_only_the_auth_metric_when_every_address_fails_on_auth() {
+    // The other side of the same decision: nothing but authentication failed, so
+    // errors.connection.init must stay untouched.
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    AuthenticationException authError =
+        new AuthenticationException(node.getEndPoint(), "mock auth failure");
+    authError.addSuppressed(new AuthenticationException(node.getEndPoint(), "mock auth failure"));
+
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).failure(node, authError).build();
+
+    CompletionStage<ChannelPool> poolFuture =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test");
+
+    factoryHelper.waitForCalls(node, 1);
+
+    assertThatStage(poolFuture).isSuccess();
+    verify(nodeMetricUpdater, VERIFY_TIMEOUT.times(1))
+        .incrementCounter(DefaultNodeMetric.AUTHENTICATION_ERRORS, null);
+    verify(nodeMetricUpdater, never())
+        .incrementCounter(DefaultNodeMetric.CONNECTION_INIT_ERRORS, null);
+  }
+
+  @Test
+  public void should_count_the_auth_metric_when_a_keyspace_failure_is_what_surfaced() {
+    // The same mix, but with a third kind of failure in it -- and ChannelFactory#surfacedFailure
+    // ranks an invalid keyspace above an authentication one, so *that* is what arrives here with
+    // the auth failure attached as suppressed. A node whose endpoint is a name expanding to two
+    // addresses: one rejects the credentials, the other answers but has no such keyspace.
+    //
+    // Testing the type of what arrived would leave errors.connection.auth at zero here, which is
+    // the very blind spot the branch above exists to close: this method is the driver's only
+    // writer of that counter.
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    InvalidKeyspaceException surfaced = new InvalidKeyspaceException("invalid keyspace");
+    surfaced.addSuppressed(new AuthenticationException(node.getEndPoint(), "mock auth failure"));
+
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).failure(node, surfaced).build();
+
+    CompletionStage<ChannelPool> poolFuture =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test");
+
+    factoryHelper.waitForCalls(node, 1);
+
+    assertThatStage(poolFuture).isSuccess();
+    verify(nodeMetricUpdater, VERIFY_TIMEOUT.times(1))
+        .incrementCounter(DefaultNodeMetric.CONNECTION_INIT_ERRORS, null);
+    verify(nodeMetricUpdater, VERIFY_TIMEOUT.times(1))
+        .incrementCounter(DefaultNodeMetric.AUTHENTICATION_ERRORS, null);
+  }
+
+  @Test
+  public void should_warn_about_credentials_when_a_fatal_failure_is_what_surfaced() {
+    // The failure the pool has to *act* on and the failure the operator has to *hear* about are
+    // not always the same one, and the routing used to decide both. A node whose endpoint is a name
+    // expanding to two addresses: one rejects the credentials, the other rejects the protocol
+    // version -- which, for an identified node, ChannelFactory#surfacedFailure treats as node-wide
+    // and promotes. Acting on it is right: forceDown, and nothing in the driver reverses that. But
+    // it used to be the whole story, so the operator got a protocol-version message, a climbing
+    // errors.connection.auth counter, and no line at any level about the login that was refused --
+    // reachable only by reading getSuppressed() off the logged throwable.
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    UnsupportedProtocolVersionException surfaced =
+        UnsupportedProtocolVersionException.forSingleAttempt(
+            node.getEndPoint(), DefaultProtocolVersion.V4);
+    surfaced.addSuppressed(new AuthenticationException(node.getEndPoint(), "mock auth failure"));
+
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).failure(node, surfaced).build();
+
+    Logger logger = (Logger) LoggerFactory.getLogger(ChannelPool.class);
+    Level levelBefore = logger.getLevel();
+    logger.setLevel(Level.WARN);
+    logger.addAppender(appender);
+    try {
+      ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test");
+      factoryHelper.waitForCalls(node, 1);
+
+      // Still acted on as before.
+      verify(eventBus, VERIFY_TIMEOUT)
+          .fire(TopologyEvent.forceDown(node.getBroadcastRpcAddress().get()));
+      verify(nodeMetricUpdater, VERIFY_TIMEOUT.times(1))
+          .incrementCounter(DefaultNodeMetric.AUTHENTICATION_ERRORS, null);
+
+      // And now also reported.
+      ArgumentCaptor<ILoggingEvent> logs = ArgumentCaptor.forClass(ILoggingEvent.class);
+      verify(appender, VERIFY_TIMEOUT.atLeastOnce()).doAppend(logs.capture());
+      assertThat(logs.getAllValues())
+          .anySatisfy(
+              event -> {
+                assertThat(event.getLevel()).isEqualTo(Level.WARN);
+                assertThat(event.getFormattedMessage())
+                    .contains("authentication failed on some of the node's addresses");
+              });
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(levelBefore);
+    }
   }
 
   @Test

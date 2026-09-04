@@ -38,6 +38,7 @@ import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.internal.core.addresstranslation.PassThroughAddressTranslator;
 import com.datastax.oss.driver.internal.core.adminrequest.AdminResult;
@@ -444,6 +445,123 @@ public class DefaultTopologyMonitorTest {
   }
 
   @Test
+  public void should_query_system_local_for_channel_node_info() {
+    // Given — a channel to identify (the control connection's connect hook is the caller).
+    UUID hostId = UUID.randomUUID();
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'", mockResult(mockLocalRow(1, hostId))));
+
+    // When
+    CompletionStage<NodeInfo> futureNodeInfo = topologyMonitor.getChannelNodeInfo(channel);
+
+    // Then
+    assertThatStage(futureNodeInfo)
+        .isSuccess(nodeInfo -> assertThat(nodeInfo.getHostId()).isEqualTo(hostId));
+  }
+
+  @Test
+  public void should_identify_the_connected_node_by_the_address_it_reached_not_the_contact_point()
+      throws Exception {
+    // Given — a control channel that came up through a contact-point hostname. ChannelFactory binds
+    // the endpoint it hands the channel to the one address that connection reached, and by
+    // PinnableEndPoint's contract that copy is identified exactly like the unpinned original.
+    //
+    // The pinned address carries the queried *name*, which is what the connect path really
+    // produces:
+    // the JDK and Netty-DNS resolvers label their results with it, and ChannelFactory
+    // #reattachHostname restores it when a custom resolver does not. A bare
+    // new InetSocketAddress("127.0.0.1", 9042) would be a shape that path cannot yield, and would
+    // let this test pass against an implementation that reads the host string back.
+    EndPoint contactPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("db.example.com", 9042));
+    InetSocketAddress reached =
+        new InetSocketAddress(
+            InetAddress.getByAddress("db.example.com", new byte[] {127, 0, 0, 1}), 9042);
+    EndPoint pinned = ((PinnableEndPoint) contactPoint).pinTo(reached);
+    assertThat(pinned.asMetricPrefix()).isEqualTo("db_example_com:9042");
+    assertThat(((InetSocketAddress) pinned.resolve()).getHostString()).isEqualTo("db.example.com");
+    when(channel.getEndPoint()).thenReturn(pinned);
+    UUID hostId = UUID.randomUUID();
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'", mockResult(mockLocalRow(1, hostId))));
+
+    // When
+    CompletionStage<NodeInfo> futureNodeInfo = topologyMonitor.getChannelNodeInfo(channel);
+
+    // Then — the node is identified by its own address, not by the name it was reached through.
+    // Keeping the contact point's identity would not even be exclusively this node's: the
+    // reconnection fallback hands the contact points back every round, so each successive control
+    // node would take the same metric prefix, and two live nodes sharing one prefix means the older
+    // one's clearMetrics() deletes the newcomer's series.
+    assertThatStage(futureNodeInfo)
+        .isSuccess(
+            nodeInfo -> {
+              assertThat(nodeInfo.getEndPoint().asMetricPrefix()).isEqualTo("127_0_0_1:9042");
+              // What the node connects to is unchanged, label included, so the TLS peer host and
+              // the Kerberos service name stay the name the operator configured -- with no reverse
+              // lookup.
+              InetSocketAddress resolved = (InetSocketAddress) nodeInfo.getEndPoint().resolve();
+              assertThat(resolved).isEqualTo(reached);
+              assertThat(resolved.getHostString()).isEqualTo("db.example.com");
+              assertThat(resolved.getAddress().getHostName()).isEqualTo("db.example.com");
+            });
+  }
+
+  @Test
+  public void should_not_let_a_cached_reverse_name_change_the_connected_nodes_identity()
+      throws Exception {
+    // An IP-literal contact point. Its pinned address starts out nameless, and begins reporting a
+    // reverse-DNS name as soon as DefaultSslEngineFactory calls getHostName() on the shared
+    // InetAddress -- which is what an already-labelled instance stands in for here. The identity
+    // has
+    // to come from the bytes, or it would depend on whether TLS is enabled and whether a PTR record
+    // exists, and would move mid-session for the same node.
+    EndPoint contactPoint =
+        new DefaultEndPoint(InetSocketAddress.createUnresolved("127.0.0.1", 9042));
+    InetSocketAddress reachedWithPtrName =
+        new InetSocketAddress(
+            InetAddress.getByAddress("node1.internal.example.com", new byte[] {127, 0, 0, 1}),
+            9042);
+    EndPoint pinned = ((PinnableEndPoint) contactPoint).pinTo(reachedWithPtrName);
+    when(channel.getEndPoint()).thenReturn(pinned);
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'",
+            mockResult(mockLocalRow(1, UUID.randomUUID()))));
+
+    CompletionStage<NodeInfo> futureNodeInfo = topologyMonitor.getChannelNodeInfo(channel);
+
+    // The identity is already the literal, so there is nothing to rebuild and the instance is kept.
+    assertThatStage(futureNodeInfo)
+        .isSuccess(
+            nodeInfo -> {
+              assertThat(nodeInfo.getEndPoint()).isSameAs(pinned);
+              assertThat(nodeInfo.getEndPoint().asMetricPrefix()).isEqualTo("127_0_0_1:9042");
+            });
+  }
+
+  @Test
+  public void should_keep_the_channels_own_endpoint_when_it_already_names_the_connected_address() {
+    // The reconnection-to-a-known-node case, and every refresh after the first: nothing was pinned
+    // because the endpoint already held the address, so the existing instance is kept -- which is
+    // what keeps the control-node check in refreshNode() an identity comparison rather than an
+    // endpoint equals() (and DefaultEndPoint's equals resolves names).
+    EndPoint endPoint = new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042));
+    when(channel.getEndPoint()).thenReturn(endPoint);
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'",
+            mockResult(mockLocalRow(1, UUID.randomUUID()))));
+
+    CompletionStage<NodeInfo> futureNodeInfo = topologyMonitor.getChannelNodeInfo(channel);
+
+    assertThatStage(futureNodeInfo)
+        .isSuccess(nodeInfo -> assertThat(nodeInfo.getEndPoint()).isSameAs(endPoint));
+  }
+
+  @Test
   public void should_stop_executing_queries_once_closed() {
     // Given
     topologyMonitor.close();
@@ -652,6 +770,47 @@ public class DefaultTopologyMonitorTest {
   }
 
   @Test
+  public void should_relearn_the_local_projection_from_every_response() {
+    // The control connection clears this cache before each candidate's identity read -- but that
+    // orders the reads, not the answers. A candidate abandoned on the connect-hook timeout is
+    // abandoned rather than cancelled, so both reads can be outstanding at once and the refused
+    // one can answer first. A cache that filled only when empty would take its columns and then
+    // decline the accepted candidate's, and since the projection is an intersection that can only
+    // shrink, the node the driver keeps would stop reporting every column the refused one lacked --
+    // dse_version here, and with it the driver's whole idea of what server it is talking to.
+    UUID hostId = node1.getHostId();
+    ImmutableList<String> narrow = ImmutableList.of("rpc_address", "data_center", "host_id");
+    ImmutableList<String> wide =
+        ImmutableList.of("rpc_address", "data_center", "host_id", "dse_version");
+    CompletableFuture<AdminResult> refusedAnswer = new CompletableFuture<>();
+    CompletableFuture<AdminResult> keptAnswer = new CompletableFuture<>();
+    topologyMonitor.stubQueries(
+        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", refusedAnswer),
+        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", keptAnswer),
+        new StubbedQuery(
+            "SELECT " + String.join(", ", wide) + " FROM system.local WHERE key='local'",
+            AdminResultTestHelper.mockResultWithColumns(wide, mockLocalRow(1, hostId))));
+
+    // When -- both reads go out with the cache cleared, as the hook does for two candidates, and
+    // the one the loop refused is the first to answer.
+    topologyMonitor.resetLocalColumnCache();
+    CompletionStage<NodeInfo> refused = topologyMonitor.getChannelNodeInfo(channel);
+    topologyMonitor.resetLocalColumnCache();
+    CompletionStage<NodeInfo> kept = topologyMonitor.getChannelNodeInfo(channel);
+    refusedAnswer.complete(
+        AdminResultTestHelper.mockResultWithColumns(narrow, mockLocalRow(1, hostId)));
+    keptAnswer.complete(AdminResultTestHelper.mockResultWithColumns(wide, mockLocalRow(1, hostId)));
+    assertThatStage(refused).isSuccess();
+    assertThatStage(kept).isSuccess();
+
+    // Then -- a third read, with nothing cleared in front of it, projects the columns of the
+    // response that came *last*, not of the one that came first. The stub is the assertion:
+    // fill-only-when-empty would send `narrow` here and the query strings would not match.
+    assertThatStage(topologyMonitor.getChannelNodeInfo(channel))
+        .isSuccess(nodeInfo -> assertThat(nodeInfo.getHostId()).isEqualTo(hostId));
+  }
+
+  @Test
   public void should_revert_to_select_star_after_reset_column_caches() {
     // Given — warm the caches with a first call
     AdminRow local = mockLocalRow(1, node1.getHostId());
@@ -768,7 +927,12 @@ public class DefaultTopologyMonitorTest {
                 "Unknown keyspace/cf pair (system.peers_v2)");
         return CompletableFutures.failedFuture(new UnexpectedResponseException(queryString, error));
       }
-      return CompletableFuture.completedFuture(nextQuery.result);
+      // A stub may hand back a future the test completes itself, which is the only way to have two
+      // of these reads outstanding at once -- the shape the connect hook produces when a candidate
+      // is abandoned on its timeout and answers anyway.
+      return (nextQuery.pending != null)
+          ? nextQuery.pending
+          : CompletableFuture.completedFuture(nextQuery.result);
     }
   }
 
@@ -777,13 +941,29 @@ public class DefaultTopologyMonitorTest {
     private final Map<String, Object> parameters;
     private final AdminResult result;
     private final boolean error;
+    private final CompletableFuture<AdminResult> pending;
 
     private StubbedQuery(
-        String queryString, Map<String, Object> parameters, AdminResult result, boolean error) {
+        String queryString,
+        Map<String, Object> parameters,
+        AdminResult result,
+        boolean error,
+        CompletableFuture<AdminResult> pending) {
       this.queryString = queryString;
       this.parameters = parameters;
       this.result = result;
       this.error = error;
+      this.pending = pending;
+    }
+
+    private StubbedQuery(
+        String queryString, Map<String, Object> parameters, AdminResult result, boolean error) {
+      this(queryString, parameters, result, error, null);
+    }
+
+    /** A query whose response the test releases, so that reads can be left in flight. */
+    private StubbedQuery(String queryString, CompletableFuture<AdminResult> pending) {
+      this(queryString, Collections.emptyMap(), null, false, pending);
     }
 
     private StubbedQuery(String queryString, Map<String, Object> parameters, AdminResult result) {

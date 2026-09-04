@@ -18,61 +18,174 @@
 package com.datastax.oss.driver.internal.core.metadata;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
-import com.datastax.oss.driver.shaded.guava.common.primitives.UnsignedBytes;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import java.net.InetAddress;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.Arrays;
-import java.util.Comparator;
+import java.net.SocketAddress;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 
-public class SniEndPoint implements EndPoint {
-  private static final AtomicInteger OFFSET = new AtomicInteger();
+public class SniEndPoint implements PinnableEndPoint {
 
   private final InetSocketAddress proxyAddress;
   private final String serverName;
 
   /**
-   * @param proxyAddress the address of the proxy. If it is {@linkplain
-   *     InetSocketAddress#isUnresolved() unresolved}, each call to {@link #resolve()} will
-   *     re-resolve it, fetch all of its A-records, and if there are more than 1 pick one in a
-   *     round-robin fashion.
+   * Built once, like {@link DefaultEndPoint}'s and {@link ClientRoutesEndPoint}'s. Both of the
+   * fields it derives from are final, and {@link PinnableEndPoint#sameIdentity} makes this the
+   * driver's identity test for endpoints: it is called for both sides of every node on every
+   * topology refresh, and {@code ControlConnection#isControlNode} calls it again for every distance
+   * and state event arriving during a control connect.
+   */
+  private final String metricPrefix;
+
+  /**
+   * The proxy IP this endpoint has been {@linkplain #pinTo(SocketAddress) pinned} to, or {@code
+   * null} if it is not pinned. Deliberately excluded from {@link #equals} and {@link #hashCode}: a
+   * pinned copy denotes the same node as the original.
+   */
+  @Nullable private final InetSocketAddress pinnedAddress;
+
+  /**
+   * @param proxyAddress the address of the proxy. Stored {@linkplain
+   *     InetSocketAddress#isUnresolved() unresolved}, whatever form it was supplied in, so that the
+   *     driver expands a proxy hostname to all of its A-records at connection time and tries each
+   *     of them — see {@link #storeUnresolved}.
    * @param serverName the SNI server name. In the context of Cloud, this is the string
    *     representation of the host id.
    */
   public SniEndPoint(InetSocketAddress proxyAddress, String serverName) {
-    this.proxyAddress = Objects.requireNonNull(proxyAddress, "SNI address cannot be null");
+    this(proxyAddress, serverName, null);
+  }
+
+  private SniEndPoint(
+      InetSocketAddress proxyAddress,
+      String serverName,
+      @Nullable InetSocketAddress pinnedAddress) {
+    this.proxyAddress =
+        storeUnresolved(Objects.requireNonNull(proxyAddress, "SNI address cannot be null"));
     this.serverName = Objects.requireNonNull(serverName, "SNI Server name cannot be null");
+    this.pinnedAddress = pinnedAddress;
+    String hostString = this.proxyAddress.getHostString();
+    if (hostString == null) {
+      throw new IllegalArgumentException(
+          "Could not extract a host string from provided proxy address " + proxyAddress);
+    }
+    this.metricPrefix =
+        hostString.replace('.', '_') + ':' + this.proxyAddress.getPort() + '_' + serverName;
+  }
+
+  /**
+   * Stores the proxy address unresolved, whatever form it arrived in.
+   *
+   * <p>{@link #resolve()} hands the stored address to the connection layer as-is, and only an
+   * unresolved one gets expanded and re-expanded there. A proxy hostname supplied already resolved
+   * would therefore stay bound to whichever single IP its lookup happened to return, for the life
+   * of the session: no spreading across the proxy's A-records, no fallback when that one IP stops
+   * answering, and no pick-up of a DNS change. That is a real possibility for a hostname handed to
+   * {@link
+   * com.datastax.oss.driver.api.core.session.SessionBuilder#withCloudProxyAddress(InetSocketAddress)},
+   * because the ordinary {@code InetSocketAddress(String, int)} constructor resolves eagerly.
+   * ({@code CloudConfigFactory}, the usual path, already builds an unresolved address.)
+   *
+   * <p>An address that is already an IP literal is stored unresolved too, even though it has
+   * nothing to expand, because that is what makes this endpoint's identity <b>stable</b>. A
+   * resolved address's {@code getHostString()} is not fixed: it starts out as the IP literal and
+   * begins reporting the reverse-DNS name as soon as anything calls {@code getHostName()} on the
+   * underlying {@code InetAddress} — which {@code SniSslEngineFactory#newSslEngine} does, on this
+   * very instance, under the default {@code
+   * advanced.ssl-engine-factory.allow-dns-reverse-lookup-san = true}. Keying {@link #equals} and
+   * {@link #asMetricPrefix()} off a string that can change underneath them would move a node's
+   * metrics mid-session and make endpoints built before and after the first TLS handshake compare
+   * unequal. An unresolved address has no such field to fill in: its host string is fixed at
+   * construction, and {@code getHostName()} on it performs no lookup.
+   *
+   * <p>The reverse lookup does not simply move to the {@linkplain #pinTo(SocketAddress) pinned}
+   * copy, though: it stops happening. {@code ChannelFactory#reattachHostname} labels every
+   * candidate before it is pinned -- with the queried name when the proxy is a hostname, and with
+   * the literal itself when it is an IP literal, deliberately, so that the SSL engine is never
+   * handed a PTR record. Either way {@code getHostName()} on the pinned copy is a field read, so
+   * {@code advanced.ssl-engine-factory.allow-dns-reverse-lookup-san} no longer changes what this
+   * endpoint's certificate is validated against. For a hostname proxy that is what happened before
+   * as well ({@code InetAddress.getAllByName} labels its answers with the queried name). For an
+   * IP-literal proxy it is a change: those answers carried no label, so the option did reach a PTR
+   * record, and a proxy certificate that carries only a DNS SAN for that name now fails the
+   * handshake. Documented in the upgrade guide; not restored, because restoring it means a blocking
+   * reverse lookup inside the channel initializer, which is what this change removed.
+   *
+   * <p>What this cannot defend against is an instance the caller polluted before handing it over,
+   * i.e. called {@code getHostName()} on themselves.
+   *
+   * <p>Normalizing here rather than at the call site keeps every {@code SniEndPoint} built from the
+   * same proxy comparable — {@link #equals} keys on this field — and matches what this endpoint did
+   * before resolution moved to the connection layer, when it re-resolved the proxy hostname on
+   * every {@code resolve()} call.
+   */
+  private static InetSocketAddress storeUnresolved(InetSocketAddress proxyAddress) {
+    return proxyAddress.isUnresolved()
+        ? proxyAddress
+        : InetSocketAddress.createUnresolved(proxyAddress.getHostString(), proxyAddress.getPort());
   }
 
   public String getServerName() {
     return serverName;
   }
 
+  /**
+   * Returns the proxy address connections should be opened to.
+   *
+   * <p>Unpinned, this is the stored proxy address as-is — always unresolved (see {@link
+   * #storeUnresolved}), which {@link com.datastax.oss.driver.internal.core.channel.ChannelFactory}
+   * expands to every proxy A-record, trying each in turn — so a single unreachable proxy IP no
+   * longer fails the connection. Re-resolving here instead would block whichever event loop called
+   * us, and would bypass a custom Netty resolver.
+   *
+   * <p>Once {@linkplain #pinTo(SocketAddress) pinned} this returns that one proxy IP. That is what
+   * {@link com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory#newSslEngine} sees: it
+   * runs inside Netty's channel initializer, so it gets the exact IP the channel is connected to
+   * without a lookup on the event loop.
+   */
   @NonNull
   @Override
   public InetSocketAddress resolve() {
-    try {
-      InetAddress[] aRecords = InetAddress.getAllByName(proxyAddress.getHostName());
-      if (aRecords.length == 0) {
-        // Probably never happens, but the JDK docs don't explicitly say so
-        throw new IllegalArgumentException(
-            "Could not resolve proxy address " + proxyAddress.getHostName());
-      }
-      // The order of the returned address is unspecified. Sort by IP to make sure we get a true
-      // round-robin
-      Arrays.sort(aRecords, IP_COMPARATOR);
-      int index =
-          (aRecords.length == 1)
-              ? 0
-              : OFFSET.getAndUpdate(x -> x == Integer.MAX_VALUE ? 0 : x + 1) % aRecords.length;
-      return new InetSocketAddress(aRecords[index], proxyAddress.getPort());
-    } catch (UnknownHostException e) {
-      throw new IllegalArgumentException(
-          "Could not resolve proxy address " + proxyAddress.getHostName(), e);
+    return pinnedAddress != null ? pinnedAddress : proxyAddress;
+  }
+
+  @NonNull
+  @Override
+  public EndPoint pinTo(@NonNull SocketAddress resolvedAddress) {
+    Objects.requireNonNull(resolvedAddress, "resolvedAddress cannot be null");
+    // Mirrors DefaultEndPoint and ClientRoutesEndPoint: an address this endpoint cannot hold in an
+    // InetSocketAddress field skips pinning rather than failing the connection, and so does an
+    // unresolved one. resolve() hands the proxy address over unresolved, and ChannelFactory passes
+    // it straight back when the user disabled the resolver or a custom one declines it; pinning
+    // that would freeze this endpoint on a name that must re-expand on every connect -- no address
+    // stability gained, and the proxy's A-record fallback silenced for good.
+    if (!(resolvedAddress instanceof InetSocketAddress)
+        || ((InetSocketAddress) resolvedAddress).isUnresolved()
+        || resolvedAddress.equals(this.pinnedAddress)) {
+      return this;
     }
+    return new SniEndPoint(proxyAddress, serverName, (InetSocketAddress) resolvedAddress);
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>{@code true}: the proxy routes by server name, so every one of its A-records reaches this
+   * same node, and connections may be spread across them. That restores what this endpoint did
+   * itself before resolution moved to the connection layer, when {@code resolve()} sorted the proxy
+   * A-records and rotated through them on every call.
+   *
+   * <p>It is the right answer to the other question this decides too: because one server answers
+   * behind every A-record, a protocol-version or event-type rejection observed at one of them is a
+   * rejection by all of them, and the remaining proxy IPs need not be dialled to confirm it.
+   *
+   * <p>The address is not consulted: there is only ever one source here — the proxy — so every
+   * address this endpoint can hand out has the same answer.
+   */
+  @Override
+  public boolean addressesAreInterchangeable(@NonNull SocketAddress resolvedAddress) {
+    return true;
   }
 
   @Override
@@ -94,26 +207,15 @@ public class SniEndPoint implements EndPoint {
 
   @Override
   public String toString() {
-    // Note that this uses the original proxy address, so if there are multiple A-records it won't
-    // show which one was selected. If that turns out to be a problem for debugging, we might need
-    // to store the result of resolve() in Connection and log that instead of the endpoint.
-    return proxyAddress.toString() + ":" + serverName;
+    // Deliberately identical for a pinned copy: see PinnableEndPoint. Which proxy IP a given
+    // connection landed on is in the channel's own toString(), which Netty builds from the actual
+    // remote address.
+    return proxyAddress + ":" + serverName;
   }
 
   @NonNull
   @Override
   public String asMetricPrefix() {
-    String hostString = proxyAddress.getHostString();
-    if (hostString == null) {
-      throw new IllegalArgumentException(
-          "Could not extract a host string from provided proxy address " + proxyAddress);
-    }
-    return hostString.replace('.', '_') + ':' + proxyAddress.getPort() + '_' + serverName;
+    return metricPrefix;
   }
-
-  @SuppressWarnings("UnnecessaryLambda")
-  private static final Comparator<InetAddress> IP_COMPARATOR =
-      (InetAddress address1, InetAddress address2) ->
-          UnsignedBytes.lexicographicalComparator()
-              .compare(address1.getAddress(), address2.getAddress());
 }

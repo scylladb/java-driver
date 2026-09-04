@@ -166,11 +166,15 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    * <p>Contact points can also be provided statically in the configuration. If both are specified,
    * they will be merged. If both are absent, the driver will default to 127.0.0.1:9042.
    *
-   * <p>Contrary to the configuration, DNS names with multiple A-records will not be handled here.
-   * If you need that, extract them manually with {@link java.net.InetAddress#getAllByName(String)}
-   * before calling this method. Similarly, if you need connect addresses to stay unresolved, make
-   * sure you pass unresolved instances here (see {@code advanced.resolve-contact-points} in the
-   * configuration for more explanations).
+   * <p>The driver automatically expands any contact point backed by an unresolved hostname to all
+   * its DNS-mapped IPs at connection time (through Netty's configured resolver, so a custom {@code
+   * AddressResolverGroup} still applies), so passing a single hostname is sufficient to try all its
+   * IPs on initial connect. This applies equally to hostnames provided here programmatically (build
+   * an unresolved {@link InetSocketAddress} with {@link InetSocketAddress#createUnresolved(String,
+   * int)} to opt in) and to hostnames specified in the configuration. An already-resolved address
+   * passed here (the common case when constructing an {@code InetSocketAddress} directly from a
+   * hostname, which resolves eagerly) is used as provided, with no further expansion. The {@code
+   * advanced.resolve-contact-points} option is deprecated and has no effect.
    */
   @NonNull
   public SelfT addContactPoints(@NonNull Collection<InetSocketAddress> contactPoints) {
@@ -741,6 +745,23 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
    *
    * <p>For more information, please refer to the DataStax Astra documentation.
    *
+   * <p>A proxy given as a hostname is resolved at connection time, to <b>all</b> of its addresses,
+   * and each is tried in turn. That holds however the {@link InetSocketAddress} was built: the
+   * driver keeps a proxy hostname unresolved internally, so passing one that the ordinary {@code
+   * InetSocketAddress(String, int)} constructor already resolved does not bind the session to that
+   * single address.
+   *
+   * <p>Prefer {@link InetSocketAddress#createUnresolved(String, int)} all the same, and especially
+   * for a proxy given as an <b>IP address</b>. Whether an address carries a name is read from
+   * {@code getHostString()}, which falls back to the underlying {@link java.net.InetAddress}'s
+   * cached host name -- and that field is filled in, on the very instance passed here, the first
+   * time anything calls {@code getHostName()} on it. The SNI SSL engine does exactly that while
+   * building an engine, unless reverse-lookup SANs are turned off. So an IP that has a {@code PTR}
+   * record can acquire a name mid-session, after which the driver treats that name as the proxy:
+   * the endpoints it builds from then on compare unequal to the earlier ones, report metrics under
+   * a different prefix, and connect to wherever that name resolves. An unresolved address is never
+   * subject to this, and is what the secure connect bundle produces.
+   *
    * @param cloudProxyAddress The address of the Cloud proxy to use.
    * @see <a href="https://en.wikipedia.org/wiki/Server_Name_Indication">Server Name Indication</a>
    */
@@ -957,11 +978,15 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
         programmaticArguments = programmaticArgumentsBuilder.build();
       }
 
-      boolean resolveAddresses =
-          defaultConfig.getBoolean(DefaultDriverOption.RESOLVE_CONTACT_POINTS, false);
-
+      // RESOLVE_CONTACT_POINTS is deprecated: contact points are always kept as unresolved
+      // hostnames, and expanded to all their DNS IPs at connection time by ChannelFactory.
+      // The value is still read, only to tell someone who set it that it no longer does anything.
+      // Note this tests the value rather than isDefined(): unlike the deprecated options warned
+      // about in DefaultDriverContext, this one ships uncommented in reference.conf, so it is
+      // always defined.
+      warnIfResolveContactPointsRequested(defaultConfig);
       Set<EndPoint> contactPoints =
-          ContactPoints.merge(programmaticContactPoints, configContactPoints, resolveAddresses);
+          ContactPoints.merge(programmaticContactPoints, configContactPoints, false);
 
       if (keyspace == null && defaultConfig.isDefined(DefaultDriverOption.SESSION_KEYSPACE)) {
         keyspace =
@@ -987,6 +1012,24 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
       }
     }
     return false;
+  }
+
+  /**
+   * Tells anyone who turned {@code advanced.resolve-contact-points} on that it no longer does
+   * anything, so the behaviour they configured does not disappear in silence.
+   */
+  @SuppressWarnings("deprecation")
+  private static void warnIfResolveContactPointsRequested(DriverExecutionProfile defaultConfig) {
+    if (defaultConfig.getBoolean(DefaultDriverOption.RESOLVE_CONTACT_POINTS, false)) {
+      LOG.warn(
+          "Option {} is deprecated and no longer has any effect. Contact points given in the"
+              + " configuration are now always kept as unresolved hostnames and expanded to all of"
+              + " their addresses at connection time, so a name that resolves to several nodes is"
+              + " one Node in the driver's metadata rather than one per address. Note that this"
+              + " never applied to contact points passed to addContactPoints(): those are used"
+              + " exactly as supplied, and an already-resolved address stays bound to that one IP.",
+          DefaultDriverOption.RESOLVE_CONTACT_POINTS.getPath());
+    }
   }
 
   /**

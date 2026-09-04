@@ -172,6 +172,13 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Integer> CONNECTION_MAX_ORPHAN_REQUESTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS, GenericType.INTEGER);
+  /**
+   * The maximum number of addresses a single connection attempt will try, when the endpoint it
+   * connects to is a DNS name that resolves to several addresses.
+   */
+  public static final TypedDriverOption<Integer> CONNECTION_MAX_CANDIDATE_ADDRESSES =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES, GenericType.INTEGER);
   /** Whether to log non-fatal errors when the driver tries to open a new connection. */
   public static final TypedDriverOption<Boolean> CONNECTION_WARN_INIT_ERROR =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR, GenericType.BOOLEAN);
@@ -600,7 +607,15 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_AGREEMENT_WARN =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, GenericType.BOOLEAN);
-  /** Whether to forcibly try original contacts if no live nodes are available */
+  /**
+   * Whether to append the original contact points to the control-connection reconnection plan,
+   * after the live nodes reported by the load balancing policy (defaults to {@code true}).
+   *
+   * <p>Contact points are appended as-is (unresolved hostnames); each is expanded to all of its
+   * current DNS IPs at connection time, which is also the driver's DNS re-resolution mechanism. The
+   * append is skipped for topology monitors that re-resolve node addresses themselves (such as the
+   * cloud/proxy monitors).
+   */
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, GenericType.BOOLEAN);
@@ -664,7 +679,16 @@ public class TypedDriverOption<ValueT> {
   /** The coalescer reschedule interval. */
   public static final TypedDriverOption<Duration> COALESCER_INTERVAL =
       new TypedDriverOption<>(DefaultDriverOption.COALESCER_INTERVAL, GenericType.DURATION);
-  /** Whether to resolve the addresses passed to `basic.contact-points`. */
+  /**
+   * Whether to resolve the addresses passed to `basic.contact-points`.
+   *
+   * @deprecated Setting this option has no effect. Contact points given in the configuration are
+   *     now always kept as unresolved hostnames and expanded to all of their DNS-mapped IPs lazily
+   *     at connection time. This never applied to programmatic contact points passed to {@code
+   *     SessionBuilder.addContactPoints}, which are used exactly as supplied -- an already-resolved
+   *     address stays bound to that one IP.
+   */
+  @Deprecated
   public static final TypedDriverOption<Boolean> RESOLVE_CONTACT_POINTS =
       new TypedDriverOption<>(DefaultDriverOption.RESOLVE_CONTACT_POINTS, GenericType.BOOLEAN);
   /**
