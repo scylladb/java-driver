@@ -318,6 +318,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
 
   @Override
   public CqlIdentifier getRoutingTable() {
+    // Honor setRoutingTable() when the caller set it.
     if (routingTable != null) {
       return routingTable;
     }
@@ -325,14 +326,12 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
     if (table != null) {
       return table;
     }
+    // No bind markers: infer the table from SELECT result columns instead.
     return tableOf(preparedStatement.getResultSetDefinitions());
   }
 
   private static CqlIdentifier tableOf(ColumnDefinitions definitions) {
-    if (definitions == null || definitions.size() == 0) {
-      return null;
-    }
-    return definitions.get(0).getTable();
+    return (definitions.size() == 0) ? null : definitions.get(0).getTable();
   }
 
   @NonNull
