@@ -46,6 +46,7 @@ import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.internal.core.cql.DefaultBoundStatement;
+import com.datastax.oss.driver.internal.core.cql.EmptyColumnDefinitions;
 import com.datastax.oss.driver.internal.core.loadbalancing.BasicLoadBalancingPolicy.RequestRoutingMethod;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -461,6 +462,7 @@ public class DefaultLoadBalancingPolicyRequestRoutingTest extends LoadBalancingP
     when(preparedStatement.isLWT()).thenReturn(false);
     when(preparedStatement.getRequestRoutingType()).thenReturn(RequestRoutingType.REGULAR);
     when(preparedStatement.getVariableDefinitions()).thenReturn(variableDefinitions);
+    when(preparedStatement.getResultSetDefinitions()).thenReturn(EmptyColumnDefinitions.INSTANCE);
     return new DefaultBoundStatement(
         preparedStatement,
         variableDefinitions,

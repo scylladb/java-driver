@@ -26,6 +26,7 @@ import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
 import com.datastax.oss.driver.internal.core.cql.DefaultBoundStatement;
+import com.datastax.oss.driver.internal.core.cql.EmptyColumnDefinitions;
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
@@ -164,6 +165,7 @@ public class StatementBuilderTest {
     when(preparedStatement.isLWT()).thenReturn(false);
     when(preparedStatement.getRequestRoutingType()).thenReturn(RequestRoutingType.REGULAR);
     when(preparedStatement.getVariableDefinitions()).thenReturn(variableDefinitions);
+    when(preparedStatement.getResultSetDefinitions()).thenReturn(EmptyColumnDefinitions.INSTANCE);
     return new DefaultBoundStatement(
         preparedStatement,
         variableDefinitions,
