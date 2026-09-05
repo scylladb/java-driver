@@ -36,6 +36,16 @@ public interface TabletMap {
   public Tablet getTablet(CqlIdentifier keyspace, CqlIdentifier table, long token);
 
   /**
+   * Replaces all tablets of a single table, leaving other tables untouched.
+   *
+   * @param keyspace target keyspace
+   * @param table target table
+   * @param tablets the complete set of tablets for that table
+   */
+  public void replaceTablets(
+      CqlIdentifier keyspace, CqlIdentifier table, Iterable<? extends Tablet> tablets);
+
+  /**
    * Removes all tablets that contain given node in its replica list.
    *
    * @param node node serving as filter criterion

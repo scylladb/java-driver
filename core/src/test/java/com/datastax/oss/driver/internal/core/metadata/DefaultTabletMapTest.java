@@ -111,4 +111,33 @@ public class DefaultTabletMapTest {
     Assert.assertEquals(result.getShardForNode(node1), 1);
     Assert.assertEquals(result.getShardForNode(node2), 2);
   }
+
+  @Test
+  public void should_replace_tablets_for_one_table() {
+    DefaultTabletMap tabletMap = DefaultTabletMap.emptyMap();
+    CqlIdentifier keyspace = CqlIdentifier.fromCql("ks");
+    CqlIdentifier firstTable = CqlIdentifier.fromCql("tab1");
+    CqlIdentifier secondTable = CqlIdentifier.fromCql("tab2");
+    Tablet staleTablet =
+        new DefaultTabletMap.DefaultTablet(
+            -100, 100, Collections.emptyList(), Collections.emptyMap());
+    Tablet replacement =
+        new DefaultTabletMap.DefaultTablet(
+            -200, 200, Collections.emptyList(), Collections.emptyMap());
+    Tablet otherTableTablet =
+        new DefaultTabletMap.DefaultTablet(
+            -300, 300, Collections.emptyList(), Collections.emptyMap());
+
+    tabletMap.addTablet(keyspace, firstTable, staleTablet);
+    tabletMap.addTablet(keyspace, secondTable, otherTableTablet);
+    tabletMap.replaceTablets(keyspace, firstTable, ImmutableList.of(replacement));
+
+    Assert.assertEquals(tabletMap.getTablet(keyspace, firstTable, 0), replacement);
+    Assert.assertEquals(tabletMap.getTablet(keyspace, secondTable, 0), otherTableTablet);
+    Assert.assertFalse(
+        tabletMap
+            .getMapping()
+            .get(new KeyspaceTableNamePair(keyspace, firstTable))
+            .contains(staleTablet));
+  }
 }

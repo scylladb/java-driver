@@ -276,6 +276,7 @@ public class StatementSizeTest {
         null,
         null,
         null,
+        null,
         Collections.emptyMap(),
         null,
         false,

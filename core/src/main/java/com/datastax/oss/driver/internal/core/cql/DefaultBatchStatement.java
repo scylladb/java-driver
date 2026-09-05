@@ -58,6 +58,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
   private final DriverExecutionProfile executionProfile;
   private final CqlIdentifier keyspace;
   private final CqlIdentifier routingKeyspace;
+  private final CqlIdentifier routingTable;
   private final ByteBuffer routingKey;
   private final Token routingToken;
   private final Map<String, ByteBuffer> customPayload;
@@ -81,6 +82,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
       DriverExecutionProfile executionProfile,
       CqlIdentifier keyspace,
       CqlIdentifier routingKeyspace,
+      CqlIdentifier routingTable,
       ByteBuffer routingKey,
       Token routingToken,
       Map<String, ByteBuffer> customPayload,
@@ -113,6 +115,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
     this.executionProfile = executionProfile;
     this.keyspace = keyspace;
     this.routingKeyspace = routingKeyspace;
+    this.routingTable = routingTable;
     this.routingKey = routingKey;
     this.routingToken = routingToken;
     this.customPayload = customPayload;
@@ -145,6 +148,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -171,6 +175,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         newKeyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -201,6 +206,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
           executionProfile,
           keyspace,
           routingKeyspace,
+          routingTable,
           routingKey,
           routingToken,
           customPayload,
@@ -235,6 +241,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
           executionProfile,
           keyspace,
           routingKeyspace,
+          routingTable,
           routingKey,
           routingToken,
           customPayload,
@@ -267,6 +274,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -304,6 +312,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -335,6 +344,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -367,6 +377,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -400,6 +411,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -431,6 +443,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         (newConfigProfileName == null) ? executionProfile : null,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -462,6 +475,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         newProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -509,13 +523,43 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
 
   @Override
   public CqlIdentifier getRoutingTable() {
+    if (routingTable != null) {
+      return routingTable;
+    }
     for (BatchableStatement<?> statement : statements) {
-      CqlIdentifier ks = statement.getRoutingTable();
-      if (ks != null) {
-        return ks;
+      CqlIdentifier table = statement.getRoutingTable();
+      if (table != null) {
+        return table;
       }
     }
     return null;
+  }
+
+  @NonNull
+  @Override
+  public BatchStatement setRoutingTable(@Nullable CqlIdentifier newRoutingTable) {
+    return new DefaultBatchStatement(
+        batchType,
+        statements,
+        executionProfileName,
+        executionProfile,
+        keyspace,
+        routingKeyspace,
+        newRoutingTable,
+        routingKey,
+        routingToken,
+        customPayload,
+        idempotent,
+        tracing,
+        timestamp,
+        pagingState,
+        pageSize,
+        consistencyLevel,
+        serialConsistencyLevel,
+        timeout,
+        node,
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @NonNull
@@ -528,6 +572,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         newRoutingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -554,6 +599,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -601,6 +647,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         newRoutingKey,
         routingToken,
         customPayload,
@@ -642,6 +689,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         newRoutingToken,
         customPayload,
@@ -674,6 +722,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         newCustomPayload,
@@ -711,6 +760,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -742,6 +792,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -773,6 +824,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -799,6 +851,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -830,6 +883,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -888,6 +942,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,

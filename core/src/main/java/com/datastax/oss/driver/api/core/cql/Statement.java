@@ -168,6 +168,30 @@ public interface Statement<SelfT extends Statement<SelfT>> extends Request {
   }
 
   /**
+   * Sets the table to use for tablet-aware routing.
+   *
+   * <p>See {@link Request#getRoutingTable()} for how this is used with {@link
+   * Request#getRoutingKeyspace()} and {@link Request#getRoutingToken()}.
+   *
+   * @param newRoutingTable The table to use, or {@code null} to clear the explicit value and fall
+   *     back to inference.
+   */
+  @NonNull
+  @CheckReturnValue
+  SelfT setRoutingTable(@Nullable CqlIdentifier newRoutingTable);
+
+  /**
+   * Shortcut for {@link #setRoutingTable(CqlIdentifier)
+   * setRoutingTable(CqlIdentifier.fromCql(newRoutingTableName))}.
+   */
+  @NonNull
+  @CheckReturnValue
+  default SelfT setRoutingTable(@Nullable String newRoutingTableName) {
+    return setRoutingTable(
+        newRoutingTableName == null ? null : CqlIdentifier.fromCql(newRoutingTableName));
+  }
+
+  /**
    * Sets the key to use for token-aware routing.
    *
    * <p>See {@link Request#getRoutingKey()} for a description of the token-aware routing algorithm.
