@@ -37,10 +37,12 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -79,6 +81,16 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   private final ClientRoutesConfig config;
   private final List<String> configuredConnectionIds;
   private final Map<String, String> connectionAddrOverrides;
+
+  /**
+   * Whether a cached route's {@code host_id} identifies the table row it was built from. {@code
+   * system.client_routes} is keyed on {@code (connection_id, host_id)} while this cache is keyed on
+   * {@code host_id} alone, so the two coincide only while a single connection ID can produce rows
+   * for a given host. Where several can, a cached entry and a returned row for the same host need
+   * not be the same route (see #1063), and a refresh keeps only the routes it rebuilt.
+   */
+  private final boolean hostIdIdentifiesRoute;
+
   private final String logPrefix;
   private final AtomicReference<Map<UUID, ClientRouteRecord>> resolvedRoutesCache;
   private final boolean useSSL;
@@ -144,6 +156,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                     Collectors.toMap(
                         ClientRouteProxy::getConnectionId,
                         ClientRouteProxy::getConnectionAddrOverride)));
+    this.hostIdIdentifiesRoute = new HashSet<>(configuredConnectionIds).size() == 1;
     this.logPrefix = context.getSessionName();
     this.resolvedRoutesCache = new AtomicReference<>(Collections.emptyMap());
     this.useSSL = context.getSslEngineFactory().isPresent();
@@ -297,53 +310,83 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
           .thenAccept(
               adminResult -> {
                 Map<UUID, ClientRouteRecord> newRoutes = new HashMap<>();
+                // Every host_id this loop manages to read, whatever becomes of the rest of its
+                // row. A host in here but not in newRoutes came back unusable, which is not the
+                // same as the server having deleted it -- keepableHostIds turns that difference
+                // into the one rule both cache writes below apply.
+                Set<UUID> hostIdsInResult = new HashSet<>();
+                // Rows this loop could not attribute to any host at all, because their host_id
+                // was unreadable. They make the set above an incomplete record of what came
+                // back, which is why absence from it stops being proof of a delete -- see
+                // keepableHostIds. Counted rather than derived from rowCount, because two rows
+                // can legitimately share one host_id (several proxies fronting one host).
+                int unattributableRows = 0;
+                int rowCount = 0;
+                String portColumn = useSSL ? "tls_port" : "port";
                 for (AdminRow row : adminResult) {
-                  if (row.isNull("host_id") || row.isNull("address")) {
-                    LOG.warn("[{}] Skipping incomplete client_routes row: {}", logPrefix, row);
-                    continue;
-                  }
-                  UUID hostId = Objects.requireNonNull(row.getUuid("host_id"));
-                  String address = Objects.requireNonNull(row.getString("address"));
+                  rowCount++;
+                  UUID hostId = null;
+                  String address = null;
+                  Integer port = null;
+                  // This loop runs inside thenAccept(), so anything thrown out of it skips the
+                  // cache update and discards every route in the pass, not just the offending
+                  // row -- and the cache then stays stale for as long as that row remains in the
+                  // table. ClientRouteRecord rejects a null or empty hostname and a port outside
+                  // 1..65535, and the column codecs reject a malformed cell; catching here is
+                  // what keeps one bad row costing one route. readHostId handles the row's
+                  // identity itself, so everything reaching the catch below failed on the
+                  // payload, with the host already recorded as present.
+                  try {
+                    hostId = readHostId(row);
+                    if (hostId == null) {
+                      unattributableRows++;
+                      continue;
+                    }
+                    hostIdsInResult.add(hostId);
+                    address = effectiveAddress(row);
 
-                  // Select port based on SSL configuration at record creation time.
-                  // Skip the record if the required port column is absent.
-                  Integer effectivePort;
-                  if (useSSL) {
-                    effectivePort = row.isNull("tls_port") ? null : row.getInteger("tls_port");
-                  } else {
-                    effectivePort = row.isNull("port") ? null : row.getInteger("port");
-                  }
-                  if (effectivePort == null) {
-                    LOG.error(
-                        "[{}] Skipping client route for host_id={} ({}): "
-                            + "required port column ({}) is not set in client routes table",
+                    // Select port based on SSL configuration at record creation time.
+                    // Skip the record if the required port column is absent.
+                    port = row.isNull(portColumn) ? null : row.getInteger(portColumn);
+                    if (port == null) {
+                      LOG.warn(
+                          "[{}] Skipping client route for host_id={} ({}): "
+                              + "required port column ({}) is not set in client routes table",
+                          logPrefix,
+                          hostId,
+                          address,
+                          portColumn);
+                      continue;
+                    }
+
+                    newRoutes.put(hostId, new ClientRouteRecord(hostId, address, port));
+                  } catch (RuntimeException e) {
+                    LOG.warn(
+                        "[{}] Skipping unusable client_routes row (host_id={}, address={}, {}={})",
                         logPrefix,
                         hostId,
                         address,
-                        useSSL ? "tls_port" : "port");
-                    continue;
+                        portColumn,
+                        port,
+                        e);
                   }
-
-                  // Apply connectionAddr override if configured for this connection_id
-                  String connId =
-                      row.contains("connection_id") && !row.isNull("connection_id")
-                          ? row.getString("connection_id")
-                          : null;
-                  if (connId != null) {
-                    String override = connectionAddrOverrides.get(connId);
-                    if (override != null) {
-                      address = override;
-                    }
-                  }
-
-                  newRoutes.put(hostId, new ClientRouteRecord(hostId, address, effectivePort));
                 }
+
+                // One view of the cache for the whole pass, and one rule over it: a cached
+                // route may be evicted only where this pass can prove the server deleted it.
+                Map<UUID, ClientRouteRecord> cachedRoutes = resolvedRoutesCache.get();
+                Set<UUID> keepableHostIds =
+                    keepableHostIds(
+                        hostIdsInResult, newRoutes, cachedRoutes, unattributableRows, rowCount);
 
                 if (isTargetedRefresh) {
                   // Merge: update only the returned host IDs, keep all others unchanged
                   mergeRoutes(newRoutes);
-                  // Remove stale routes: host IDs present in the event but absent from query
-                  // results have been deleted server-side (e.g. node decommission).
+                  // Remove stale routes: a host ID the event named that keepableHostIds does
+                  // not hold has been deleted server-side (e.g. node decommission). Evicting one
+                  // it does hold would drop a working route back to the node's unreachable
+                  // private address, which is why every reason a host is not provably absent
+                  // lives in that one set rather than in a condition here.
                   for (String hostIdStr : eventHostIds) {
                     UUID hostId;
                     try {
@@ -356,7 +399,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                           e);
                       continue;
                     }
-                    if (!newRoutes.containsKey(hostId)) {
+                    if (!keepableHostIds.contains(hostId)) {
                       removeRoute(hostId);
                     }
                   }
@@ -364,7 +407,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                       "[{}] Merged {} client routes (targeted refresh)",
                       logPrefix,
                       newRoutes.size());
-                } else if (newRoutes.isEmpty() && !resolvedRoutesCache.get().isEmpty()) {
+                } else if (rowCount == 0 && !resolvedRoutesCache.get().isEmpty()) {
                   int emptyCount = consecutiveEmptyResults.incrementAndGet();
                   if (emptyCount >= MAX_CONSECUTIVE_EMPTY_RESULTS) {
                     // Too many consecutive empties -- routes were likely removed server-side.
@@ -390,10 +433,18 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                         resolvedRoutesCache.get().size());
                   }
                 } else {
+                  // Rows came back, so this is not the eventual-consistency race the counter
+                  // above tracks, whatever else was wrong with them.
                   consecutiveEmptyResults.set(0);
-                  resolvedRoutesCache.set(Collections.unmodifiableMap(newRoutes));
+                  Map<UUID, ClientRouteRecord> updated =
+                      withRetainedCachedRoutes(cachedRoutes, newRoutes, keepableHostIds);
+                  resolvedRoutesCache.set(Collections.unmodifiableMap(updated));
                   LOG.debug(
-                      "[{}] Updated client routes: {} routes loaded", logPrefix, newRoutes.size());
+                      "[{}] Updated client routes: {} routes loaded"
+                          + " ({} kept from the previous refresh)",
+                      logPrefix,
+                      updated.size(),
+                      updated.size() - newRoutes.size());
                 }
               })
           .exceptionally(
@@ -408,6 +459,59 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       completeAndDrain(sentinel);
       return sentinel;
     }
+  }
+
+  /**
+   * Returns the row's {@code host_id}, or {@code null} when the row carries no readable identity:
+   * an unset cell, or one the UUID codec rejects. {@code host_id} is the row's identity — the cache
+   * key, the presence bookkeeping and every log line depend on it — so unlike the address and the
+   * port it is read here rather than left to {@link ClientRouteRecord}, and both ways of failing
+   * land in one place. A row this returns {@code null} for cannot be attributed to any host, which
+   * is why the caller stops treating absence from the result as evidence of a delete for the rest
+   * of the pass.
+   *
+   * <p>The {@code requireNonNull} is not redundant: {@link AdminRow#isNull} only tests for a null
+   * {@code ByteBuffer}, while the UUID codec returns {@code null} for a zero-length cell.
+   */
+  @Nullable
+  private UUID readHostId(@NonNull AdminRow row) {
+    if (row.isNull("host_id")) {
+      LOG.warn("[{}] Skipping client_routes row: host_id is not set", logPrefix);
+      return null;
+    }
+    try {
+      return Objects.requireNonNull(row.getUuid("host_id"));
+    } catch (RuntimeException e) {
+      LOG.warn("[{}] Skipping client_routes row: host_id is not readable", logPrefix, e);
+      return null;
+    }
+  }
+
+  /**
+   * Returns the address a row's route should use: the configured {@code connection_addr} override
+   * for the row's {@code connection_id} when one applies, otherwise the table's {@code address}
+   * column. {@link ClientRouteProxy} documents the override as replacing that column outright for a
+   * matching connection ID, without qualifying that on the column holding anything usable — so an
+   * override short-circuits the column, and a cell the text codec rejects cannot defeat one.
+   *
+   * <p>A {@code connection_id} the codec rejects does skip the row, via the caller's {@code catch}.
+   * That is the intended asymmetry: without it the driver cannot know which override applies.
+   *
+   * <p>May return {@code null} or an empty string; {@link ClientRouteRecord} rejects both. Leaving
+   * the verdict there is what keeps "is this address usable" one question with one answer, rather
+   * than one guard for an absent column and another for an empty one.
+   */
+  @Nullable
+  private String effectiveAddress(@NonNull AdminRow row) {
+    String connId =
+        row.contains("connection_id") && !row.isNull("connection_id")
+            ? row.getString("connection_id")
+            : null;
+    String override = connId == null ? null : connectionAddrOverrides.get(connId);
+    if (override != null) {
+      return override;
+    }
+    return row.isNull("address") ? null : row.getString("address");
   }
 
   /**
@@ -552,6 +656,105 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   @NonNull
   private static String cqlQuoteLiteral(@NonNull String value) {
     return "'" + value.replace("'", "''") + "'";
+  }
+
+  /**
+   * Returns the host IDs whose cached route this refresh may leave in place even though it built no
+   * record for them. Absence from this set is what both cache writers treat as proof that the
+   * server deleted the host, so the whole eviction rule lives here rather than in a condition at
+   * each of them.
+   *
+   * <p>Three cases, least carry-over first.
+   *
+   * <p>Where {@code host_id} is not the whole route identity ({@link #hostIdIdentifiesRoute})
+   * nothing is carried over. Keeping a cached route asks whether <em>that route's</em> row came
+   * back unusable, and a set of host IDs cannot answer a question about one {@code (connection_id,
+   * host_id)} row: the cached entry and the row that failed need not be the same route. Keeping it
+   * anyway would preserve a route the server deleted for as long as some other connection's row
+   * stayed unusable, and no non-empty refresh would ever reset that. So the refresh keeps only what
+   * it rebuilt, as it did before row-level tolerance existed. See #1063, which corrects the cache
+   * key itself; retention by the full key falls out of that fix.
+   *
+   * <p>Otherwise a row that came back and merely failed to parse is not an absent row, so every
+   * host ID the loop read is keepable: the refresh replaces the routes it could rebuild and leaves
+   * the rest alone.
+   *
+   * <p>Unless the loop could not attribute some row to any host at all, which destroys that
+   * evidence for the whole refresh -- the unattributable row may have been the very host now
+   * missing from {@code hostIdsInResult}. Evicting on a guess would send a working node back to its
+   * private address, unreachable in the deployment client routes exist for and permanent until the
+   * table changes, whereas a route kept one refresh too long fails fast on connect. So the whole
+   * cache is keepable, and the next clean refresh evicts.
+   */
+  @NonNull
+  private Set<UUID> keepableHostIds(
+      @NonNull Set<UUID> hostIdsInResult,
+      @NonNull Map<UUID, ClientRouteRecord> newRoutes,
+      @NonNull Map<UUID, ClientRouteRecord> cachedRoutes,
+      int unattributableRows,
+      int rowCount) {
+    if (!hostIdIdentifiesRoute) {
+      if (unattributableRows > 0 || hostIdsInResult.size() > newRoutes.size()) {
+        LOG.warn(
+            "[{}] Not carrying over cached routes for the {} host(s) this refresh could not rebuild"
+                + " ({} row(s) named no host_id at all): with {} connection IDs configured a cached"
+                + " route cannot be told from another connection's, and keeping it would preserve a"
+                + " route the server may have deleted",
+            logPrefix,
+            hostIdsInResult.size() - newRoutes.size(),
+            unattributableRows,
+            configuredConnectionIds.size());
+      }
+      return newRoutes.keySet();
+    }
+    if (unattributableRows == 0) {
+      return hostIdsInResult;
+    }
+    if (hostIdsInResult.isEmpty()) {
+      LOG.error(
+          "[{}] None of the {} client_routes rows named a readable host_id; "
+              + "keeping all {} existing cached routes",
+          logPrefix,
+          rowCount,
+          cachedRoutes.size());
+    } else {
+      LOG.warn(
+          "[{}] {} of {} client_routes rows named no readable host_id; keeping the "
+              + "cached routes this refresh cannot prove deleted",
+          logPrefix,
+          unattributableRows,
+          rowCount);
+    }
+    return cachedRoutes.keySet();
+  }
+
+  /**
+   * Returns the map a full refresh should install: every route it could build, plus the cached
+   * record of each host in {@code keepableHostIds}.
+   *
+   * <p>A full refresh replaces the cache outright, because a host missing from the result has been
+   * deleted server-side. {@link #keepableHostIds} is the exception list -- the hosts this refresh
+   * cannot show the server to have deleted -- and dropping one of those would send a working node
+   * back to its private address, unreachable in the deployment client routes exist for. A
+   * carried-over record outlives the bad row for as long as it stays bad; the per-row {@code WARN}
+   * is the signal that it has.
+   */
+  @NonNull
+  private static Map<UUID, ClientRouteRecord> withRetainedCachedRoutes(
+      @NonNull Map<UUID, ClientRouteRecord> cachedRoutes,
+      @NonNull Map<UUID, ClientRouteRecord> newRoutes,
+      @NonNull Set<UUID> keepableHostIds) {
+    if (cachedRoutes.isEmpty()) {
+      return newRoutes;
+    }
+    Map<UUID, ClientRouteRecord> merged = new HashMap<>(newRoutes);
+    for (Map.Entry<UUID, ClientRouteRecord> entry : cachedRoutes.entrySet()) {
+      if (keepableHostIds.contains(entry.getKey())) {
+        // A host with both a usable and an unusable row keeps the usable one.
+        merged.putIfAbsent(entry.getKey(), entry.getValue());
+      }
+    }
+    return merged;
   }
 
   /**
