@@ -27,7 +27,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,6 +79,7 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import io.netty.channel.DefaultEventLoop;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
@@ -168,8 +171,11 @@ public class InsightsClientTest {
     assertThat(insightData.getApplicationName()).isEqualTo("app-name");
     assertThat(insightData.getApplicationVersion()).isEqualTo("1.0.0");
     assertThat(insightData.isApplicationNameWasGenerated()).isEqualTo(false);
+    // Keyed on the literal the fixture configured, not on what the loopback's reverse zone calls
+    // it: the fixture's contact point is a resolved InetSocketAddress built from an IP literal, so
+    // it carries no name and grouping on getHostName() used to reverse-resolve it ("localhost").
     assertThat(insightData.getContactPoints())
-        .isEqualTo(ImmutableMap.of("localhost", Collections.singletonList("127.0.0.1:9999")));
+        .isEqualTo(ImmutableMap.of("127.0.0.1", Collections.singletonList("127.0.0.1:9999")));
 
     assertThat(insightData.getInitialControlConnection()).isEqualTo("127.0.0.1:10");
     assertThat(insightData.getLocalAddress()).isEqualTo("127.0.0.1");
@@ -217,7 +223,7 @@ public class InsightsClientTest {
   }
 
   @Test
-  public void should_group_contact_points_by_host_name() {
+  public void should_group_contact_points_by_host_string() {
     // given
     Set<InetSocketAddress> contactPoints =
         ImmutableSet.of(
@@ -238,6 +244,24 @@ public class InsightsClientTest {
 
     // then
     assertThat(resolvedContactPoints).isEqualTo(expected);
+  }
+
+  @Test
+  public void should_not_reverse_resolve_a_contact_point_that_carries_no_name() throws Exception {
+    // A contact point built from an InetAddress carries no host name, so getHostName() is a
+    // reverse lookup on the admin executor whose answer depends on the local reverse zone
+    // ("localhost" with a PTR record, the literal without), while getHostString() looks nothing
+    // up. Without a PTR record no fixture can tell the two apart, so forbid the lookup itself: the
+    // spy is the real address in every other respect and fails the test if it is consulted.
+    InetAddress address = spy(InetAddress.getByAddress(new byte[] {127, 0, 0, 1}));
+    doThrow(new AssertionError("reverse DNS lookup")).when(address).getHostName();
+    Set<InetSocketAddress> contactPoints = ImmutableSet.of(new InetSocketAddress(address, 9042));
+
+    Map<String, List<String>> resolvedContactPoints =
+        InsightsClient.getResolvedContactPoints(contactPoints);
+
+    assertThat(resolvedContactPoints)
+        .isEqualTo(ImmutableMap.of("127.0.0.1", ImmutableList.of("127.0.0.1:9042")));
   }
 
   @Test

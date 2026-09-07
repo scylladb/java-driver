@@ -363,6 +363,12 @@ public class InsightsClient {
     return TimeUnit.MILLISECONDS.toSeconds(insightsConfiguration.getStatusEventDelayMillis());
   }
 
+  /**
+   * Groups the contact points by host string, not host name: for a resolved address that carries no
+   * name — one built from an {@code InetAddress}, or from an IP literal — {@code getHostName()} is
+   * a reverse DNS lookup, and this runs on the admin executor while the startup event is built. The
+   * key is the host as configured; the values are unchanged.
+   */
   @VisibleForTesting
   static Map<String, List<String>> getResolvedContactPoints(Set<InetSocketAddress> contactPoints) {
     if (contactPoints == null) {
@@ -371,7 +377,7 @@ public class InsightsClient {
     return contactPoints.stream()
         .collect(
             Collectors.groupingBy(
-                InetSocketAddress::getHostName,
+                InetSocketAddress::getHostString,
                 Collectors.mapping(AddressFormatter::nullSafeToString, Collectors.toList())));
   }
 

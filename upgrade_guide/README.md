@@ -19,6 +19,19 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.2
+
+#### DSE Insights keys contact points on their host string
+
+The `contactPoints` map in the Insights startup event is now keyed on each contact point's host
+*string* rather than its host *name*. The two differ for a contact point that ends up as a resolved
+`InetSocketAddress` carrying no name — one built from an `InetAddress`, or from an IP literal,
+which includes IP-literal `basic.contact-points` entries whenever
+`advanced.resolve-contact-points = true`. Such a key was whatever a reverse DNS lookup returned,
+and is now the IP literal. Contact points given as host names, and the unresolved contact points
+this driver uses by default, are unaffected. The lookup, which ran on the driver's admin executor
+while the event was built, no longer runs.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time

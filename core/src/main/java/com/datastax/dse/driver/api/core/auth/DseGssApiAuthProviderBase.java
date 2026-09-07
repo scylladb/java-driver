@@ -22,12 +22,16 @@ import com.datastax.oss.driver.api.core.auth.AuthenticationException;
 import com.datastax.oss.driver.api.core.auth.Authenticator;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
@@ -319,13 +323,49 @@ public abstract class DseGssApiAuthProviderBase implements AuthProvider {
                 SUPPORTED_MECHANISMS,
                 options.getAuthorizationId(),
                 protocol,
-                ((InetSocketAddress) endPoint.resolve()).getAddress().getCanonicalHostName(),
+                serverName(endPoint),
                 options.getSaslProperties(),
                 null);
       } catch (LoginException | SaslException e) {
-        throw new AuthenticationException(endPoint, e.getMessage());
+        throw new AuthenticationException(endPoint, "Failed to initialize GSSAPI: " + e, e);
       }
       this.endPoint = endPoint;
+    }
+
+    /**
+     * The host name to build the Kerberos service principal from.
+     *
+     * <p>Kerberos expects the host's canonical name and JGSS will not supply it: it lower-cases
+     * what it is given, and substitutes a canonical name only when that is a longer form of it, so
+     * an IP literal or a CNAME alias would reach the KDC verbatim and be rejected. With {@code
+     * advanced.resolve-contact-points = false} (the default) a contact point's endpoint is
+     * unresolved and {@code getAddress()} is null, so canonicalize the host string rather than
+     * dereferencing null.
+     *
+     * <p>The lookup blocks the connection's event loop, as the {@code login.login()} KDC round trip
+     * above already does; moving either off it needs an asynchronous {@link AuthProvider} contract.
+     */
+    @VisibleForTesting
+    static String serverName(EndPoint endPoint) throws SaslException {
+      SocketAddress socketAddress = endPoint.resolve();
+      if (!(socketAddress instanceof InetSocketAddress)) {
+        throw new SaslException(
+            "Cannot build a Kerberos service principal: "
+                + endPoint
+                + " does not resolve to an IP address");
+      }
+      InetSocketAddress address = (InetSocketAddress) socketAddress;
+      InetAddress inetAddress = address.getAddress();
+      if (inetAddress != null) {
+        return inetAddress.getCanonicalHostName();
+      }
+      String hostString = address.getHostString();
+      try {
+        return InetAddress.getByName(hostString).getCanonicalHostName();
+      } catch (UnknownHostException e) {
+        // Nothing better to name the principal after; let the KDC reject it with its own message.
+        return hostString;
+      }
     }
 
     @NonNull
