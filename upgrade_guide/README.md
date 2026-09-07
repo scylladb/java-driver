@@ -19,6 +19,16 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.2
+
+#### The local-DC check no longer inspects contact points
+
+`OptionalLocalDcHelper` no longer logs "you specified X as the local DC, but some contact points are
+from a different DC". It compared the configured DC against contact-point placeholder nodes, whose
+datacenter is never populated, so it fired on every session that configured a local DC, wherever the
+contact points actually were. The warning for a configured DC that matches no node in the cluster is
+unchanged. `checkLocalDatacenterCompatibility` is removed, so drop any override of it.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time
