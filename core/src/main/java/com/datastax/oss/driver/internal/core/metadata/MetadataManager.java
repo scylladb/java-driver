@@ -148,8 +148,10 @@ public class MetadataManager implements AsyncAutoCloseable {
 
   public void addContactPoints(Set<EndPoint> providedContactPoints) {
     // Convert the EndPoints to Nodes, but we can't put them into the Metadata yet, because we
-    // don't know their host_id. So store them in a volatile field instead, they will get copied
-    // during the first node refresh.
+    // don't know their host_id. So store them in a volatile field instead, exposed through
+    // getContactPoints(). These placeholders are never copied into the Metadata: the first node
+    // refresh matches nodes by host_id (InitialNodeListRefresh) and registerNode builds fresh Node
+    // objects, so a placeholder's datacenter, rack and version stay null for its whole life.
     ImmutableSet.Builder<DefaultNode> contactPointsBuilder = ImmutableSet.builder();
     if (providedContactPoints == null || providedContactPoints.isEmpty()) {
       LOG.info(
