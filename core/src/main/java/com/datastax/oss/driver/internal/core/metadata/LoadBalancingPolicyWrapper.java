@@ -27,6 +27,9 @@ import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.util.ArrayUtils;
+import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.ReplayingEventFilter;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
@@ -144,7 +147,20 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
   @NonNull
   public Queue<Node> newQueryPlan(
       @Nullable Request request, @NonNull String executionProfileName, @Nullable Session session) {
-    switch (stateRef.get()) {
+    return newQueryPlan(stateRef.get(), request, executionProfileName, session);
+  }
+
+  /**
+   * Builds a query plan for a state that the caller has already read, so that a caller taking more
+   * than one decision from the state takes them all from the same value.
+   */
+  @NonNull
+  private Queue<Node> newQueryPlan(
+      @NonNull State state,
+      @Nullable Request request,
+      @NonNull String executionProfileName,
+      @Nullable Session session) {
+    switch (state) {
       case BEFORE_INIT:
       case DURING_INIT:
         // The contact points are not stored in the metadata yet:
@@ -164,20 +180,27 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
 
   @NonNull
   public Queue<Node> newControlReconnectionQueryPlan() {
-    Queue<Node> regularQueryPlan = newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
+    // One read, shared by the plan below and the guard after it: init() flips the state on the
+    // session's admin thread while this method runs on the control connection's, so reading twice
+    // could see DURING_INIT here and RUNNING in newQueryPlan(), and drop the fallback from a plan
+    // that was built by the policy.
+    State state = stateRef.get();
+    Queue<Node> regularQueryPlan =
+        newQueryPlan(state, null, DriverExecutionProfile.DEFAULT_NAME, null);
 
-    if (context
-        .getConfig()
-        .getDefaultProfile()
-        .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)) {
-      Set<DefaultNode> originalNodes = context.getMetadataManager().getContactPoints();
-      List<Node> contactNodes = new ArrayList<>();
-      for (DefaultNode node : originalNodes) {
-        contactNodes.add(DefaultNode.newContactPoint(node.getEndPoint(), context));
-      }
-      Collections.shuffle(contactNodes);
-      // Append contact points to the end of the regular query plan so they serve as a fallback
-      regularQueryPlan.addAll(contactNodes);
+    // Before RUNNING, newQueryPlan() already built the plan from the contact points, so appending
+    // them again would only duplicate every entry. Once RUNNING, the plan comes from the policy and
+    // is an immutable QueryPlan (add()/addAll() throw), so concatenate rather than mutate. The
+    // nodes retained by MetadataManager are appended, not fresh copies: their identity stays stable
+    // across reconnection rounds, and no throwaway node is minted per round.
+    if (state == State.RUNNING
+        && context
+            .getConfig()
+            .getDefaultProfile()
+            .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)) {
+      Object[] contactNodes = context.getMetadataManager().getContactPoints().toArray();
+      ArrayUtils.shuffleHead(contactNodes, contactNodes.length);
+      return new CompositeQueryPlan(regularQueryPlan, new SimpleQueryPlan(contactNodes));
     }
 
     return regularQueryPlan;
