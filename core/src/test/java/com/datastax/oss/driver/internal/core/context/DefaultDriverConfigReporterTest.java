@@ -42,6 +42,7 @@ import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.api.core.time.TimestampGenerator;
 import com.datastax.oss.driver.internal.core.connection.ConstantReconnectionPolicy;
 import com.datastax.oss.driver.internal.core.connection.ExponentialReconnectionPolicy;
+import com.datastax.oss.driver.internal.core.context.DriverConfigReporter.TlsInfo;
 import com.datastax.oss.driver.internal.core.loadbalancing.BasicLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.loadbalancing.DcInferringLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
@@ -49,9 +50,7 @@ import com.datastax.oss.driver.internal.core.retry.ConsistencyDowngradingRetryPo
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import com.datastax.oss.driver.internal.core.specex.ConstantSpeculativeExecutionPolicy;
 import com.datastax.oss.driver.internal.core.specex.NoSpeculativeExecutionPolicy;
-import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
-import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
 import com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator;
@@ -127,7 +126,7 @@ public class DefaultDriverConfigReporterTest {
   private DefaultDriverConfigReporter reporterReporting(Supplier<String> json) {
     return new DefaultDriverConfigReporter(mockContext) {
       @Override
-      String buildJson() {
+      String buildJson(TlsInfo tlsInfo) {
         return json.get();
       }
     };
@@ -142,7 +141,8 @@ public class DefaultDriverConfigReporterTest {
   public void should_add_driver_config_when_enabled() {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
-    reporterReporting(() -> "{\"version\":1}").populateControlConnectionOptions(options);
+    reporterReporting(() -> "{\"version\":1}")
+        .populateControlConnectionOptions(options, TlsInfo.disabled());
     assertThat(options)
         .hasSize(1)
         .containsEntry(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}");
@@ -152,7 +152,7 @@ public class DefaultDriverConfigReporterTest {
   public void should_add_nothing_when_disabled() {
     enableReporting(false);
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options);
+    reporter.populateControlConnectionOptions(options, TlsInfo.disabled());
     assertThat(options).isEmpty();
   }
 
@@ -163,7 +163,7 @@ public class DefaultDriverConfigReporterTest {
     // getBoolean(), ignoring the fallback that is under test here.
     Map<String, String> options = new HashMap<>();
     defaultsReporter(map -> map.remove(TypedDriverOption.DRIVER_CONFIG_REPORTING_ENABLED))
-        .populateControlConnectionOptions(options);
+        .populateControlConnectionOptions(options, TlsInfo.disabled());
     assertThat(options).containsKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
   }
 
@@ -176,7 +176,7 @@ public class DefaultDriverConfigReporterTest {
     // in-process; what is checked here is that the substitute contributes nothing and, in
     // particular, does not need a context to say so.
     Map<String, String> options = new HashMap<>();
-    new NoopDriverConfigReporter().populateControlConnectionOptions(options);
+    new NoopDriverConfigReporter().populateControlConnectionOptions(options, TlsInfo.disabled());
     assertThat(options).isEmpty();
   }
 
@@ -187,7 +187,7 @@ public class DefaultDriverConfigReporterTest {
     when(mockProfile.getBoolean(DefaultDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, true))
         .thenThrow(new IllegalStateException("config blew up"));
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options); // must not throw
+    reporter.populateControlConnectionOptions(options, TlsInfo.disabled()); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -199,7 +199,7 @@ public class DefaultDriverConfigReporterTest {
             () -> {
               throw new IllegalStateException("introspection blew up");
             })
-        .populateControlConnectionOptions(options); // must not throw
+        .populateControlConnectionOptions(options, TlsInfo.disabled()); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -208,7 +208,7 @@ public class DefaultDriverConfigReporterTest {
     // buildJson() returns null when Jackson fails to serialize the node tree.
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
-    reporterReporting(() -> null).populateControlConnectionOptions(options);
+    reporterReporting(() -> null).populateControlConnectionOptions(options, TlsInfo.disabled());
     assertThat(options).isEmpty();
   }
 
@@ -285,7 +285,7 @@ public class DefaultDriverConfigReporterTest {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
     reporterReporting(() -> oversizedReport())
-        .populateControlConnectionOptions(options); // must not throw
+        .populateControlConnectionOptions(options, TlsInfo.disabled()); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -294,7 +294,7 @@ public class DefaultDriverConfigReporterTest {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
     String atLimit = padTo(DefaultDriverConfigReporter.MAX_DRIVER_CONFIG_LENGTH);
-    reporterReporting(() -> atLimit).populateControlConnectionOptions(options);
+    reporterReporting(() -> atLimit).populateControlConnectionOptions(options, TlsInfo.disabled());
     assertThat(options).containsEntry(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, atLimit);
   }
 
@@ -314,13 +314,13 @@ public class DefaultDriverConfigReporterTest {
     // Built, well-formed and over the limit: it is dropped for its size, not because building it
     // failed. Reporting is left at the shipped default here, since defaultsReporter() reads a real
     // profile rather than the bare mock the tests above use.
-    String json = reporter.buildJson();
+    String json = reporter.buildJson(TlsInfo.disabled());
     assertConformsToSchema(MAPPER.readTree(json));
     assertThat(json.getBytes(StandardCharsets.UTF_8).length)
         .isGreaterThan(DefaultDriverConfigReporter.MAX_DRIVER_CONFIG_LENGTH);
 
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options);
+    reporter.populateControlConnectionOptions(options, TlsInfo.disabled());
     assertThat(options).isEmpty();
   }
 
@@ -1432,10 +1432,58 @@ public class DefaultDriverConfigReporterTest {
 
   @Test
   public void should_report_tls_enabled_with_hostname_verification() throws Exception {
-    // hostname-verification comes from the factory's own state, not the config option.
-    SslEngineFactory factory =
-        new ProgrammaticSslEngineFactory(
-            SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
+    DefaultDriverConfigReporter r =
+        reporterWith(
+            defaults(map -> {}),
+            exponentialReconnection(),
+            mock(DefaultRetryPolicy.class),
+            mock(NoSpeculativeExecutionPolicy.class),
+            loadBalancing(DefaultLoadBalancingPolicy.class),
+            clientSideGenerator(),
+            Optional.empty());
+    JsonNode connection = report(r, TlsInfo.enabled(true)).get("connection");
+    // Presence of the group is what reports TLS as on: the schema dropped the "enabled" boolean.
+    assertThat(connection.has("tls")).isTrue();
+    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isTrue();
+  }
+
+  @Test
+  public void should_report_hostname_verification_from_active_tls_snapshot_not_config_option()
+      throws Exception {
+    DefaultDriverConfigReporter r =
+        reporterWith(
+            defaults(map -> map.put(TypedDriverOption.SSL_HOSTNAME_VALIDATION, true)),
+            exponentialReconnection(),
+            mock(DefaultRetryPolicy.class),
+            mock(NoSpeculativeExecutionPolicy.class),
+            loadBalancing(DefaultLoadBalancingPolicy.class),
+            clientSideGenerator(),
+            Optional.empty());
+    JsonNode connection = report(r, TlsInfo.enabled(false)).get("connection");
+    assertThat(connection.has("tls")).isTrue();
+    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isFalse();
+  }
+
+  @Test
+  public void should_omit_hostname_verification_when_active_engine_state_is_unknown()
+      throws Exception {
+    DefaultDriverConfigReporter r =
+        reporterWith(
+            defaults(map -> {}),
+            exponentialReconnection(),
+            mock(DefaultRetryPolicy.class),
+            mock(NoSpeculativeExecutionPolicy.class),
+            loadBalancing(DefaultLoadBalancingPolicy.class),
+            clientSideGenerator(),
+            Optional.empty());
+    JsonNode report = report(r, TlsInfo.enabledWithUnknownHostnameVerification());
+    assertThat(report.get("connection").get("tls").has("hostname-verification")).isFalse();
+    assertConformsToSchema(report);
+  }
+
+  @Test
+  public void should_not_report_tls_when_the_configured_ssl_handler_was_removed() throws Exception {
+    SslEngineFactory factory = new ProgrammaticSslEngineFactory(SSLContext.getDefault());
     DefaultDriverConfigReporter r =
         reporterWith(
             defaults(map -> {}),
@@ -1445,71 +1493,32 @@ public class DefaultDriverConfigReporterTest {
             loadBalancing(DefaultLoadBalancingPolicy.class),
             clientSideGenerator(),
             Optional.of(factory));
-    JsonNode connection = report(r).get("connection");
-    // Presence of the group is what reports TLS as on: the schema dropped the "enabled" boolean.
-    assertThat(connection.has("tls")).isTrue();
-    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isTrue();
+
+    assertThat(report(r).get("connection").has("tls")).isFalse();
   }
 
   @Test
-  public void should_report_hostname_verification_from_factory_not_config_option()
-      throws Exception {
-    // Regression for the false-report bug: a ProgrammaticSslEngineFactory (as built by
-    // SessionBuilder.withSslContext(...)) does NO hostname validation by default and ignores the
-    // SSL_HOSTNAME_VALIDATION config option. The report must reflect the factory's real state
-    // (false), not the config option (true here) — otherwise it falsely claims validation is on.
-    SslEngineFactory programmatic = new ProgrammaticSslEngineFactory(SSLContext.getDefault());
+  public void should_report_tls_when_a_pipeline_hook_added_an_ssl_handler() throws Exception {
     DefaultDriverConfigReporter r =
         reporterWith(
-            defaults(map -> map.put(TypedDriverOption.SSL_HOSTNAME_VALIDATION, true)),
+            defaults(map -> {}),
             exponentialReconnection(),
             mock(DefaultRetryPolicy.class),
             mock(NoSpeculativeExecutionPolicy.class),
             loadBalancing(DefaultLoadBalancingPolicy.class),
             clientSideGenerator(),
-            Optional.of(programmatic));
-    JsonNode connection = report(r).get("connection");
-    // Presence of the group is what reports TLS as on: the schema dropped the "enabled" boolean.
-    assertThat(connection.has("tls")).isTrue();
-    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isFalse();
-  }
+            Optional.empty());
 
-  @Test
-  public void should_report_tls_enabled_for_a_custom_ssl_handler_factory() throws Exception {
-    // Overriding DefaultDriverContext.buildSslHandlerFactory() is the driver's documented low-level
-    // SSL extension point (e.g. Netty's native OpenSSL), and such an override supplies no
-    // SslEngineFactory at all. That session is still encrypted, so TLS must be read from the
-    // handler
-    // factory — the same reference ChannelFactory installs the SSL handler from — and not from
-    // getSslEngineFactory(). Host name validation is a property of the JDK SSLEngine and cannot be
-    // read on this path at all, so it is omitted rather than guessed in either direction.
-    DefaultDriverConfigReporter r =
-        reporterWith(
-            defaults(map -> map.put(TypedDriverOption.SSL_HOSTNAME_VALIDATION, true)),
-            exponentialReconnection(),
-            mock(DefaultRetryPolicy.class),
-            mock(NoSpeculativeExecutionPolicy.class),
-            loadBalancing(DefaultLoadBalancingPolicy.class),
-            clientSideGenerator(),
-            /* ssl= */ Optional.empty(),
-            Optional.of(mock(SslHandlerFactory.class)),
-            /* programmaticLocalDc= */ null);
-    JsonNode report = report(r);
-    JsonNode connection = report.get("connection");
-    // Presence of the group is what reports TLS as on: the schema dropped the "enabled" boolean.
-    assertThat(connection.has("tls")).isTrue();
-    assertThat(connection.get("tls").has("hostname-verification")).isFalse();
-    // An empty tls group is a valid document: the schema made hostname-verification optional so
-    // that "unknown" has a representation.
+    JsonNode report = report(r, TlsInfo.enabled(false));
+    JsonNode tls = report.get("connection").get("tls");
+    assertThat(tls).isNotNull();
+    assertThat(tls.get("hostname-verification").asBoolean()).isFalse();
     assertConformsToSchema(report);
   }
 
   @Test
-  public void should_omit_hostname_verification_for_an_unrecognized_engine_factory()
+  public void should_report_active_hostname_verification_for_an_unrecognized_engine_factory()
       throws Exception {
-    // The JDK path, but with a custom engine factory that is none of the driver's own, so its host
-    // name handling is unknown. Guessing false here would report a session as not checking host
-    // names when its factory may well be doing exactly that.
     SslEngineFactory unrecognized = mock(SslEngineFactory.class);
     DefaultDriverConfigReporter r =
         reporterWith(
@@ -1520,58 +1529,17 @@ public class DefaultDriverConfigReporterTest {
             loadBalancing(DefaultLoadBalancingPolicy.class),
             clientSideGenerator(),
             Optional.of(unrecognized));
-    JsonNode report = report(r);
+    JsonNode report = report(r, TlsInfo.enabled(true));
     JsonNode tls = report.get("connection").get("tls");
     assertThat(tls).isNotNull();
-    assertThat(tls.has("hostname-verification")).isFalse();
+    assertThat(tls.get("hostname-verification").asBoolean()).isTrue();
     assertConformsToSchema(report);
   }
 
   @Test
-  public void should_report_every_built_in_engine_factory() throws Exception {
-    // None of the built-ins is ever reported as unknown. Real instances rather than mocks, so that
-    // the branches are pinned to the classes the driver actually instantiates — and, for the
-    // configured one, to the whole option-to-field-to-report chain.
-    assertThat(hostnameVerificationOf(new DefaultSslEngineFactory(policyConstructionContext())))
-        .isTrue();
-    assertThat(hostnameVerificationOf(new SniSslEngineFactory(SSLContext.getDefault()))).isTrue();
-    assertThat(hostnameVerificationOf(new ProgrammaticSslEngineFactory(SSLContext.getDefault())))
-        .isFalse();
-    assertThat(
-            hostnameVerificationOf(
-                new ProgrammaticSslEngineFactory(
-                    SSLContext.getDefault(), null, /* requireHostnameValidation= */ true)))
-        .isTrue();
-  }
-
-  /** The {@code connection.tls.hostname-verification} a report built over this factory carries. */
-  private Boolean hostnameVerificationOf(SslEngineFactory factory) throws Exception {
-    DefaultDriverConfigReporter r =
-        reporterWith(
-            defaults(map -> {}),
-            exponentialReconnection(),
-            mock(DefaultRetryPolicy.class),
-            mock(NoSpeculativeExecutionPolicy.class),
-            loadBalancing(DefaultLoadBalancingPolicy.class),
-            clientSideGenerator(),
-            Optional.of(factory));
-    JsonNode verification = report(r).get("connection").get("tls").get("hostname-verification");
-    assertThat(verification).isNotNull();
-    return verification.asBoolean();
-  }
-
-  @Test
-  public void should_report_hostname_verification_from_the_engine_the_handler_actually_wraps()
+  public void should_report_active_hostname_verification_not_the_configured_factory()
       throws Exception {
-    // The configured engine factory and the one the active handler wraps can be different objects:
-    // a context that overrides buildSslHandlerFactory() may pass an engine factory of its own while
-    // advanced.ssl-engine-factory.class still names another. The report has to describe the engine
-    // that actually builds the connection's SSLEngine, so the wrapped one wins.
-    SslEngineFactory wrapped =
-        new ProgrammaticSslEngineFactory(
-            SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
-    SslEngineFactory configuredButUnused =
-        new ProgrammaticSslEngineFactory(SSLContext.getDefault());
+    SslEngineFactory configuredButUnused = mock(SslEngineFactory.class);
     DefaultDriverConfigReporter r =
         reporterWith(
             defaults(map -> {}),
@@ -1581,10 +1549,10 @@ public class DefaultDriverConfigReporterTest {
             loadBalancing(DefaultLoadBalancingPolicy.class),
             clientSideGenerator(),
             Optional.of(configuredButUnused),
-            Optional.of(new JdkSslHandlerFactory(wrapped)),
+            Optional.of(mock(SslHandlerFactory.class)),
             /* programmaticLocalDc= */ null);
-    JsonNode connection = report(r).get("connection");
-    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isTrue();
+    JsonNode connection = report(r, TlsInfo.enabled(false)).get("connection");
+    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isFalse();
   }
 
   @Test
@@ -1597,10 +1565,6 @@ public class DefaultDriverConfigReporterTest {
     // Mockito cannot have a when(...) open while another begins.
     ReconnectionPolicy reconnection = exponentialReconnection();
     TimestampGenerator timestamps = clientSideGenerator();
-    SslEngineFactory wrapped =
-        new ProgrammaticSslEngineFactory(
-            SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
-    SslHandlerFactory handlerFactory = new JdkSslHandlerFactory(wrapped);
     // Built before the stubbing chain below: the helper stubs the policy itself, and Mockito
     // rejects a nested when() inside an unfinished one.
     LoadBalancingPolicy policy = loadBalancing(DefaultLoadBalancingPolicy.class);
@@ -1616,26 +1580,19 @@ public class DefaultDriverConfigReporterTest {
         .thenReturn(mock(NoSpeculativeExecutionPolicy.class));
     when(ctx.getLoadBalancingPolicy(DriverExecutionProfile.DEFAULT_NAME)).thenReturn(policy);
     when(ctx.getTimestampGenerator()).thenReturn(timestamps);
-    when(ctx.getSslHandlerFactory()).thenReturn(Optional.of(handlerFactory));
+    when(ctx.getSslHandlerFactory()).thenThrow(new AssertionError("must not be resolved"));
     when(ctx.getSslEngineFactory())
         .thenThrow(new AssertionError("the configured engine factory must not be resolved"));
 
-    JsonNode report = MAPPER.readTree(new DefaultDriverConfigReporter(ctx).buildJson());
-    // The group is built from the wrapped engine factory alone; getSslEngineFactory() throwing
-    // proves it was never consulted.
+    JsonNode report =
+        MAPPER.readTree(new DefaultDriverConfigReporter(ctx).buildJson(TlsInfo.enabled(true)));
     assertThat(report.get("connection").get("tls").get("hostname-verification").asBoolean())
         .isTrue();
   }
 
   @Test
-  public void should_not_report_hostname_verification_from_an_unused_engine_factory()
+  public void should_not_report_hostname_verification_from_an_unused_engine_factory_as_enabled()
       throws Exception {
-    // The handler factory and the engine factory are independent: a context can override
-    // buildSslHandlerFactory() (so the pipeline gets a handler the driver knows nothing about) and
-    // still have advanced.ssl-engine-factory.class configured, leaving a fully built engine factory
-    // that nothing on the connection path ever consults. Reading it would claim host name
-    // validation the custom handler does not perform, so hostname-verification is omitted unless
-    // the handler in force is the driver's own JdkSslHandlerFactory.
     SslEngineFactory validating =
         new ProgrammaticSslEngineFactory(
             SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
@@ -1650,10 +1607,9 @@ public class DefaultDriverConfigReporterTest {
             Optional.of(validating),
             Optional.of(mock(SslHandlerFactory.class)),
             /* programmaticLocalDc= */ null);
-    JsonNode connection = report(r).get("connection");
-    // Presence of the group is what reports TLS as on: the schema dropped the "enabled" boolean.
+    JsonNode connection = report(r, TlsInfo.enabled(false)).get("connection");
     assertThat(connection.has("tls")).isTrue();
-    assertThat(connection.get("tls").has("hostname-verification")).isFalse();
+    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isFalse();
   }
 
   @Test
@@ -2595,7 +2551,11 @@ public class DefaultDriverConfigReporterTest {
   }
 
   private JsonNode report(DefaultDriverConfigReporter reporter) throws Exception {
-    return MAPPER.readTree(reporter.buildJson());
+    return report(reporter, TlsInfo.disabled());
+  }
+
+  private JsonNode report(DefaultDriverConfigReporter reporter, TlsInfo tlsInfo) throws Exception {
+    return MAPPER.readTree(reporter.buildJson(tlsInfo));
   }
 
   /** A real default execution profile with the given customizations applied. */
@@ -2639,8 +2599,8 @@ public class DefaultDriverConfigReporterTest {
       TimestampGenerator timestamps,
       Optional<SslEngineFactory> ssl,
       String programmaticLocalDc) {
-    // tls.enabled reads the low-level handler factory, which DefaultDriverContext derives from the
-    // engine factory when SSL was configured through the public API; mirror that wrapping here.
+    // DefaultDriverContext derives the low-level handler factory from the public engine factory;
+    // mirror the context shape even though the reporter now reads neither one.
     return reporterWith(
         profile,
         reconnection,

@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.channel;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,15 +38,22 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ConnectionInitException;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import com.datastax.oss.driver.api.core.ssl.ProgrammaticSslEngineFactory;
+import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.internal.core.DefaultProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.TestResponses;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverConfigReporter;
 import com.datastax.oss.driver.internal.core.context.DriverConfigReporter;
+import com.datastax.oss.driver.internal.core.context.DriverConfigReporter.TlsInfo;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
+import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
+import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.Frame;
@@ -64,6 +72,8 @@ import com.datastax.oss.protocol.internal.response.Ready;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.ssl.SslHandler;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
@@ -72,8 +82,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.slf4j.LoggerFactory;
@@ -107,7 +121,8 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
         .thenReturn(Duration.ofSeconds(30));
     when(internalDriverContext.getProtocolVersionRegistry()).thenReturn(protocolVersionRegistry);
     // The init handler consults the config reporter for the control connection; default to a no-op.
-    when(internalDriverContext.getDriverConfigReporter()).thenReturn(startupOptions -> {});
+    when(internalDriverContext.getDriverConfigReporter())
+        .thenReturn((startupOptions, tlsInfo) -> {});
 
     channel
         .pipeline()
@@ -160,17 +175,24 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
   }
 
   // Mirrors the real reporter, which only ever sees the control connection.
-  private void stubConfigReporter() {
-    when(internalDriverContext.getDriverConfigReporter())
-        .thenReturn(
-            startupOptions ->
-                startupOptions.put(
-                    DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}"));
+  private DriverConfigReporter stubConfigReporter() {
+    DriverConfigReporter reporter = mock(DriverConfigReporter.class);
+    doAnswer(
+            invocation -> {
+              invocation
+                  .<Map<String, String>>getArgument(0)
+                  .put(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}");
+              return null;
+            })
+        .when(reporter)
+        .populateControlConnectionOptions(any(), any());
+    when(internalDriverContext.getDriverConfigReporter()).thenReturn(reporter);
+    return reporter;
   }
 
   @Test
   public void should_report_driver_config_on_control_connection() {
-    stubConfigReporter();
+    DriverConfigReporter reporter = stubConfigReporter();
     channel
         .pipeline()
         .addLast(
@@ -190,6 +212,105 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     assertThat(requestFrame.message).isInstanceOf(Startup.class);
     Startup startup = (Startup) requestFrame.message;
     assertThat(startup.options).containsKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
+
+    ArgumentCaptor<TlsInfo> tlsInfo = ArgumentCaptor.forClass(TlsInfo.class);
+    verify(reporter).populateControlConnectionOptions(any(), tlsInfo.capture());
+    assertThat(tlsInfo.getValue().isEnabled()).isFalse();
+  }
+
+  @Test
+  public void should_preserve_unknown_hostname_verification_for_replacement_ssl_engine()
+      throws Exception {
+    EmbeddedChannel sslChannel = new EmbeddedChannel();
+    try {
+      SslHandler installedSslHandler = sslHandler(/* hostnameVerification= */ false);
+      sslChannel.pipeline().addLast(ChannelFactory.SSL_HANDLER_NAME, installedSslHandler);
+      sslChannel
+          .pipeline()
+          .replace(
+              ChannelFactory.SSL_HANDLER_NAME,
+              ChannelFactory.SSL_HANDLER_NAME,
+              sslHandler(/* hostnameVerification= */ true));
+
+      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel, installedSslHandler, true);
+      assertThat(tlsInfo.isEnabled()).isTrue();
+      assertThat(tlsInfo.getHostnameVerification()).isEmpty();
+    } finally {
+      sslChannel.finishAndReleaseAll();
+    }
+  }
+
+  @Test
+  public void should_report_hostname_verification_for_recognized_installed_ssl_engine()
+      throws Exception {
+    EmbeddedChannel sslChannel = new EmbeddedChannel();
+    try {
+      SslHandler installedSslHandler = sslHandler(/* hostnameVerification= */ true);
+      sslChannel.pipeline().addLast(ChannelFactory.SSL_HANDLER_NAME, installedSslHandler);
+
+      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel, installedSslHandler, true);
+      assertThat(tlsInfo.isEnabled()).isTrue();
+      assertThat(tlsInfo.getHostnameVerification()).contains(true);
+    } finally {
+      sslChannel.finishAndReleaseAll();
+    }
+  }
+
+  @Test
+  public void should_preserve_unknown_hostname_verification_for_custom_engine_factory()
+      throws Exception {
+    EmbeddedChannel sslChannel = new EmbeddedChannel();
+    try {
+      SslHandler installedSslHandler = sslHandler(/* hostnameVerification= */ true);
+      sslChannel.pipeline().addLast(ChannelFactory.SSL_HANDLER_NAME, installedSslHandler);
+
+      TlsInfo tlsInfo = ProtocolInitHandler.tlsInfo(sslChannel, installedSslHandler, false);
+      assertThat(tlsInfo.isEnabled()).isTrue();
+      assertThat(tlsInfo.getHostnameVerification()).isEmpty();
+    } finally {
+      sslChannel.finishAndReleaseAll();
+    }
+  }
+
+  @Test
+  public void should_recognize_only_driver_owned_jdk_ssl_factories() throws Exception {
+    DriverContext driverContext = mock(DriverContext.class);
+    DriverConfig driverConfig = mock(DriverConfig.class);
+    DriverExecutionProfile profile = mock(DriverExecutionProfile.class);
+    when(driverContext.getConfig()).thenReturn(driverConfig);
+    when(driverConfig.getDefaultProfile()).thenReturn(profile);
+
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                new JdkSslHandlerFactory(new DefaultSslEngineFactory(driverContext))))
+        .isTrue();
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                new JdkSslHandlerFactory(mock(SslEngineFactory.class))))
+        .isFalse();
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                mock(SslHandlerFactory.class)))
+        .isFalse();
+  }
+
+  @Test
+  public void should_not_assume_programmatic_ssl_context_has_known_hostname_validator()
+      throws Exception {
+    assertThat(
+            ProtocolInitHandler.hasKnownHostnameVerificationSemantics(
+                new JdkSslHandlerFactory(
+                    new ProgrammaticSslEngineFactory(SSLContext.getDefault()))))
+        .isFalse();
+  }
+
+  private static SslHandler sslHandler(boolean hostnameVerification) throws Exception {
+    SSLEngine engine = SSLContext.getDefault().createSSLEngine();
+    engine.setUseClientMode(true);
+    SSLParameters parameters = engine.getSSLParameters();
+    parameters.setEndpointIdentificationAlgorithm(hostnameVerification ? "HTTPS" : null);
+    engine.setSSLParameters(parameters);
+    return new SslHandler(engine, true);
   }
 
   @Test
@@ -216,7 +337,7 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     assertThat(requestFrame.message).isInstanceOf(Startup.class);
     Startup startup = (Startup) requestFrame.message;
     assertThat(startup.options).doesNotContainKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
-    verify(reporter, never()).populateControlConnectionOptions(any());
+    verify(reporter, never()).populateControlConnectionOptions(any(), any());
   }
 
   @Test
