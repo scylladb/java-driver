@@ -60,18 +60,31 @@ matches none of the classes.
 an error rather than a silent "off", because a run that quietly skipped the agent only shows up
 much later, when `make coverage-report` finds nothing to aggregate.
 
-In CI, the unit and integration jobs in `tests@v1.yml` run with `COVERAGE=true` and upload their
+In CI, the unit and integration lanes in `tests@v1.yml` run with `COVERAGE=true` and upload their
 execution data; the "Coverage report" job aggregates it and writes both the lanes it actually
 received data from and the resulting percentage to its job summary, then attaches the HTML report
 as an artifact. That job is `continue-on-error`, so a flaky integration test costs the metric some
 data rather than adding a second failure to the pull request. Collecting from the existing lanes
 rather than a dedicated workflow keeps the Scylla suite from being run twice.
 
-JaCoCo matches execution data to classes by checksum, so the data has to come from the same build
-of the classes the report is rendered against. When they diverge it only warns and drops that
-class's data, leaving a report that renders happily and reads low, so `make coverage-report` greps
+Only the lanes on `COVERAGE_JAVA_VERSION` (a workflow-level variable, JDK 17) are instrumented.
+javac 11 and javac 17 do not emit the same bytes for the same source even under `--release 11` --
+they order the constant pool differently -- so the class ids differ, and a report rendered against
+one compiler's classes cannot see the other's execution data. Instrumenting the JDK 11 lanes would
+not have added anything to the number; it would only have slowed them down. Each lane records the
+JDK it ran on alongside its execution data and the aggregating job refuses anything that does not
+match its own, so a future matrix change cannot quietly reintroduce the mismatch.
+
+JaCoCo matches execution data to classes by an id derived from the compiled bytes, so the data has
+to come from the same build of the classes the report is rendered against. When they diverge it
+drops that class's data and the report renders happily, just short, so `make coverage-report` greps
 its own Maven log for `Execution data for class ... does not match` and fails on it. The usual
 cause is stale execution data from before a recompile, which `make clean-coverage` clears.
+
+That warning only covers the case where JaCoCo finds no data at all under a class's id. When two
+builds of the same class are represented -- one matching, one not -- the matching one wins and the
+other is dropped in silence, which is why the JDK the data was recorded on is checked separately
+rather than left to the warning.
 
 Note: the surefire/failsafe configs in `core` and `integration-tests` previously set `<argLine>` to
 just their own JVM flags (e.g. `${mockitoopens.argline}`), which silently discarded the
