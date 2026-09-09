@@ -61,7 +61,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Queue;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -499,6 +498,34 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                                           node,
                                           new Exception("Channel closed during endpoint resolve")));
                                   connect(nodes, newErrors, onSuccess, onFailure);
+                                } else if (isUnusableForControl(resolvedNode)) {
+                                  // Events name the identified node, not the placeholder we
+                                  // dialled, so isControlNode() cannot match them without a
+                                  // blocking endpoint lookup. Re-checked here instead.
+                                  controlNodeState = ControlNodeState.NONE;
+                                  LOG.debug(
+                                      "[{}] New channel opened ({}) but {} is ignored, removed "
+                                          + "or forced down, closing and trying next node",
+                                      logPrefix,
+                                      channel,
+                                      resolvedNode);
+                                  // Null out before forceClose() so that onChannelClosed() does not
+                                  // start a redundant reconnection on top of the connect() retry
+                                  // below.
+                                  ControlConnection.this.channel = null;
+                                  channel.forceClose();
+                                  // Recorded like every other drop; on init this list is what the
+                                  // user sees. A reconnection discards it, leaving the debug log.
+                                  List<Entry<Node, Throwable>> newErrors =
+                                      (errors == null) ? new ArrayList<>() : errors;
+                                  newErrors.add(
+                                      new SimpleEntry<>(
+                                          node,
+                                          new Exception(
+                                              "Control node "
+                                                  + resolvedNode
+                                                  + " is ignored, removed or forced down")));
+                                  connect(nodes, newErrors, onSuccess, onFailure);
                                 } else {
                                   controlNodeState = new ControlNodeState(resolvedNode, null);
                                   context
@@ -687,12 +714,32 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           && eventNode.getHostId().equals(state.current.getHostId())) {
         return true;
       }
-      if (state.current == null
-          && state.pending != null
-          && Objects.equals(eventNode.getEndPoint(), state.pending.getEndPoint())) {
-        return true;
-      }
-      return false;
+      // Reference identity, not endpoint equality: with unresolved contact points in the plan,
+      // DefaultEndPoint.equals resolves the unresolved side of a mixed pair -- a blocking lookup on
+      // this admin executor, during the DNS outage the fallback exists for. An event naming the
+      // metadata node for a host still being identified cannot match here at all; connect()
+      // re-checks that node with isUnusableForControl() once the resolve completes.
+      return state.current == null && state.pending != null && eventNode == state.pending;
+    }
+
+    /**
+     * Whether an event has already marked this node unusable for the control connection: ignored by
+     * the load balancing policy, or removed or forced down.
+     *
+     * <p>{@link #connect} runs the same checks on the node it dialled, before adopting the channel;
+     * this one runs a turn later, on the node that channel was identified as.
+     *
+     * <p>Keyed by node instance, so it cannot see a node {@code MetadataManager#registerNode}
+     * minted fresh for an unknown host id: that host is resurrected, not rejected. Detecting it
+     * would need a removal record keyed by host id -- rejecting host ids absent from the metadata
+     * would also reject the new nodes of a cluster that moved, which is what the fallback exists to
+     * recover.
+     */
+    private boolean isUnusableForControl(Node node) {
+      NodeState state = lastNodeState.get(node);
+      return lastNodeDistance.get(node) == NodeDistance.IGNORED
+          || (lastNodeState.containsKey(node)
+              && (state == null /*(removed)*/ || state == NodeState.FORCED_DOWN));
     }
 
     private void onDistanceEvent(DistanceEvent event) {

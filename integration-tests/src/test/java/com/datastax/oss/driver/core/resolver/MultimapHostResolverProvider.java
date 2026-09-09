@@ -29,4 +29,13 @@ public class MultimapHostResolverProvider {
     }
     resolver.removeHost(hostname);
   }
+
+  /**
+   * Drops what the JVM has cached from previous lookups, so that the next lookup of a re-pointed
+   * hostname reaches the resolver instead of being served the old answer for {@code
+   * networkaddress.cache.ttl}.
+   */
+  public static synchronized void clearJvmCache() {
+    HostResolutionRequestInterceptor.INSTANCE.clearCache();
+  }
 }

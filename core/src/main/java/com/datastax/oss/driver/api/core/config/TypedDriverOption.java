@@ -600,7 +600,13 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_AGREEMENT_WARN =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, GenericType.BOOLEAN);
-  /** Whether to forcibly try original contacts if no live nodes are available */
+  /**
+   * Whether to append the original contact points to the control connection's reconnection plan,
+   * after the live nodes reported by the load balancing policy (defaults to {@code true}).
+   *
+   * <p>A contact point given as a hostname is kept unresolved and looked up again on each connect,
+   * so this is how the driver picks up changed DNS records once the live nodes are exhausted.
+   */
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, GenericType.BOOLEAN);

@@ -39,6 +39,8 @@ import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultProgrammaticDriverConfigLoaderBuilder;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -47,6 +49,8 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
@@ -59,6 +63,26 @@ public class MockResolverIT {
 
   private static final int CLUSTER_WAIT_SECONDS =
       20; // Maximal wait time for cluster nodes to get up
+
+  /**
+   * Generous: a lookup racing the re-point can re-cache the dead addresses for one {@code
+   * networkaddress.cache.ttl}, and each round first fails on the previous cluster's nodes.
+   */
+  private static final int RECOVERY_WAIT_SECONDS = 120;
+
+  /** Bounds the driver noticing only: {@code decommission} already blocked on nodetool. */
+  private static final int DECOMMISSION_WAIT_SECONDS = 120;
+
+  /**
+   * Resolver entries and the JVM's cache of them are process-global and shared by every test here,
+   * so a name one test re-points must not be served to the next.
+   */
+  @Before
+  @After
+  public void clearResolverState() {
+    MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+    MultimapHostResolverProvider.clearJvmCache();
+  }
 
   private static void waitForAllNodesUp(CqlSession session, int expectedNodes) {
     Awaitility.await()
@@ -190,6 +214,195 @@ public class MockResolverIT {
       }
     }
     session.close();
+  }
+
+  @Test
+  public void should_recover_when_the_cluster_moves_to_new_addresses() {
+    // replace_cluster_test brings the cluster back on the same addresses, so only the contact-point
+    // fallback can show a session finding one that came back on *different* ones.
+    // Four nodes, not three: Cassandra 4 refuses to decommission below system_distributed's
+    // replication factor of 3. RemovedNodeIT sizes its cluster the same way.
+    final int initialNodes = 4;
+    final int movedNodes = 3;
+    DriverConfigLoader loader =
+        new DefaultProgrammaticDriverConfigLoaderBuilder()
+            // Pinned like every other test here: the fallback only re-resolves a contact point
+            // kept unresolved. Leaving the fallback's own default alone is deliberate.
+            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
+            .withBoolean(TypedDriverOption.RECONNECT_ON_INIT.getRawOption(), true)
+            .withDuration(
+                TypedDriverOption.RECONNECTION_BASE_DELAY.getRawOption(), Duration.ofSeconds(1))
+            .withDuration(
+                TypedDriverOption.RECONNECTION_MAX_DELAY.getRawOption(), Duration.ofSeconds(1))
+            .withDuration(
+                TypedDriverOption.CONNECTION_CONNECT_TIMEOUT.getRawOption(), Duration.ofSeconds(2))
+            .withStringList(
+                TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                Collections.singletonList("test.cluster.fake:9042"))
+            .build();
+    CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
+    CqlSession session = null;
+
+    try {
+      try (CcmBridge ccmBridge =
+          CcmBridge.builder().withNodes(initialNodes).withIpPrefix("127.0.1.").build()) {
+        pointContactPointAt(ccmBridge, initialNodes);
+        ccmBridge.create();
+        ccmBridge.start();
+        session = builder.build();
+        waitForAllNodesUp(session, initialNodes);
+        assertThat(nodesOnPrefix(session, "127.0.1.")).hasSize(initialNodes);
+        // The loader leaves the fallback at its default on purpose; assert it, or a flipped
+        // default would surface as a bare Awaitility timeout below.
+        assertThat(
+                session
+                    .getContext()
+                    .getConfig()
+                    .getDefaultProfile()
+                    .getBoolean(
+                        TypedDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS
+                            .getRawOption()))
+            .isTrue();
+
+        // The node reached through the contact point keeps re-resolving that name in its pool, so
+        // left in place it would find the new cluster by itself and this test would pass with the
+        // fallback off. Decommission rather than stop it: a stopped node stays in the metadata.
+        Node hostnameNode = theNodeNamingTheContactPoint(session);
+        ccmBridge.decommission(ccmNodeIndexOf(ccmBridge, hostnameNode, initialNodes));
+        awaitRemovalOfContactPointNode(session, initialNodes - 1);
+      }
+      // Re-point the name and drop the JVM's cached answers before the new cluster exists, or the
+      // fallback is served the dead addresses for one networkaddress.cache.ttl.
+      try (CcmBridge ccmBridge =
+          CcmBridge.builder().withNodes(movedNodes).withIpPrefix("127.0.2.").build()) {
+        pointContactPointAt(ccmBridge, movedNodes);
+        MultimapHostResolverProvider.clearJvmCache();
+        ccmBridge.create();
+        ccmBridge.start();
+        awaitAllNodesUpOnPrefix(session, "127.0.2.", movedNodes);
+        // The point of the test: the session followed the name and let go of the old cluster.
+        Collection<Node> nodes = session.getMetadata().getNodes().values();
+        assertThat(nodesOnPrefix(session, "127.0.1.")).isEmpty();
+        // The fallback's signature: the node it reached is registered under the name, and only it.
+        assertThat(nodesNamingTheContactPoint(nodes)).hasSize(1);
+        ResultSet rs = session.execute("select * from system.local where key='local'");
+        assertThat(rs.one()).isNotNull();
+      }
+    } finally {
+      // A failure must not leave this session reconnecting against torn-down clusters.
+      if (session != null) {
+        session.close();
+      }
+    }
+  }
+
+  private static void pointContactPointAt(CcmBridge ccmBridge, int numberOfNodes) {
+    MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+    for (int i = 1; i <= numberOfNodes; i++) {
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(i));
+    }
+  }
+
+  /** The one metadata node registered under the contact point's name; fails if there is not one. */
+  private static Node theNodeNamingTheContactPoint(CqlSession session) {
+    Set<Node> named = nodesNamingTheContactPoint(session.getMetadata().getNodes().values());
+    assertThat(named).hasSize(1);
+    return named.iterator().next();
+  }
+
+  /**
+   * The CCM index of the node {@code node} was identified as, by its broadcast RPC address: its own
+   * endpoint is the contact point's unresolved name.
+   */
+  private static int ccmNodeIndexOf(CcmBridge ccmBridge, Node node, int numberOfNodes) {
+    InetSocketAddress rpcAddress =
+        node.getBroadcastRpcAddress()
+            .orElseThrow(() -> new AssertionError("No broadcast RPC address recorded for " + node));
+    String ip = rpcAddress.getAddress().getHostAddress();
+    for (int i = 1; i <= numberOfNodes; i++) {
+      if (ip.equals(ccmBridge.getNodeIpAddress(i))) {
+        return i;
+      }
+    }
+    throw new AssertionError(node + " (rpc " + ip + ") is not one of the CCM nodes");
+  }
+
+  /**
+   * Waits until the decommissioned node has left the metadata and no remaining node is registered
+   * under the contact point's name.
+   */
+  private static void awaitRemovalOfContactPointNode(CqlSession session, int expectedNodes) {
+    Awaitility.await()
+        .atMost(DECOMMISSION_WAIT_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Collection<Node> nodes = session.getMetadata().getNodes().values();
+              assertThat(nodes).hasSize(expectedNodes);
+              assertThat(nodesNamingTheContactPoint(nodes)).isEmpty();
+            });
+  }
+
+  /** Waits until every node the session knows sits on {@code ipPrefix} and is up. */
+  private static void awaitAllNodesUpOnPrefix(
+      CqlSession session, String ipPrefix, int numberOfNodes) {
+    Awaitility.await()
+        .atMost(RECOVERY_WAIT_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(1, TimeUnit.SECONDS)
+        // untilAsserted so a timeout names the condition that failed. Up-ness is counted on the
+        // prefix, the total across the metadata: the old cluster leaving is part of the wait.
+        .untilAsserted(
+            () -> {
+              Set<Node> onPrefix = nodesOnPrefix(session, ipPrefix);
+              assertThat(onPrefix).hasSize(numberOfNodes);
+              assertThat(upNodes(onPrefix)).hasSize(numberOfNodes);
+              assertThat(session.getMetadata().getNodes()).hasSize(numberOfNodes);
+            });
+  }
+
+  /**
+   * The metadata nodes sitting in {@code ipPrefix}. The node reached through the contact point
+   * holds the unresolved name, so its broadcast RPC address says where it is.
+   */
+  private static Set<Node> nodesOnPrefix(CqlSession session, String ipPrefix) {
+    return session.getMetadata().getNodes().values().stream()
+        .filter(
+            node -> {
+              String ip = hostAddressOf(node);
+              return ip != null && ip.startsWith(ipPrefix);
+            })
+        .collect(Collectors.toSet());
+  }
+
+  private static Set<Node> upNodes(Set<Node> nodes) {
+    return nodes.stream().filter(n -> n.getUpSinceMillis() > 0).collect(Collectors.toSet());
+  }
+
+  /**
+   * The IP a node sits at: its endpoint's address when resolved, else its broadcast RPC address,
+   * else {@code null}.
+   */
+  private static String hostAddressOf(Node node) {
+    SocketAddress resolved = node.getEndPoint().resolve();
+    if (resolved instanceof InetSocketAddress && !((InetSocketAddress) resolved).isUnresolved()) {
+      return ((InetSocketAddress) resolved).getAddress().getHostAddress();
+    }
+    return node.getBroadcastRpcAddress()
+        .map(address -> address.getAddress().getHostAddress())
+        .orElse(null);
+  }
+
+  /** The nodes whose endpoint carries the contact-point name as its host string. */
+  private static Set<Node> nodesNamingTheContactPoint(Collection<Node> nodes) {
+    return nodes.stream()
+        .filter(
+            node -> {
+              SocketAddress resolved = node.getEndPoint().resolve();
+              return resolved instanceof InetSocketAddress
+                  && "test.cluster.fake".equals(((InetSocketAddress) resolved).getHostString());
+            })
+        .collect(Collectors.toSet());
   }
 
   @SuppressWarnings("unused")
