@@ -93,7 +93,8 @@ public class BasicLoadBalancingPolicyInitTest extends LoadBalancingPolicyTestBas
 
     // Then
     assertThat(policy.getLocalDatacenter()).isNull();
-    // should not warn about contact points not being in the same DC
+    // no local DC is configured, so discoverLocalDc() returns empty before it checks any
+    // node's datacenter
     verify(appender, never()).doAppend(loggingEventCaptor.capture());
   }
 

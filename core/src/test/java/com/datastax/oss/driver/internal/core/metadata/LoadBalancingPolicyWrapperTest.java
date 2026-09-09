@@ -21,6 +21,7 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -33,17 +34,17 @@ import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy.DistanceReporter;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
-import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
+import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
-import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
@@ -108,7 +109,9 @@ public class LoadBalancingPolicyWrapperTest {
     when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
         .thenReturn(false);
 
-    defaultPolicyQueryPlan = Lists.newLinkedList(ImmutableList.of(node3, node2, node1));
+    // A real built-in QueryPlan, not a mutable LinkedList: its add()/addAll() throw, so the
+    // control-reconnection plan must compose rather than mutate it.
+    defaultPolicyQueryPlan = new SimpleQueryPlan(node3, node2, node1);
     when(policy1.newQueryPlan(null, null)).thenReturn(defaultPolicyQueryPlan);
 
     eventBus = spy(new EventBus("test"));
@@ -161,29 +164,29 @@ public class LoadBalancingPolicyWrapperTest {
     }
 
     // When
-    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+    Queue<Node> queryPlan = wrapper.newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
 
     // Then
-    // no-arg newQueryPlan() uses the default profile
     verify(policy1).newQueryPlan(null, null);
-    assertThat(queryPlan).isEqualTo(defaultPolicyQueryPlan);
+    assertThat(queryPlan).isSameAs(defaultPolicyQueryPlan);
   }
 
   @Test
   public void should_fetch_control_connection_query_plan_from_policy_after_init() {
     // Given
+    // the reconnect-contact-points flag defaults to false in the test setup (see @Before)
     wrapper.init();
     for (LoadBalancingPolicy policy : ImmutableList.of(policy1, policy2, policy3)) {
       verify(policy).init(anyMap(), any(DistanceReporter.class));
     }
 
     // When
-    Queue<Node> queryPlan = wrapper.newQueryPlan(null, DriverExecutionProfile.DEFAULT_NAME, null);
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
 
     // Then
-    // no-arg newQueryPlan() uses the default profile
+    // the policy's own plan is returned as is; nothing is appended or wrapped
     verify(policy1).newQueryPlan(null, null);
-    assertThat(queryPlan).isEqualTo(defaultPolicyQueryPlan);
+    assertThat(queryPlan).isSameAs(defaultPolicyQueryPlan);
   }
 
   @Test
@@ -204,17 +207,9 @@ public class LoadBalancingPolicyWrapperTest {
     assertThat(queryPlan.poll()).isEqualTo(node3);
     assertThat(queryPlan.poll()).isEqualTo(node2);
     assertThat(queryPlan.poll()).isEqualTo(node1);
-    // Remaining nodes are contact points appended at the end.
-    // They are new DefaultNode instances created via newContactPoint, so compare by endpoint.
-    Set<EndPoint> remainingEndpoints = new java.util.HashSet<>();
-    for (Node n : queryPlan) {
-      remainingEndpoints.add(n.getEndPoint());
-    }
-    Set<EndPoint> contactEndpoints = new java.util.HashSet<>();
-    for (DefaultNode n : contactPoints) {
-      contactEndpoints.add(n.getEndPoint());
-    }
-    assertThat(remainingEndpoints).isEqualTo(contactEndpoints);
+    // Remaining nodes are the retained contact-point instances appended at the end. DefaultNode
+    // does not override equals, so this is an identity check.
+    assertThat(queryPlan).containsExactlyInAnyOrderElementsOf(contactPoints);
   }
 
   @Test
@@ -223,24 +218,54 @@ public class LoadBalancingPolicyWrapperTest {
     when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
         .thenReturn(true);
     wrapper.init();
-    // Make the policy return an empty query plan
-    when(policy1.newQueryPlan(null, null)).thenReturn(Lists.newLinkedList(ImmutableList.of()));
+    // Make the policy return an empty query plan (QueryPlan.EMPTY, as the real policies do)
+    when(policy1.newQueryPlan(null, null)).thenReturn(QueryPlan.EMPTY);
 
     // When
     Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
 
     // Then
-    // Should get the contact points (compare by endpoint since they are new instances)
-    assertThat(queryPlan.size()).isEqualTo(contactPoints.size());
-    Set<EndPoint> resultEndpoints = new java.util.HashSet<>();
-    for (Node n : queryPlan) {
-      resultEndpoints.add(n.getEndPoint());
-    }
-    Set<EndPoint> contactEndpoints = new java.util.HashSet<>();
-    for (DefaultNode n : contactPoints) {
-      contactEndpoints.add(n.getEndPoint());
-    }
-    assertThat(resultEndpoints).isEqualTo(contactEndpoints);
+    // Should get the retained contact-point instances themselves.
+    assertThat(queryPlan).containsExactlyInAnyOrderElementsOf(contactPoints);
+  }
+
+  @Test
+  public void should_reuse_the_retained_contact_point_nodes_rather_than_minting_copies() {
+    // Given
+    when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
+        .thenReturn(true);
+    wrapper.init();
+    when(policy1.newQueryPlan(null, null)).thenReturn(QueryPlan.EMPTY);
+
+    // When — two rounds, as a reconnection sequence would produce.
+    Queue<Node> firstPlan = wrapper.newControlReconnectionQueryPlan();
+    Queue<Node> secondPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then — both plans hand out the very objects MetadataManager retains, not per-plan copies, so
+    // a contact point keeps one identity across reconnection rounds. DefaultNode does not override
+    // equals, so these are identity checks.
+    assertThat(firstPlan).containsExactlyInAnyOrder(node1, node2);
+    assertThat(secondPlan).containsExactlyInAnyOrder(node1, node2);
+  }
+
+  @Test
+  public void should_not_duplicate_contact_points_before_init() {
+    // Given — the flag is on, but the wrapper is not init()-ed yet (BEFORE_INIT), so newQueryPlan()
+    // already builds the plan from the contact points; appending them again would duplicate every
+    // entry. Lenient: the flag is never read before RUNNING, so on the fixed code this stub goes
+    // deliberately unused.
+    lenient()
+        .when(
+            defaultProfile.getBoolean(
+                DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
+        .thenReturn(true);
+
+    // When
+    Queue<Node> queryPlan = wrapper.newControlReconnectionQueryPlan();
+
+    // Then — the contact points are read once and appear once.
+    verify(metadataManager, times(1)).getContactPoints();
+    assertThat(queryPlan).containsExactlyInAnyOrder(node1, node2);
   }
 
   @Test

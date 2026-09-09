@@ -26,7 +26,6 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -68,73 +67,34 @@ public class OptionalLocalDcHelper implements LocalDcHelper {
   @Override
   @NonNull
   public Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {
-    String localDcStr = context.getLocalDatacenter(profile.getName());
-    Optional<String> localDc;
-    if (localDcStr != null) {
-      LOG.debug("[{}] Local DC set programmatically: {}", logPrefix, localDcStr);
-      localDc = Optional.of(localDcStr);
+    String localDc = context.getLocalDatacenter(profile.getName());
+    if (localDc != null) {
+      LOG.debug("[{}] Local DC set programmatically: {}", logPrefix, localDc);
     } else if (profile.isDefined(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER)) {
-      localDcStr = profile.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER);
-      LOG.debug("[{}] Local DC set from configuration: {}", logPrefix, localDcStr);
-      localDc = Optional.of(localDcStr);
-    } else {
-      localDc = Optional.empty();
-    }
-    if (localDc.isPresent()) {
-      checkLocalDatacenterCompatibility(
-          localDc.get(), context.getMetadataManager().getContactPoints());
-      // Also warn if the configured DC doesn't match any node in the cluster
-      if (!nodes.isEmpty()) {
-        boolean found = false;
-        for (Node node : nodes.values()) {
-          if (localDc.get().equals(node.getDatacenter())) {
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          LOG.warn(
-              "[{}] Configured local DC '{}' does not match any node's datacenter"
-                  + " (available DCs: {}); please verify your configuration",
-              logPrefix,
-              localDc.get(),
-              formatDcs(nodes.values()));
-        }
-      }
+      localDc = profile.getString(DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER);
+      LOG.debug("[{}] Local DC set from configuration: {}", logPrefix, localDc);
     } else {
       LOG.debug("[{}] Local DC not set, DC awareness will be disabled", logPrefix);
+      return Optional.empty();
     }
-    return localDc;
-  }
-
-  /**
-   * Checks if the contact points are compatible with the local datacenter specified either through
-   * configuration, or programmatically.
-   *
-   * <p>The default implementation logs a warning when a contact point reports a datacenter
-   * different from the local one, and only for the default profile.
-   *
-   * @param localDc The local datacenter, as specified in the config, or programmatically.
-   * @param contactPoints The contact points provided when creating the session.
-   */
-  protected void checkLocalDatacenterCompatibility(
-      @NonNull String localDc, Set<? extends Node> contactPoints) {
-    if (profile.getName().equals(DriverExecutionProfile.DEFAULT_NAME)) {
-      Set<Node> badContactPoints = new LinkedHashSet<>();
-      for (Node node : contactPoints) {
-        if (!Objects.equals(localDc, node.getDatacenter())) {
-          badContactPoints.add(node);
+    if (!nodes.isEmpty()) {
+      boolean found = false;
+      for (Node node : nodes.values()) {
+        if (localDc.equals(node.getDatacenter())) {
+          found = true;
+          break;
         }
       }
-      if (!badContactPoints.isEmpty()) {
+      if (!found) {
         LOG.warn(
-            "[{}] You specified {} as the local DC, but some contact points are from a different DC: {}; "
-                + "please provide the correct local DC, or check your contact points",
+            "[{}] Configured local DC '{}' does not match any node's datacenter"
+                + " (available DCs: {}); please verify your configuration",
             logPrefix,
             localDc,
-            formatNodesAndDcs(badContactPoints));
+            formatDcs(nodes.values()));
       }
     }
+    return Optional.of(localDc);
   }
 
   /**

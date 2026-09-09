@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -29,9 +30,13 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
+import com.datastax.oss.driver.internal.core.loadbalancing.helper.OptionalLocalDcHelper;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import java.net.InetSocketAddress;
 import java.util.UUID;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -208,6 +213,39 @@ public class DefaultLoadBalancingPolicyInitTest extends LoadBalancingPolicyTestB
                 .anyMatch(
                     e -> e.getFormattedMessage().contains("does not match any node's datacenter")))
         .isTrue();
+  }
+
+  @Test
+  public void should_not_warn_about_dc_mismatch_when_the_only_real_node_matches_configured_dc() {
+    // Given — CUSTOMER-588. Until the first node refresh, a contact point is represented by an
+    // ephemeral placeholder Node (MetadataManager#addContactPoints via
+    // DefaultNode#newContactPoint) whose datacenter is always null: the refresh keys nodes by
+    // host_id and never reuses these objects. The removed
+    // OptionalLocalDcHelper#checkLocalDatacenterCompatibility compared the configured local DC
+    // against *those* placeholders, so it warned whenever a local DC was configured, wherever the
+    // contact points actually were. The stub below is what makes this test fail against the
+    // pristine helper, so keep it even though the fixed code never reads it.
+    DefaultNode ephemeralContactPointNode =
+        DefaultNode.newContactPoint(
+            new DefaultEndPoint(new InetSocketAddress("127.0.0.9", 9042)), context);
+    when(metadataManager.getContactPoints()).thenReturn(ImmutableSet.of(ephemeralContactPointNode));
+    DefaultLoadBalancingPolicy policy = createPolicy();
+
+    // When
+    policy.init(ImmutableMap.of(UUID.randomUUID(), node1), distanceReporter);
+
+    // Then — DC discovery must not consult contact points at all; node1, the only node carrying
+    // real metadata, is in the configured DC ("dc1", per base setup). Asserting on the absence of
+    // any WARN from the helper, rather than on one message, also catches the false positive coming
+    // back under different wording.
+    verify(metadataManager, never()).getContactPoints();
+    verify(appender, never())
+        .doAppend(
+            argThat(
+                event ->
+                    event.getLevel() == Level.WARN
+                        && event.getLoggerName().equals(OptionalLocalDcHelper.class.getName())));
+    assertThat(policy.getLocalDatacenter()).isEqualTo("dc1");
   }
 
   @NonNull
