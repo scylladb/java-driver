@@ -30,7 +30,10 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  *
  * @see ReactiveGraphSession
  * @see ReactiveGraphResultSet
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface ReactiveGraphNode extends GraphNode {
 
   /**

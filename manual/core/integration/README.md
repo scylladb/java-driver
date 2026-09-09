@@ -538,45 +538,6 @@ In the dependency specification above you should use any 1.2.x version of Esri (
 1.2.1).  These versions are older than the current 2.x versions of the library but they are
 guaranteed to be fully compatible with DSE.
 
-#### TinkerPop
-
-[Apache TinkerPop™](http://tinkerpop.apache.org/) is used in the graph API.
-
-For driver versions ranging from 4.4.0 to 4.9.0 inclusive, TinkerPop is declared as a required
-dependency, but the driver can operate normally without it. If you don't use the graph API at all,
-you can exclude the TinkerPop dependencies:
-
-```xml
-<dependency>
-  <groupId>com.scylladb</groupId>
-  <artifactId>java-driver-core</artifactId>
-  <version>${driver.version}</version>
-  <exclusions>
-    <exclusion>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>*</artifactId>
-    </exclusion>
-  </exclusions>
-</dependency>
-```
-
-Starting with driver 4.10 however, TinkerPop switched to an optional dependency. Excluding TinkerPop
-explicitly is not required anymore if you don't use it. _If you do use the graph API though, you now
-need to explicitly include the dependencies below in your application_:
-
-```xml
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>gremlin-core</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>tinkergraph-gremlin</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-```
-
 #### Reactive Streams
 
 [Reactive Streams](https://www.reactive-streams.org/) types are referenced in our [reactive

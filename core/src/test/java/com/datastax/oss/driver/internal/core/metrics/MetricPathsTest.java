@@ -15,21 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.api.core.metrics;
+package com.datastax.oss.driver.internal.core.metrics;
 
-import com.datastax.oss.driver.api.core.session.Session;
-import edu.umd.cs.findbugs.annotations.NonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * A node-level metric exposed through {@link Session#getMetrics()}.
- *
- * <p>All metrics exposed out of the box by the driver are instances of {@link DefaultNodeMetric}
- * (this interface only exists to allow custom metrics in driver extensions).
- *
- * @see SessionMetric
- */
-public interface NodeMetric {
+import java.util.Arrays;
+import java.util.Collections;
+import org.junit.Test;
 
-  @NonNull
-  String getPath();
+public class MetricPathsTest {
+
+  @Test
+  public void should_ignore_deprecated_graph_metrics() {
+    assertThat(
+            MetricPaths.parseSessionMetricPaths(
+                Arrays.asList("graph-requests", "graph-client-timeouts"), "test"))
+        .isEmpty();
+    assertThat(
+            MetricPaths.parseNodeMetricPaths(Collections.singletonList("graph-messages"), "test"))
+        .isEmpty();
+  }
 }

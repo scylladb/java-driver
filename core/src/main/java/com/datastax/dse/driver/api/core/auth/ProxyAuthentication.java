@@ -18,6 +18,7 @@
 package com.datastax.dse.driver.api.core.auth;
 
 import com.datastax.dse.driver.api.core.graph.GraphStatement;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
@@ -52,16 +53,13 @@ public class ProxyAuthentication {
         addProxyExecuteEntry(statement.getCustomPayload(), userOrRole));
   }
 
-  /**
-   * Adds proxy authentication information to a graph statement.
-   *
-   * @see #executeAs(String, Statement)
-   */
+  /** @deprecated DSE Graph is no longer supported. */
+  @Deprecated
+  @SuppressWarnings("DoNotCallSuggester")
   @NonNull
   public static <StatementT extends GraphStatement<StatementT>> StatementT executeAs(
       @NonNull String userOrRole, @NonNull StatementT statement) {
-    return statement.setCustomPayload(
-        addProxyExecuteEntry(statement.getCustomPayload(), userOrRole));
+    throw GraphSupportRemoved.exception();
   }
 
   private static Map<String, ByteBuffer> addProxyExecuteEntry(

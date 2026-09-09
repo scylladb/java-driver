@@ -35,7 +35,10 @@ import org.apache.tinkerpop.gremlin.process.remote.RemoteConnection;
  * }</pre>
  *
  * @see CqlSession
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface DseGraphRemoteConnectionBuilder {
 
   /** Build the remote connection that was configured with this builder. */

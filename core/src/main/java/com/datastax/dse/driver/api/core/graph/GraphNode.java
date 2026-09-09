@@ -44,7 +44,11 @@ import org.apache.tinkerpop.gremlin.structure.VertexProperty;
  * to cast it to a particular Java type. Two generic methods {@link #as(Class)} and {@link
  * #as(GenericType)} can produce any arbitrary Java type, provided that the underlying serialization
  * runtime has been correctly configured to support the requested conversion.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface GraphNode {
 
   /** Whether this node represents a {@code null} value. */

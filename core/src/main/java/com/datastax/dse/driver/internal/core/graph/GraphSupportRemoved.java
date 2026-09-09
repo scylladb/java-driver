@@ -15,21 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.oss.driver.api.core.metrics;
+package com.datastax.dse.driver.internal.core.graph;
 
-import com.datastax.oss.driver.api.core.session.Session;
-import edu.umd.cs.findbugs.annotations.NonNull;
+public final class GraphSupportRemoved {
 
-/**
- * A node-level metric exposed through {@link Session#getMetrics()}.
- *
- * <p>All metrics exposed out of the box by the driver are instances of {@link DefaultNodeMetric}
- * (this interface only exists to allow custom metrics in driver extensions).
- *
- * @see SessionMetric
- */
-public interface NodeMetric {
+  public static final String MESSAGE =
+      "DSE Graph is not supported starting with Java driver 4.19.2.2; "
+          + "use 4.19.2.1 or migrate the Graph workload before upgrading";
 
-  @NonNull
-  String getPath();
+  public static UnsupportedOperationException exception() {
+    return new UnsupportedOperationException(MESSAGE);
+  }
+
+  private GraphSupportRemoved() {}
 }

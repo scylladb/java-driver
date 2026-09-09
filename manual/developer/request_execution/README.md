@@ -178,8 +178,6 @@ ResultT)` combination defines an execution model, for example:
 | `Statement` | `ResultSet` | CQL, synchronous |
 | `Statement` | `CompletionStage<AsyncResultSet>` | CQL, asynchronous |
 | `Statement` | `ReactiveResultSet` | CQL, reactive |
-| `GraphStatement` | `GraphResultSet` | DSE Graph, synchronous |
-| `GraphStatement` | `CompletionStage<AsyncGraphResultSet>` | DSE Graph, asynchronous |
 
 In general, regular client code doesn't use `Session.execute` directly. Instead, child interfaces
 expose more user-friendly shortcuts for a given result type:
