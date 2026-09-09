@@ -685,6 +685,13 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * private address, unreachable in the deployment client routes exist for and permanent until the
    * table changes, whereas a route kept one refresh too long fails fast on connect. So the whole
    * cache is keepable, and the next clean refresh evicts.
+   *
+   * <p>In that last case the cached keys are not the whole answer, because the two readers of this
+   * set do not read it the same way. {@link #withRetainedCachedRoutes} starts from the routes the
+   * pass rebuilt and takes this set as what to <em>add</em>; the targeted sweep takes it as the
+   * complete keep-list and removes every event host ID outside it. A host this pass rebuilt is
+   * present by construction, so it is unioned in -- without that, a route merged moments earlier is
+   * swept straight back out whenever the cache did not already hold it.
    */
   @NonNull
   private Set<UUID> keepableHostIds(
@@ -725,7 +732,9 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
           unattributableRows,
           rowCount);
     }
-    return cachedRoutes.keySet();
+    Set<UUID> keepable = new HashSet<>(cachedRoutes.keySet());
+    keepable.addAll(newRoutes.keySet());
+    return keepable;
   }
 
   /**

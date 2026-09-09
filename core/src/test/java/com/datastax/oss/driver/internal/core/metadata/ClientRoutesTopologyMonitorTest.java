@@ -1252,6 +1252,66 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
+  public void should_keep_rebuilt_route_when_a_row_had_an_unreadable_host_id_and_cache_was_empty()
+      throws Exception {
+    // Evicting nothing is only half the rule: the sweep reads the keep-set as the complete list
+    // of host IDs it may not remove, so the routes this pass just rebuilt have to be in it too.
+    // With an unattributable row in the pass the set is the cached keys, and an empty cache made
+    // that empty -- so hostId was merged by mergeRoutes and removed again by the sweep below it,
+    // in one pass. The pass that discovers a host is exactly the pass with no cache entry for it.
+    UUID hostId = UUID.randomUUID();
+    initHandler();
+    assertThat(handler.getRoutes()).isEmpty();
+
+    AdminRow unreadableRow = Mockito.mock(AdminRow.class);
+    Mockito.lenient().when(unreadableRow.isNull("host_id")).thenReturn(true);
+
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(mockRouteRow(hostId, "127.0.0.9", 9043), unreadableRow));
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            Collections.singletonList(connectionId),
+            Collections.singletonList(hostId.toString())));
+
+    assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+    assertThat(handler.getRoutes().get(hostId).getHostname()).isEqualTo("127.0.0.9");
+    assertThat(handler.getRoutes().get(hostId).getPort()).isEqualTo(9043);
+  }
+
+  @Test
+  public void should_keep_both_a_rebuilt_and_a_carried_over_route_when_a_row_was_unreadable()
+      throws Exception {
+    // The same defect without an empty cache: what decides it is whether the rebuilt host is
+    // already cached, not whether anything is. The cache holds only carriedHostId, so the keep-set
+    // was {carriedHostId} and the sweep removed the freshly rebuilt rebuiltHostId. Both belong:
+    // one because the pass rebuilt it, one because the unattributable row leaves its absence
+    // unproven.
+    UUID rebuiltHostId = UUID.randomUUID();
+    UUID carriedHostId = UUID.randomUUID();
+    initHandler();
+    handler.setRoutes(
+        ImmutableMap.of(carriedHostId, new ClientRouteRecord(carriedHostId, "127.0.0.1", 9042)));
+
+    AdminRow unreadableRow = Mockito.mock(AdminRow.class);
+    Mockito.lenient().when(unreadableRow.isNull("host_id")).thenReturn(true);
+
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(
+            mockRouteRow(rebuiltHostId, "127.0.0.9", 9043), unreadableRow));
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            Collections.singletonList(connectionId),
+            java.util.Arrays.asList(rebuiltHostId.toString(), carriedHostId.toString())));
+
+    assertThat(handler.getRoutes()).containsOnlyKeys(rebuiltHostId, carriedHostId);
+    assertThat(handler.getRoutes().get(rebuiltHostId).getHostname()).isEqualTo("127.0.0.9");
+    assertThat(handler.getRoutes().get(rebuiltHostId).getPort()).isEqualTo(9043);
+    assertThat(handler.getRoutes().get(carriedHostId).getHostname()).isEqualTo("127.0.0.1");
+  }
+
+  @Test
   public void should_keep_cached_route_absent_from_a_refresh_that_saw_an_unreadable_row()
       throws Exception {
     // The same rule on the full-refresh writer, in the mixed case: some rows were readable, so
