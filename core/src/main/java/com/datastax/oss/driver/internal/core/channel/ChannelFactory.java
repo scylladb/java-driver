@@ -23,11 +23,9 @@
  */
 package com.datastax.oss.driver.internal.core.channel;
 
-import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
@@ -35,7 +33,6 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeShardingInfo;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
-import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
@@ -46,7 +43,6 @@ import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -59,7 +55,6 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -76,19 +71,7 @@ public class ChannelFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChannelFactory.class);
 
-  /**
-   * A value for {@link #productType} that indicates that we are connected to DataStax Cloud. This
-   * value matches the one defined at DSE DB server side at {@code ProductType.java}.
-   */
-  private static final String DATASTAX_CLOUD_PRODUCT_TYPE = "DATASTAX_APOLLO";
-
   private static final AtomicBoolean LOGGED_ORPHAN_WARNING = new AtomicBoolean();
-
-  /**
-   * A value for {@link #productType} that indicates that the server does not report any product
-   * type.
-   */
-  private static final String UNKNOWN_PRODUCT_TYPE = "UNKNOWN";
 
   // The names of the handlers on the pipeline:
   public static final String SSL_HANDLER_NAME = "ssl";
@@ -131,14 +114,6 @@ public class ChannelFactory {
   @VisibleForTesting volatile ProtocolVersion protocolVersion;
 
   private volatile String clusterName;
-
-  /**
-   * The value of the {@code PRODUCT_TYPE} option reported by the first channel we opened, in
-   * response to a {@code SUPPORTED} request.
-   *
-   * <p>If the server does not return that option, the value will be {@link #UNKNOWN_PRODUCT_TYPE}.
-   */
-  @VisibleForTesting volatile String productType;
 
   public ChannelFactory(InternalDriverContext context) {
     this.logPrefix = context.getSessionName();
@@ -295,24 +270,6 @@ public class ChannelFactory {
             }
             if (ChannelFactory.this.clusterName == null) {
               ChannelFactory.this.clusterName = driverChannel.getClusterName();
-            }
-            Map<String, List<String>> supportedOptions = driverChannel.getOptions();
-            if (ChannelFactory.this.productType == null && supportedOptions != null) {
-              List<String> productTypes = supportedOptions.get("PRODUCT_TYPE");
-              String productType =
-                  productTypes != null && !productTypes.isEmpty()
-                      ? productTypes.get(0)
-                      : UNKNOWN_PRODUCT_TYPE;
-              ChannelFactory.this.productType = productType;
-              DriverConfig driverConfig = context.getConfig();
-              if (driverConfig instanceof TypesafeDriverConfig
-                  && productType.equals(DATASTAX_CLOUD_PRODUCT_TYPE)) {
-                ((TypesafeDriverConfig) driverConfig)
-                    .overrideDefaults(
-                        ImmutableMap.of(
-                            DefaultDriverOption.REQUEST_CONSISTENCY,
-                            ConsistencyLevel.LOCAL_QUORUM.name()));
-              }
             }
             resultFuture.complete(driverChannel);
           } else {

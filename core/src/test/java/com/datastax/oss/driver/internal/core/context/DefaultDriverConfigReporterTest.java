@@ -51,7 +51,6 @@ import com.datastax.oss.driver.internal.core.specex.ConstantSpeculativeExecution
 import com.datastax.oss.driver.internal.core.specex.NoSpeculativeExecutionPolicy;
 import com.datastax.oss.driver.internal.core.ssl.DefaultSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
-import com.datastax.oss.driver.internal.core.ssl.SniSslEngineFactory;
 import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.time.AtomicTimestampGenerator;
 import com.datastax.oss.driver.internal.core.time.ServerSideTimestampGenerator;
@@ -1534,7 +1533,6 @@ public class DefaultDriverConfigReporterTest {
     // configured one, to the whole option-to-field-to-report chain.
     assertThat(hostnameVerificationOf(new DefaultSslEngineFactory(policyConstructionContext())))
         .isTrue();
-    assertThat(hostnameVerificationOf(new SniSslEngineFactory(SSLContext.getDefault()))).isTrue();
     assertThat(hostnameVerificationOf(new ProgrammaticSslEngineFactory(SSLContext.getDefault())))
         .isFalse();
     assertThat(
