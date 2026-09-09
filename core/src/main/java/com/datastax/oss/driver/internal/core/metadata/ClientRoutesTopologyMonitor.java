@@ -355,7 +355,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                     // Skip the record if the required port column is absent.
                     port = row.isNull(portColumn) ? null : row.getInteger(portColumn);
                     if (port == null) {
-                      LOG.warn(
+                      LOG.error(
                           "[{}] Skipping client route for host_id={} ({}): "
                               + "required port column ({}) is not set in client routes table",
                           logPrefix,
@@ -413,11 +413,11 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                       "[{}] Merged {} client routes (targeted refresh)",
                       logPrefix,
                       newRoutes.size());
-                } else if (rowCount == 0 && !resolvedRoutesCache.get().isEmpty()) {
+                } else if (rowCount == 0 && !cachedRoutes.isEmpty()) {
                   int emptyCount = consecutiveEmptyResults.incrementAndGet();
                   if (emptyCount >= MAX_CONSECUTIVE_EMPTY_RESULTS) {
                     // Too many consecutive empties -- routes were likely removed server-side.
-                    int staleSize = resolvedRoutesCache.get().size();
+                    int staleSize = cachedRoutes.size();
                     resolvedRoutesCache.set(Collections.emptyMap());
                     consecutiveEmptyResults.set(0);
                     LOG.warn(
@@ -436,7 +436,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                         logPrefix,
                         emptyCount,
                         MAX_CONSECUTIVE_EMPTY_RESULTS,
-                        resolvedRoutesCache.get().size());
+                        cachedRoutes.size());
                   }
                 } else {
                   // Rows came back, so this is not the eventual-consistency race the counter
@@ -745,14 +745,25 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       int unattributableRows,
       int rowCount) {
     if (!hostIdIdentifiesRoute) {
-      if (unattributableRows > 0 || hostIdsInResult.size() > newRoutes.size()) {
+      // Only a pass that failed on some row can drop a route it had no evidence about; a host
+      // missing from a clean result really was deleted, and saying so here would be wrong.
+      boolean someRowUnusable = unattributableRows > 0 || hostIdsInResult.size() > newRoutes.size();
+      int droppedRoutes = 0;
+      if (someRowUnusable) {
+        for (UUID cachedHostId : cachedRoutes.keySet()) {
+          if (!newRoutes.containsKey(cachedHostId)) {
+            droppedRoutes++;
+          }
+        }
+      }
+      if (droppedRoutes > 0) {
         LOG.warn(
-            "[{}] Not carrying over cached routes for the {} host(s) this refresh could not rebuild"
+            "[{}] Dropping the cached route for {} host(s) this refresh could not rebuild"
                 + " ({} row(s) named no host_id at all): with {} connection IDs configured a cached"
-                + " route cannot be told from another connection's, and keeping it would preserve a"
-                + " route the server may have deleted",
+                + " route cannot be told from another connection's, so keeping it could preserve a"
+                + " route the server has deleted",
             logPrefix,
-            hostIdsInResult.size() - newRoutes.size(),
+            droppedRoutes,
             unattributableRows,
             configuredConnectionIds.size());
       }
