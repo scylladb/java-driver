@@ -159,6 +159,8 @@ abstract class ControlConnectionTestBase {
     when(config.getDefaultProfile()).thenReturn(defaultProfile);
     when(defaultProfile.getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS))
         .thenReturn(false);
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES))
+        .thenReturn(5);
 
     TopologyMonitor topologyMonitor = mock(TopologyMonitor.class);
     when(topologyMonitor.getChannelNodeInfo(any(DriverChannel.class)))
