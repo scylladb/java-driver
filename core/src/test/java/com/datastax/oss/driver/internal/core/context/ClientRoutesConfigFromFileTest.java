@@ -71,11 +71,6 @@ public class ClientRoutesConfigFromFileTest {
    * reference.conf} merged on top of the supplied extra HOCON string.
    */
   private DefaultDriverContext contextFromHocon(String extraHocon) {
-    return contextFromHocon(extraHocon, ProgrammaticArguments.builder().build());
-  }
-
-  private DefaultDriverContext contextFromHocon(
-      String extraHocon, ProgrammaticArguments programmaticArguments) {
     DriverConfigLoader loader =
         new DefaultDriverConfigLoader(
             () -> {
@@ -85,7 +80,8 @@ public class ClientRoutesConfigFromFileTest {
                       ConfigFactory.defaultReference()
                           .getConfig(DefaultDriverConfigLoader.DEFAULT_ROOT_PATH));
             });
-    DefaultDriverContext ctx = new DefaultDriverContext(loader, programmaticArguments);
+    DefaultDriverContext ctx =
+        new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
     createdContexts.add(ctx);
     return ctx;
   }
