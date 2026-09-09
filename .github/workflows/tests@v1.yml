@@ -512,19 +512,40 @@ jobs:
       # directory, so each lane's data only has to land there under a name of
       # its own. The module name was flattened on upload (metrics/micrometer ->
       # metrics-micrometer), so undo that to find the directory again.
+      #
+      # The lanes are listed to the job summary because "if: !cancelled()"
+      # lets this job run with some of them failed or skipped, and a lane
+      # missing its data costs the percentage silently: the report is simply
+      # lower, with nothing in it recording what it was built from.
       - name: Place execution data next to the classes it was recorded against
         run: |
+          set -o pipefail
           shopt -s nullglob
-          for lane in coverage-exec/*/; do
+          lanes=(coverage-exec/*/)
+          if [[ ${#lanes[@]} -eq 0 ]]; then
+            echo '::error::No coverage execution data was downloaded from any test lane.'
+            exit 1
+          fi
+          {
+            echo '### Coverage execution data'
+            echo
+            echo "| Lane | Modules |"
+            echo "| --- | --- |"
+          } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          for lane in "${lanes[@]}"; do
             lane_name="$(basename "$lane")"
+            modules=()
             for exec_file in "$lane"*.exec; do
               module="$(basename "$exec_file" .exec)"
               if [[ ! -d "$module" && -d "${module/-//}" ]]; then
                 module="${module/-//}"
               fi
+              modules+=("$module")
               mkdir -p "$module/target"
               cp "$exec_file" "$module/target/jacoco-${lane_name#coverage-exec-}.exec"
             done
+            echo "| ${lane_name#coverage-exec-} | ${#modules[@]}: ${modules[*]} |" \
+              | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
           done
           find . -name 'jacoco-*.exec' -printf '%p\t%s bytes\n'
 

@@ -29,14 +29,25 @@ RELEASE_SKIP_TESTS ?=
 # execution data is on disk. Off by default: the agent slows every fork down,
 # and the existing test lanes have to stay able to run without it.
 COVERAGE ?= false
-ifeq ($(filter true 1,$(COVERAGE)),)
+# Spellings are normalised, and anything outside the two lists below is an
+# error rather than a silent "off": COVERAGE=TRUE used to run without the
+# agent, and the miss only surfaced much later, when `make coverage-report`
+# said to run with COVERAGE=true -- the thing you thought you had just done.
+_COVERAGE_NORM := $(or $(shell printf '%s' '$(COVERAGE)' | tr '[:upper:]' '[:lower:]'),false)
+ifneq ($(filter $(_COVERAGE_NORM),true 1 yes on),)
+	MVN_COVERAGE := -Pcoverage
+	COVERAGE_PREREQ := .clean-coverage-data
+else ifneq ($(filter $(_COVERAGE_NORM),false 0 no off),)
 	MVN_COVERAGE :=
 	COVERAGE_PREREQ :=
 else
-	MVN_COVERAGE := -Pcoverage
-	COVERAGE_PREREQ := .clean-coverage-data
+# Not tab-indented, unlike the assignments above: make reads a tab-indented
+# line that is not an assignment as a recipe line.
+$(error COVERAGE must be one of true/1/yes/on or false/0/no/off, got '$(COVERAGE)')
 endif
 COVERAGE_REPORT_DIR := coverage-report/target/site/jacoco-aggregate
+COVERAGE_MAVEN_LOG_DIR := coverage-report/target
+COVERAGE_MAVEN_LOG := ${COVERAGE_MAVEN_LOG_DIR}/coverage-maven.log
 
 ifeq (${CCM_CONFIG_DIR},)
 	CCM_CONFIG_DIR = ~/.ccm
@@ -438,13 +449,28 @@ test-integration-cassandra: .install-all-modules .prepare-scylla-ccm resolve-cas
 # so make would otherwise treat the target as already up to date and skip it.
 .PHONY: coverage-report clean-coverage
 coverage-report: .install-guava-shaded
-	@if [[ -z "$$(find . -name 'jacoco*.exec' -not -path './coverage-report/*' -print -quit)" ]]; then
+	@# Without this the recipe's exit status is that of the tee on its last
+	@# line, not of the python that feeds it, so the empty-report check would
+	@# print its complaint and let the target pass anyway.
+	set -o pipefail
+	if [[ -z "$$(find . -name 'jacoco*.exec' -not -path './coverage-report/*' -print -quit)" ]]; then
 		echo 'No JaCoCo execution data found.'
 		echo "Run the tests with COVERAGE=true first, e.g. 'make test-unit COVERAGE=true'."
 		exit 1
 	fi
 	rm -rf '${COVERAGE_REPORT_DIR}'
-	$(MVNCMD) verify -Pcoverage -pl coverage-report -am -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
+	mkdir -p '${COVERAGE_MAVEN_LOG_DIR}'
+	$(MVNCMD) verify -Pcoverage -pl coverage-report -am -DskipTests -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true 2>&1 | tee '${COVERAGE_MAVEN_LOG}'
+	# JaCoCo matches execution data to classes by checksum and only warns when
+	# it does not match, dropping that class's data; the report still renders,
+	# just quietly short. Nothing else in this target can see that -- the
+	# percentage is simply lower -- so fail on the warning itself.
+	if grep -q 'Execution data for class .* does not match' '${COVERAGE_MAVEN_LOG}'; then
+		echo 'Execution data does not match the compiled classes, so the report below understates coverage.'
+		echo 'The data has to come from the same build of the classes the report is rendered against.'
+		grep 'Execution data for class .* does not match' '${COVERAGE_MAVEN_LOG}' | sort -u
+		exit 1
+	fi
 	if [[ ! -f '${COVERAGE_REPORT_DIR}/jacoco.xml' ]]; then
 		echo 'Maven produced no report at ${COVERAGE_REPORT_DIR}/jacoco.xml.'
 		exit 1
@@ -460,7 +486,7 @@ coverage-report: .install-guava-shaded
 clean-coverage:
 	find . -name 'jacoco*.exec' -delete
 	find . -type d -path '*/target/site/jacoco*' -exec rm -rf {} +
-	rm -rf coverage-report/target/site
+	rm -rf coverage-report/target/site '${COVERAGE_MAVEN_LOG}'
 
 check-no-compile-warnings:
 	@$(MAKE) compile-all | grep WARNING >/tmp/all-compile-warnings.log || true

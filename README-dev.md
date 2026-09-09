@@ -56,17 +56,22 @@ The report lands in `coverage-report/target/site/jacoco-aggregate` (HTML, XML an
 than rendering a confident-looking but empty report if it finds no execution data, or if the data
 matches none of the classes.
 
+`COVERAGE` accepts `true`/`1`/`yes`/`on` and `false`/`0`/`no`/`off`, in any case; anything else is
+an error rather than a silent "off", because a run that quietly skipped the agent only shows up
+much later, when `make coverage-report` finds nothing to aggregate.
+
 In CI, the unit and integration jobs in `tests@v1.yml` run with `COVERAGE=true` and upload their
-execution data; the "Coverage report" job aggregates it, prints the percentage to its job summary
-and attaches the HTML report as an artifact. That job is `continue-on-error`, so a flaky
-integration test costs the metric some data rather than adding a second failure to the pull
-request. Collecting from the existing lanes rather than a dedicated workflow keeps the Scylla suite
-from being run twice.
+execution data; the "Coverage report" job aggregates it and writes both the lanes it actually
+received data from and the resulting percentage to its job summary, then attaches the HTML report
+as an artifact. That job is `continue-on-error`, so a flaky integration test costs the metric some
+data rather than adding a second failure to the pull request. Collecting from the existing lanes
+rather than a dedicated workflow keeps the Scylla suite from being run twice.
 
 JaCoCo matches execution data to classes by checksum, so the data has to come from the same build
-of the classes the report is rendered against. If a report shows code you know was exercised as
-uncovered, look for `Execution data for class ... does not match` in the Maven log; the usual cause
-is stale execution data from before a recompile, which `make clean-coverage` clears.
+of the classes the report is rendered against. When they diverge it only warns and drops that
+class's data, leaving a report that renders happily and reads low, so `make coverage-report` greps
+its own Maven log for `Execution data for class ... does not match` and fails on it. The usual
+cause is stale execution data from before a recompile, which `make clean-coverage` clears.
 
 Note: the surefire/failsafe configs in `core` and `integration-tests` previously set `<argLine>` to
 just their own JVM flags (e.g. `${mockitoopens.argline}`), which silently discarded the
