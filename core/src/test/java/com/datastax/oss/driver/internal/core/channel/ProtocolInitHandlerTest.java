@@ -69,7 +69,6 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ConcurrentModificationException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
@@ -270,15 +269,16 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     assertThat(connectFuture).isNotDone();
 
     // Simulate the SUPPORTED response
-    writeInboundFrame(requestFrame, TestResponses.supportedResponse("mock_key", "mock_value"));
-
-    Map<String, List<String>> supportedOptions = channel.attr(DriverChannel.OPTIONS_KEY).get();
-    assertThat(supportedOptions).containsKey("mock_key");
-    assertThat(supportedOptions.get("mock_key")).containsOnly("mock_value");
+    writeInboundFrame(
+        requestFrame,
+        TestResponses.supportedResponse(
+            "SCYLLA_LWT_ADD_METADATA_MARK", "LWT_OPTIMIZATION_META_BIT_MASK=1"));
 
     // It should send a STARTUP message
     requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Startup.class);
+    assertThat(((Startup) requestFrame.message).options)
+        .containsEntry("SCYLLA_LWT_ADD_METADATA_MARK", "1");
     assertThat(connectFuture).isNotDone();
 
     // Simulate a READY response

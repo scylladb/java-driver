@@ -25,7 +25,6 @@ import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.internal.core.TestResponses;
 import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
-import com.datastax.oss.protocol.internal.response.Ready;
 import java.util.concurrent.CompletionStage;
 import org.junit.Test;
 
@@ -46,16 +45,16 @@ public class ChannelFactorySupportedOptionsTest extends ChannelFactoryTestBase {
             null,
             DriverChannelOptions.DEFAULT,
             NoopNodeMetricUpdater.INSTANCE);
-    writeInboundFrame(
-        readOutboundFrame(), TestResponses.supportedResponse("mock_key", "mock_value"));
-    writeInboundFrame(readOutboundFrame(), new Ready());
-    writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("mockClusterName"));
+    completeSimpleChannelInit(
+        TestResponses.supportedResponse(
+            "SCYLLA_LWT_ADD_METADATA_MARK", "LWT_OPTIMIZATION_META_BIT_MASK=1"),
+        "mockClusterName");
 
     // Then
     assertThatStage(channelFuture1).isSuccess();
     DriverChannel channel1 = channelFuture1.toCompletableFuture().get();
-    assertThat(channel1.getOptions()).containsKey("mock_key");
-    assertThat(channel1.getOptions().get("mock_key")).containsOnly("mock_value");
+    assertThat(channel1.getSupportedFeatures().getLwtFeatureInfo()).isNotNull();
+    assertThat(channel1.getSupportedFeatures().getLwtFeatureInfo().getMask()).isEqualTo(1);
 
     // When
     CompletionStage<DriverChannel> channelFuture2 =
@@ -65,15 +64,11 @@ public class ChannelFactorySupportedOptionsTest extends ChannelFactoryTestBase {
             null,
             DriverChannelOptions.DEFAULT,
             NoopNodeMetricUpdater.INSTANCE);
-    writeInboundFrame(
-        readOutboundFrame(), TestResponses.supportedResponse("mock_key", "mock_value"));
-    writeInboundFrame(readOutboundFrame(), new Ready());
-    writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("mockClusterName"));
+    completeSimpleChannelInit();
 
     // Then
     assertThatStage(channelFuture2).isSuccess();
     DriverChannel channel2 = channelFuture2.toCompletableFuture().get();
-    assertThat(channel2.getOptions()).containsKey("mock_key");
-    assertThat(channel2.getOptions().get("mock_key")).containsOnly("mock_value");
+    assertThat(channel2.getSupportedFeatures().getLwtFeatureInfo()).isNull();
   }
 }
