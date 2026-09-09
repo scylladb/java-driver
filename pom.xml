@@ -793,13 +793,11 @@
       </plugin>
       <!--
           jacoco-maven-plugin's prepare-agent/report executions live in the
-          "coverage" profile below, not here. Bound unconditionally, they
-          instrumented every module's build (all IT lanes across every CI
-          job, not just the coverage workflow), with no way to opt out:
-          -Djacoco.skip=true skipped prepare-agent but left the modules
-          that combine argLine via @{argLine} (core, integration-tests)
-          trying to fork with that literal, unresolved string as a JVM
-          argument.
+          "coverage" profile below, not here. Bound unconditionally they
+          would attach the agent to every forked test JVM in every CI job,
+          and the only way back off would be -Djacoco.skip=true on each of
+          them. An opt-in profile puts that cost on the runs that want the
+          number and leaves the existing lanes as they were.
       -->
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
@@ -1055,12 +1053,13 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </profile>
     <profile>
       <!--
-          Opt-in instrumentation/reporting for code coverage measurement
-          (see Makefile's test-unit-coverage/test-integration-scylla/
-          coverage-report targets and .github/workflows/coverage.yml).
-          Kept out of the default build so it doesn't add -javaagent
-          overhead, or a jacoco.skip escape hatch, to every other build and
-          test job.
+          Opt-in instrumentation and reporting for code coverage
+          measurement. COVERAGE=true on any of the Makefile's test-*
+          targets activates it, which is how the unit and integration
+          lanes in .github/workflows/tests@v1.yml switch it on; `make
+          coverage-report` then aggregates the execution data those lanes
+          leave behind. Kept out of the default build so the -javaagent
+          overhead lands only on the runs that asked for the number.
       -->
       <id>coverage</id>
       <build>
