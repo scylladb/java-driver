@@ -88,6 +88,12 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * {@code host_id} alone, so the two coincide only while a single connection ID can produce rows
    * for a given host. Where several can, a cached entry and a returned row for the same host need
    * not be the same route (see #1063), and a refresh keeps only the routes it rebuilt.
+   *
+   * <p>This is a statement about the <em>configured</em> connection IDs, so it holds only because
+   * {@link #allowedConnectionIds} keeps every query's scope inside them. Drop that filter and a
+   * server event can steer a pass at a connection ID this driver never configured, whose rows say
+   * nothing about the routes cached under ours -- at which point carrying a cached route over
+   * because some row named its host is no longer sound.
    */
   private final boolean hostIdIdentifiesRoute;
 
@@ -539,8 +545,40 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     if (closed) {
       return;
     }
+    List<String> eventConnectionIds = event.getConnectionIds();
+    List<String> allowedConnectionIds = allowedConnectionIds(eventConnectionIds);
+    if (!eventConnectionIds.isEmpty() && allowedConnectionIds.isEmpty()) {
+      // The event named connections, and none of them is ours: whatever changed, it was not a
+      // route this session caches. An event naming none at all is the different case handled by
+      // buildQuery's fallback -- it carries no scope, so it cannot rule this session out.
+      LOG.debug("[{}] Ignoring {}: it names no configured connection ID", logPrefix, event);
+      return;
+    }
     LOG.debug("[{}] Received {}, refreshing routes", logPrefix, event);
-    queryClientRoutesAndCache(event.getConnectionIds(), event.getHostIds());
+    queryClientRoutesAndCache(allowedConnectionIds, event.getHostIds());
+  }
+
+  /**
+   * Returns the connection IDs an event names that this driver actually configured, dropping the
+   * rest. Scylla broadcasts every changed key, so an event routinely names proxies belonging to
+   * other clients, and until they are dropped they reach {@link #buildQuery} and become the query's
+   * scope verbatim -- unlike the host IDs beside them, which are validated there.
+   *
+   * <p>Two things go wrong when they do. A usable row for an unconfigured connection installs a
+   * route through a proxy this client is not configured to use, addressed as that proxy's clients
+   * address it. An unusable one is read as evidence about a host whose cached route was built from
+   * a different connection's row, which is what {@link #hostIdIdentifiesRoute} assumes cannot
+   * happen. Both are the same mistake: a row is only evidence about the connection it belongs to.
+   *
+   * <p>Empty IDs are dropped as well. {@link ClientRouteProxy} rejects a blank connection ID, so
+   * one can never match, and leaving it in would only widen the {@code IN} list.
+   */
+  @NonNull
+  private List<String> allowedConnectionIds(@NonNull List<String> eventConnectionIds) {
+    return eventConnectionIds.stream()
+        .filter(id -> id != null && !id.isEmpty())
+        .filter(configuredConnectionIds::contains)
+        .collect(Collectors.toList());
   }
 
   /**
@@ -595,6 +633,12 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    *       connection IDs when present, otherwise falls back to all configured connection IDs
    *   <li>Neither → full scan with {@code ALLOW FILTERING} (should not occur in practice)
    * </ul>
+   *
+   * <p>{@code eventConnectionIds} has already been reduced to configured IDs by {@link
+   * #allowedConnectionIds}, so the scope this builds is always inside them. The fallback above
+   * therefore covers two arrivals that differ: an event that named no connection at all, and one
+   * whose IDs were all dropped -- and the second never reaches here, because a pass over our own
+   * connections would answer a question that event did not ask.
    */
   @NonNull
   private static String buildQuery(

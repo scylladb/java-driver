@@ -1710,6 +1710,67 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
+  public void should_query_only_the_configured_connection_ids_an_event_names() {
+    // Scylla broadcasts every changed key, so an event names other clients' proxies too. Those
+    // IDs used to become the query's scope verbatim, which reads another client's routes and
+    // caches them under our host IDs -- and makes rows arrive that say nothing about the routes
+    // cached under our own connection, which is what hostIdIdentifiesRoute assumes cannot happen.
+    // The scope narrows to the event's configured IDs: conn-1 only, not conn-2 as a fallback
+    // would give, and never the unconfigured one.
+    String connId1 = "conn-1";
+    String connId2 = "conn-2";
+    String unconfiguredConnId = "conn-unconfigured";
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRouteProxy(connId1, "nlb1.example.com"))
+            .addEndpoint(new ClientRouteProxy(connId2, "nlb2.example.com"))
+            .build();
+    TestableClientRoutesTopologyMonitor h =
+        new TestableClientRoutesTopologyMonitor(context, config);
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    h.init();
+
+    UUID hostId = UUID.randomUUID();
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            java.util.Arrays.asList(connId1, unconfiguredConnId),
+            Collections.singletonList(hostId.toString())));
+
+    assertThat(h.lastCapturedQuery())
+        .contains("'" + connId1 + "'")
+        .doesNotContain(unconfiguredConnId)
+        .doesNotContain("'" + connId2 + "'")
+        .contains("host_id IN (" + hostId + ")");
+  }
+
+  @Test
+  public void should_ignore_an_event_that_names_no_configured_connection_id() {
+    // An event naming connections, none of them ours, proves no route this session caches
+    // changed, so there is nothing to ask the server. Querying anyway was not merely wasted --
+    // scoped to a connection we do not serve it comes back empty, and the sweep then read that
+    // emptiness as a delete and evicted a working route. Distinct from an event naming no
+    // connection at all, which carries no scope and still falls back to the configured IDs
+    // (should_fall_back_to_configured_connection_ids_on_empty_change_event).
+    UUID hostId = UUID.randomUUID();
+    initHandler();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+    int queriesBefore = handler.capturedQueries.size();
+
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            Collections.singletonList("conn-not-configured"),
+            Collections.singletonList(hostId.toString())));
+
+    assertThat(handler.capturedQueries).hasSize(queriesBefore);
+    assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+    assertThat(handler.getRoutes().get(hostId).getHostname()).isEqualTo("127.0.0.1");
+  }
+
+  @Test
   public void should_apply_correct_override_per_connection_id_with_multiple_endpoints()
       throws Exception {
     String connId1 = "conn-1";
