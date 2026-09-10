@@ -1714,7 +1714,7 @@ public class ClientRoutesTopologyMonitorTest {
     // Scylla broadcasts every changed key, so an event names other clients' proxies too. Those
     // IDs used to become the query's scope verbatim, which reads another client's routes and
     // caches them under our host IDs -- and makes rows arrive that say nothing about the routes
-    // cached under our own connection, which is what hostIdIdentifiesRoute assumes cannot happen.
+    // cached under our own connection, which no row from an unconfigured proxy can speak to.
     // The scope narrows to the event's configured IDs: conn-1 only, not conn-2 as a fallback
     // would give, and never the unconfigured one.
     String connId1 = "conn-1";
@@ -1895,16 +1895,16 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
-  public void should_not_keep_cached_route_for_unusable_row_with_several_connection_ids()
+  public void should_keep_cached_route_for_unusable_row_with_several_connection_ids()
       throws Exception {
     // system.client_routes is keyed (connection_id, host_id) while the cache is keyed on host_id
     // alone, so with two connection IDs configured "the cached entry for this host" and "the row
-    // for this host that failed" need not be the same route. Here conn-1's row is gone -- the
-    // route the cache holds was deleted server-side -- and only conn-2's unusable row comes back.
-    // Carrying the entry over would keep the deleted route for as long as conn-2's row stayed
-    // unusable, and no non-empty refresh resets that, so nothing is carried over.
-    // should_keep_cached_route_for_unusable_row_on_full_refresh is the one-connection-ID case,
-    // where absence from the result really does mean the route is gone.
+    // for this host that failed" need not be the same route. That ambiguity is real, but it
+    // belongs to the cache key (#1063) and is not a reason to evict: the row came back, so a route
+    // for this host still exists, and dropping the cached one would strand the node on an address
+    // that does not work in the deployment client routes exist for. The rule is therefore the same
+    // as should_keep_cached_route_for_unusable_row_on_full_refresh, whatever the connection-ID
+    // count; recordCarryOvers is what stops the staleness being silent.
     String connId1 = "conn-1";
     String connId2 = "conn-2";
     ClientRoutesConfig config =
@@ -1924,17 +1924,20 @@ public class ClientRoutesTopologyMonitorTest {
 
     h.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
-    assertThat(h.getRoutes()).isEmpty();
+    assertThat(h.getRoutes()).containsOnlyKeys(hostId);
+    assertThat(h.getRoutes().get(hostId).getHostname()).isEqualTo("nlb1.example.com");
+    assertThat(h.getRoutes().get(hostId).getPort()).isEqualTo(9042);
+    assertThat(h.getCarryOverCounts()).containsEntry(hostId, 1);
   }
 
   @Test
-  public void should_evict_targeted_host_with_unusable_row_with_several_connection_ids()
+  public void should_keep_targeted_host_with_unusable_row_with_several_connection_ids()
       throws Exception {
-    // The same rule on the other cache writer. The removal sweep reads a host ID the event named
-    // but the refresh cannot keep as a server-side delete, and with several connection IDs a row
-    // that came back unusable is no longer a reason to keep the host: it may be a different
-    // route's row than the one cached. should_keep_cached_route_when_targeted_refresh_returns
-    // _unusable_row is the one-connection-ID counterweight.
+    // The same rule on the other cache writer. The removal sweep evicts a host ID the event named
+    // only when the refresh can prove the server deleted it, and an unusable row proves the
+    // opposite -- the row exists. So the host stays, exactly as in
+    // should_keep_cached_route_when_targeted_refresh_returns_unusable_row, and the connection-ID
+    // count does not enter into it.
     String connId1 = "conn-1";
     String connId2 = "conn-2";
     ClientRoutesConfig config =
@@ -1963,17 +1966,18 @@ public class ClientRoutesTopologyMonitorTest {
             Collections.singletonList(connId2),
             Collections.singletonList(hostId.toString())));
 
-    assertThat(h.getRoutes()).isEmpty();
+    assertThat(h.getRoutes()).containsOnlyKeys(hostId);
+    assertThat(h.getRoutes().get(hostId).getHostname()).isEqualTo("nlb1.example.com");
   }
 
   @Test
-  public void should_not_keep_cached_routes_for_unreadable_host_id_with_several_connection_ids()
+  public void should_keep_cached_routes_for_unreadable_host_id_with_several_connection_ids()
       throws Exception {
     // A row whose host_id the driver cannot read makes absence from the result stop being proof of
-    // a delete, so with one connection ID the whole cache is kept -- see
-    // should_keep_all_cached_routes_when_no_row_names_a_readable_host_id. That rests on the same
-    // identity assumption as every other carry-over and goes the same way when it fails: keeping
-    // routes the refresh cannot attribute would keep deleted ones among them, indefinitely.
+    // a delete, so the whole cache is kept -- see
+    // should_keep_all_cached_routes_when_no_row_names_a_readable_host_id, which is the same
+    // assertion with one connection ID. This pass learned nothing at all about which hosts exist,
+    // and evicting on no evidence is what the rule forbids.
     String connId1 = "conn-1";
     String connId2 = "conn-2";
     ClientRoutesConfig config =
@@ -1999,6 +2003,136 @@ public class ClientRoutesTopologyMonitorTest {
 
     h.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
-    assertThat(h.getRoutes()).isEmpty();
+    assertThat(h.getRoutes()).containsOnlyKeys(hostId1, hostId2);
+  }
+
+  // ---- unconfirmed carry-over bookkeeping -------------------------------
+
+  @Test
+  public void should_keep_a_cached_route_for_a_permanently_unusable_row() throws Exception {
+    // Retention is deliberately unbounded. The row keeps coming back, so the server still holds a
+    // route for this host and the driver simply cannot read its current value; the cached one
+    // stays the best answer available. Evicting after N passes would trade a stale route that
+    // fails fast on connect for a node stranded on its private address, unreachable here and
+    // permanent until the table changes. What the count buys is the ERROR at
+    // CARRY_OVERS_BEFORE_ESCALATION, so this is reported rather than silently served.
+    UUID hostId = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(mockRouteRow(hostId, null, 9042)));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    for (int i = 0; i < 4; i++) {
+      handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+      assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+    }
+
+    assertThat(handler.getRoutes().get(hostId).getHostname()).isEqualTo("127.0.0.1");
+    assertThat(handler.getRoutes().get(hostId).getPort()).isEqualTo(9042);
+    // Past the threshold, so the escalation path ran on the last two passes.
+    assertThat(handler.getCarryOverCounts()).containsEntry(hostId, 4);
+  }
+
+  @Test
+  public void should_reset_the_carry_over_count_when_a_route_is_rebuilt() throws Exception {
+    // A rebuilt route is a confirmed route: the count has to start again, or a host that goes
+    // unreadable once every few refreshes would eventually be reported as permanently unconfirmed.
+    UUID hostId = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(mockRouteRow(hostId, null, 9042)));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertThat(handler.getCarryOverCounts()).containsEntry(hostId, 2);
+
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(mockRouteRow(hostId, "127.0.0.9", 9043)));
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getCarryOverCounts()).doesNotContainKey(hostId);
+    assertThat(handler.getRoutes().get(hostId).getHostname()).isEqualTo("127.0.0.9");
+  }
+
+  @Test
+  public void should_forget_the_carry_over_count_for_an_evicted_host() throws Exception {
+    // The count map is keyed by host and must never outgrow the cache it annotates, so a host the
+    // refresh evicts has to take its entry with it.
+    UUID carriedHostId = UUID.randomUUID();
+    UUID freshHostId = UUID.randomUUID();
+    handler.setRoutes(
+        ImmutableMap.of(carriedHostId, new ClientRouteRecord(carriedHostId, "127.0.0.1", 9042)));
+
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(mockRouteRow(carriedHostId, null, 9042)));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertThat(handler.getCarryOverCounts()).containsEntry(carriedHostId, 1);
+
+    // A clean pass that does not mention the host at all: absent, therefore provably deleted.
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(mockRouteRow(freshHostId, "127.0.0.3", 9044)));
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getRoutes()).containsOnlyKeys(freshHostId);
+    assertThat(handler.getCarryOverCounts()).isEmpty();
+  }
+
+  @Test
+  public void should_not_count_a_carry_over_for_a_host_outside_a_targeted_refresh()
+      throws Exception {
+    // A targeted refresh only asks about the hosts the event named. Not rebuilding one it never
+    // queried says nothing about that host, so its count must not advance -- otherwise a busy
+    // stream of targeted events would report every untouched route as unconfirmed.
+    UUID queriedHostId = UUID.randomUUID();
+    UUID untouchedHostId = UUID.randomUUID();
+    initHandler();
+    handler.setRoutes(
+        ImmutableMap.of(
+            queriedHostId, new ClientRouteRecord(queriedHostId, "127.0.0.1", 9042),
+            untouchedHostId, new ClientRouteRecord(untouchedHostId, "127.0.0.2", 9042)));
+
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(mockRouteRow(queriedHostId, null, 9042)));
+
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            Collections.singletonList(connectionId),
+            Collections.singletonList(queriedHostId.toString())));
+
+    assertThat(handler.getRoutes()).containsOnlyKeys(queriedHostId, untouchedHostId);
+    assertThat(handler.getCarryOverCounts()).containsEntry(queriedHostId, 1);
+    assertThat(handler.getCarryOverCounts()).doesNotContainKey(untouchedHostId);
+  }
+
+  @Test
+  public void should_not_let_an_unusable_pass_advance_the_consecutive_empty_guard()
+      throws Exception {
+    // The consecutive-empty guard exists for the eventual-consistency race, which returns zero
+    // rows. Before row-level tolerance the guard keyed on newRoutes.isEmpty(), so a pass whose
+    // rows all failed to parse counted as empty and cleared the cache on the third one -- while
+    // logging that the query had returned no rows, which was untrue. Keying it on rowCount keeps
+    // the counter for the race it was written for: rows that came back and could not be read are
+    // carried over and reported instead, and they reset the counter like any other non-empty pass.
+    UUID hostId = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    // Third pass returns a row, so it is not an empty result however unusable it turns out to be.
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(mockRouteRow(hostId, null, 9042)));
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+    assertThat(handler.getRoutes().get(hostId).getPort()).isEqualTo(9042);
   }
 }

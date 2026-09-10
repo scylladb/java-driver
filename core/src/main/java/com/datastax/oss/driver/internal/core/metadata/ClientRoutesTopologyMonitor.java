@@ -78,27 +78,35 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    */
   private static final int MAX_CONSECUTIVE_EMPTY_RESULTS = 3;
 
+  /**
+   * Consecutive refreshes that may carry a host's cached route over, unconfirmed, before the driver
+   * says so at {@code ERROR}. Deliberately a reporting threshold and not an eviction one: the row
+   * came back, so the route still exists and dropping it would strand the node on an address that
+   * does not work here. Matches {@link #MAX_CONSECUTIVE_EMPTY_RESULTS} so the two backstops read
+   * alike.
+   */
+  private static final int CARRY_OVERS_BEFORE_ESCALATION = 3;
+
   private final ClientRoutesConfig config;
   private final List<String> configuredConnectionIds;
   private final Map<String, String> connectionAddrOverrides;
 
-  /**
-   * Whether a cached route's {@code host_id} identifies the table row it was built from. {@code
-   * system.client_routes} is keyed on {@code (connection_id, host_id)} while this cache is keyed on
-   * {@code host_id} alone, so the two coincide only while a single connection ID can produce rows
-   * for a given host. Where several can, a cached entry and a returned row for the same host need
-   * not be the same route (see #1063), and a refresh keeps only the routes it rebuilt.
-   *
-   * <p>This is a statement about the <em>configured</em> connection IDs, so it holds only because
-   * {@link #allowedConnectionIds} keeps every query's scope inside them. Drop that filter and a
-   * server event can steer a pass at a connection ID this driver never configured, whose rows say
-   * nothing about the routes cached under ours -- at which point carrying a cached route over
-   * because some row named its host is no longer sound.
-   */
-  private final boolean hostIdIdentifiesRoute;
-
   private final String logPrefix;
   private final AtomicReference<Map<UUID, ClientRouteRecord>> resolvedRoutesCache;
+
+  /**
+   * Per host, how many consecutive refreshes returned rows but could not rebuild that host's route,
+   * leaving the cached record in place. Reset the moment a pass rebuilds the route, and dropped
+   * entirely once the host leaves the cache, so this map never outgrows it.
+   *
+   * <p>Refreshes that returned no rows at all are not counted: that is the eventual-consistency
+   * race {@link #consecutiveEmptyResults} already tracks, and it clears the cache on its own.
+   * Counted here is the other thing -- the server keeps returning a row this driver cannot read --
+   * which nothing evicts and which therefore has to be said out loud instead.
+   */
+  private final AtomicReference<Map<UUID, Integer>> carryOverCounts =
+      new AtomicReference<>(Collections.emptyMap());
+
   private final boolean useSSL;
   private volatile boolean closed = false;
   private final AtomicInteger consecutiveEmptyResults = new AtomicInteger(0);
@@ -162,7 +170,6 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                     Collectors.toMap(
                         ClientRouteProxy::getConnectionId,
                         ClientRouteProxy::getConnectionAddrOverride)));
-    this.hostIdIdentifiesRoute = new HashSet<>(configuredConnectionIds).size() == 1;
     this.logPrefix = context.getSessionName();
     this.resolvedRoutesCache = new AtomicReference<>(Collections.emptyMap());
     this.useSSL = context.getSslEngineFactory().isPresent();
@@ -393,6 +400,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                   // it does hold would drop a working route back to the node's unreachable
                   // private address, which is why every reason a host is not provably absent
                   // lives in that one set rather than in a condition here.
+                  Set<UUID> queriedHostIds = new HashSet<>();
                   for (String hostIdStr : eventHostIds) {
                     UUID hostId;
                     try {
@@ -405,10 +413,12 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                           e);
                       continue;
                     }
+                    queriedHostIds.add(hostId);
                     if (!keepableHostIds.contains(hostId)) {
                       removeRoute(hostId);
                     }
                   }
+                  recordCarryOvers(resolvedRoutesCache.get(), newRoutes, queriedHostIds);
                   LOG.debug(
                       "[{}] Merged {} client routes (targeted refresh)",
                       logPrefix,
@@ -440,11 +450,18 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                   }
                 } else {
                   // Rows came back, so this is not the eventual-consistency race the counter
-                  // above tracks, whatever else was wrong with them.
+                  // above tracks, whatever else was wrong with them. That race returns zero rows;
+                  // keying the guard on newRoutes.isEmpty() instead, as this did before row-level
+                  // tolerance, let a pass whose rows all failed to parse count as empty and clear
+                  // the cache on the third one -- while logging that the query had returned no
+                  // rows, which was untrue. Unusable rows are carried over and reported instead.
                   consecutiveEmptyResults.set(0);
                   Map<UUID, ClientRouteRecord> updated =
                       withRetainedCachedRoutes(cachedRoutes, newRoutes, keepableHostIds);
                   resolvedRoutesCache.set(Collections.unmodifiableMap(updated));
+                  // A full refresh asked about every host, so anything it did not rebuild was in
+                  // scope and genuinely went unconfirmed.
+                  recordCarryOvers(updated, newRoutes, null);
                   LOG.debug(
                       "[{}] Updated client routes: {} routes loaded"
                           + " ({} kept from the previous refresh)",
@@ -567,8 +584,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * <p>Two things go wrong when they do. A usable row for an unconfigured connection installs a
    * route through a proxy this client is not configured to use, addressed as that proxy's clients
    * address it. An unusable one is read as evidence about a host whose cached route was built from
-   * a different connection's row, which is what {@link #hostIdIdentifiesRoute} assumes cannot
-   * happen. Both are the same mistake: a row is only evidence about the connection it belongs to.
+   * a different connection's row entirely. Both are the same mistake: a row is only evidence about
+   * the connection it belongs to.
    *
    * <p>Empty IDs are dropped as well. {@link ClientRouteProxy} rejects a blank connection ID, so
    * one can never match, and leaving it in would only widen the {@code IN} list.
@@ -708,20 +725,11 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * server deleted the host, so the whole eviction rule lives here rather than in a condition at
    * each of them.
    *
-   * <p>Three cases, least carry-over first.
-   *
-   * <p>Where {@code host_id} is not the whole route identity ({@link #hostIdIdentifiesRoute})
-   * nothing is carried over. Keeping a cached route asks whether <em>that route's</em> row came
-   * back unusable, and a set of host IDs cannot answer a question about one {@code (connection_id,
-   * host_id)} row: the cached entry and the row that failed need not be the same route. Keeping it
-   * anyway would preserve a route the server deleted for as long as some other connection's row
-   * stayed unusable, and no non-empty refresh would ever reset that. So the refresh keeps only what
-   * it rebuilt, as it did before row-level tolerance existed. See #1063, which corrects the cache
-   * key itself; retention by the full key falls out of that fix.
-   *
-   * <p>Otherwise a row that came back and merely failed to parse is not an absent row, so every
-   * host ID the loop read is keepable: the refresh replaces the routes it could rebuild and leaves
-   * the rest alone.
+   * <p>A row that came back and merely failed to parse is not an absent row: the server still holds
+   * a route for that host, this pass just could not read its current value. So every host ID the
+   * loop read is keepable -- the refresh replaces the routes it could rebuild and leaves the rest
+   * alone. A deletion shows up as an <em>absent</em> row, never as an unusable one, and that case
+   * still evicts.
    *
    * <p>Unless the loop could not attribute some row to any host at all, which destroys that
    * evidence for the whole refresh -- the unattributable row may have been the very host now
@@ -730,12 +738,19 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * table changes, whereas a route kept one refresh too long fails fast on connect. So the whole
    * cache is keepable, and the next clean refresh evicts.
    *
-   * <p>In that last case the cached keys are not the whole answer, because the two readers of this
-   * set do not read it the same way. {@link #withRetainedCachedRoutes} starts from the routes the
-   * pass rebuilt and takes this set as what to <em>add</em>; the targeted sweep takes it as the
-   * complete keep-list and removes every event host ID outside it. A host this pass rebuilt is
-   * present by construction, so it is unioned in -- without that, a route merged moments earlier is
-   * swept straight back out whenever the cache did not already hold it.
+   * <p>Either way the hosts this pass rebuilt are unioned in, because the two readers of this set
+   * do not read it the same way. {@link #withRetainedCachedRoutes} starts from the routes the pass
+   * rebuilt and takes this set as what to <em>add</em>; the targeted sweep takes it as the complete
+   * keep-list and removes every event host ID outside it. Without the union a route merged moments
+   * earlier is swept straight back out whenever the cache did not already hold it.
+   *
+   * <p>The rule does not vary with the number of configured connection IDs. It once did: where
+   * {@code (connection_id, host_id)} can name several rows for one host, a cached entry and the row
+   * that failed need not be the same route, so the refresh kept only what it rebuilt. That traded a
+   * bounded staleness for an unbounded outage -- a route dropped on no evidence falls back to an
+   * unreachable private address -- and it let a pass whose every row was unusable empty the cache
+   * outright. The ambiguity is real, but it belongs to the cache key (#1063), not to retention;
+   * {@link #carryOverCounts} is what keeps the staleness visible until then.
    */
   @NonNull
   private Set<UUID> keepableHostIds(
@@ -744,52 +759,96 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       @NonNull Map<UUID, ClientRouteRecord> cachedRoutes,
       int unattributableRows,
       int rowCount) {
-    if (!hostIdIdentifiesRoute) {
-      // Only a pass that failed on some row can drop a route it had no evidence about; a host
-      // missing from a clean result really was deleted, and saying so here would be wrong.
-      boolean someRowUnusable = unattributableRows > 0 || hostIdsInResult.size() > newRoutes.size();
-      int droppedRoutes = 0;
-      if (someRowUnusable) {
-        for (UUID cachedHostId : cachedRoutes.keySet()) {
-          if (!newRoutes.containsKey(cachedHostId)) {
-            droppedRoutes++;
-          }
-        }
-      }
-      if (droppedRoutes > 0) {
-        LOG.warn(
-            "[{}] Dropping the cached route for {} host(s) this refresh could not rebuild"
-                + " ({} row(s) named no host_id at all): with {} connection IDs configured a cached"
-                + " route cannot be told from another connection's, so keeping it could preserve a"
-                + " route the server has deleted",
-            logPrefix,
-            droppedRoutes,
-            unattributableRows,
-            configuredConnectionIds.size());
-      }
-      return newRoutes.keySet();
-    }
+    Set<UUID> keepable;
     if (unattributableRows == 0) {
-      return hostIdsInResult;
-    }
-    if (hostIdsInResult.isEmpty()) {
-      LOG.error(
-          "[{}] None of the {} client_routes rows named a readable host_id; "
-              + "keeping all {} existing cached routes",
-          logPrefix,
-          rowCount,
-          cachedRoutes.size());
+      keepable = new HashSet<>(hostIdsInResult);
     } else {
-      LOG.warn(
-          "[{}] {} of {} client_routes rows named no readable host_id; keeping the "
-              + "cached routes this refresh cannot prove deleted",
-          logPrefix,
-          unattributableRows,
-          rowCount);
+      if (hostIdsInResult.isEmpty()) {
+        LOG.error(
+            "[{}] None of the {} client_routes rows named a readable host_id; "
+                + "keeping all {} existing cached routes",
+            logPrefix,
+            rowCount,
+            cachedRoutes.size());
+      } else {
+        LOG.warn(
+            "[{}] {} of {} client_routes rows named no readable host_id; keeping the "
+                + "cached routes this refresh cannot prove deleted",
+            logPrefix,
+            unattributableRows,
+            rowCount);
+      }
+      keepable = new HashSet<>(cachedRoutes.keySet());
     }
-    Set<UUID> keepable = new HashSet<>(cachedRoutes.keySet());
     keepable.addAll(newRoutes.keySet());
     return keepable;
+  }
+
+  /**
+   * Advances the unconfirmed-carry-over count for every cached host this pass had in scope but
+   * could not rebuild, resets it for the ones it did, and forgets every host that is no longer
+   * cached. Then, for any host that has now gone unconfirmed {@value
+   * #CARRY_OVERS_BEFORE_ESCALATION} times or more, says so once at {@code ERROR}.
+   *
+   * <p>Nothing is evicted here, by design. The rows came back; the server still holds a route for
+   * these hosts and this driver simply cannot read it, so the cached value remains the best answer
+   * available and dropping it would send a working node to an address that does not work in the
+   * deployment client routes exist for. What retention cannot do is stay quiet about it, since the
+   * per-row {@code WARN} says a row was unusable but never that a route is still being served on
+   * the strength of an older one.
+   *
+   * @param installedRoutes the cache as this pass left it; hosts outside it are forgotten.
+   * @param newRoutes the routes this pass rebuilt; these are the confirmed ones.
+   * @param queriedHostIds the hosts this pass actually asked about, or {@code null} for a full
+   *     refresh, which asked about all of them. A targeted refresh learns nothing about a host
+   *     outside its scope, so such a host keeps its count rather than advancing it.
+   */
+  private void recordCarryOvers(
+      @NonNull Map<UUID, ClientRouteRecord> installedRoutes,
+      @NonNull Map<UUID, ClientRouteRecord> newRoutes,
+      @Nullable Set<UUID> queriedHostIds) {
+    Map<UUID, Integer> previous = carryOverCounts.get();
+    Map<UUID, Integer> current = new HashMap<>();
+    for (UUID hostId : installedRoutes.keySet()) {
+      if (newRoutes.containsKey(hostId)) {
+        continue;
+      }
+      if (queriedHostIds != null && !queriedHostIds.contains(hostId)) {
+        Integer carried = previous.get(hostId);
+        if (carried != null) {
+          current.put(hostId, carried);
+        }
+        continue;
+      }
+      Integer carried = previous.get(hostId);
+      current.put(hostId, (carried == null ? 0 : carried) + 1);
+    }
+    carryOverCounts.set(Collections.unmodifiableMap(current));
+
+    List<UUID> unconfirmed = new ArrayList<>();
+    for (Map.Entry<UUID, Integer> entry : current.entrySet()) {
+      if (entry.getValue() >= CARRY_OVERS_BEFORE_ESCALATION) {
+        unconfirmed.add(entry.getKey());
+      }
+    }
+    if (!unconfirmed.isEmpty()) {
+      Collections.sort(unconfirmed);
+      LOG.error(
+          "[{}] Serving {} client route(s) that the last {} refreshes could not confirm: {}. "
+              + "system.client_routes still returns a row for each, so the cached route is kept "
+              + "rather than dropped to the node's fallback address, but its value may be stale -- "
+              + "check those rows for an unreadable address or port",
+          logPrefix,
+          unconfirmed.size(),
+          CARRY_OVERS_BEFORE_ESCALATION,
+          unconfirmed);
+    }
+  }
+
+  /** The per-host unconfirmed-carry-over counts, for tests: this class asserts no log output. */
+  @VisibleForTesting
+  Map<UUID, Integer> getCarryOverCounts() {
+    return carryOverCounts.get();
   }
 
   /**
@@ -800,8 +859,13 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * deleted server-side. {@link #keepableHostIds} is the exception list -- the hosts this refresh
    * cannot show the server to have deleted -- and dropping one of those would send a working node
    * back to its private address, unreachable in the deployment client routes exist for. A
-   * carried-over record outlives the bad row for as long as it stays bad; the per-row {@code WARN}
-   * is the signal that it has.
+   * carried-over record outlives the bad row for as long as it stays bad -- indefinitely, if the
+   * row never becomes readable, because no non-empty refresh resets {@link
+   * #consecutiveEmptyResults}. That is the intended side of the trade rather than an oversight: an
+   * unusable row is evidence the route <em>exists</em>, since a deleted route is absent instead,
+   * and absence still evicts. Keeping a value that may be stale costs a connection attempt that
+   * fails fast; dropping one that was fine costs the node its only reachable address until the
+   * table changes. {@link #recordCarryOvers} is what stops the difference being invisible.
    */
   @NonNull
   private static Map<UUID, ClientRouteRecord> withRetainedCachedRoutes(
