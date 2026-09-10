@@ -27,6 +27,19 @@ on:
       - ".gitignore"
   workflow_dispatch:
 
+# JaCoCo matches execution data to classes by an id derived from the compiled
+# bytes, and javac 11 and javac 17 do not emit the same bytes for the same
+# source even under --release 11 (they order the constant pool differently).
+# Execution data recorded on one of them is therefore invisible to a report
+# rendered against classes compiled by the other, and invisible is literal:
+# JaCoCo only warns about a name it has no id for at all, so data that loses
+# to a matching id from another lane is dropped without a word. Only the lanes
+# on this JDK are instrumented, and the aggregating job compiles on it and
+# rejects data from any other, so the number stays one the lanes actually
+# produced.
+env:
+  COVERAGE_JAVA_VERSION: "17"
+
 jobs:
   build:
     name: Build
@@ -133,7 +146,34 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
 
       - name: Run unit tests
+        env:
+          COVERAGE: ${{ matrix.java-version == env.COVERAGE_JAVA_VERSION }}
         run: make test-unit
+
+      # Flattened to one file per module so the artifact layout does not depend
+      # on how many modules happened to produce data, and named per lane so the
+      # aggregating job can keep each lane's contribution apart.
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: |
+          shopt -s nullglob
+          mkdir -p coverage-exec
+          # Read back by the aggregating job, which refuses data compiled by a
+          # different javac than the one it renders the report against.
+          echo '${{ matrix.java-version }}' > coverage-exec/jdk.txt
+          for exec_file in */target/jacoco.exec metrics/*/target/jacoco.exec; do
+            module="${exec_file%/target/jacoco.exec}"
+            cp "$exec_file" "coverage-exec/${module//\//-}.exec"
+          done
+          ls -l coverage-exec
+
+      - name: Upload coverage execution data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        with:
+          name: coverage-exec-unit-${{ matrix.java-version }}
+          path: coverage-exec/
+          if-no-files-found: warn
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -256,7 +296,30 @@ jobs:
           GET_VERSION_VERSION: 0.4.5
           GH_TOKEN: ${{ github.token }}
           MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
+          COVERAGE: ${{ matrix.java-version == env.COVERAGE_JAVA_VERSION }}
         run: make test-integration-cassandra
+
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: |
+          shopt -s nullglob
+          mkdir -p coverage-exec
+          # Read back by the aggregating job, which refuses data compiled by a
+          # different javac than the one it renders the report against.
+          echo '${{ matrix.java-version }}' > coverage-exec/jdk.txt
+          for exec_file in */target/jacoco.exec metrics/*/target/jacoco.exec; do
+            module="${exec_file%/target/jacoco.exec}"
+            cp "$exec_file" "coverage-exec/${module//\//-}.exec"
+          done
+          ls -l coverage-exec
+
+      - name: Upload coverage execution data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        with:
+          name: coverage-exec-cassandra-${{ matrix.cassandra-version }}-${{ matrix.java-version }}-${{ matrix.test-group }}
+          path: coverage-exec/
+          if-no-files-found: warn
 
       - name: Upload test results
         if: failure() && steps.run-integration-tests.outcome == 'failure'
@@ -369,7 +432,30 @@ jobs:
         env:
           SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
           MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
+          COVERAGE: ${{ matrix.java-version == env.COVERAGE_JAVA_VERSION }}
         run: make test-integration-scylla
+
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: |
+          shopt -s nullglob
+          mkdir -p coverage-exec
+          # Read back by the aggregating job, which refuses data compiled by a
+          # different javac than the one it renders the report against.
+          echo '${{ matrix.java-version }}' > coverage-exec/jdk.txt
+          for exec_file in */target/jacoco.exec metrics/*/target/jacoco.exec; do
+            module="${exec_file%/target/jacoco.exec}"
+            cp "$exec_file" "coverage-exec/${module//\//-}.exec"
+          done
+          ls -l coverage-exec
+
+      - name: Upload coverage execution data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        with:
+          name: coverage-exec-scylla-${{ matrix.scylla-version }}-${{ matrix.java-version }}-${{ matrix.test-group }}
+          path: coverage-exec/
+          if-no-files-found: warn
 
       - name: Upload test results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -396,3 +482,107 @@ jobs:
           detailed_summary: true
           updateComment: false
           skip_annotations: true
+
+  coverage-report:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    needs: [unit-tests, cassandra-integration-tests, scylla-integration-tests]
+    # Runs even when a test lane failed: partial coverage data is still worth
+    # reporting, and continue-on-error keeps a flaky integration test from
+    # turning this metric into a second failure on the pull request.
+    if: ${{ !cancelled() }}
+    continue-on-error: true
+    timeout-minutes: 20
+
+    # Only needs to read the checkout; same-run artifacts are handled by the
+    # Actions runtime token rather than GITHUB_TOKEN. Scoped on this job alone
+    # so the existing lanes keep the token permissions their reporting steps
+    # rely on.
+    permissions:
+      contents: read
+
+    env:
+      # Overrides the Makefile default of `mvn -B -X -ntp`; this job has nothing
+      # to debug and -X buys a log measured in hundreds of megabytes.
+      MVNCMD: mvn -B -ntp
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK ${{ env.COVERAGE_JAVA_VERSION }}
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          java-version: ${{ env.COVERAGE_JAVA_VERSION }}
+          distribution: 'temurin'
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ env.COVERAGE_JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Download coverage execution data
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: coverage-exec-*
+          path: coverage-exec
+
+      # jacoco:report-aggregate picks up every *.exec in a module's target
+      # directory, so each lane's data only has to land there under a name of
+      # its own. The module name was flattened on upload (metrics/micrometer ->
+      # metrics-micrometer), so undo that to find the directory again.
+      #
+      # The lanes are listed to the job summary because "if: !cancelled()"
+      # lets this job run with some of them failed or skipped, and a lane
+      # missing its data costs the percentage silently: the report is simply
+      # lower, with nothing in it recording what it was built from.
+      - name: Place execution data next to the classes it was recorded against
+        run: |
+          set -o pipefail
+          shopt -s nullglob
+          lanes=(coverage-exec/*/)
+          if [[ ${#lanes[@]} -eq 0 ]]; then
+            echo '::error::No coverage execution data was downloaded from any test lane.'
+            exit 1
+          fi
+          {
+            echo '### Coverage execution data'
+            echo
+            echo "| Lane | Modules |"
+            echo "| --- | --- |"
+          } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          for lane in "${lanes[@]}"; do
+            lane_name="$(basename "$lane")"
+            lane_jdk="$(cat "$lane/jdk.txt" 2>/dev/null || true)"
+            if [[ "$lane_jdk" != "$COVERAGE_JAVA_VERSION" ]]; then
+              echo "::error::${lane_name} recorded its execution data on JDK ${lane_jdk:-unknown}, but this job renders the report against classes compiled by JDK ${COVERAGE_JAVA_VERSION}. JaCoCo would drop that lane's data without a warning, so fail here instead."
+              exit 1
+            fi
+            modules=()
+            for exec_file in "$lane"*.exec; do
+              module="$(basename "$exec_file" .exec)"
+              if [[ ! -d "$module" && -d "${module/-//}" ]]; then
+                module="${module/-//}"
+              fi
+              modules+=("$module")
+              mkdir -p "$module/target"
+              cp "$exec_file" "$module/target/jacoco-${lane_name#coverage-exec-}.exec"
+            done
+            echo "| ${lane_name#coverage-exec-} | ${#modules[@]}: ${modules[*]} |" \
+              | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          done
+          find . -name 'jacoco-*.exec' -printf '%p\t%s bytes\n'
+
+      - name: Aggregate coverage
+        run: make coverage-report
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-report
+          path: coverage-report/target/site/jacoco-aggregate
+          if-no-files-found: error
