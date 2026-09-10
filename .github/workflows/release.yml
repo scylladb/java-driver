@@ -25,11 +25,33 @@ jobs:
 
     permissions:
       contents: write
+      issues: read
 
     env:
       MVNCMD: mvn -B -X -ntp
 
     steps:
+      - name: Check for open release blockers
+        if: inputs.dry-run == false
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          blocker="$(
+            gh issue list \
+              --repo "$GITHUB_REPOSITORY" \
+              --state open \
+              --label release-blocker \
+              --limit 1 \
+              --json title,url \
+              --jq '.[0] | select(.) | "\(.url) — \(.title)"'
+          )"
+          if [[ -n "$blocker" ]]; then
+            echo "::error::Release blocked by open issue: $blocker"
+            exit 1
+          fi
+          echo "No open release blockers."
+
       - name: Checkout Repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
