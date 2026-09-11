@@ -67,6 +67,11 @@ public interface NettyOptions {
   /**
    * A hook invoked each time the driver creates a client bootstrap in order to open a channel. This
    * is a good place to configure any custom option on the bootstrap.
+   *
+   * <p>It is also invoked once against a bootstrap that opens no channel, so that the driver can
+   * read back the {@code AddressResolverGroup} the hook installs (see {@code
+   * ChannelFactory#resolveAll}). A hook with side effects of its own should expect that one extra
+   * call.
    */
   void afterBootstrapInitialized(Bootstrap bootstrap);
 
