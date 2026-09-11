@@ -130,15 +130,32 @@ install-scylla-ccm:
 
 download-all-dependencies: compile-all .download-test-dependencies .download-verify-dependencies
 
-# A server version is usable only when it names one build: MAJOR.MINOR.PATCH, or an exact
-# pre-release build (2022.2.0-rc0, 5.0.rc3, 4.0-alpha1, 2022.1.3-dev-0.20220922.539a55e35).
-# A pre-release label must start with a letter and carry a numeric discriminator, so a bare
-# selector such as 6.2.0~rc or 6.2.0-dev is not one: CCM resolves it to whichever build is
-# newest today. Anything less - a bare MAJOR.MINOR above all - makes every 'ccm create'
-# re-query S3 for the newest patch instead of reusing the release it already installed.
+# A server version is usable only when it names one build. Three shapes do:
+#
+#   6.2.3                               MAJOR.MINOR.PATCH
+#   2022.2.0-rc0, 5.0.rc3, 4.0-alpha1   a pre-release label carrying its own number
+#   5.4.0~dev-0.20230801.37b548f46365   a label with no number, plus a dated build id
+#
+# The number has to sit in the label itself, not merely somewhere after it: CCM strips a
+# trailing -x86_64/-aarch64 before parsing (ccmlib/utils/version.py), so 6.2.0-dev-aarch64
+# would reach it as the bare, moving selector 6.2.0-dev, resolved to whichever build is
+# newest today. A label carrying no number of its own is exact only when a dated build id
+# follows it. A bare one (5.1.2-0.20221225.4c0f7ea09893) is not exact in practice:
+# normalize_scylla_version rewrites its '-' to '~' and CCM then resolves no package.
+# Anything less - a bare MAJOR.MINOR above all - makes every 'ccm create' re-query S3 for
+# the newest patch instead of reusing the release it already installed.
 # Used by the resolvers below and by every target that hands a version to CCM, so that one
 # grammar decides all of them.
-SERVER_VERSION_RE = ^[0-9]+\.[0-9]+\.[0-9]+$$|^[0-9]+\.[0-9]+(\.[0-9]+)?[-~.][A-Za-z][A-Za-z._~-]*[0-9][A-Za-z0-9._~-]*$$
+_VERSION_NUM   = [0-9]+\.[0-9]+(\.[0-9]+)?
+_VERSION_LABEL = [A-Za-z]+[0-9][A-Za-z0-9]*
+_VERSION_BUILD = [0-9]+\.20[0-9]{6}\.[0-9A-Za-z]+
+# A packaging suffix (.x86_64, -0.20230207.8ff4717fd010) may follow, but never a bare
+# separator: a trailing '-' or '.' is the same sloppiness as the partial version '4.1.'.
+_VERSION_TAIL  = ([-~.][A-Za-z0-9]([A-Za-z0-9._~-]*[A-Za-z0-9])?)?
+_VERSION_PLAIN = [0-9]+\.[0-9]+\.[0-9]+
+_VERSION_PRE   = $(_VERSION_NUM)[-~.]$(_VERSION_LABEL)$(_VERSION_TAIL)
+_VERSION_DATED = $(_VERSION_NUM)[-~.][A-Za-z]+-$(_VERSION_BUILD)$(_VERSION_TAIL)
+SERVER_VERSION_RE = ^($(_VERSION_PLAIN)|$(_VERSION_PRE)|$(_VERSION_DATED))$$
 
 # $(1) = name of the shell var to hold the cached value (e.g. CASSANDRA_VERSION_CACHED)
 # $(2) = cache file path (e.g. ${CASSANDRA_VERSION_FILE})
