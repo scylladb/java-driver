@@ -172,6 +172,8 @@ public class RecommissionedNodeTest {
             .withStoragePort(mainCcm.getStoragePort())
             .withThriftPort(mainCcm.getThriftPort())
             .withBinaryPort(mainCcm.getBinaryPort())
+            // 2.1.20 is a Cassandra version: say so, or a Scylla run would install it as Scylla.
+            .withScylla(false)
             .withVersion(VersionNumber.parse("2.1.20"));
     otherCcm = CCMCache.get(otherCcmBuilder);
     otherCcm.waitForUp(1);

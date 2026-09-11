@@ -345,6 +345,14 @@ public class CCMTestsSupport {
     }
 
     @SuppressWarnings("SimplifiableIfStatement")
+    private Boolean scylla() {
+      for (CCMConfig ann : annotations) {
+        if (ann != null && ann.scylla().length > 0) return ann.scylla()[0];
+      }
+      return null;
+    }
+
+    @SuppressWarnings("SimplifiableIfStatement")
     private boolean ssl() {
       for (CCMConfig ann : annotations) {
         if (ann != null && ann.ssl().length > 0) return ann.ssl()[0];
@@ -497,14 +505,19 @@ public class CCMTestsSupport {
           ccmBuilder = CCMBridge.builder().withNodes(numberOfNodes()).notStarted();
         }
 
+        // Set the flavor before the version: which server an explicitly configured version names
+        // is decided by these flags, which otherwise default to the flavor of the surrounding run.
+        Boolean dse = dse();
+        if (dse != null) ccmBuilder.withDSE(dse);
+        Boolean scylla = scylla();
+        if (scylla != null) ccmBuilder.withScylla(scylla);
+
         String versionStr = version();
         if (versionStr != null) {
           VersionNumber version = VersionNumber.parse(versionStr);
           ccmBuilder.withVersion(version);
         }
 
-        Boolean dse = dse();
-        if (dse != null) ccmBuilder.withDSE(dse);
         if (ssl()) ccmBuilder.withSSL();
         if (auth()) ccmBuilder.withAuth();
         for (Map.Entry<String, Object> entry : config().entrySet()) {
