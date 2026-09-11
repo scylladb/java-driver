@@ -46,6 +46,32 @@ deduplicated. Set the option to `false` if your contact points are IP literals o
 never change, or to keep reconnection rounds short; the control connection then re-resolves
 nothing.
 
+#### A contact point given as a hostname is tried at every address it resolves to
+
+When the control connection reaches a contact point kept as a hostname (the default,
+`advanced.resolve-contact-points = false`), at startup or through the reconnection fallback above,
+the name is now resolved to all of its addresses, and up to
+`advanced.connection.max-candidate-addresses` of them (5 by default) are tried in random order before
+the contact point is given up on. A dead first record no longer fails `CqlSession.build()`. What
+changes:
+
+- `AllNodesFailedException` carries one entry per address tried, under a temporary node named
+  `cluster.example.com/10.0.0.1:9042`, instead of one entry for the hostname.
+- The node the control connection reaches through a contact point is registered under that labelled
+  address. Its `getEndPoint().resolve()` is now resolved (`getAddress()` is no longer `null`), its
+  `toString()` and the `node` metric tag read `cluster.example.com/10.0.0.1:9042` rather than
+  `cluster.example.com:9042`, and connections opened to it later go to that address instead of
+  resolving the name again. Its host string, Dropwizard metric prefix
+  (`nodes.cluster_example_com:9042.*`), TLS hostname and the endpoint handed to `AuthProvider` are
+  unchanged. A node already known under its own address keeps that endpoint.
+- Startup takes up to `max-candidate-addresses` × (`connect-timeout` + the init handshake) when every
+  record is dead. Set the option to `1` for the previous one-attempt behaviour.
+- A `NodeStateListener` sees `onDown` for each address that failed before the session was
+  initialized, as it did for the contact point itself.
+- Nothing else expands: IP-literal contact points, already-resolved contact points
+  (`resolve-contact-points = true`, a programmatic resolved `InetSocketAddress`), custom `EndPoint`s
+  and every node discovered from the cluster are tried as they are.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time

@@ -21,18 +21,26 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
+import com.datastax.oss.driver.internal.core.channel.DriverChannelOptions;
 import com.datastax.oss.driver.internal.core.channel.MockChannelFactoryHelper;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
@@ -40,8 +48,15 @@ import com.datastax.oss.driver.internal.core.metadata.NodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -49,6 +64,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
 
 @RunWith(DataProviderRunner.class)
 public class ControlConnectionTest extends ControlConnectionTestBase {
@@ -1088,5 +1104,420 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     verify(topologyMonitor, never()).getChannelNodeInfo(any(DriverChannel.class));
 
     factoryHelper.verifyNoMoreCalls();
+  }
+
+  // ---- Contact-point expansion: a hostname is resolved to every address it maps to, and each one
+  // is tried as its own temporary node before the rest of the plan.
+
+  private static final InetSocketAddress HOSTNAME =
+      InetSocketAddress.createUnresolved("cluster.example.com", 9042);
+
+  /** A contact point given as a hostname, as `basic.contact-points` produces under the defaults. */
+  private DefaultNode hostnameContactPoint() {
+    return DefaultNode.newContactPoint(new DefaultEndPoint(HOSTNAME), context);
+  }
+
+  /** What the resolver answers with: a resolved loopback address, {@code 127.0.0.<lastByte>}. */
+  private static SocketAddress resolvedAddress(int lastByte) {
+    return new InetSocketAddress("127.0.0." + lastByte, 9042);
+  }
+
+  private void mockResolveAll(SocketAddress... answer) {
+    when(channelFactory.resolveAll(HOSTNAME))
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.copyOf(answer)));
+  }
+
+  /** Matches the temporary node the expansion mints for {@code 127.0.0.<lastByte>}. */
+  private static ArgumentMatcher<Node> nodeAt(int lastByte) {
+    return node -> {
+      // Null-safe: Mockito evaluates existing matchers against null while registering the next
+      // stub.
+      if (node == null) {
+        return false;
+      }
+      SocketAddress address = node.getEndPoint().resolve();
+      return address instanceof InetSocketAddress
+          && !((InetSocketAddress) address).isUnresolved()
+          && ((InetSocketAddress) address)
+              .getAddress()
+              .getHostAddress()
+              .equals("127.0.0." + lastByte);
+    };
+  }
+
+  private void mockConnectSuccess(ArgumentMatcher<Node> node, DriverChannel channel) {
+    when(channelFactory.connect(argThat(node), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel));
+  }
+
+  private void mockConnectFailure(ArgumentMatcher<Node> node, String message) {
+    CompletableFuture<DriverChannel> failed = new CompletableFuture<>();
+    failed.completeExceptionally(new IllegalStateException(message));
+    when(channelFactory.connect(argThat(node), any(DriverChannelOptions.class))).thenReturn(failed);
+  }
+
+  /**
+   * Every node {@code connect()} was called with, in call order, once {@code expected} calls
+   * happened.
+   */
+  private List<Node> connectedNodes(int expected) {
+    ArgumentCaptor<Node> captor = ArgumentCaptor.forClass(Node.class);
+    verify(channelFactory, timeout(500).times(expected))
+        .connect(captor.capture(), any(DriverChannelOptions.class));
+    return captor.getAllValues();
+  }
+
+  private static String labelled(int lastByte) {
+    return "cluster.example.com/127.0.0." + lastByte + ":9042";
+  }
+
+  @Test
+  public void should_try_every_address_a_contact_point_resolves_to() {
+    // Given -- the name maps to two addresses, the first of which is dead
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(resolvedAddress(1), resolvedAddress(2));
+    mockConnectFailure(nodeAt(1), "dead record");
+    DriverChannel channel2 = newMockDriverChannel(2);
+    mockConnectSuccess(nodeAt(2), channel2);
+    // Resolver order is kept for this test: a two-element shuffle with this seed is the identity.
+    controlConnection = new ControlConnection(context, new Random(1));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- the second address rescued the contact point
+    assertThatStage(initFuture)
+        .isSuccess(v -> assertThat(controlConnection.channel()).isEqualTo(channel2));
+    verify(channelFactory).resolveAll(HOSTNAME);
+    List<Node> tried = connectedNodes(2);
+    // Each attempt is its own temporary node, labelled with the name and the address it dialled,
+    // so TLS and authentication see the configured name and a failure says which address failed.
+    assertThat(tried)
+        .extracting(node -> node.getEndPoint().toString())
+        .containsExactly(labelled(1), labelled(2));
+    for (Node node : tried) {
+      assertThat(node).isNotSameAs(contactPoint);
+      assertThat(node.getHostId()).isNull();
+      InetSocketAddress address = (InetSocketAddress) node.getEndPoint().resolve();
+      assertThat(address.isUnresolved()).isFalse();
+      assertThat(address.getHostString()).isEqualTo("cluster.example.com");
+    }
+    // The retained contact point itself was never dialled and never changed.
+    verify(channelFactory, never()).connect(same(contactPoint), any(DriverChannelOptions.class));
+    assertThat(((InetSocketAddress) contactPoint.getEndPoint().resolve()).isUnresolved()).isTrue();
+  }
+
+  @Test
+  public void should_report_each_address_of_a_contact_point_that_failed() {
+    // Given
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(resolvedAddress(1), resolvedAddress(2));
+    mockConnectFailure(nodeAt(1), "dead record 1");
+    mockConnectFailure(nodeAt(2), "dead record 2");
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- one entry per address, under the temporary node that dialled it
+    assertThatStage(initFuture)
+        .isFailed(
+            error -> {
+              assertThat(error).isInstanceOf(AllNodesFailedException.class);
+              AllNodesFailedException allFailed = (AllNodesFailedException) error;
+              assertThat(allFailed.getAllErrors()).hasSize(2);
+              assertThat(allFailed.getAllErrors().keySet())
+                  .extracting(node -> node.getEndPoint().toString())
+                  .containsExactlyInAnyOrder(labelled(1), labelled(2));
+              assertThat(allFailed.getAllErrors().values())
+                  .allSatisfy(
+                      errors ->
+                          assertThat(errors)
+                              .hasSize(1)
+                              .allSatisfy(t -> assertThat(t).hasMessageContaining("dead record")));
+            });
+    // and the round is reported per attempt, as for any contact point
+    for (Node node : connectedNodes(2)) {
+      verify(eventBus).fire(ChannelEvent.controlConnectionFailed(node));
+    }
+  }
+
+  @Test
+  public void should_deduplicate_the_addresses_a_contact_point_resolves_to() {
+    // Given -- a duplicated record (#989)
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(resolvedAddress(1), resolvedAddress(1), resolvedAddress(2));
+    mockConnectFailure(nodeAt(1), "dead record");
+    mockConnectFailure(nodeAt(2), "dead record");
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- the duplicate is not dialled twice
+    assertThatStage(initFuture).isFailed();
+    assertThat(connectedNodes(2))
+        .extracting(node -> node.getEndPoint().toString())
+        .containsExactlyInAnyOrder(labelled(1), labelled(2));
+  }
+
+  @Test
+  public void should_shuffle_the_addresses_a_contact_point_resolves_to() {
+    // Given -- five records, all dead, and a seeded source of randomness
+    long seed = 7;
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(
+        resolvedAddress(1),
+        resolvedAddress(2),
+        resolvedAddress(3),
+        resolvedAddress(4),
+        resolvedAddress(5));
+    for (int i = 1; i <= 5; i++) {
+      mockConnectFailure(nodeAt(i), "dead record");
+    }
+    controlConnection = new ControlConnection(context, new Random(seed));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- dialled in the order that seed shuffles the resolver's answer into, not the
+    // resolver's own, so that a dead first record is not dead for every session
+    assertThatStage(initFuture).isFailed();
+    List<String> resolverOrder = new ArrayList<>();
+    for (int i = 1; i <= 5; i++) {
+      resolverOrder.add(labelled(i));
+    }
+    List<String> expectedOrder = new ArrayList<>(resolverOrder);
+    Collections.shuffle(expectedOrder, new Random(seed));
+    assertThat(expectedOrder).isNotEqualTo(resolverOrder); // or the test would prove nothing
+    assertThat(connectedNodes(5))
+        .extracting(node -> node.getEndPoint().toString())
+        .containsExactlyElementsOf(expectedOrder);
+  }
+
+  @Test
+  public void should_try_at_most_max_candidate_addresses_of_a_contact_point() {
+    // Given -- seven records, a cap of two
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES))
+        .thenReturn(2);
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    SocketAddress[] answer = new SocketAddress[7];
+    for (int i = 0; i < 7; i++) {
+      answer[i] = resolvedAddress(i + 1);
+      mockConnectFailure(nodeAt(i + 1), "dead record");
+    }
+    mockResolveAll(answer);
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- two attempts, two entries, and the round ends there
+    assertThatStage(initFuture)
+        .isFailed(error -> assertThat(((AllNodesFailedException) error).getAllErrors()).hasSize(2));
+    assertThat(connectedNodes(2)).hasSize(2);
+    verify(channelFactory, times(2)).connect(any(Node.class), any(DriverChannelOptions.class));
+  }
+
+  @Test
+  public void should_try_at_least_one_address_when_the_cap_is_zero() {
+    // Given
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES))
+        .thenReturn(0);
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(resolvedAddress(1), resolvedAddress(2));
+    DriverChannel channel = newMockDriverChannel(1);
+    mockConnectSuccess(nodeAt(1), channel);
+    mockConnectSuccess(nodeAt(2), channel);
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then
+    assertThatStage(initFuture).isSuccess();
+    verify(channelFactory, times(1)).connect(any(Node.class), any(DriverChannelOptions.class));
+  }
+
+  @Test
+  public void should_not_expand_a_contact_point_given_as_an_ip_literal() {
+    // Given -- under resolve-contact-points = false an IP literal is kept unresolved too; there is
+    // nothing to expand in it
+    DefaultNode literal =
+        DefaultNode.newContactPoint(
+            new DefaultEndPoint(InetSocketAddress.createUnresolved("127.0.0.9", 9042)), context);
+    mockQueryPlan(literal);
+    DriverChannel channel = newMockDriverChannel(9);
+    when(channelFactory.connect(same(literal), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- dialled as it is, the way it always was
+    assertThatStage(initFuture)
+        .isSuccess(v -> assertThat(controlConnection.channel()).isEqualTo(channel));
+    verify(channelFactory, never()).resolveAll(any(SocketAddress.class));
+  }
+
+  @Test
+  public void should_not_expand_a_resolved_contact_point() {
+    // Given -- resolve-contact-points = true, or a programmatic resolved InetSocketAddress
+    DefaultNode resolved = TestNodeFactory.newContactPoint(2, context);
+    mockQueryPlan(resolved);
+    DriverChannel channel = newMockDriverChannel(2);
+    when(channelFactory.connect(same(resolved), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then
+    assertThatStage(initFuture).isSuccess();
+    verify(channelFactory, never()).resolveAll(any(SocketAddress.class));
+  }
+
+  @Test
+  public void should_not_expand_an_identified_node_with_a_hostname_endpoint() {
+    // Given -- an address translator can hand an identified node a hostname on purpose, to be
+    // re-resolved by Netty on every connect; that node is one server, not a set of addresses
+    DefaultNode identified =
+        TestNodeFactory.newNode(
+            DefaultNodeInfo.builder()
+                .withEndPoint(new DefaultEndPoint(HOSTNAME))
+                .withHostId(UUID.randomUUID())
+                .build(),
+            context);
+    mockQueryPlan(identified);
+    DriverChannel channel = newMockDriverChannel(3);
+    when(channelFactory.connect(same(identified), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then
+    assertThatStage(initFuture).isSuccess();
+    verify(channelFactory, never()).resolveAll(any(SocketAddress.class));
+  }
+
+  @Test
+  public void should_not_expand_a_custom_endpoint() {
+    // Given -- a custom EndPoint keeps its own semantics, whatever resolve() returns
+    EndPoint custom = mock(EndPoint.class);
+    when(custom.resolve()).thenReturn(HOSTNAME);
+    when(custom.asMetricPrefix()).thenReturn("custom");
+    DefaultNode contactPoint = DefaultNode.newContactPoint(custom, context);
+    mockQueryPlan(contactPoint);
+    DriverChannel channel = newMockDriverChannel(4);
+    when(channelFactory.connect(same(contactPoint), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then
+    assertThatStage(initFuture).isSuccess();
+    verify(channelFactory, never()).resolveAll(any(SocketAddress.class));
+  }
+
+  @Test
+  public void should_try_the_contact_point_as_is_when_resolution_fails() {
+    // Given
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    CompletableFuture<List<SocketAddress>> failed = new CompletableFuture<>();
+    failed.completeExceptionally(new IllegalStateException("resolver down"));
+    when(channelFactory.resolveAll(HOSTNAME)).thenReturn(failed);
+    DriverChannel channel = newMockDriverChannel(5);
+    when(channelFactory.connect(same(contactPoint), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- exactly what happened before expansion existed: Netty resolves inside the connect
+    assertThatStage(initFuture)
+        .isSuccess(v -> assertThat(controlConnection.channel()).isEqualTo(channel));
+    verify(channelFactory, times(1)).connect(any(Node.class), any(DriverChannelOptions.class));
+  }
+
+  @Test
+  public void should_try_the_contact_point_as_is_when_resolution_answers_nothing_usable() {
+    // Given -- a resolver that declines (NoopAddressResolverGroup, say) hands the name back as is
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(HOSTNAME);
+    DriverChannel channel = newMockDriverChannel(6);
+    when(channelFactory.connect(same(contactPoint), any(DriverChannelOptions.class)))
+        .thenReturn(CompletableFuture.completedFuture(channel));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then
+    assertThatStage(initFuture)
+        .isSuccess(v -> assertThat(controlConnection.channel()).isEqualTo(channel));
+    verify(channelFactory, times(1)).connect(any(Node.class), any(DriverChannelOptions.class));
+  }
+
+  @Test
+  public void should_expand_a_contact_point_reached_by_the_reconnection_fallback()
+      throws Exception {
+    // Given -- initialized on node1
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    DriverChannel channel1 = newMockDriverChannel(1);
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).success(node1, channel1).build();
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    factoryHelper.waitForCall(node1);
+    assertThatStage(initFuture)
+        .isSuccess(v -> assertThat(controlConnection.channel()).isEqualTo(channel1));
+
+    // the reconnection plan falls back to the contact point, whose name now maps elsewhere
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(resolvedAddress(7));
+    DriverChannel channel7 = newMockDriverChannel(7);
+    mockConnectSuccess(nodeAt(7), channel7);
+
+    // When
+    channel1.close();
+
+    // Then -- the fallback went through the expansion too, and the control connection moved to
+    // the address the name resolved to
+    verify(reconnectionSchedule, VERIFY_TIMEOUT).nextDelay();
+    await().untilAsserted(() -> assertThat(controlConnection.channel()).isEqualTo(channel7));
+    verify(channelFactory).resolveAll(HOSTNAME);
+    verify(channelFactory, never()).connect(same(contactPoint), any(DriverChannelOptions.class));
+  }
+
+  @Test
+  public void should_complete_the_round_when_closed_during_resolution() {
+    // Given -- initialized on node1, reconnecting through a contact point whose resolution hangs
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    DriverChannel channel1 = newMockDriverChannel(1);
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).success(node1, channel1).build();
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    factoryHelper.waitForCall(node1);
+    assertThatStage(initFuture).isSuccess();
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    CompletableFuture<List<SocketAddress>> pendingResolution = new CompletableFuture<>();
+    when(channelFactory.resolveAll(HOSTNAME)).thenReturn(pendingResolution);
+    channel1.close();
+    verify(channelFactory, VERIFY_TIMEOUT).resolveAll(HOSTNAME);
+
+    // When -- the control connection is closed while the name is still being resolved
+    CompletionStage<Void> closeFuture = controlConnection.forceCloseAsync();
+    assertThatStage(closeFuture).isSuccess();
+    pendingResolution.complete(ImmutableList.of(resolvedAddress(8)));
+
+    // Then -- the late answer opens nothing, and the round is over rather than left pending
+    verify(channelFactory, never()).connect(argThat(nodeAt(8)), any(DriverChannelOptions.class));
+    verify(channelFactory, never()).connect(same(contactPoint), any(DriverChannelOptions.class));
   }
 }

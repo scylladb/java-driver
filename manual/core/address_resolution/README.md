@@ -39,6 +39,42 @@ to establish connections.
   nodes are discovered by gossip.
 
 
+### Contact points given as hostnames
+
+A contact point written as a hostname (`basic.contact-points`, or `SessionBuilder.addContactPoint`
+with an unresolved `InetSocketAddress`) is kept as a name: under the default
+`advanced.resolve-contact-points = false` the driver never turns it into an address up front. Each
+time the control connection reaches such a contact point -- at startup, and on a reconnection round
+that has exhausted the live nodes (see
+`advanced.control-connection.reconnection.fallback-to-original-contact-points` in the
+[control connection](../control_connection/) page) -- the name is resolved to all of its current
+addresses, and up to `advanced.connection.max-candidate-addresses` of them (5 by default) are tried
+in random order before the contact point is given up on. Each attempt is its own temporary node,
+named `cluster.example.com/10.0.0.1:9042`, so TLS and authentication see the name you configured and
+a failure names the address it happened at; `AllNodesFailedException` lists one entry per address
+tried.
+
+The node the control connection ends up on is registered under that labelled address, and
+connections opened to it later go there directly. The name is resolved again only through the
+contact point, on the next fallback.
+
+What is not expanded:
+
+* a contact point given as an IP literal, or passed programmatically as an already-resolved
+  `InetSocketAddress`: there is no name left in it. Use `InetSocketAddress.createUnresolved`, or a
+  string contact point, if you want the name expanded;
+* a custom `EndPoint` given to `addContactEndPoint`, which keeps its own semantics;
+* every node discovered from the cluster: one server, one address. Pooled connections never expand a
+  name. A hostname an `AddressTranslator` hands back is re-resolved by Netty on every connect, one
+  address per connect, as before.
+
+Resolution goes through the resolver configured on Netty's `Bootstrap`, so an `AddressResolverGroup`
+installed via `NettyOptions.afterBootstrapInitialized` is honoured (`DnsAddressResolverGroup`, for
+non-blocking lookups, say). With Netty's default resolver the lookup blocks a Netty I/O event loop,
+never the admin executor, exactly as connecting to an unresolved contact point did before; the JVM's
+DNS cache (`networkaddress.cache.ttl`) applies to it.
+
+
 ### Cassandra-side configuration
 
 The address that each Cassandra node shares with clients is the **broadcast RPC address**; it is
