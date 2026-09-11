@@ -277,14 +277,39 @@ class HostConnectionPool implements Connection.Owner {
     if (reusedConnection != null && reusedConnection.setOwner(this)) {
       return initAsyncWithConnection(reusedConnection);
     }
-    try {
-      return initAsyncWithConnection(manager.connectionFactory().open(this));
-    } catch (Exception e) {
-      phase.compareAndSet(Phase.INITIALIZING, Phase.INIT_FAILED);
-      SettableFuture<Void> future = SettableFuture.create();
-      future.setException(e);
-      return future;
-    }
+
+    // Use the non-blocking openAsync to avoid a cyclic deadlock. The blocking open() call could
+    // be executed on a Netty I/O thread (via directExecutor() in SessionManager.initAsync), and
+    // if Netty's round-robin assigns the new channel to the same blocked I/O thread, the driver
+    // hangs indefinitely since no timeout task can interrupt it.
+    ListenableFuture<Void> initFuture =
+        Futures.transformAsync(
+            manager.connectionFactory().openAsync(this),
+            new AsyncFunction<Connection, Void>() {
+              @Override
+              public ListenableFuture<Void> apply(Connection conn) {
+                return initAsyncWithConnection(conn);
+              }
+            },
+            MoreExecutors.directExecutor());
+
+    Futures.addCallback(
+        initFuture,
+        new FutureCallback<Void>() {
+          @Override
+          public void onSuccess(Void v) {}
+
+          @Override
+          public void onFailure(Throwable t) {
+            // initAsyncWithConnection already sets INIT_FAILED in its own callback for async
+            // connection failures; this covers the case where openAsync itself fails (e.g.
+            // factory shutdown, or immediate ECONNREFUSED before the Netty channel is created).
+            phase.compareAndSet(Phase.INITIALIZING, Phase.INIT_FAILED);
+          }
+        },
+        MoreExecutors.directExecutor());
+
+    return initFuture;
   }
 
   ListenableFuture<Void> initAsyncWithConnection(Connection reusedConnection) {
