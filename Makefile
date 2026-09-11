@@ -137,16 +137,16 @@ download-all-dependencies: compile-all .download-test-dependencies .download-ver
 #
 #   6.2.3                               MAJOR.MINOR.PATCH
 #   2022.2.0-rc0, 5.0.rc3, 4.0-alpha1   a pre-release label carrying its own number
-#   5.1.2-0.20221225.4c0f7ea09893       a dated build id, with or without a leading label
-#   5.4.0~dev-0.20230801.37b548f46365
+#   5.4.0~dev-0.20230801.37b548f46365   a label with no number, plus a dated build id
 #
 # The number has to sit in the label itself, not merely somewhere after it: CCM strips a
 # trailing -x86_64/-aarch64 before parsing (ccmlib/utils/version.py), so 6.2.0-dev-aarch64
 # would reach it as the bare, moving selector 6.2.0-dev, resolved to whichever build is
 # newest today. A label carrying no number of its own is exact only when a dated build id
-# follows it, the one form CCM itself recognises as a dated dev build. Anything less - a
-# bare MAJOR.MINOR above all - makes every 'ccm create' re-query S3 for the newest patch
-# instead of reusing the release it already installed.
+# follows it. A bare one (5.1.2-0.20221225.4c0f7ea09893) is not exact in practice:
+# normalize_scylla_version rewrites its '-' to '~' and CCM then resolves no package.
+# Anything less - a bare MAJOR.MINOR above all - makes every 'ccm create' re-query S3 for
+# the newest patch instead of reusing the release it already installed.
 # Used by the resolvers below and by every target that hands a version to CCM, so that one
 # grammar decides all of them.
 _VERSION_NUM   = [0-9]+\.[0-9]+(\.[0-9]+)?
@@ -157,7 +157,7 @@ _VERSION_BUILD = [0-9]+\.20[0-9]{6}\.[0-9A-Za-z]+
 _VERSION_TAIL  = ([-~.][A-Za-z0-9]([A-Za-z0-9._~-]*[A-Za-z0-9])?)?
 _VERSION_PLAIN = [0-9]+\.[0-9]+\.[0-9]+
 _VERSION_PRE   = $(_VERSION_NUM)[-~.]$(_VERSION_LABEL)$(_VERSION_TAIL)
-_VERSION_DATED = $(_VERSION_NUM)([-~.][A-Za-z]+)?-$(_VERSION_BUILD)$(_VERSION_TAIL)
+_VERSION_DATED = $(_VERSION_NUM)[-~.][A-Za-z]+-$(_VERSION_BUILD)$(_VERSION_TAIL)
 SERVER_VERSION_RE = ^($(_VERSION_PLAIN)|$(_VERSION_PRE)|$(_VERSION_DATED))$$
 
 # $(1) = name of the shell var to hold the cached value (e.g. CASSANDRA_VERSION_CACHED)
@@ -183,9 +183,8 @@ endef
 define REQUIRE_FULLY_QUALIFIED_VERSION
 	version_re='$(SERVER_VERSION_RE)'
 	if [[ ! "$$$(1)" =~ $$version_re ]]; then
-		echo "$(2) version '$$$(1)' does not name one build, expected MAJOR.MINOR.PATCH, an exact"
-		echo "pre-release build such as 2022.2.0-rc0, or a dated build such as"
-		echo "5.1.2-0.20221225.4c0f7ea09893 - a bare '-rc'/'-dev' selector is not one"
+		echo "$(2) version '$$$(1)' does not name one build, expected MAJOR.MINOR.PATCH or an"
+		echo "exact pre-release build such as 2022.2.0-rc0 - a bare '-rc'/'-dev' selector is not one"
 		exit 1
 	fi
 endef
@@ -215,9 +214,8 @@ resolve-cassandra-version: .prepare-get-version
 		CASSANDRA_VERSION_RESOLVED=$$(get-version -source github-tag -repo apache/cassandra -prefix "cassandra-" -out-no-prefix -filters "^[0-9]+$$.^[0-9]+$$.^[0-9]+$$ and ${CASSANDRA_VERSION}.LAST" | tr -d '\"')
 	else
 		echo "Unknown Cassandra version name '${CASSANDRA_VERSION}'"
-		echo "Expected 3-LATEST, 4-LATEST, MAJOR.MINOR.PATCH, MAJOR.MINOR, an exact pre-release"
-		echo "build such as 4.0-alpha1, or a dated build such as 4.3.0-0.20210110.000585522 -"
-		echo "a bare '-rc'/'-dev' selector is not one"
+		echo "Expected 3-LATEST, 4-LATEST, MAJOR.MINOR.PATCH, MAJOR.MINOR, or an exact pre-release"
+		echo "build such as 4.0-alpha1 - a bare '-rc'/'-dev' selector is not one"
 		exit 1
 	fi
 
@@ -279,9 +277,8 @@ resolve-scylla-version: .prepare-get-version
 		fi
 	else
 		echo "Unknown ScyllaDB version name '${SCYLLA_VERSION}'"
-		echo "Expected LATEST, PRIOR, LTS-LATEST, LTS-PRIOR, MAJOR.MINOR.PATCH, MAJOR.MINOR, an"
-		echo "exact pre-release build such as 2022.2.0-rc0, or a dated build such as"
-		echo "5.1.2-0.20221225.4c0f7ea09893 - a bare '-rc'/'-dev' selector is not one"
+		echo "Expected LATEST, PRIOR, LTS-LATEST, LTS-PRIOR, MAJOR.MINOR.PATCH, MAJOR.MINOR, or an"
+		echo "exact pre-release build such as 2022.2.0-rc0 - a bare '-rc'/'-dev' selector is not one"
 		exit 1
 	fi
 
