@@ -701,8 +701,17 @@ public enum DefaultDriverOption implements DriverOption {
   CONTROL_CONNECTION_AGREEMENT_WARN("advanced.control-connection.schema-agreement.warn-on-failure"),
 
   /**
-   * Whether to forcibly add original contact points held by MetadataManager to the reconnection
-   * plan, in case there is no live nodes available according to LBP. Experimental.
+   * Whether to append the original contact points held by MetadataManager to the control
+   * connection's reconnection plan, after the live nodes reported by the load balancing policy.
+   * Defaults to {@code true}.
+   *
+   * <p>This is the driver's DNS re-resolution path. A metadata node discovered from the peers table
+   * holds an address resolved once and never re-resolved; a contact point given as a hostname is
+   * kept unresolved (the default) and looked up again through Netty's resolver on each connect, so
+   * once the live nodes are exhausted the contact points find a cluster that moved to new
+   * addresses, as soon as the JVM's DNS cache ({@code networkaddress.cache.ttl}) has expired. A
+   * resolved contact point ({@code advanced.resolve-contact-points = true}, or a programmatic
+   * resolved address) is appended as it is and never re-resolved.
    *
    * <p>Value-type: boolean
    */

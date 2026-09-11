@@ -190,6 +190,11 @@ public class MetadataManager implements AsyncAutoCloseable {
    * they are never added to metadata and never exposed to user-facing APIs (events, {@link
    * com.datastax.oss.driver.api.core.metadata.Metadata#getNodes()}, or {@link
    * com.datastax.oss.driver.api.core.metadata.NodeStateListener} callbacks).
+   *
+   * <p>The metadata node stores {@code nodeInfo.getEndPoint()} as-is and never re-resolves it. A
+   * contact-point hostname is re-read only through the control connection's reconnection fallback
+   * ({@code advanced.control-connection.reconnection.fallback-to-original-contact-points}), which
+   * re-offers the retained, still-unresolved contact points to Netty's resolver on each connect.
    */
   public CompletionStage<Node> registerNode(NodeInfo nodeInfo) {
     Preconditions.checkNotNull(nodeInfo.getHostId(), "Cannot register node without hostId");

@@ -29,6 +29,23 @@ datacenter is never populated, so it fired on every session that configured a lo
 contact points actually were. The warning for a configured DC that matches no node in the cluster is
 unchanged. `checkLocalDatacenterCompatibility` is removed, so drop any override of it.
 
+#### The control connection falls back to the contact points by default
+
+`advanced.control-connection.reconnection.fallback-to-original-contact-points` now defaults to
+`true`. Once a control-connection reconnection round has exhausted the live nodes, the original
+contact points are tried again. A contact point given as a hostname is kept unresolved and looked up
+again on each connect, so a cluster that moved to new addresses is found again once the JVM's DNS
+cache (`networkaddress.cache.ttl`) has expired; this is what
+[#215](https://github.com/scylladb/java-driver/issues/215) asked for. A resolved contact point
+(`advanced.resolve-contact-points = true`, or a programmatic `InetSocketAddress` that was already
+resolved) is appended as it is and is not re-resolved.
+
+The cost is one extra connection attempt per contact point per exhausted round: at plan time the
+contact points are hostnames and the live nodes resolved addresses, so the two cannot be
+deduplicated. Set the option to `false` if your contact points are IP literals or their records
+never change, or to keep reconnection rounds short; the control connection then re-resolves
+nothing.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time

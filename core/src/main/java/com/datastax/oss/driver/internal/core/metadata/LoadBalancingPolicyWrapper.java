@@ -35,10 +35,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -164,9 +161,7 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
       case BEFORE_INIT:
       case DURING_INIT:
         // The contact points are not stored in the metadata yet:
-        List<Node> nodes = new ArrayList<>(context.getMetadataManager().getContactPoints());
-        Collections.shuffle(nodes);
-        return new ConcurrentLinkedQueue<>(nodes);
+        return contactPointPlan();
       case RUNNING:
         LoadBalancingPolicy policy = policiesPerProfile.get(executionProfileName);
         if (policy == null) {
@@ -190,20 +185,30 @@ public class LoadBalancingPolicyWrapper implements AutoCloseable {
 
     // Before RUNNING, newQueryPlan() already built the plan from the contact points, so appending
     // them again would only duplicate every entry. Once RUNNING, the plan comes from the policy and
-    // is an immutable QueryPlan (add()/addAll() throw), so concatenate rather than mutate. The
-    // nodes retained by MetadataManager are appended, not fresh copies: their identity stays stable
-    // across reconnection rounds, and no throwaway node is minted per round.
+    // is an immutable QueryPlan (add()/addAll() throw), so concatenate rather than mutate.
     if (state == State.RUNNING
         && context
             .getConfig()
             .getDefaultProfile()
             .getBoolean(DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS)) {
-      Object[] contactNodes = context.getMetadataManager().getContactPoints().toArray();
-      ArrayUtils.shuffleHead(contactNodes, contactNodes.length);
-      return new CompositeQueryPlan(regularQueryPlan, new SimpleQueryPlan(contactNodes));
+      return new CompositeQueryPlan(regularQueryPlan, contactPointPlan());
     }
 
     return regularQueryPlan;
+  }
+
+  /**
+   * The retained contact points, in random order: the whole plan before the session is initialized,
+   * and what the control connection falls back to once the policy's plan is exhausted. One path for
+   * both, so a fallback round tries exactly what the initial connection tried. The nodes are the
+   * ones {@code MetadataManager} retains, not fresh copies: their identity stays stable across
+   * reconnection rounds, and no throwaway node is minted per round.
+   */
+  @NonNull
+  private Queue<Node> contactPointPlan() {
+    Object[] contactNodes = context.getMetadataManager().getContactPoints().toArray();
+    ArrayUtils.shuffleHead(contactNodes, contactNodes.length);
+    return new SimpleQueryPlan(contactNodes);
   }
 
   // when it comes in from the outside
