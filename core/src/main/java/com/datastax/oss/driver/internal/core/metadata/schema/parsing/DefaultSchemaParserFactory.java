@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
-import com.datastax.dse.driver.internal.core.metadata.schema.parsing.DseSchemaParser;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
 import net.jcip.annotations.ThreadSafe;
@@ -34,7 +32,6 @@ public class DefaultSchemaParserFactory implements SchemaParserFactory {
 
   @Override
   public SchemaParser newInstance(SchemaRows rows) {
-    boolean isDse = rows.getNode().getExtras().containsKey(DseNodeProperties.DSE_VERSION);
-    return isDse ? new DseSchemaParser(rows, context) : new CassandraSchemaParser(rows, context);
+    return new CassandraSchemaParser(rows, context);
   }
 }

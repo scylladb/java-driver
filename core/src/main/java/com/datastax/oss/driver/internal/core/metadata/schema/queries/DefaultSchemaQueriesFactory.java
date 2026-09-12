@@ -17,7 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -68,48 +67,27 @@ public class DefaultSchemaQueriesFactory implements SchemaQueriesFactory {
 
     DriverExecutionProfile config = context.getConfig().getDefaultProfile();
 
-    Version dseVersion = (Version) node.getExtras().get(DseNodeProperties.DSE_VERSION);
-    if (dseVersion != null) {
-      dseVersion = dseVersion.nextStable();
-
-      LOG.debug(
-          "[{}] Sending schema queries to {} with DSE version {}", logPrefix, node, dseVersion);
-      // 4.8 is the oldest version supported, which uses C* 2.1 schema
-      if (dseVersion.compareTo(Version.V5_0_0) < 0) {
-        return new Cassandra21SchemaQueries(channel, node, config, logPrefix);
-      } else if (dseVersion.compareTo(Version.V6_7_0) < 0) {
-        // 5.0 - 6.7 uses C* 3.0 schema
-        return new Cassandra3SchemaQueries(channel, node, config, logPrefix);
-      } else if (dseVersion.compareTo(Version.V6_8_0) < 0) {
-        // 6.7 uses C* 4.0 schema
-        return new Cassandra4SchemaQueries(channel, node, config, logPrefix);
-      } else {
-        // 6.8+ uses DSE 6.8 schema (C* 4.0 schema with graph metadata) (JAVA-1898)
-        return new Dse68SchemaQueries(channel, node, config, logPrefix);
-      }
+    Version cassandraVersion = node.getCassandraVersion();
+    if (cassandraVersion == null) {
+      LOG.warn(
+          "[{}] Cassandra version missing for {}, defaulting to {}",
+          logPrefix,
+          node,
+          Version.V3_0_0);
+      cassandraVersion = Version.V3_0_0;
     } else {
-      Version cassandraVersion = node.getCassandraVersion();
-      if (cassandraVersion == null) {
-        LOG.warn(
-            "[{}] Cassandra version missing for {}, defaulting to {}",
-            logPrefix,
-            node,
-            Version.V3_0_0);
-        cassandraVersion = Version.V3_0_0;
-      } else {
-        cassandraVersion = cassandraVersion.nextStable();
-      }
-      LOG.debug(
-          "[{}] Sending schema queries to {} with version {}", logPrefix, node, cassandraVersion);
-      if (cassandraVersion.compareTo(Version.V2_2_0) < 0) {
-        return new Cassandra21SchemaQueries(channel, node, config, logPrefix);
-      } else if (cassandraVersion.compareTo(Version.V3_0_0) < 0) {
-        return new Cassandra22SchemaQueries(channel, node, config, logPrefix);
-      } else if (cassandraVersion.compareTo(Version.V4_0_0) < 0) {
-        return new Cassandra3SchemaQueries(channel, node, config, logPrefix);
-      } else {
-        return new Cassandra4SchemaQueries(channel, node, config, logPrefix);
-      }
+      cassandraVersion = cassandraVersion.nextStable();
+    }
+    LOG.debug(
+        "[{}] Sending schema queries to {} with version {}", logPrefix, node, cassandraVersion);
+    if (cassandraVersion.compareTo(Version.V2_2_0) < 0) {
+      return new Cassandra21SchemaQueries(channel, node, config, logPrefix);
+    } else if (cassandraVersion.compareTo(Version.V3_0_0) < 0) {
+      return new Cassandra22SchemaQueries(channel, node, config, logPrefix);
+    } else if (cassandraVersion.compareTo(Version.V4_0_0) < 0) {
+      return new Cassandra3SchemaQueries(channel, node, config, logPrefix);
+    } else {
+      return new Cassandra4SchemaQueries(channel, node, config, logPrefix);
     }
   }
 }

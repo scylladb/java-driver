@@ -86,16 +86,6 @@ public class Cassandra22SchemaQueries extends CassandraSchemaQueries {
   }
 
   @Override
-  protected Optional<String> selectEdgesQuery() {
-    return Optional.empty();
-  }
-
-  @Override
-  protected Optional<String> selectVerticiesQuery() {
-    return Optional.empty();
-  }
-
-  @Override
   protected Optional<String> selectScyllaKeyspacesQuery() {
     return Optional.empty();
   }

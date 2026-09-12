@@ -133,27 +133,9 @@
           <instructions>
             <Bundle-SymbolicName>com.datastax.oss.driver.querybuilder</Bundle-SymbolicName>
             <Import-Package>!net.jcip.annotations.*, !edu.umd.cs.findbugs.annotations.*, *</Import-Package>
-            <Export-Package>com.datastax.oss.driver.*.querybuilder.*, com.datastax.dse.driver.*.querybuilder.*</Export-Package>
+            <Export-Package>com.datastax.oss.driver.*.querybuilder.*</Export-Package>
           </instructions>
         </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>generate-dependency-list</id>
-            <goals>
-              <goal>list</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <includeScope>runtime</includeScope>
-              <outputScope>true</outputScope>
-              <excludeGroupIds>com.datastax.cassandra,com.datastax.dse</excludeGroupIds>
-              <outputFile>${project.build.outputDirectory}/com/datastax/dse/driver/internal/querybuilder/deps.txt</outputFile>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

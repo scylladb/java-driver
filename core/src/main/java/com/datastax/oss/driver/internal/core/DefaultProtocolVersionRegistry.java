@@ -18,19 +18,16 @@
 package com.datastax.oss.driver.internal.core;
 
 import com.datastax.dse.driver.api.core.DseProtocolVersion;
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.dse.driver.internal.core.DseProtocolFeature;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.Node;
-import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import net.jcip.annotations.ThreadSafe;
@@ -50,21 +47,6 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
           .add(DefaultProtocolVersion.values())
           .add(DseProtocolVersion.values())
           .build();
-
-  @VisibleForTesting
-  static final Version DSE_4_7_0 = Objects.requireNonNull(Version.parse("4.7.0"));
-
-  @VisibleForTesting
-  static final Version DSE_5_0_0 = Objects.requireNonNull(Version.parse("5.0.0"));
-
-  @VisibleForTesting
-  static final Version DSE_5_1_0 = Objects.requireNonNull(Version.parse("5.1.0"));
-
-  @VisibleForTesting
-  static final Version DSE_6_0_0 = Objects.requireNonNull(Version.parse("6.0.0"));
-
-  @VisibleForTesting
-  static final Version DSE_7_0_0 = Objects.requireNonNull(Version.parse("7.0.0"));
 
   private final String logPrefix;
 
@@ -131,71 +113,38 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
     // For each node, remove the versions it doesn't support
     for (Node node : nodes) {
 
-      // We can't trust the Cassandra version reported by DSE to infer the maximum OSS protocol
-      // supported. For example DSE 6 reports release_version 4.0-SNAPSHOT, but only supports OSS
-      // protocol v4 (while Cassandra 4 will support v5). So we treat DSE separately.
-      Version dseVersion = (Version) node.getExtras().get(DseNodeProperties.DSE_VERSION);
-      if (dseVersion != null) {
-        LOG.debug("[{}] Node {} reports DSE version {}", logPrefix, node.getEndPoint(), dseVersion);
-        dseVersion = dseVersion.nextStable();
-        if (dseVersion.compareTo(DSE_4_7_0) < 0) {
-          throw new UnsupportedProtocolVersionException(
-              node.getEndPoint(),
-              String.format(
-                  "Node %s reports DSE version %s, "
-                      + "but the driver only supports 4.7.0 and above",
-                  node.getEndPoint(), dseVersion),
-              initialCandidates);
-        } else if (dseVersion.compareTo(DSE_5_0_0) < 0) {
-          // DSE 4.7.x, 4.8.x
-          removeHigherThan(DefaultProtocolVersion.V3, null, candidates);
-        } else if (dseVersion.compareTo(DSE_5_1_0) < 0) {
-          // DSE 5.0
-          removeHigherThan(DefaultProtocolVersion.V4, null, candidates);
-        } else if (dseVersion.compareTo(DSE_6_0_0) < 0) {
-          // DSE 5.1
-          removeHigherThan(DefaultProtocolVersion.V4, DseProtocolVersion.DSE_V1, candidates);
-        } else if (dseVersion.compareTo(DSE_7_0_0) < 0) {
-          // DSE 6
-          removeHigherThan(DefaultProtocolVersion.V4, DseProtocolVersion.DSE_V2, candidates);
-        } else {
-          // DSE 7.0
-          removeHigherThan(DefaultProtocolVersion.V5, DseProtocolVersion.DSE_V2, candidates);
-        }
-      } else { // not DSE
-        Version cassandraVersion = node.getCassandraVersion();
-        if (cassandraVersion == null) {
-          LOG.warn(
-              "[{}] Node {} reports neither DSE version nor Cassandra version, "
-                  + "ignoring it from optimal protocol version computation",
-              logPrefix,
-              node.getEndPoint());
-          continue;
-        }
-        cassandraVersion = cassandraVersion.nextStable();
-        LOG.debug(
-            "[{}] Node {} reports Cassandra version {}",
+      Version cassandraVersion = node.getCassandraVersion();
+      if (cassandraVersion == null) {
+        LOG.warn(
+            "[{}] Node {} does not report a Cassandra version, "
+                + "ignoring it from optimal protocol version computation",
             logPrefix,
+            node.getEndPoint());
+        continue;
+      }
+      cassandraVersion = cassandraVersion.nextStable();
+      LOG.debug(
+          "[{}] Node {} reports Cassandra version {}",
+          logPrefix,
+          node.getEndPoint(),
+          cassandraVersion);
+      if (cassandraVersion.compareTo(Version.V2_1_0) < 0) {
+        throw new UnsupportedProtocolVersionException(
             node.getEndPoint(),
-            cassandraVersion);
-        if (cassandraVersion.compareTo(Version.V2_1_0) < 0) {
-          throw new UnsupportedProtocolVersionException(
-              node.getEndPoint(),
-              String.format(
-                  "Node %s reports Cassandra version %s, "
-                      + "but the driver only supports 2.1.0 and above",
-                  node.getEndPoint(), cassandraVersion),
-              ImmutableList.of(DefaultProtocolVersion.V3, DefaultProtocolVersion.V4));
-        } else if (cassandraVersion.compareTo(Version.V2_2_0) < 0) {
-          // 2.1.0
-          removeHigherThan(DefaultProtocolVersion.V3, null, candidates);
-        } else if (cassandraVersion.compareTo(Version.V4_0_0) < 0) {
-          // 2.2, 3.x
-          removeHigherThan(DefaultProtocolVersion.V4, null, candidates);
-        } else {
-          // 4.0
-          removeHigherThan(DefaultProtocolVersion.V5, null, candidates);
-        }
+            String.format(
+                "Node %s reports Cassandra version %s, "
+                    + "but the driver only supports 2.1.0 and above",
+                node.getEndPoint(), cassandraVersion),
+            ImmutableList.of(DefaultProtocolVersion.V3, DefaultProtocolVersion.V4));
+      } else if (cassandraVersion.compareTo(Version.V2_2_0) < 0) {
+        // 2.1.0
+        removeHigherThan(DefaultProtocolVersion.V3, null, candidates);
+      } else if (cassandraVersion.compareTo(Version.V4_0_0) < 0) {
+        // 2.2, 3.x
+        removeHigherThan(DefaultProtocolVersion.V4, null, candidates);
+      } else {
+        // 4.0
+        removeHigherThan(DefaultProtocolVersion.V5, null, candidates);
       }
     }
 

@@ -26,7 +26,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
@@ -35,7 +34,6 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
@@ -52,8 +50,7 @@ public class DefaultSchemaQueriesFactoryTest {
     CASS_21(Cassandra21SchemaQueries.class),
     CASS_22(Cassandra22SchemaQueries.class),
     CASS_3(Cassandra3SchemaQueries.class),
-    CASS_4(Cassandra4SchemaQueries.class),
-    DSE_6_8(Dse68SchemaQueries.class);
+    CASS_4(Cassandra4SchemaQueries.class);
 
     final Class<? extends SchemaQueries> clz;
 
@@ -82,47 +79,19 @@ public class DefaultSchemaQueriesFactoryTest {
           .add(ImmutableList.of("4.1.0", Optional.empty(), Expected.CASS_4))
           .build();
 
-  private static ImmutableList<ImmutableList<Object>> dseVersions =
-      ImmutableList.<ImmutableList<Object>>builder()
-          // DSE 6.0.0
-          .add(ImmutableList.of("4.0.0.2284", Optional.of("6.0.0"), Expected.CASS_3))
-          // DSE 6.0.1
-          .add(ImmutableList.of("4.0.0.2349", Optional.of("6.0.1"), Expected.CASS_3))
-          // DSE 6.0.2 moved to DSE version (minus dots) in an extra element
-          .add(ImmutableList.of("4.0.0.602", Optional.of("6.0.2"), Expected.CASS_3))
-          // DSE 6.7.0 continued with the same idea
-          .add(ImmutableList.of("4.0.0.670", Optional.of("6.7.0"), Expected.CASS_4))
-          // DSE 6.8.0 does the same
-          .add(ImmutableList.of("4.0.0.680", Optional.of("6.8.0"), Expected.DSE_6_8))
-          .build();
-
-  private static ImmutableList<ImmutableList<Object>> allVersions =
-      ImmutableList.<ImmutableList<Object>>builder()
-          .addAll(cassandraVersions)
-          .addAll(dseVersions)
-          .build();
-
   @DataProvider(format = "%m %p[1] => %p[0]")
   public static Iterable<?> expected() {
 
-    return allVersions;
+    return cassandraVersions;
   }
 
   @Test
   @UseDataProvider("expected")
   public void should_return_correct_schema_queries_impl(
-      String cassandraVersion, Optional<String> dseVersion, Expected expected) {
+      String cassandraVersion, Optional<String> ignored, Expected expected) {
 
     final Node mockNode = mock(Node.class);
     when(mockNode.getCassandraVersion()).thenReturn(Version.parse(cassandraVersion));
-    dseVersion.ifPresent(
-        versionStr -> {
-          when(mockNode.getExtras())
-              .thenReturn(
-                  ImmutableMap.<String, Object>of(
-                      DseNodeProperties.DSE_VERSION, Version.parse(versionStr)));
-        });
-
     DefaultSchemaQueriesFactory factory = buildFactory();
 
     @SuppressWarnings("unchecked")

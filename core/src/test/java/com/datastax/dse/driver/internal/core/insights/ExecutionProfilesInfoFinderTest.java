@@ -22,7 +22,6 @@ import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMoc
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.SPECEX_MAX_DEFAULT;
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockDefaultExecutionProfile;
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockNonDefaultConsistency;
-import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockNonDefaultGraphOptions;
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockNonDefaultLoadBalancingExecutionProfile;
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockNonDefaultRequestTimeoutExecutionProfile;
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockNonDefaultSerialConsistency;
@@ -84,8 +83,7 @@ public class ExecutionProfilesInfoFinderTest {
                         ImmutableMap.of("maxSpeculativeExecutions", 100, "delay", 20),
                         DEFAULT_SPECULATIVE_EXECUTION_PACKAGE),
                     "LOCAL_ONE",
-                    "SERIAL",
-                    ImmutableMap.of("source", "src-graph"))));
+                    "SERIAL")));
   }
 
   @Test
@@ -120,8 +118,7 @@ public class ExecutionProfilesInfoFinderTest {
                         ImmutableMap.of("maxSpeculativeExecutions", 100, "delay", 20),
                         DEFAULT_SPECULATIVE_EXECUTION_PACKAGE),
                     "LOCAL_ONE",
-                    "SERIAL",
-                    ImmutableMap.of("source", "src-graph")),
+                    "SERIAL"),
                 "non-default",
                 expected));
   }
@@ -131,7 +128,7 @@ public class ExecutionProfilesInfoFinderTest {
     return new Object[][] {
       {
         mockNonDefaultRequestTimeoutExecutionProfile(),
-        new SpecificExecutionProfile(50, null, null, null, null, null)
+        new SpecificExecutionProfile(50, null, null, null, null)
       },
       {
         mockNonDefaultLoadBalancingExecutionProfile(),
@@ -141,7 +138,6 @@ public class ExecutionProfilesInfoFinderTest {
                 "NonDefaultLoadBalancing",
                 ImmutableMap.of("localDataCenter", DEFAULT_LOCAL_DC, "filterFunction", true),
                 DEFAULT_LOAD_BALANCING_PACKAGE),
-            null,
             null,
             null,
             null)
@@ -154,7 +150,6 @@ public class ExecutionProfilesInfoFinderTest {
                 "NonDefaultLoadBalancing",
                 ImmutableMap.of("filterFunction", true),
                 DEFAULT_LOAD_BALANCING_PACKAGE),
-            null,
             null,
             null,
             null)
@@ -170,26 +165,14 @@ public class ExecutionProfilesInfoFinderTest {
                     "maxSpeculativeExecutions", SPECEX_MAX_DEFAULT, "delay", SPECEX_DELAY_DEFAULT),
                 DEFAULT_SPECULATIVE_EXECUTION_PACKAGE),
             null,
-            null,
             null)
       },
-      {
-        mockNonDefaultConsistency(),
-        new SpecificExecutionProfile(null, null, null, "ALL", null, null)
-      },
+      {mockNonDefaultConsistency(), new SpecificExecutionProfile(null, null, null, "ALL", null)},
       {
         mockNonDefaultSerialConsistency(),
-        new SpecificExecutionProfile(null, null, null, null, "ONE", null)
+        new SpecificExecutionProfile(null, null, null, null, "ONE")
       },
-      {
-        mockNonDefaultGraphOptions(),
-        new SpecificExecutionProfile(
-            null, null, null, null, null, ImmutableMap.of("source", "non-default-graph"))
-      },
-      {
-        mockDefaultExecutionProfile(),
-        new SpecificExecutionProfile(null, null, null, null, null, null)
-      }
+      {mockDefaultExecutionProfile(), new SpecificExecutionProfile(null, null, null, null, null)}
     };
   }
 
@@ -197,14 +180,13 @@ public class ExecutionProfilesInfoFinderTest {
   public void should_not_include_null_fields_in_json() throws JsonProcessingException {
     // given
     SpecificExecutionProfile specificExecutionProfile =
-        new SpecificExecutionProfile(50, null, null, "ONE", null, ImmutableMap.of("a", "b"));
+        new SpecificExecutionProfile(50, null, null, "ONE", null);
 
     // when
     String result = new ObjectMapper().writeValueAsString(specificExecutionProfile);
 
     // then
-    assertThat(result)
-        .isEqualTo("{\"readTimeout\":50,\"consistency\":\"ONE\",\"graphOptions\":{\"a\":\"b\"}}");
+    assertThat(result).isEqualTo("{\"readTimeout\":50,\"consistency\":\"ONE\"}");
   }
 
   @Test
@@ -212,7 +194,7 @@ public class ExecutionProfilesInfoFinderTest {
       throws JsonProcessingException {
     // given
     Map<String, SpecificExecutionProfile> executionProfiles =
-        ImmutableMap.of("p", new SpecificExecutionProfile(null, null, null, null, null, null));
+        ImmutableMap.of("p", new SpecificExecutionProfile(null, null, null, null, null));
 
     // when
     String result = new ObjectMapper().writeValueAsString(executionProfiles);
