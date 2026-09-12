@@ -47,8 +47,8 @@ right dependencies:
 </tr>
 <tr>
   <td>
-    Same as the above, but without explicit dependencies to <a href="#netty">Netty</a>,
-    <a href="#jackson">Jackson</a> or <a href="#esri">ESRI</a>. 
+    Same as the above, but without explicit dependencies to <a href="#netty">Netty</a> or
+    <a href="#jackson">Jackson</a>.
   </td>
   <td><code>java&#8209;driver&#8209;core&#8209;shaded</code></td>
   <td>
@@ -498,84 +498,6 @@ Note that configuration reporting is the one feature in that list which is enabl
 excluding Jackson turns it off without you having to opt out: the driver logs an informational message
 at startup and does not send `DRIVER_CONFIG`. Nothing else changes — `SESSION_ID` is still sent on
 every connection, and connecting is unaffected.
-
-#### Esri
-
-The geospatial types implementation is based on the [Esri Geometry
-API](https://github.com/Esri/geometry-api-java).
-
-For driver versions >= 4.4.0 and < 4.14.0 Esri is declared as a required dependency,
-although the driver can operate normally without it. If you don't use geospatial types
-anywhere in your application you can exclude the dependency:
-
-```xml
-<dependency>
-  <groupId>com.scylladb</groupId>
-  <artifactId>java-driver-core</artifactId>
-  <version>${driver.version}</version>
-  <exclusions>
-   <exclusion>
-     <groupId>com.esri.geometry</groupId>
-     <artifactId>*</artifactId>
-   </exclusion>
-  </exclusions>
-</dependency>
-```
-
-Starting with driver 4.14.0 Esri has been changed to an optional dependency.  You no longer have to
-explicitly exclude the dependency if it's not used, but if you do wish to make use of the Esri
-library you must now explicitly specify it as a dependency :
-
-```xml
-<dependency>
-  <groupId>com.esri.geometry</groupId>
-  <artifactId>esri-geometry-api</artifactId>
-  <version>${esri.version}</version>
-</dependency>
-```
-
-In the dependency specification above you should use any 1.2.x version of Esri (we recommend
-1.2.1).  These versions are older than the current 2.x versions of the library but they are
-guaranteed to be fully compatible with DSE.
-
-#### TinkerPop
-
-[Apache TinkerPop™](http://tinkerpop.apache.org/) is used in the graph API.
-
-For driver versions ranging from 4.4.0 to 4.9.0 inclusive, TinkerPop is declared as a required
-dependency, but the driver can operate normally without it. If you don't use the graph API at all,
-you can exclude the TinkerPop dependencies:
-
-```xml
-<dependency>
-  <groupId>com.scylladb</groupId>
-  <artifactId>java-driver-core</artifactId>
-  <version>${driver.version}</version>
-  <exclusions>
-    <exclusion>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>*</artifactId>
-    </exclusion>
-  </exclusions>
-</dependency>
-```
-
-Starting with driver 4.10 however, TinkerPop switched to an optional dependency. Excluding TinkerPop
-explicitly is not required anymore if you don't use it. _If you do use the graph API though, you now
-need to explicitly include the dependencies below in your application_:
-
-```xml
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>gremlin-core</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>tinkergraph-gremlin</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-```
 
 #### Reactive Streams
 

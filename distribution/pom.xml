@@ -131,11 +131,6 @@
                   <version>3.0.2</version>
                 </additionalDependency>
                 <additionalDependency>
-                  <groupId>com.esri.geometry</groupId>
-                  <artifactId>esri-geometry-api</artifactId>
-                  <version>${esri.version}</version>
-                </additionalDependency>
-                <additionalDependency>
                   <groupId>at.yawk.lz4</groupId>
                   <artifactId>lz4-java</artifactId>
                   <version>${lz4.version}</version>
@@ -144,21 +139,6 @@
                   <groupId>org.xerial.snappy</groupId>
                   <artifactId>snappy-java</artifactId>
                   <version>${snappy.version}</version>
-                </additionalDependency>
-                <additionalDependency>
-                  <groupId>org.apache.tinkerpop</groupId>
-                  <artifactId>gremlin-core</artifactId>
-                  <version>${tinkerpop.version}</version>
-                </additionalDependency>
-                <additionalDependency>
-                  <groupId>org.apache.tinkerpop</groupId>
-                  <artifactId>tinkergraph-gremlin</artifactId>
-                  <version>${tinkerpop.version}</version>
-                </additionalDependency>
-                <additionalDependency>
-                  <groupId>org.javatuples</groupId>
-                  <artifactId>javatuples</artifactId>
-                  <version>1.2</version>
                 </additionalDependency>
               </additionalDependencies>
             </configuration>

@@ -17,8 +17,6 @@
  */
 package com.datastax.dse.driver.internal.core.insights;
 
-import static com.datastax.dse.driver.api.core.config.DseDriverOption.GRAPH_TRAVERSAL_SOURCE;
-
 import com.datastax.dse.driver.internal.core.insights.PackageUtil.ClassSettingDetails;
 import com.datastax.dse.driver.internal.core.insights.schema.LoadBalancingInfo;
 import com.datastax.dse.driver.internal.core.insights.schema.SpecificExecutionProfile;
@@ -26,7 +24,6 @@ import com.datastax.dse.driver.internal.core.insights.schema.SpeculativeExecutio
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -84,17 +81,8 @@ class ExecutionProfilesInfoFinder {
             specificExecutionProfile,
             SpecificExecutionProfile::getSerialConsistency);
 
-    Map<String, Object> graphOptions =
-        getIfDifferentOrReturnNull(
-            defaultProfile, specificExecutionProfile, SpecificExecutionProfile::getGraphOptions);
-
     return new SpecificExecutionProfile(
-        readTimeout,
-        loadBalancingInfo,
-        speculativeExecutionInfo,
-        consistency,
-        serialConsistency,
-        graphOptions);
+        readTimeout, loadBalancingInfo, speculativeExecutionInfo, consistency, serialConsistency);
   }
 
   private <T> T getIfDifferentOrReturnNull(
@@ -117,8 +105,7 @@ class ExecutionProfilesInfoFinder {
         getLoadBalancingInfo(driverExecutionProfile),
         getSpeculativeExecutionInfo(driverExecutionProfile),
         driverExecutionProfile.getString(DefaultDriverOption.REQUEST_CONSISTENCY),
-        driverExecutionProfile.getString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY),
-        getGraphOptions(driverExecutionProfile));
+        driverExecutionProfile.getString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY));
   }
 
   private SpeculativeExecutionInfo getSpeculativeExecutionInfo(
@@ -171,14 +158,5 @@ class ExecutionProfilesInfoFinder {
             driverExecutionProfile.getString(DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS));
     return new LoadBalancingInfo(
         loadBalancingDetails.getClassName(), options, loadBalancingDetails.getFullPackage());
-  }
-
-  private Map<String, Object> getGraphOptions(DriverExecutionProfile driverExecutionProfile) {
-    Map<String, Object> graphOptionsMap = new HashMap<>();
-    String graphTraversalSource = driverExecutionProfile.getString(GRAPH_TRAVERSAL_SOURCE, null);
-    if (graphTraversalSource != null) {
-      graphOptionsMap.put("source", graphTraversalSource);
-    }
-    return graphOptionsMap;
   }
 }

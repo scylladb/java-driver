@@ -17,7 +17,6 @@
  */
 package com.datastax.dse.driver.api.core.auth;
 
-import com.datastax.dse.driver.api.core.graph.GraphStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
@@ -47,18 +46,6 @@ public class ProxyAuthentication {
    */
   @NonNull
   public static <StatementT extends Statement<StatementT>> StatementT executeAs(
-      @NonNull String userOrRole, @NonNull StatementT statement) {
-    return statement.setCustomPayload(
-        addProxyExecuteEntry(statement.getCustomPayload(), userOrRole));
-  }
-
-  /**
-   * Adds proxy authentication information to a graph statement.
-   *
-   * @see #executeAs(String, Statement)
-   */
-  @NonNull
-  public static <StatementT extends GraphStatement<StatementT>> StatementT executeAs(
       @NonNull String userOrRole, @NonNull StatementT statement) {
     return statement.setCustomPayload(
         addProxyExecuteEntry(statement.getCustomPayload(), userOrRole));

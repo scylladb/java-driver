@@ -47,7 +47,7 @@ public class OsgiDefaultIT {
   @Configuration
   public Option[] config() {
     // this configuration purposely excludes bundles whose resolution should be optional:
-    // ESRI, Reactive Streams and Tinkerpop. This allows to validate that the driver can still
+    // Reactive Streams. This allows to validate that the driver can still
     // work properly in an OSGi container as long as the missing packages are not accessed.
     return CoreOptions.options(
         BundleOptions.applicationBundle(),
