@@ -18,7 +18,7 @@
 package com.datastax.dse.driver.internal.core.cql.reactive;
 
 import static com.datastax.dse.driver.DseTestFixtures.singleDseRow;
-import static com.datastax.dse.driver.api.core.DseProtocolVersion.DSE_V1;
+import static com.datastax.oss.driver.api.core.ProtocolVersion.V4;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -61,7 +61,7 @@ public class CqlRequestReactiveProcessorTest extends CqlRequestHandlerTestBase {
   @Test
   public void should_create_request_handler() {
     RequestHandlerTestHarness.Builder builder =
-        RequestHandlerTestHarness.builder().withProtocolVersion(DSE_V1);
+        RequestHandlerTestHarness.builder().withProtocolVersion(V4);
     try (RequestHandlerTestHarness harness = builder.build()) {
       CqlRequestReactiveProcessor processor =
           new CqlRequestReactiveProcessor(new CqlRequestAsyncProcessor());
@@ -76,7 +76,7 @@ public class CqlRequestReactiveProcessorTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
-  @UseDataProvider(value = "allDseAndOssProtocolVersions", location = DseTestDataProviders.class)
+  @UseDataProvider(value = "allOssProtocolVersions", location = DseTestDataProviders.class)
   public void should_complete_single_page_result(ProtocolVersion version) {
     try (RequestHandlerTestHarness harness =
         RequestHandlerTestHarness.builder()
@@ -120,7 +120,7 @@ public class CqlRequestReactiveProcessorTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
-  @UseDataProvider(value = "allDseAndOssProtocolVersions", location = DseTestDataProviders.class)
+  @UseDataProvider(value = "allOssProtocolVersions", location = DseTestDataProviders.class)
   public void should_complete_multi_page_result(ProtocolVersion version) {
     RequestHandlerTestHarness.Builder builder =
         RequestHandlerTestHarness.builder().withProtocolVersion(version);

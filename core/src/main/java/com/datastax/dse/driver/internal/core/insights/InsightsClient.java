@@ -25,7 +25,6 @@ import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.PROTOC
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.SSL_ENGINE_FACTORY_CLASS;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.SSL_HOSTNAME_VALIDATION;
 
-import com.datastax.dse.driver.api.core.DseProtocolVersion;
 import com.datastax.dse.driver.internal.core.insights.PackageUtil.ClassSettingDetails;
 import com.datastax.dse.driver.internal.core.insights.configuration.InsightsConfiguration;
 import com.datastax.dse.driver.internal.core.insights.exceptions.InsightEventFormatException;
@@ -38,6 +37,7 @@ import com.datastax.dse.driver.internal.core.insights.schema.InsightsStatusData;
 import com.datastax.dse.driver.internal.core.insights.schema.PoolSizeByHostDistance;
 import com.datastax.dse.driver.internal.core.insights.schema.SSL;
 import com.datastax.dse.driver.internal.core.insights.schema.SessionStateForNode;
+import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.SessionBuilder;
@@ -229,7 +229,7 @@ public class InsightsClient {
   private QueryOptions createQueryOptionsWithJson(String json) {
     TypeCodec<String> codec =
         driverContext.getCodecRegistry().codecFor(DataTypes.TEXT, String.class);
-    ByteBuffer startupMessageSerialized = codec.encode(json, DseProtocolVersion.DSE_V2);
+    ByteBuffer startupMessageSerialized = codec.encode(json, DefaultProtocolVersion.V5);
     return new QueryOptions(
         QueryOptions.DEFAULT.consistency,
         Collections.singletonList(startupMessageSerialized),

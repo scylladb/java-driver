@@ -85,22 +85,6 @@ the subscriber.
 [`ReactiveSession`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/reactive/ReactiveSession.html
 [`executeReactive`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/reactive/ReactiveSession.html#executeReactive-com.datastax.oss.driver.api.core.cql.Statement-
 
-There is one exception though: continuous paging queries (a feature specific to DSE) have a special
-execution model which uses internal locks for coordination. Although such locks are only held for 
-extremely brief periods of time, and never under high contention, this execution model doesn't 
-qualify as lock-free. 
-
-As a consequence, all methods declared in [`ContinuousSession`] and [`ContinuousReactiveSession`] 
-cannot be considered as implemented 100% lock-free, even those built on top of the asynchronous or 
-reactive APIs like [`executeContinuouslyAsync`] and [`executeContinuouslyReactive`]. In practice 
-though, continuous paging is extremely efficient and can safely be used in most non-blocking 
-contexts, unless they require strict lock-freedom.
-
-[`ContinuousSession`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/continuous/ContinuousSession.html
-[`ContinuousReactiveSession`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/continuous/reactive/ContinuousReactiveSession.html
-[`executeContinuouslyAsync`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/continuous/ContinuousSession.html#executeContinuouslyAsync-com.datastax.oss.driver.api.core.cql.Statement-
-[`executeContinuouslyReactive`]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/continuous/reactive/ContinuousReactiveSession.html#executeContinuouslyReactive-com.datastax.oss.driver.api.core.cql.Statement-
-
 #### Driver lock-free guarantees per session lifecycle phases
 
 The guarantees vary according to three possible session states: initializing, running, and closing.
@@ -288,9 +272,8 @@ More specifically, the following items are currently declared to be allowed:
 
 * Loading of native libraries during startup (`TimestampGenerator`);
 * Locks held during startup only (`DefaultNettyOptions`, `LazyReference`, `ReplayingEventFilter`);
-* Locks held during startup and topology and status events processing (`ChannelSet`, 
+* Locks held during startup and topology and status events processing (`ChannelSet`,
   `DistanceReporter`);
-* Locks held when executing continuous paging queries;
 * Locks held during calls to `MutableCodecRegistry.register()` and `Uuids.timeBased()`.
 
 The following items are NOT declared to be allowed and are likely to be reported by BlockHound if

@@ -44,8 +44,6 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A single-subscriber subscription that executes one single query and emits all the returned rows.
- *
- * <p>This class can handle both continuous and non-continuous result sets.
  */
 @ThreadSafe
 public class ReactiveResultSetSubscription<ResultSetT extends AsyncPagingIterable<Row, ResultSetT>>
@@ -474,8 +472,7 @@ public class ReactiveResultSetSubscription<ResultSetT extends AsyncPagingIterabl
       } catch (Exception e) {
         // This is a synchronous failure in the driver.
         // It can happen in rare cases when the driver throws an exception instead of returning a
-        // failed future; e.g. if someone tries to execute a continuous paging request but the
-        // protocol version in use does not support it.
+        // failed future; e.g. if the next page supplier fails before returning its future.
         // We treat it as a failed future.
         return CompletableFutures.failedFuture(e);
       }

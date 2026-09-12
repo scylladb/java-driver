@@ -37,10 +37,8 @@ public class SerializationUtils {
     out.writeObject(geometry);
 
     byte[] bytes = baos.toByteArray();
-    if (!(geometry instanceof Distance)) {
-      byte[] wkb = Bytes.getArray(geometry.asWellKnownBinary());
-      assertThat(bytes).containsSequence(wkb);
-    }
+    byte[] wkb = Bytes.getArray(geometry.asWellKnownBinary());
+    assertThat(bytes).containsSequence(wkb);
     ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(bytes));
     return in.readObject();
   }

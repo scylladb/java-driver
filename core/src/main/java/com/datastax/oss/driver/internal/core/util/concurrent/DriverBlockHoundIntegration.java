@@ -70,33 +70,6 @@ public final class DriverBlockHoundIntegration implements BlockHoundIntegration 
         // protect the whole Uuids.timeBased method.
         "com.datastax.oss.driver.api.core.uuid.Uuids", "timeBased");
 
-    // continuous paging
-
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "cancel");
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "dequeueOrCreatePending");
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "isLastResponse");
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "onFailure");
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "onPageTimeout");
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "onResponse");
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "onStreamIdAssigned");
-    builder.allowBlockingCallsInside(
-        "com.datastax.dse.driver.internal.core.cql.continuous.ContinuousRequestHandlerBase$NodeResponseCallback",
-        "operationComplete");
-
     // Netty extra exceptions
 
     // see https://github.com/netty/netty/pull/10810
