@@ -185,6 +185,31 @@ public class DefaultMetadataTabletMapIT {
   }
 
   @Test
+  public void should_force_refresh_all_tablets() {
+    CqlSession session = SESSION_RULE.session();
+    CqlIdentifier keyspace = CqlIdentifier.fromCql(KEYSPACE_NAME);
+    CqlIdentifier table = CqlIdentifier.fromCql(TABLE_NAME);
+    session.getMetadata().getTabletMap().get().removeByKeyspace(keyspace);
+
+    List<Tablet> tablets = session.refreshTablets(keyspace, table);
+
+    Assert.assertEquals(INITIAL_TABLETS, tablets.size());
+    for (Tablet tablet : tablets) {
+      Assert.assertEquals(REPLICATION_FACTOR, tablet.getReplicaNodesList().size());
+      Assert.assertEquals(
+          tablet,
+          session
+              .getMetadata()
+              .getTabletMap()
+              .get()
+              .getTablet(keyspace, table, tablet.getLastToken()));
+      for (Node replica : tablet.getReplicaNodesList()) {
+        Assert.assertTrue(tablet.getShardForNode(replica) >= 0);
+      }
+    }
+  }
+
+  @Test
   public void every_statement_should_deliver_tablet_info() {
     Map<String, Supplier<CqlSession>> sessions = new HashMap<>();
     sessions.put(

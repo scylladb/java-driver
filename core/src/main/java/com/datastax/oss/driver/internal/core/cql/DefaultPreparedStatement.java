@@ -237,6 +237,7 @@ public class DefaultPreparedStatement implements PreparedStatement, RequestRouti
         executionProfileNameForBoundStatements,
         executionProfileForBoundStatements,
         routingKeyspaceForBoundStatements,
+        null,
         routingKeyForBoundStatements,
         routingTokenForBoundStatements,
         customPayloadForBoundStatements,

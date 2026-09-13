@@ -51,6 +51,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
   private final DriverExecutionProfile executionProfile;
   private final CqlIdentifier keyspace;
   private final CqlIdentifier routingKeyspace;
+  private final CqlIdentifier routingTable;
   private final ByteBuffer routingKey;
   private final Token routingToken;
 
@@ -76,6 +77,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
       DriverExecutionProfile executionProfile,
       CqlIdentifier keyspace,
       CqlIdentifier routingKeyspace,
+      CqlIdentifier routingTable,
       ByteBuffer routingKey,
       Token routingToken,
       Map<String, ByteBuffer> customPayload,
@@ -100,6 +102,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
     this.executionProfile = executionProfile;
     this.keyspace = keyspace;
     this.routingKeyspace = routingKeyspace;
+    this.routingTable = routingTable;
     this.routingKey = routingKey;
     this.routingToken = routingToken;
     this.customPayload = customPayload;
@@ -133,6 +136,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -166,6 +170,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -199,6 +204,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -232,6 +238,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         (newConfigProfileName == null) ? executionProfile : null,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -265,6 +272,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         newProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -298,6 +306,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         newKeyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -320,6 +329,40 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
     return routingKeyspace;
   }
 
+  @Nullable
+  @Override
+  public CqlIdentifier getRoutingTable() {
+    return routingTable;
+  }
+
+  @NonNull
+  @Override
+  public SimpleStatement setRoutingTable(@Nullable CqlIdentifier newRoutingTable) {
+    return new DefaultSimpleStatement(
+        query,
+        positionalValues,
+        namedValues,
+        executionProfileName,
+        executionProfile,
+        keyspace,
+        routingKeyspace,
+        newRoutingTable,
+        routingKey,
+        routingToken,
+        customPayload,
+        idempotent,
+        tracing,
+        timestamp,
+        pagingState,
+        pageSize,
+        consistencyLevel,
+        serialConsistencyLevel,
+        timeout,
+        node,
+        nowInSeconds,
+        requestRoutingType);
+  }
+
   @NonNull
   @Override
   public SimpleStatement setRoutingKeyspace(@Nullable CqlIdentifier newRoutingKeyspace) {
@@ -331,6 +374,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         newRoutingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -358,6 +402,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -397,6 +442,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         newRoutingKey,
         routingToken,
         customPayload,
@@ -430,6 +476,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         newRoutingToken,
         customPayload,
@@ -463,6 +510,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         newCustomPayload,
@@ -496,6 +544,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -528,6 +577,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -560,6 +610,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -593,6 +644,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -626,6 +678,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -658,6 +711,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -691,6 +745,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -725,6 +780,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -757,6 +813,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -802,6 +859,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -873,6 +931,7 @@ public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTy
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,

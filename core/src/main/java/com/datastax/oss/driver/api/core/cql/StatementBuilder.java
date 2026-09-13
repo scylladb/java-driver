@@ -50,6 +50,7 @@ public abstract class StatementBuilder<
   @Nullable protected String executionProfileName;
   @Nullable protected DriverExecutionProfile executionProfile;
   @Nullable protected CqlIdentifier routingKeyspace;
+  @Nullable protected CqlIdentifier routingTable;
   @Nullable protected ByteBuffer routingKey;
   @Nullable protected Token routingToken;
   @Nullable private NullAllowingImmutableMap.Builder<String, ByteBuffer> customPayloadBuilder;
@@ -73,6 +74,7 @@ public abstract class StatementBuilder<
     this.executionProfileName = template.getExecutionProfileName();
     this.executionProfile = template.getExecutionProfile();
     this.routingKeyspace = template.getRoutingKeyspace();
+    this.routingTable = template.getRoutingTable();
     this.routingKey = template.getRoutingKey();
     this.routingToken = template.getRoutingToken();
     if (!template.getCustomPayload().isEmpty()) {
@@ -136,6 +138,23 @@ public abstract class StatementBuilder<
   public SelfT setRoutingKeyspace(@Nullable String routingKeyspaceName) {
     return setRoutingKeyspace(
         routingKeyspaceName == null ? null : CqlIdentifier.fromCql(routingKeyspaceName));
+  }
+
+  /** @see Statement#setRoutingTable(CqlIdentifier) */
+  @NonNull
+  public SelfT setRoutingTable(@Nullable CqlIdentifier routingTable) {
+    this.routingTable = routingTable;
+    return self;
+  }
+
+  /**
+   * Shortcut for {@link #setRoutingTable(CqlIdentifier)
+   * setRoutingTable(CqlIdentifier.fromCql(routingTableName))}.
+   */
+  @NonNull
+  public SelfT setRoutingTable(@Nullable String routingTableName) {
+    return setRoutingTable(
+        routingTableName == null ? null : CqlIdentifier.fromCql(routingTableName));
   }
 
   /** @see Statement#setRoutingKey(ByteBuffer) */

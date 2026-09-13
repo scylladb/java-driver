@@ -34,6 +34,7 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
+import com.datastax.oss.driver.api.core.metadata.Tablet;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.core.session.Request;
@@ -187,6 +188,13 @@ public class DefaultSession implements CqlSession {
     return metadataManager
         .refreshSchema(null, true, true)
         .thenApply(RefreshSchemaResult::getMetadata);
+  }
+
+  @NonNull
+  @Override
+  public CompletionStage<List<Tablet>> refreshTabletsAsync(
+      @NonNull CqlIdentifier keyspace, @NonNull CqlIdentifier table) {
+    return metadataManager.refreshTablets(keyspace, table);
   }
 
   @NonNull

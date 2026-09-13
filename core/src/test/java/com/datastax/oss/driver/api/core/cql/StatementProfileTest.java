@@ -25,6 +25,7 @@ import com.datastax.oss.driver.TestDataProviders;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.internal.core.cql.DefaultBoundStatement;
+import com.datastax.oss.driver.internal.core.cql.EmptyColumnDefinitions;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
@@ -171,10 +172,12 @@ public class StatementProfileTest {
     PreparedStatement preparedStatement = mock(PreparedStatement.class);
     ColumnDefinitions variableDefinitions = mock(ColumnDefinitions.class);
     when(preparedStatement.getVariableDefinitions()).thenReturn(variableDefinitions);
+    when(preparedStatement.getResultSetDefinitions()).thenReturn(EmptyColumnDefinitions.INSTANCE);
     return new DefaultBoundStatement(
         preparedStatement,
         variableDefinitions,
         new ByteBuffer[0],
+        null,
         null,
         null,
         null,

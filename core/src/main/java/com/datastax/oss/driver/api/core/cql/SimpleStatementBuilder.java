@@ -173,6 +173,7 @@ public class SimpleStatementBuilder
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         buildCustomPayload(),

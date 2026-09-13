@@ -59,6 +59,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
         null,
         null,
         null,
+        null,
         Collections.emptyMap(),
         null,
         false,
@@ -91,6 +92,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
         null,
         null,
         null,
+        null,
         Collections.emptyMap(),
         null,
         false,
@@ -117,6 +119,7 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
     return new DefaultBatchStatement(
         batchType,
         ImmutableList.copyOf(statements),
+        null,
         null,
         null,
         null,

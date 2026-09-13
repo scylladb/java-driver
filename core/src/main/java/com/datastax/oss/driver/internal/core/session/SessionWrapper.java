@@ -20,12 +20,14 @@ package com.datastax.oss.driver.internal.core.session;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
+import com.datastax.oss.driver.api.core.metadata.Tablet;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 import net.jcip.annotations.ThreadSafe;
@@ -84,6 +86,13 @@ public class SessionWrapper implements Session {
   @Override
   public CompletionStage<Metadata> refreshSchemaAsync() {
     return delegate.refreshSchemaAsync();
+  }
+
+  @NonNull
+  @Override
+  public CompletionStage<List<Tablet>> refreshTabletsAsync(
+      @NonNull CqlIdentifier keyspace, @NonNull CqlIdentifier table) {
+    return delegate.refreshTabletsAsync(keyspace, table);
   }
 
   @NonNull
