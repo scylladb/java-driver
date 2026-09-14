@@ -786,7 +786,17 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     if (unattributableRows == 0) {
       keepable = new HashSet<>(hostIdsInResult);
     } else {
-      if (hostIdsInResult.isEmpty()) {
+      if (hostIdsInResult.isEmpty() && cachedRoutes.isEmpty()) {
+        // Nothing read and nothing held: the keep rule has nothing to keep, and reporting that it
+        // kept all zero of them would be the calmest line in the log on the worst path there is.
+        LOG.error(
+            "[{}] None of the {} client_routes rows named a readable host_id and no route was "
+                + "cached, so this refresh installs none: every node falls back to the address it "
+                + "broadcasts, which is the one client routes exist to avoid. Check those rows "
+                + "for an unreadable host_id",
+            logPrefix,
+            rowCount);
+      } else if (hostIdsInResult.isEmpty()) {
         LOG.error(
             "[{}] None of the {} client_routes rows named a readable host_id; "
                 + "keeping all {} existing cached routes",

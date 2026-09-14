@@ -2347,4 +2347,24 @@ public class ClientRoutesTopologyMonitorTest {
     assertThat(handler.getRoutes()).isEmpty();
     assertThat(handler.getCarryOverCounts()).isEmpty();
   }
+
+  @Test
+  public void should_report_that_a_cold_start_installed_no_route() throws Exception {
+    // Nothing read and nothing cached is the worst outcome there is -- every node falls back to
+    // the address it broadcasts, which client routes exist to avoid -- and the keep rule's usual
+    // wording reports it as having kept all zero of them.
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(mockRouteRow(null, "10.0.0.1", 9042)));
+
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getRoutes()).isEmpty();
+    List<String> errors = loggedAt(Level.ERROR);
+    assertThat(errors).hasSize(1);
+    assertThat(errors.get(0))
+        .contains("no route was cached, so this refresh installs none")
+        .contains("falls back to the address it broadcasts")
+        .doesNotContain("keeping all");
+  }
 }
