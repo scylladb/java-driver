@@ -27,10 +27,11 @@ BRANCHES = [
     'scylla-4.15.0.x',
     'scylla-4.17.0.x',
     'scylla-4.18.1.x',
-    'scylla-4.19.0.x'
+    'scylla-4.19.0.x',
+    'scylla-4.x'
 ]
 # Set the latest version.
-LATEST_VERSION = 'scylla-4.19.0.x'
+LATEST_VERSION = 'scylla-4.x'
 # Set which versions are not released yet.
 UNSTABLE_VERSIONS = []
 # Set which versions are deprecated
