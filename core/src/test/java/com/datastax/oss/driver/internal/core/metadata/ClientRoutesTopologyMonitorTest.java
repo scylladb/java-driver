@@ -2324,4 +2324,27 @@ public class ClientRoutesTopologyMonitorTest {
     assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
     assertThat(handler.getRoutes().get(hostId).getPort()).isEqualTo(9042);
   }
+
+  @Test
+  public void should_forget_carry_over_counts_when_empty_results_clear_the_cache()
+      throws Exception {
+    // The counts are keyed on hosts the cache holds, and recordCarryOvers is what forgets one.
+    // The empty-result backstop clears the cache without going through it, so the counts have to
+    // be cleared here or they outlive the routes they describe.
+    UUID hostId = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(mockRouteRow(hostId, null, 9042)));
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertThat(handler.getCarryOverCounts()).containsEntry(hostId, 1);
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
+    for (int i = 0; i < 3; i++) {
+      handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    }
+
+    assertThat(handler.getRoutes()).isEmpty();
+    assertThat(handler.getCarryOverCounts()).isEmpty();
+  }
 }

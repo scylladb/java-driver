@@ -441,6 +441,10 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                     // Too many consecutive empties -- routes were likely removed server-side.
                     int staleSize = cachedRoutes.size();
                     resolvedRoutesCache.set(Collections.emptyMap());
+                    // Nothing is cached any more, so nothing is being carried over either.
+                    // recordCarryOvers is what normally forgets a host, and this branch is the
+                    // one path to an empty cache that never reaches it.
+                    carryOverCounts.set(Collections.emptyMap());
                     consecutiveEmptyResults.set(0);
                     LOG.warn(
                         "[{}] Client routes query returned 0 rows {} consecutive times; "
