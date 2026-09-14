@@ -220,9 +220,9 @@ public class ClientRoutesTopologyMonitorTest {
   /**
    * Mocks a {@code system.client_routes} row. Stubs are lenient because callers use only the
    * columns their scenario reaches, and the class runs under the strict {@link MockitoJUnitRunner}.
-   * A null {@code hostId} or {@code address} makes the corresponding {@code isNull()} answer true;
-   * a null {@code port} makes {@code portColumn} absent; a null {@code connectionId} makes {@code
-   * contains("connection_id")} answer false.
+   * A null {@code hostId}, {@code address}, {@code port} or {@code connectionId} makes the
+   * corresponding {@code isNull()} answer true, which is what {@link AdminRow} answers for an
+   * absent column as well as for an unset cell.
    */
   private static AdminRow mockRouteRow(
       UUID hostId, String address, String portColumn, Integer port, String connectionId) {
@@ -233,7 +233,6 @@ public class ClientRoutesTopologyMonitorTest {
     Mockito.lenient().when(row.getString("address")).thenReturn(address);
     Mockito.lenient().when(row.isNull(portColumn)).thenReturn(port == null);
     Mockito.lenient().when(row.getInteger(portColumn)).thenReturn(port);
-    Mockito.lenient().when(row.contains("connection_id")).thenReturn(connectionId != null);
     Mockito.lenient().when(row.isNull("connection_id")).thenReturn(connectionId == null);
     Mockito.lenient().when(row.getString("connection_id")).thenReturn(connectionId);
     return row;
@@ -816,7 +815,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row.getUuid("host_id")).thenReturn(hostId);
     Mockito.lenient().when(row.getString("address")).thenReturn("original.example.com");
     when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(true);
     when(row.isNull("connection_id")).thenReturn(false);
     when(row.getString("connection_id")).thenReturn(connId);
 
@@ -847,7 +845,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row.getUuid("host_id")).thenReturn(hostId);
     when(row.getString("address")).thenReturn("original.example.com");
     when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(true);
     when(row.isNull("connection_id")).thenReturn(false);
     when(row.getString("connection_id")).thenReturn("conn-2");
 
@@ -878,7 +875,7 @@ public class ClientRoutesTopologyMonitorTest {
     when(row.getUuid("host_id")).thenReturn(hostId);
     when(row.getString("address")).thenReturn("original.example.com");
     when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(false);
+    when(row.isNull("connection_id")).thenReturn(true);
 
     h.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -909,7 +906,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(matchingRow.getUuid("host_id")).thenReturn(hostId1);
     Mockito.lenient().when(matchingRow.getString("address")).thenReturn("original-1.example.com");
     when(matchingRow.getInteger("port")).thenReturn(9042);
-    when(matchingRow.contains("connection_id")).thenReturn(true);
     when(matchingRow.isNull("connection_id")).thenReturn(false);
     when(matchingRow.getString("connection_id")).thenReturn(connId);
 
@@ -921,7 +917,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(nonMatchingRow.getUuid("host_id")).thenReturn(hostId2);
     when(nonMatchingRow.getString("address")).thenReturn("original-2.example.com");
     when(nonMatchingRow.getInteger("port")).thenReturn(9042);
-    when(nonMatchingRow.contains("connection_id")).thenReturn(true);
     when(nonMatchingRow.isNull("connection_id")).thenReturn(false);
     when(nonMatchingRow.getString("connection_id")).thenReturn("conn-other");
 
@@ -951,7 +946,7 @@ public class ClientRoutesTopologyMonitorTest {
     when(validRow.getUuid("host_id")).thenReturn(validHostId);
     when(validRow.getString("address")).thenReturn("127.0.0.1");
     when(validRow.getInteger("port")).thenReturn(9042);
-    when(validRow.contains("connection_id")).thenReturn(false);
+    when(validRow.isNull("connection_id")).thenReturn(true);
 
     handler.setNextQueryResult(AdminResultTestHelper.mockResult(nullRow, validRow));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -974,7 +969,7 @@ public class ClientRoutesTopologyMonitorTest {
     when(row.getUuid("host_id")).thenReturn(hostId);
     when(row.getString("address")).thenReturn("127.0.0.1");
     when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(false);
+    when(row.isNull("connection_id")).thenReturn(true);
 
     handler.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -1007,7 +1002,7 @@ public class ClientRoutesTopologyMonitorTest {
     when(row.getString("address")).thenReturn("127.0.0.1");
     when(row.isNull("tls_port")).thenReturn(false);
     when(row.getInteger("tls_port")).thenReturn(9142);
-    when(row.contains("connection_id")).thenReturn(false);
+    when(row.isNull("connection_id")).thenReturn(true);
 
     sslHandler.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -1432,7 +1427,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row.getUuid("host_id")).thenReturn(hostId);
     when(row.isNull("port")).thenReturn(false);
     when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(true);
     when(row.isNull("connection_id")).thenReturn(false);
     when(row.getString("connection_id")).thenReturn(connId);
     // Both stubs are lenient because a passing run never reaches them -- that is the assertion.
@@ -1581,7 +1575,7 @@ public class ClientRoutesTopologyMonitorTest {
     when(newRow.getUuid("host_id")).thenReturn(hostId2);
     when(newRow.getString("address")).thenReturn("127.0.0.2");
     when(newRow.getInteger("port")).thenReturn(9043);
-    when(newRow.contains("connection_id")).thenReturn(false);
+    when(newRow.isNull("connection_id")).thenReturn(true);
 
     handler.setNextQueryResult(AdminResultTestHelper.mockResult(newRow));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -1686,7 +1680,7 @@ public class ClientRoutesTopologyMonitorTest {
     when(row.getUuid("host_id")).thenReturn(hostId1);
     when(row.getString("address")).thenReturn("127.0.0.1");
     when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(false);
+    when(row.isNull("connection_id")).thenReturn(true);
 
     handler.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -1863,7 +1857,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row1.getUuid("host_id")).thenReturn(hostId1);
     Mockito.lenient().when(row1.getString("address")).thenReturn("10.0.0.1");
     when(row1.getInteger("port")).thenReturn(9042);
-    when(row1.contains("connection_id")).thenReturn(true);
     when(row1.isNull("connection_id")).thenReturn(false);
     when(row1.getString("connection_id")).thenReturn(connId1);
 
@@ -1875,7 +1868,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row2.getUuid("host_id")).thenReturn(hostId2);
     Mockito.lenient().when(row2.getString("address")).thenReturn("10.0.0.2");
     when(row2.getInteger("port")).thenReturn(9042);
-    when(row2.contains("connection_id")).thenReturn(true);
     when(row2.isNull("connection_id")).thenReturn(false);
     when(row2.getString("connection_id")).thenReturn(connId2);
 
@@ -1916,7 +1908,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row1.getUuid("host_id")).thenReturn(hostId1);
     Mockito.lenient().when(row1.getString("address")).thenReturn("10.0.0.1");
     when(row1.getInteger("port")).thenReturn(9042);
-    when(row1.contains("connection_id")).thenReturn(true);
     when(row1.isNull("connection_id")).thenReturn(false);
     when(row1.getString("connection_id")).thenReturn(connId1);
 
@@ -1927,7 +1918,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row2.getUuid("host_id")).thenReturn(hostId2);
     Mockito.lenient().when(row2.getString("address")).thenReturn("10.0.0.2");
     when(row2.getInteger("port")).thenReturn(9043);
-    when(row2.contains("connection_id")).thenReturn(true);
     when(row2.isNull("connection_id")).thenReturn(false);
     when(row2.getString("connection_id")).thenReturn(connId2);
 
@@ -1938,7 +1928,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(row3.getUuid("host_id")).thenReturn(hostId3);
     Mockito.lenient().when(row3.getString("address")).thenReturn("10.0.0.3");
     when(row3.getInteger("port")).thenReturn(9044);
-    when(row3.contains("connection_id")).thenReturn(true);
     when(row3.isNull("connection_id")).thenReturn(false);
     when(row3.getString("connection_id")).thenReturn(connId3);
 

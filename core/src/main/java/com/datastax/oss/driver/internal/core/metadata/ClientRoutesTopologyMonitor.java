@@ -345,7 +345,9 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                   rowCount++;
                   UUID hostId = null;
                   String address = null;
-                  Integer port = null;
+                  // Not `port`: that name is the inherited field this class sets from the
+                  // configured native transport port, and a local would shadow it here.
+                  Integer effectivePort = null;
                   // This loop runs inside thenAccept(), so anything thrown out of it skips the
                   // cache update and discards every route in the pass, not just the offending
                   // row -- and the cache then stays stale for as long as that row remains in the
@@ -365,8 +367,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
 
                     // Select port based on SSL configuration at record creation time.
                     // Skip the record if the required port column is absent.
-                    port = row.isNull(portColumn) ? null : row.getInteger(portColumn);
-                    if (port == null) {
+                    effectivePort = row.isNull(portColumn) ? null : row.getInteger(portColumn);
+                    if (effectivePort == null) {
                       LOG.error(
                           "[{}] Skipping client route for host_id={} ({}): "
                               + "required port column ({}) is not set in client routes table",
@@ -377,7 +379,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                       continue;
                     }
 
-                    newRoutes.put(hostId, new ClientRouteRecord(hostId, address, port));
+                    newRoutes.put(hostId, new ClientRouteRecord(hostId, address, effectivePort));
                   } catch (RuntimeException e) {
                     LOG.warn(
                         "[{}] Skipping unusable client_routes row (host_id={}, address={}, {}={})",
@@ -385,7 +387,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                         hostId,
                         address,
                         portColumn,
-                        port,
+                        effectivePort,
                         e);
                   }
                 }
@@ -542,10 +544,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    */
   @Nullable
   private String effectiveAddress(@NonNull AdminRow row) {
-    String connId =
-        row.contains("connection_id") && !row.isNull("connection_id")
-            ? row.getString("connection_id")
-            : null;
+    String connId = row.isNull("connection_id") ? null : row.getString("connection_id");
     String override = connId == null ? null : connectionAddrOverrides.get(connId);
     if (override != null) {
       return override;
