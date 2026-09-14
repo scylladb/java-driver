@@ -35,8 +35,10 @@ import com.datastax.oss.driver.internal.core.clientroutes.ClientRouteRecord;
 import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
+import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
@@ -52,6 +54,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -84,6 +88,7 @@ public class ClientRoutesTopologyMonitorTest {
 
     volatile AdminResult nextQueryResult = EMPTY_RESULT;
     volatile boolean failNextQuery = false;
+    volatile boolean throwOnNextQuery = false;
 
     TestableClientRoutesTopologyMonitor(InternalDriverContext ctx, ClientRoutesConfig cfg) {
       super(ctx, cfg);
@@ -118,6 +123,10 @@ public class ClientRoutesTopologyMonitorTest {
     protected CompletionStage<AdminResult> runAdminQuery(
         @NonNull DriverChannel channel, @NonNull String queryString, @NonNull Duration timeout) {
       capturedQueries.add(queryString);
+      if (throwOnNextQuery) {
+        // Fails *synchronously*, rather than returning a failed stage
+        throw new IllegalStateException("simulated synchronous failure");
+      }
       if (failNextQuery) {
         CompletableFuture<AdminResult> failed = new CompletableFuture<>();
         failed.completeExceptionally(new RuntimeException("simulated failure"));
@@ -1324,5 +1333,265 @@ public class ClientRoutesTopologyMonitorTest {
         .contains("'" + connId1 + "'")
         .contains("'" + connId2 + "'")
         .contains("'" + connId3 + "'");
+  }
+
+  // ---- init() / closeAsync() lifecycle ------------------------------------
+
+  /** An {@link EventBus} that counts unregistrations and can close a monitor mid-registration. */
+  static class CountingEventBus extends EventBus {
+    final AtomicInteger unregisterCalls = new AtomicInteger();
+    /** Unregistrations that removed a listener, i.e. were passed the key register() returned. */
+    final AtomicInteger removals = new AtomicInteger();
+
+    volatile Runnable onRegister;
+    volatile Consumer<?> lastListener;
+
+    CountingEventBus() {
+      super("test-counting");
+    }
+
+    @Override
+    public <EventT> Object register(Class<EventT> eventClass, Consumer<EventT> listener) {
+      Object key = super.register(eventClass, listener);
+      lastListener = listener;
+      Runnable hook = onRegister;
+      if (hook != null) {
+        hook.run();
+      }
+      return key;
+    }
+
+    @Override
+    public <EventT> boolean unregister(Object key, Class<EventT> eventClass) {
+      unregisterCalls.incrementAndGet();
+      boolean removed = super.unregister(key, eventClass);
+      if (removed) {
+        removals.incrementAndGet();
+      }
+      return removed;
+    }
+  }
+
+  private TestableClientRoutesTopologyMonitor handlerOn(CountingEventBus bus) {
+    when(context.getEventBus()).thenReturn(bus);
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRouteProxy(connectionId, "host1"))
+            .build();
+    return new TestableClientRoutesTopologyMonitor(context, config);
+  }
+
+  @Test
+  public void should_not_initialize_when_already_closed() throws Exception {
+    CountingEventBus bus = new CountingEventBus();
+    TestableClientRoutesTopologyMonitor closedHandler = handlerOn(bus);
+    closedHandler.closeAsync();
+
+    closedHandler.init().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    // No listener registered and no query issued
+    assertThat(bus.lastListener).isNull();
+    assertThat(closedHandler.capturedQueries).isEmpty();
+  }
+
+  @Test
+  public void should_unregister_listener_when_init_races_close() throws Exception {
+    CountingEventBus bus = new CountingEventBus();
+    TestableClientRoutesTopologyMonitor racedHandler = handlerOn(bus);
+    // Close the monitor the instant its listener is registered, so init() observes closed == true
+    // only *after* it has already registered
+    bus.onRegister = racedHandler::closeAsync;
+
+    racedHandler.init().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    // The listener that init() just added must be taken back out, and no query may run
+    assertThat(bus.removals.get()).isEqualTo(1);
+    assertThat(racedHandler.capturedQueries).isEmpty();
+  }
+
+  @Test
+  public void should_unregister_listener_when_init_fails() {
+    CountingEventBus bus = new CountingEventBus();
+    TestableClientRoutesTopologyMonitor failingHandler = handlerOn(bus);
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFutures.failedFuture(new IllegalStateException("no control node")));
+
+    CompletionStage<Void> stage = failingHandler.init();
+
+    // The failure propagates, and the listener is not left dangling on the bus
+    assertThatThrownBy(() -> stage.toCompletableFuture().get(5, TimeUnit.SECONDS))
+        .hasRootCauseInstanceOf(IllegalStateException.class);
+    assertThat(bus.removals.get()).isEqualTo(1);
+  }
+
+  @Test
+  public void should_not_unregister_when_closed_before_init() {
+    CountingEventBus bus = new CountingEventBus();
+    TestableClientRoutesTopologyMonitor neverInitialized = handlerOn(bus);
+
+    neverInitialized.closeAsync();
+
+    // Nothing was ever registered, so there is no key to unregister. Counts calls, not removals:
+    // a call with a null key removes nothing and would otherwise go unnoticed
+    assertThat(bus.unregisterCalls.get()).isZero();
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  public void should_ignore_route_update_event_delivered_after_close() throws Exception {
+    CountingEventBus bus = new CountingEventBus();
+    TestableClientRoutesTopologyMonitor closingHandler = handlerOn(bus);
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    closingHandler.init().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    int queriesAfterInit = closingHandler.capturedQueries.size();
+
+    closingHandler.closeAsync();
+
+    // closeAsync() unregisters the listener, but an event already in flight still reaches it
+    Consumer<ClientRoutesUpdateEvent> listener =
+        (Consumer<ClientRoutesUpdateEvent>) bus.lastListener;
+    listener.accept(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            Collections.singletonList(connectionId),
+            Collections.singletonList(UUID.randomUUID().toString())));
+
+    // The closed guard means no further query is issued
+    assertThat(closingHandler.capturedQueries).hasSize(queriesAfterInit);
+  }
+
+  // ---- consecutive empty results ------------------------------------------
+
+  @Test
+  public void should_clear_stale_routes_after_three_consecutive_empty_results() throws Exception {
+    UUID hostId = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    // The first two empty results are treated as eventual consistency and leave the cache alone
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+
+    // The third consecutive empty result means the routes really are gone server-side
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertThat(handler.getRoutes()).isEmpty();
+  }
+
+  @Test
+  public void should_reset_empty_result_counter_when_routes_come_back() throws Exception {
+    UUID hostId = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    // Two empties, then a non-empty result, then two more empties
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(routeRow(hostId, "127.0.0.1")));
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    // The counter restarted at the non-empty result, so we are only two empties in
+    assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+  }
+
+  // ---- synchronous failure of the admin query ------------------------------
+
+  @Test
+  public void should_not_propagate_exception_when_query_throws_synchronously() throws Exception {
+    UUID hostId = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+    handler.throwOnNextQuery = true;
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    // A synchronous throw is caught, so the stage still completes and the cache survives
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getRoutes()).containsOnlyKeys(hostId);
+  }
+
+  @Test
+  public void should_release_refresh_slot_when_query_throws_synchronously() throws Exception {
+    handler.throwOnNextQuery = true;
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    // The in-flight slot was released, so a later refresh can still run
+    handler.throwOnNextQuery = false;
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.capturedQueries).hasSize(2);
+  }
+
+  // ---- buildNodeEndPoint broadcast-address fallback ------------------------
+
+  @Test
+  public void should_fall_back_to_broadcast_address_column() throws Exception {
+    UUID hostId = UUID.randomUUID();
+    AdminRow row = Mockito.mock(AdminRow.class);
+    when(row.getUuid("host_id")).thenReturn(hostId);
+    when(row.contains("peer")).thenReturn(false);
+    when(row.getInetAddress("broadcast_address"))
+        .thenReturn(InetAddress.getByAddress(new byte[] {10, 0, 0, 2}));
+
+    // A control-node row can carry no broadcast RPC address at all, so the column is consulted next
+    EndPoint result = handler.buildNodeEndPoint(row, null, Mockito.mock(EndPoint.class));
+
+    assertThat(result.asMetricPrefix()).isEqualTo("10_0_0_2_" + hostId);
+  }
+
+  @Test
+  public void should_prefer_broadcast_rpc_address_over_row_columns() throws Exception {
+    UUID hostId = UUID.randomUUID();
+    AdminRow row = Mockito.mock(AdminRow.class);
+    when(row.getUuid("host_id")).thenReturn(hostId);
+    when(row.contains("peer")).thenReturn(false);
+
+    EndPoint result =
+        handler.buildNodeEndPoint(
+            row,
+            new InetSocketAddress(InetAddress.getByAddress(new byte[] {10, 0, 0, 1}), 9042),
+            Mockito.mock(EndPoint.class));
+
+    // Neither row column is consulted when the socket address already resolves
+    assertThat(result.asMetricPrefix()).isEqualTo("10_0_0_1_" + hostId);
+    Mockito.verify(row, Mockito.never()).getInetAddress("broadcast_address");
+    Mockito.verify(row, Mockito.never()).getInetAddress("peer");
+  }
+
+  // ---- removeRoute() edge cases -------------------------------------------
+
+  @Test
+  public void should_do_nothing_when_removing_an_absent_route() {
+    UUID present = UUID.randomUUID();
+    handler.setRoutes(ImmutableMap.of(present, new ClientRouteRecord(present, "127.0.0.1", 9042)));
+    Map<UUID, ClientRouteRecord> before = handler.getRoutes();
+
+    handler.removeRouteForTest(UUID.randomUUID());
+
+    // The cache is left untouched, not rebuilt
+    assertThat(handler.getRoutes()).isSameAs(before);
+  }
+
+  private static AdminRow routeRow(UUID hostId, String address) {
+    AdminRow row = Mockito.mock(AdminRow.class);
+    when(row.isNull("host_id")).thenReturn(false);
+    when(row.isNull("address")).thenReturn(false);
+    when(row.isNull("port")).thenReturn(false);
+    when(row.getUuid("host_id")).thenReturn(hostId);
+    when(row.getString("address")).thenReturn(address);
+    when(row.getInteger("port")).thenReturn(9042);
+    when(row.contains("connection_id")).thenReturn(false);
+    return row;
   }
 }
