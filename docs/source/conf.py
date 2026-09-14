@@ -18,6 +18,7 @@ BRANCHES = [
     'scylla-3.11.2.x',
     'scylla-3.11.4.x',
     'scylla-3.11.5.x',
+    'scylla-3.x',
     'scylla-4.7.2.x',
     'scylla-4.10.0.x',
     'scylla-4.11.1.x',
@@ -40,7 +41,8 @@ DEPRECATED_VERSIONS = [
     'scylla-3.11.0.x',
     'scylla-3.11.2.x',
     'scylla-3.11.4.x',
-    'scylla-3.11.5.x'
+    'scylla-3.11.5.x',
+    'scylla-3.x'
 ]
 
 # Add any Sphinx extension module names here, as strings. They can be
@@ -158,7 +160,10 @@ html_theme_options = {
     'hide_feedback_buttons': 'false',
     'versions_unstable': UNSTABLE_VERSIONS,
     'versions_deprecated': DEPRECATED_VERSIONS,
-    'hide_version_dropdown': ['scylla-3.x'],
+    # Emptied with scylla-3.x's return to BRANCHES. 308ccd8e94 added the name here in
+    # the same commit that first published it, to build the then-default branch without
+    # advertising it; hiding it now would publish the maintenance branch unreachable.
+    'hide_version_dropdown': [],
     'skip_warnings': 'document_has_underscores'
 }
 

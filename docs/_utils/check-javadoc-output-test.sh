@@ -34,9 +34,9 @@ ALL="scylla-4.17.0.x scylla-4.18.1.x scylla-4.19.0.x stable"
 # BRANCHES order, then the smv_rename_latest_version alias. Changing the published set
 # is meant to land here too.
 REAL_ALL="scylla-3.7.2.x scylla-3.10.2.x scylla-3.11.0.x scylla-3.11.2.x \
-scylla-3.11.4.x scylla-3.11.5.x scylla-4.7.2.x scylla-4.10.0.x scylla-4.11.1.x \
-scylla-4.12.0.x scylla-4.13.0.x scylla-4.14.1.x scylla-4.15.0.x scylla-4.17.0.x \
-scylla-4.18.1.x scylla-4.19.0.x stable"
+scylla-3.11.4.x scylla-3.11.5.x scylla-3.x scylla-4.7.2.x scylla-4.10.0.x \
+scylla-4.11.1.x scylla-4.12.0.x scylla-4.13.0.x scylla-4.14.1.x \
+scylla-4.15.0.x scylla-4.17.0.x scylla-4.18.1.x scylla-4.19.0.x stable"
 REAL_ALL="$(echo $REAL_ALL)"
 
 failures=0
@@ -193,8 +193,8 @@ real_full="$TMP/real-full"
 mkdir -p "$real_full"
 for version in $REAL_ALL; do make_version "$real_full" "$version" ok; done
 run_case "real conf.py, everything built" 0 "" "" "$real_full" "$REAL_CONF"
-assert_summary "real conf.py, everything built" "All 16 documented versions"
-assert_summary "real conf.py, everything built" "17 directories, including .stable."
+assert_summary "real conf.py, everything built" "All 17 documented versions"
+assert_summary "real conf.py, everything built" "18 directories, including .stable."
 
 # Run by hand, neither variable exists and the report goes to stdout.
 plain="$(build_tree plain ok ok ok ok)"
