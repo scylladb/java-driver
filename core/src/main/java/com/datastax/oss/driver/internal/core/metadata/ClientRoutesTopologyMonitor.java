@@ -80,11 +80,11 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   private static final int MAX_CONSECUTIVE_EMPTY_RESULTS = 3;
 
   /**
-   * Consecutive refreshes that may carry a host's cached route over, unconfirmed, before the driver
-   * says so at {@code ERROR}. Deliberately a reporting threshold and not an eviction one: the row
-   * came back, so the route still exists and dropping it would strand the node on an address that
-   * does not work here. Matches {@link #MAX_CONSECUTIVE_EMPTY_RESULTS} so the two backstops read
-   * alike.
+   * The consecutive-carry-over count at which the driver starts saying so at {@code ERROR}: two
+   * passes carry a host's cached route over unconfirmed in silence, the third and every later one
+   * report it. Deliberately a reporting threshold and not an eviction one: the row came back, so
+   * the route still exists and dropping it would strand the node on an address that does not work
+   * here. Matches {@link #MAX_CONSECUTIVE_EMPTY_RESULTS} so the two backstops read alike.
    */
   private static final int CARRY_OVERS_BEFORE_ESCALATION = 3;
 
@@ -820,7 +820,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * Advances the unconfirmed-carry-over count for every cached host this pass had in scope but
    * could not rebuild, resets it for the ones it did, and forgets every host that is no longer
    * cached. Then, for any host <em>this pass</em> advanced to {@value
-   * #CARRY_OVERS_BEFORE_ESCALATION} or beyond, says so once at {@code ERROR}.
+   * #CARRY_OVERS_BEFORE_ESCALATION} or beyond, says so at {@code ERROR} -- and again on every later
+   * pass that advances it, since the count climbing is the news.
    *
    * <p>Nothing is evicted here, by design. The rows came back; the server still holds a route for
    * these hosts and this driver simply cannot read it, so the cached value remains the best answer
@@ -905,12 +906,13 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * cannot show the server to have deleted -- and dropping one of those would send a working node
    * back to its private address, unreachable in the deployment client routes exist for. A
    * carried-over record outlives the bad row for as long as it stays bad -- indefinitely, if the
-   * row never becomes readable, because no non-empty refresh resets {@link
-   * #consecutiveEmptyResults}. That is the intended side of the trade rather than an oversight: an
-   * unusable row is evidence the route <em>exists</em>, since a deleted route is absent instead,
-   * and absence still evicts. Keeping a value that may be stale costs a connection attempt that
-   * fails fast; dropping one that was fine costs the node its only reachable address until the
-   * table changes. {@link #recordCarryOvers} is what stops the difference being invisible.
+   * row never becomes readable, because every non-empty refresh resets {@link
+   * #consecutiveEmptyResults}, so the empty-result backstop never fires while rows keep coming
+   * back. That is the intended side of the trade rather than an oversight: an unusable row is
+   * evidence the route <em>exists</em>, since a deleted route is absent instead, and absence still
+   * evicts. Keeping a value that may be stale costs a connection attempt that fails fast; dropping
+   * one that was fine costs the node its only reachable address until the table changes. {@link
+   * #recordCarryOvers} is what stops the difference being invisible.
    */
   @NonNull
   private static Map<UUID, ClientRouteRecord> withRetainedCachedRoutes(
