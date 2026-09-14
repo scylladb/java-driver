@@ -29,6 +29,7 @@ import org.junit.Test;
  * Covers the methods that don't depend on the underlying factory (we use Murmur3 as the
  * implementation here).
  *
+ * @see CDCTokenRangeTest
  * @see Murmur3TokenRangeTest
  * @see ByteOrderedTokenRangeTest
  * @see RandomTokenRangeTest
