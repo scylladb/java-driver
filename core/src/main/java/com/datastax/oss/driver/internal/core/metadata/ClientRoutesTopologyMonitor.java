@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -801,8 +802,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   /**
    * Advances the unconfirmed-carry-over count for every cached host this pass had in scope but
    * could not rebuild, resets it for the ones it did, and forgets every host that is no longer
-   * cached. Then, for any host that has now gone unconfirmed {@value
-   * #CARRY_OVERS_BEFORE_ESCALATION} times or more, says so once at {@code ERROR}.
+   * cached. Then, for any host <em>this pass</em> advanced to {@value
+   * #CARRY_OVERS_BEFORE_ESCALATION} or beyond, says so once at {@code ERROR}.
    *
    * <p>Nothing is evicted here, by design. The rows came back; the server still holds a route for
    * these hosts and this driver simply cannot read it, so the cached value remains the best answer
@@ -815,7 +816,9 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    * @param newRoutes the routes this pass rebuilt; these are the confirmed ones.
    * @param queriedHostIds the hosts this pass actually asked about, or {@code null} for a full
    *     refresh, which asked about all of them. A targeted refresh learns nothing about a host
-   *     outside its scope, so such a host keeps its count rather than advancing it.
+   *     outside its scope, so such a host keeps its count rather than advancing it -- and is left
+   *     out of the report too, even at or past the threshold, since a count that did not move is
+   *     nothing this pass found out. The next full refresh puts it back in scope and reports it.
    */
   private void recordCarryOvers(
       @NonNull Map<UUID, ClientRouteRecord> installedRoutes,
@@ -823,6 +826,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       @Nullable Set<UUID> queriedHostIds) {
     Map<UUID, Integer> previous = carryOverCounts.get();
     Map<UUID, Integer> current = new HashMap<>();
+    List<UUID> unconfirmed = new ArrayList<>();
     for (UUID hostId : installedRoutes.keySet()) {
       if (newRoutes.containsKey(hostId)) {
         continue;
@@ -835,27 +839,37 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
         continue;
       }
       Integer carried = previous.get(hostId);
-      current.put(hostId, (carried == null ? 0 : carried) + 1);
+      int count = (carried == null ? 0 : carried) + 1;
+      current.put(hostId, count);
+      if (count >= CARRY_OVERS_BEFORE_ESCALATION) {
+        // Reported here and not from the finished map, so that only hosts this pass advanced
+        // can appear. A count merely carried over is not news, and reporting it would re-log
+        // the same host on every unrelated targeted refresh for as long as it stayed cached.
+        unconfirmed.add(hostId);
+      }
     }
     carryOverCounts.set(Collections.unmodifiableMap(current));
 
-    List<UUID> unconfirmed = new ArrayList<>();
-    for (Map.Entry<UUID, Integer> entry : current.entrySet()) {
-      if (entry.getValue() >= CARRY_OVERS_BEFORE_ESCALATION) {
-        unconfirmed.add(entry.getKey());
-      }
-    }
     if (!unconfirmed.isEmpty()) {
       Collections.sort(unconfirmed);
+      Map<UUID, Integer> counts = new LinkedHashMap<>();
+      for (UUID hostId : unconfirmed) {
+        counts.put(hostId, current.get(hostId));
+      }
+      // Says only what the pass established: these routes were not rebuilt. Which rows were to
+      // blame is not knowable here -- once a row cannot be attributed to any host, every cached
+      // route becomes keepable, so a host whose row was genuinely absent lands in this list
+      // beside one whose row came back unreadable.
       LOG.error(
-          "[{}] Serving {} client route(s) that the last {} refreshes could not confirm: {}. "
-              + "system.client_routes still returns a row for each, so the cached route is kept "
-              + "rather than dropped to the node's fallback address, but its value may be stale -- "
-              + "check those rows for an unreadable address or port",
+          "[{}] Serving {} client route(s) this refresh did not rebuild, with the number of "
+              + "consecutive refreshes that could not confirm each: {}. Some rows in "
+              + "system.client_routes could not be read or attributed to a host, so a route the "
+              + "server may have changed -- or deleted -- is kept rather than dropped to the "
+              + "node's fallback address. Check those rows for an unreadable connection_id, "
+              + "host_id, address or port",
           logPrefix,
           unconfirmed.size(),
-          CARRY_OVERS_BEFORE_ESCALATION,
-          unconfirmed);
+          counts);
     }
   }
 

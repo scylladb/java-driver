@@ -20,8 +20,14 @@ package com.datastax.oss.driver.internal.core.metadata;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.Appender;
 import com.datastax.oss.driver.api.core.config.ClientRouteProxy;
 import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -54,12 +60,15 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.slf4j.LoggerFactory;
 
 @RunWith(MockitoJUnitRunner.class)
 public class ClientRoutesTopologyMonitorTest {
@@ -68,8 +77,11 @@ public class ClientRoutesTopologyMonitorTest {
   @Mock private ControlConnection controlConnection;
   @Mock private DriverConfig driverConfig;
   @Mock private DriverExecutionProfile defaultProfile;
+  @Mock private Appender<ILoggingEvent> appender;
 
   private TestableClientRoutesTopologyMonitor handler;
+  private Logger logger;
+  private Level initialLogLevel;
 
   /**
    * Subclass exposing package-private {@code resolvedRoutesCache} so tests can inject test data
@@ -162,6 +174,35 @@ public class ClientRoutesTopologyMonitorTest {
             .addEndpoint(new ClientRouteProxy(connectionId, "host1"))
             .build();
     handler = new TestableClientRoutesTopologyMonitor(context, config);
+
+    logger = (Logger) LoggerFactory.getLogger(ClientRoutesTopologyMonitor.class);
+    initialLogLevel = logger.getLevel();
+    // This class is chatty at DEBUG; INFO keeps the captured events to the ones worth asserting on.
+    logger.setLevel(Level.INFO);
+    logger.addAppender(appender);
+  }
+
+  @After
+  public void teardown() {
+    logger.detachAppender(appender);
+    logger.setLevel(initialLogLevel);
+  }
+
+  /**
+   * The messages logged at {@code level} so far. Captures into a fresh {@link ArgumentCaptor} each
+   * call, since a shared one accumulates across verifications and would report every event twice on
+   * the second call.
+   */
+  private List<String> loggedAt(Level level) {
+    ArgumentCaptor<ILoggingEvent> captor = ArgumentCaptor.forClass(ILoggingEvent.class);
+    verify(appender, atLeast(0)).doAppend(captor.capture());
+    List<String> messages = new ArrayList<>();
+    for (ILoggingEvent event : captor.getAllValues()) {
+      if (event.getLevel() == level) {
+        messages.add(event.getFormattedMessage());
+      }
+    }
+    return messages;
   }
 
   /**
@@ -2139,6 +2180,78 @@ public class ClientRoutesTopologyMonitorTest {
 
     assertThat(handler.getRoutes()).containsOnlyKeys(freshHostId);
     assertThat(handler.getCarryOverCounts()).isEmpty();
+  }
+
+  @Test
+  public void should_escalate_when_a_route_is_carried_over_past_the_threshold() throws Exception {
+    // Retention here is deliberate and unbounded -- the row came back, so the route exists and
+    // dropping it would strand the node on an unreachable address. What retention must not do is
+    // stay quiet, so once a route has gone unconfirmed CARRY_OVERS_BEFORE_ESCALATION times the
+    // driver says so, with the count, and says only what it established: these were not rebuilt.
+    // It cannot name the rows to blame, because one unattributable row makes every cached route
+    // keepable, so a host whose row was genuinely absent lands in the list beside one whose row
+    // was unreadable.
+    UUID hostId = UUID.randomUUID();
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+    handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
+    handler.setNextQueryResult(AdminResultTestHelper.mockResult(mockRouteRow(hostId, null, 9042)));
+
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    // Below the threshold the per-row WARN is the whole report.
+    assertThat(loggedAt(Level.ERROR)).isEmpty();
+
+    handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    assertThat(handler.getCarryOverCounts()).containsEntry(hostId, 3);
+    List<String> errors = loggedAt(Level.ERROR);
+    assertThat(errors).hasSize(1);
+    assertThat(errors.get(0))
+        .contains("did not rebuild")
+        .contains(hostId + "=3")
+        .contains("could not be read or attributed to a host")
+        .contains("unreadable connection_id, host_id, address or port")
+        .doesNotContain("returns a row for each");
+  }
+
+  @Test
+  public void should_not_re_escalate_a_host_outside_a_targeted_refresh() throws Exception {
+    // Counts survive a refresh that did not ask about their host, but surviving is not news. A
+    // host already at the threshold would otherwise be re-reported by every unrelated targeted
+    // refresh, for as long as it stayed cached, so the report is built from the hosts this pass
+    // advanced rather than from the finished map.
+    UUID carriedHostId = UUID.randomUUID();
+    UUID rebuiltHostId = UUID.randomUUID();
+    initHandler();
+    handler.setRoutes(
+        ImmutableMap.of(
+            carriedHostId, new ClientRouteRecord(carriedHostId, "10.0.0.8", 9042),
+            rebuiltHostId, new ClientRouteRecord(rebuiltHostId, "10.0.0.9", 9042)));
+
+    // Every full refresh rebuilds one host and cannot rebuild the other.
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(
+            mockRouteRow(carriedHostId, null, 9042),
+            mockRouteRow(rebuiltHostId, "10.0.0.1", 9042)));
+    for (int i = 0; i < 3; i++) {
+      handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    }
+    assertThat(handler.getCarryOverCounts()).containsEntry(carriedHostId, 3);
+    assertThat(loggedAt(Level.ERROR)).hasSize(1);
+    int errorsBeforeEvent = loggedAt(Level.ERROR).size();
+
+    // A targeted refresh for the other host learns nothing about the carried one.
+    handler.setNextQueryResult(
+        AdminResultTestHelper.mockResult(mockRouteRow(rebuiltHostId, "10.0.0.1", 9042)));
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            Collections.singletonList(connectionId),
+            Collections.singletonList(rebuiltHostId.toString())));
+
+    assertThat(loggedAt(Level.ERROR)).hasSize(errorsBeforeEvent);
+    assertThat(handler.getCarryOverCounts()).containsEntry(carriedHostId, 3);
   }
 
   @Test
