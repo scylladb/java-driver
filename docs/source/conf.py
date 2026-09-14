@@ -18,6 +18,7 @@ BRANCHES = [
     'scylla-3.11.2.x',
     'scylla-3.11.4.x',
     'scylla-3.11.5.x',
+    'scylla-3.x',
     'scylla-4.7.2.x',
     'scylla-4.10.0.x',
     'scylla-4.11.1.x',
@@ -41,7 +42,8 @@ DEPRECATED_VERSIONS = [
     'scylla-3.11.0.x',
     'scylla-3.11.2.x',
     'scylla-3.11.4.x',
-    'scylla-3.11.5.x'
+    'scylla-3.11.5.x',
+    'scylla-3.x'
 ]
 
 # Add any Sphinx extension module names here, as strings. They can be
