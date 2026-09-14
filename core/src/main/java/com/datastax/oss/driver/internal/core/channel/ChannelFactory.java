@@ -60,6 +60,7 @@ import io.netty.resolver.AddressResolver;
 import io.netty.resolver.AddressResolverGroup;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -153,11 +154,10 @@ public class ChannelFactory {
    */
   @VisibleForTesting volatile String productType;
 
-  /** @see #resolverGroup() */
-  private volatile ResolvedResolverGroup resolverGroup;
+  private final Object resolverLock = new Object();
 
-  /** @see #resolverExecutor() */
-  private volatile EventExecutor resolverExecutor;
+  /** @see #resolverState() */
+  private volatile ResolverState resolverState;
 
   public ChannelFactory(InternalDriverContext context) {
     this.logPrefix = context.getSessionName();
@@ -230,23 +230,29 @@ public class ChannelFactory {
    * AddressResolver#resolveAll} resolves inline, and Netty's default resolver blocks on the JDK
    * lookup. A connect pays that on an event loop too (Netty resolves it from the channel's
    * registration listener), and a {@code DnsAddressResolverGroup} blocks nothing. The stage
-   * completes on that loop, or on the calling thread when the answer needs no resolver at all, so a
-   * caller that cares hops to its own executor.
+   * completes on that loop, on the calling thread when the answer needs no resolver at all, or on
+   * neither when the loop terminates with the lookup in flight, so a caller that cares hops to its
+   * own executor.
    *
-   * <p>Nothing here bounds the wait but the resolver itself, exactly as for a connect. Never
-   * throws: a synchronous failure is reported through the stage.
+   * <p>Nothing here bounds the wait but the resolver itself, exactly as for a connect: a resolver
+   * that never answers leaves the stage pending until its loop goes away. Every path through the
+   * driver completes the stage, that termination included, and none of them throws at the caller.
    */
   public CompletionStage<List<SocketAddress>> resolveAll(SocketAddress address) {
     CompletableFuture<List<SocketAddress>> result = new CompletableFuture<>();
     try {
-      AddressResolverGroup<?> resolverGroup = resolverGroup();
-      if (resolverGroup == null) {
+      ResolverState resolver = resolverState();
+      AddressResolverGroup<?> resolverGroup = resolver.group;
+      EventExecutor executor = resolver.executor;
+      if (resolverGroup == null || executor == null) {
         // disableResolver(): Netty would connect to the address exactly as given.
         result.complete(ImmutableList.of(address));
         return result;
       }
-      EventExecutor executor = resolverExecutor();
       executor.execute(() -> resolveAllOnExecutor(resolverGroup, executor, address, result));
+      // Only once the task is accepted: a loop that refuses it answers through the catch below,
+      // and a termination listener added first could beat that rejection to the stage.
+      failWhenExecutorTerminates(executor, address, result);
     } catch (Throwable t) {
       // Including the RejectedExecutionException of a loop that is already shutting down.
       result.completeExceptionally(t);
@@ -297,52 +303,81 @@ public class ChannelFactory {
   }
 
   /**
-   * The resolver group the bootstrap hook leaves installed, or {@code null} if the hook disabled
-   * resolution. Discovered once: the hook is user code, and one shaped {@code
-   * bootstrap.resolver(new DnsAddressResolverGroup(...))} would otherwise mint a group, a resolver,
-   * a UDP socket and an empty DNS cache on every lookup.
+   * Fails a lookup that its event loop does not outlive. An asynchronous resolver completes its
+   * promise from a response or from a scheduled timeout, and a terminating loop cancels the latter
+   * without running it, which would leave the stage — and whoever waits on it — pending for good.
    */
-  @Nullable
-  private AddressResolverGroup<?> resolverGroup() {
-    ResolvedResolverGroup discovered = this.resolverGroup;
-    if (discovered == null) {
-      NettyOptions nettyOptions = context.getNettyOptions();
-      // A resolver is installed on a Bootstrap, and only there: build one the way connect() does
-      // and ask it what it was given. The channel class, allocator and handler are what make this
-      // a connect bootstrap to the hook; none of them affects config().resolver().
-      Bootstrap bootstrap =
-          new Bootstrap()
-              .group(nettyOptions.ioEventLoopGroup())
-              .channel(nettyOptions.channelClass())
-              .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
-              .handler(NO_OP_INITIALIZER);
-      nettyOptions.afterBootstrapInitialized(bootstrap);
-      // Only a hook that returned is remembered; one that threw is asked again next time.
-      discovered = new ResolvedResolverGroup(bootstrap.config().resolver());
-      this.resolverGroup = discovered;
-    }
-    return discovered.group;
+  private static void failWhenExecutorTerminates(
+      EventExecutor executor,
+      SocketAddress address,
+      CompletableFuture<List<SocketAddress>> result) {
+    @SuppressWarnings("unchecked")
+    Future<Object> termination = (Future<Object>) executor.terminationFuture();
+    GenericFutureListener<Future<Object>> onTermination =
+        terminated ->
+            result.completeExceptionally(
+                new IllegalStateException(
+                    "Event loop terminated before " + address + " could be resolved"));
+    // Netty notifies this one off the loop that is dying, and the stage settles the race itself.
+    termination.addListener(onTermination);
+    // After the listener, never before: a stage that is already complete would otherwise run the
+    // removal first and leave a listener on a promise that lives as long as the loop.
+    result.whenComplete((resolved, error) -> termination.removeListener(onTermination));
   }
 
-  /** The single I/O loop {@link #resolveAll} runs every lookup on. */
-  private EventExecutor resolverExecutor() {
-    EventExecutor executor = this.resolverExecutor;
-    if (executor == null) {
-      // next() advances the group's round-robin chooser, so take one loop and keep it: a lookup
-      // must not shift which loop the next channel registers on, and the group hands back the
-      // same resolver, with the same DNS cache, for the same executor.
-      executor = context.getNettyOptions().ioEventLoopGroup().next();
-      this.resolverExecutor = executor;
+  /**
+   * The resolver group the bootstrap hook leaves installed, and the single I/O loop {@link
+   * #resolveAll} runs every lookup on. Discovered together and once: the hook is user code, and one
+   * shaped {@code bootstrap.resolver(new DnsAddressResolverGroup(...))} would otherwise mint a
+   * group, a resolver, a UDP socket and an empty DNS cache on every lookup.
+   */
+  private ResolverState resolverState() {
+    ResolverState state = this.resolverState;
+    if (state == null) {
+      synchronized (resolverLock) {
+        // Re-read under the lock: the null above is only a hint, and two callers that both acted
+        // on it would run the hook twice and pin a loop each.
+        state = this.resolverState;
+        if (state == null) {
+          this.resolverState = state = discoverResolver();
+        }
+      }
     }
-    return executor;
+    return state;
   }
 
-  /** Tells "the hook has not run yet" apart from "it ran, and disabled resolution". */
-  private static final class ResolvedResolverGroup {
+  /** Only a hook that returned is remembered; one that threw is asked again next time. */
+  private ResolverState discoverResolver() {
+    NettyOptions nettyOptions = context.getNettyOptions();
+    // A resolver is installed on a Bootstrap, and only there: build one the way connect() does
+    // and ask it what it was given. The channel class, allocator and handler are what make this
+    // a connect bootstrap to the hook; none of them affects config().resolver().
+    Bootstrap bootstrap =
+        new Bootstrap()
+            .group(nettyOptions.ioEventLoopGroup())
+            .channel(nettyOptions.channelClass())
+            .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
+            .handler(NO_OP_INITIALIZER);
+    nettyOptions.afterBootstrapInitialized(bootstrap);
+    AddressResolverGroup<?> group = bootstrap.config().resolver();
+    // next() advances the group's round-robin chooser, so take one loop and keep it: a lookup
+    // must not shift which loop the next channel registers on, and the group hands back the
+    // same resolver, with the same DNS cache, for the same executor.
+    return new ResolverState(group, group == null ? null : nettyOptions.ioEventLoopGroup().next());
+  }
+
+  /**
+   * What {@link #resolveAll} needs of the hook, taken in one step so a group can never be paired
+   * with another caller's loop. Both fields are null when the hook disabled resolution, which is
+   * how that is told apart from a hook that has not run: then there is no instance at all.
+   */
+  private static final class ResolverState {
     @Nullable final AddressResolverGroup<?> group;
+    @Nullable final EventExecutor executor;
 
-    ResolvedResolverGroup(@Nullable AddressResolverGroup<?> group) {
+    ResolverState(@Nullable AddressResolverGroup<?> group, @Nullable EventExecutor executor) {
       this.group = group;
+      this.executor = executor;
     }
   }
 

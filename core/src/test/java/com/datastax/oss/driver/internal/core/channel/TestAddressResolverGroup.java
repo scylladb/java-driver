@@ -29,6 +29,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * A stand-in for a user-supplied {@code AddressResolverGroup} (e.g. Netty's {@code
@@ -55,6 +56,9 @@ class TestAddressResolverGroup extends AddressResolverGroup<SocketAddress> {
   /** The thread the last lookup actually ran on. */
   @Nullable volatile Thread resolvingThread;
 
+  /** Counts down as a lookup starts, for a test that needs one provably in flight. */
+  final CountDownLatch lookupStarted = new CountDownLatch(1);
+
   /** The addresses to answer with, or {@code null} to fail every lookup. */
   @Nullable private final List<SocketAddress> answer;
 
@@ -66,6 +70,8 @@ class TestAddressResolverGroup extends AddressResolverGroup<SocketAddress> {
   private final boolean claimNothingIsResolved;
 
   private volatile boolean deferred;
+
+  private volatile boolean stalled;
 
   TestAddressResolverGroup(@Nullable List<SocketAddress> answer) {
     this(answer, false);
@@ -82,6 +88,15 @@ class TestAddressResolverGroup extends AddressResolverGroup<SocketAddress> {
    */
   TestAddressResolverGroup deferred() {
     this.deferred = true;
+    return this;
+  }
+
+  /**
+   * Never answers, leaving the promise pending the way an asynchronous resolver's is while its
+   * query is in flight — which is the state a terminating event loop strands.
+   */
+  TestAddressResolverGroup stalled() {
+    this.stalled = true;
     return this;
   }
 
@@ -138,9 +153,13 @@ class TestAddressResolverGroup extends AddressResolverGroup<SocketAddress> {
       private void record(SocketAddress address) {
         queried.add(address);
         resolvingThread = Thread.currentThread();
+        lookupStarted.countDown();
       }
 
       private void answerWith(Runnable onFailure, Runnable onSuccess) {
+        if (stalled) {
+          return;
+        }
         Runnable answering = (answer == null) ? onFailure : onSuccess;
         if (deferred) {
           executor.execute(answering);

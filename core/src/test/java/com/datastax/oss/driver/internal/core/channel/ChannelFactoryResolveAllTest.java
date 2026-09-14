@@ -34,8 +34,14 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 
 /**
@@ -150,6 +156,61 @@ public class ChannelFactoryResolveAllTest extends ChannelFactoryTestBase {
   }
 
   @Test
+  public void should_run_the_bootstrap_hook_once_when_lookups_race() throws Exception {
+    // Given -- a hook shaped like a real one, building the group it installs
+    AtomicInteger hookCalls = new AtomicInteger();
+    List<TestAddressResolverGroup> installed = new CopyOnWriteArrayList<>();
+    doAnswer(
+            invocation -> {
+              hookCalls.incrementAndGet();
+              TestAddressResolverGroup group =
+                  new TestAddressResolverGroup(ImmutableList.of(new LocalAddress("a")));
+              installed.add(group);
+              // Wide enough that an unsynchronized discovery loses the race every time
+              Thread.sleep(50);
+              invocation.<Bootstrap>getArgument(0).resolver(group);
+              return null;
+            })
+        .when(nettyOptions)
+        .afterBootstrapInitialized(any(Bootstrap.class));
+    ChannelFactory factory = newChannelFactory();
+    int callers = 8;
+    CyclicBarrier start = new CyclicBarrier(callers);
+    CountDownLatch done = new CountDownLatch(callers);
+    List<CompletionStage<List<SocketAddress>>> stages = new CopyOnWriteArrayList<>();
+    ExecutorService pool = Executors.newFixedThreadPool(callers);
+
+    // When -- every caller's lookup is the first one
+    try {
+      for (int i = 0; i < callers; i++) {
+        pool.submit(
+            () -> {
+              try {
+                start.await(10, TimeUnit.SECONDS);
+                stages.add(factory.resolveAll(HOSTNAME));
+              } catch (Exception e) {
+                // The assertions below fail on the missing stage
+              } finally {
+                done.countDown();
+              }
+            });
+      }
+      assertThat(done.await(30, TimeUnit.SECONDS)).isTrue();
+    } finally {
+      pool.shutdownNow();
+    }
+
+    // Then -- one hook call, so one group, one resolver and one pinned loop for all of them
+    assertThat(hookCalls.get()).isEqualTo(1);
+    assertThat(installed).hasSize(1);
+    assertThat(stages).hasSize(callers);
+    for (CompletionStage<List<SocketAddress>> stage : stages) {
+      assertThatStage(stage).isSuccess(resolved -> assertThat(resolved).hasSize(1));
+    }
+    assertThat(installed.get(0).queried).hasSize(callers);
+  }
+
+  @Test
   public void should_fail_the_stage_when_the_io_loop_no_longer_accepts_tasks() throws Exception {
     // Given
     installResolver(new TestAddressResolverGroup(ImmutableList.of(new LocalAddress("a"))));
@@ -162,6 +223,29 @@ public class ChannelFactoryResolveAllTest extends ChannelFactoryTestBase {
     // Then -- reported through the stage, never thrown at the caller
     assertThatStage(stage)
         .isFailed(error -> assertThat(error).isInstanceOf(RejectedExecutionException.class));
+  }
+
+  @Test
+  public void should_fail_the_stage_when_the_io_loop_terminates_mid_lookup() throws Exception {
+    // Given -- a lookup that has not answered yet, as an asynchronous resolver's has not mid-query
+    TestAddressResolverGroup group =
+        installResolver(
+            new TestAddressResolverGroup(ImmutableList.of(new LocalAddress("a"))).stalled());
+    ChannelFactory factory = newChannelFactory();
+    CompletionStage<List<SocketAddress>> stage = factory.resolveAll(HOSTNAME);
+    assertThat(group.lookupStarted.await(10, TimeUnit.SECONDS)).isTrue();
+
+    // When -- the session closes around it. Shutdown cancels the scheduled timeout an asynchronous
+    // resolver fails its promise from, so nothing else will ever complete this.
+    clientGroup.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS).sync();
+
+    // Then
+    assertThatStage(stage)
+        .isFailed(
+            error ->
+                assertThat(error)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Event loop terminated"));
   }
 
   @Test
