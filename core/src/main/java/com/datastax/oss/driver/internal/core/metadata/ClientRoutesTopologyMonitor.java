@@ -309,7 +309,6 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       return sentinel;
     }
 
-    String query = buildQuery(config, configuredConnectionIds, queryConnectionIds, eventHostIds);
     // A targeted refresh (host IDs known) merges into the existing cache rather than replacing it
     boolean isTargetedRefresh = eventHostIds != null && !eventHostIds.isEmpty();
 
@@ -320,6 +319,11 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
             .getDuration(DefaultDriverOption.CONTROL_CONNECTION_TIMEOUT);
 
     try {
+      // Built inside the try because it rejects a malformed host_id by throwing, and the event
+      // carries those straight off the wire. Built outside, that throw escaped with the in-flight
+      // slot still held: nothing completed the sentinel, so every later refresh returned it
+      // unfinished -- and so did the node list refresh ControlConnection chains onto it.
+      String query = buildQuery(config, configuredConnectionIds, queryConnectionIds, eventHostIds);
       runAdminQuery(channel, query, timeout)
           .thenAccept(
               adminResult -> {

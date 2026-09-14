@@ -520,18 +520,32 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
-  public void should_reject_invalid_host_id_format() {
+  public void should_release_the_refresh_slot_when_a_host_id_is_malformed() {
+    // The host IDs come off the wire unvalidated, and building the query is what rejects a
+    // malformed one. Thrown past the in-flight slot, that rejection left the slot held forever:
+    // every later refresh returned a sentinel nothing would complete, and so did the node list
+    // refresh the control connection chains onto it on every reconnect.
     initHandler();
+    int queriesAfterInit = handler.capturedQueries.size();
 
-    ClientRoutesUpdateEvent event =
+    eventBus.fire(
         new ClientRoutesUpdateEvent(
             "UPDATED",
             Collections.singletonList(connectionId),
-            Collections.singletonList("not-a-uuid; DROP TABLE foo"));
+            Collections.singletonList("not-a-uuid; DROP TABLE foo")));
 
-    assertThatThrownBy(() -> eventBus.fire(event))
-        .hasCauseInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Invalid host ID");
+    // The refresh is dropped -- the ID is still rejected, and nothing reaches the server.
+    assertThat(handler.capturedQueries).hasSize(queriesAfterInit);
+    assertThat(loggedAt(Level.WARN)).filteredOn(m -> m.contains("Invalid host ID")).hasSize(1);
+
+    // ...but the monitor is still usable, which is the part the throw used to cost.
+    String hostId = UUID.randomUUID().toString();
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED", Collections.singletonList(connectionId), Collections.singletonList(hostId)));
+
+    assertThat(handler.capturedQueries).hasSize(queriesAfterInit + 1);
+    assertThat(handler.lastCapturedQuery()).contains(hostId);
   }
 
   @Test
