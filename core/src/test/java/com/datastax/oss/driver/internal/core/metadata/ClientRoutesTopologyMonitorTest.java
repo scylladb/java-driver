@@ -53,6 +53,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -85,6 +86,13 @@ public class ClientRoutesTopologyMonitorTest {
 
     volatile AdminResult nextQueryResult = EMPTY_RESULT;
     volatile boolean failNextQuery = false;
+
+    /**
+     * Answers a query from its text instead of returning a fixed result, so a test can model the
+     * server rather than the driver: a row comes back only when the query actually asks for the
+     * connection that holds it. Takes precedence over {@link #nextQueryResult} when set.
+     */
+    volatile Function<String, AdminResult> resultForQuery = null;
 
     TestableClientRoutesTopologyMonitor(InternalDriverContext ctx, ClientRoutesConfig cfg) {
       super(ctx, cfg);
@@ -123,6 +131,10 @@ public class ClientRoutesTopologyMonitorTest {
         CompletableFuture<AdminResult> failed = new CompletableFuture<>();
         failed.completeExceptionally(new RuntimeException("simulated failure"));
         return failed;
+      }
+      Function<String, AdminResult> answer = resultForQuery;
+      if (answer != null) {
+        return CompletableFuture.completedFuture(answer.apply(queryString));
       }
       return CompletableFuture.completedFuture(nextQueryResult);
     }
@@ -1710,13 +1722,16 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
-  public void should_query_only_the_configured_connection_ids_an_event_names() {
-    // Scylla broadcasts every changed key, so an event names other clients' proxies too. Those
-    // IDs used to become the query's scope verbatim, which reads another client's routes and
-    // caches them under our host IDs -- and makes rows arrive that say nothing about the routes
-    // cached under our own connection, which no row from an unconfigured proxy can speak to.
-    // The scope narrows to the event's configured IDs: conn-1 only, not conn-2 as a fallback
-    // would give, and never the unconfigured one.
+  public void should_query_every_configured_connection_id_when_an_event_names_only_some() {
+    // Scylla broadcasts every changed key, so an event names other clients' proxies too, and an
+    // unconfigured one must never reach the query: its rows would install a route through a
+    // proxy this client is not configured to use.
+    //
+    // The configured IDs the event leaves out are the opposite case. Scoping the query to the
+    // event's subset made the refresh evict on partial evidence: a cached record names no
+    // connection, so a host missing from a conn-1-only result was read as deleted even when its
+    // route had been built from conn-2, which the pass never asked about. The query covers every
+    // configured ID so that absence means absence.
     String connId1 = "conn-1";
     String connId2 = "conn-2";
     String unconfiguredConnId = "conn-unconfigured";
@@ -1741,8 +1756,8 @@ public class ClientRoutesTopologyMonitorTest {
 
     assertThat(h.lastCapturedQuery())
         .contains("'" + connId1 + "'")
+        .contains("'" + connId2 + "'")
         .doesNotContain(unconfiguredConnId)
-        .doesNotContain("'" + connId2 + "'")
         .contains("host_id IN (" + hostId + ")");
   }
 
@@ -1928,6 +1943,53 @@ public class ClientRoutesTopologyMonitorTest {
     assertThat(h.getRoutes().get(hostId).getHostname()).isEqualTo("nlb1.example.com");
     assertThat(h.getRoutes().get(hostId).getPort()).isEqualTo(9042);
     assertThat(h.getCarryOverCounts()).containsEntry(hostId, 1);
+  }
+
+  @Test
+  public void should_keep_a_route_cached_from_a_connection_the_event_did_not_name()
+      throws Exception {
+    // A cached record names no connection, so a refresh may only call a host absent once it has
+    // asked every connection that host's route could have come from. Here the event names conn-1
+    // and the route was built from conn-2: scoped to the event's own IDs the query never saw
+    // conn-2's rows, the host looked deleted, and the sweep dropped a working node to its
+    // unreachable private address on evidence about a different connection. The query covers
+    // every configured ID, so conn-2's row arrives and rebuilds the route instead.
+    String connId1 = "conn-1";
+    String connId2 = "conn-2";
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRouteProxy(connId1, "nlb1.example.com"))
+            .addEndpoint(new ClientRouteProxy(connId2))
+            .build();
+    TestableClientRoutesTopologyMonitor h =
+        new TestableClientRoutesTopologyMonitor(context, config);
+
+    // init() before the seed, so its own full refresh cannot overwrite it.
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    h.init();
+
+    UUID hostId = UUID.randomUUID();
+    h.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "10.0.0.9", 9042)));
+
+    // The server holds this host's route under conn-2 only, so it comes back exactly when the
+    // query asks about conn-2 -- which is what makes this test fail if the scope narrows again.
+    h.resultForQuery =
+        query ->
+            query.contains("'" + connId2 + "'")
+                ? AdminResultTestHelper.mockResult(
+                    mockRouteRow(hostId, "10.0.0.2", "port", 9042, connId2))
+                : AdminResultTestHelper.mockResult();
+
+    eventBus.fire(
+        new ClientRoutesUpdateEvent(
+            "UPDATED",
+            Collections.singletonList(connId1),
+            Collections.singletonList(hostId.toString())));
+
+    assertThat(h.getRoutes()).containsOnlyKeys(hostId);
+    assertThat(h.getRoutes().get(hostId).getHostname()).isEqualTo("10.0.0.2");
   }
 
   @Test

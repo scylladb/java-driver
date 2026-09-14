@@ -251,7 +251,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   }
 
   private CompletionStage<Void> queryClientRoutesAndCache(
-      @Nullable List<String> eventConnectionIds, @Nullable List<String> eventHostIds) {
+      @Nullable List<String> queryConnectionIds, @Nullable List<String> eventHostIds) {
     CompletableFuture<Void> sentinel = new CompletableFuture<>();
 
     // Try to acquire the in-flight slot via CAS with exponential backoff.
@@ -261,12 +261,12 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
     long backoffMs = BACKOFF_START_MS;
     for (int attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt++) {
       if (inFlightRefresh.compareAndSet(null, sentinel)) {
-        return executeRefresh(sentinel, eventConnectionIds, eventHostIds);
+        return executeRefresh(sentinel, queryConnectionIds, eventHostIds);
       }
       CompletionStage<Void> existing = inFlightRefresh.get();
       if (existing != null) {
         // Another refresh is in-flight — queue this request (coalescing with any pending one).
-        RefreshRequest incoming = new RefreshRequest(eventConnectionIds, eventHostIds);
+        RefreshRequest incoming = new RefreshRequest(queryConnectionIds, eventHostIds);
         queuedRefresh.getAndUpdate(q -> q == null ? incoming : q.coalesce(incoming));
         LOG.debug("[{}] Client routes refresh in progress, request queued", logPrefix);
         return existing;
@@ -298,7 +298,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    */
   private CompletionStage<Void> executeRefresh(
       CompletableFuture<Void> sentinel,
-      @Nullable List<String> eventConnectionIds,
+      @Nullable List<String> queryConnectionIds,
       @Nullable List<String> eventHostIds) {
 
     DriverChannel channel = context.getControlConnection().channel();
@@ -308,7 +308,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       return sentinel;
     }
 
-    String query = buildQuery(config, configuredConnectionIds, eventConnectionIds, eventHostIds);
+    String query = buildQuery(config, configuredConnectionIds, queryConnectionIds, eventHostIds);
     // A targeted refresh (host IDs known) merges into the existing cache rather than replacing it
     boolean isTargetedRefresh = eventHostIds != null && !eventHostIds.isEmpty();
 
@@ -400,6 +400,13 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                   // it does hold would drop a working route back to the node's unreachable
                   // private address, which is why every reason a host is not provably absent
                   // lives in that one set rather than in a condition here.
+                  //
+                  // Absence is proof only because the query covered every configured connection
+                  // ID (see onClientRoutesUpdateEvent) while the cached record names none: a
+                  // pass scoped to fewer connections than the cache was built from would be
+                  // evicting on rows that say nothing about the route it is removing. Keying
+                  // the cache by (connection_id, host_id) is what would let this sweep narrow
+                  // to what the event actually named -- #1063.
                   Set<UUID> queriedHostIds = new HashSet<>();
                   for (String hostIdStr : eventHostIds) {
                     UUID hostId;
@@ -572,23 +579,30 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       return;
     }
     LOG.debug("[{}] Received {}, refreshing routes", logPrefix, event);
-    queryClientRoutesAndCache(allowedConnectionIds, event.getHostIds());
+    // Whether this event concerns us and what the refresh may evict are separate questions. The
+    // filter above answers the first. The second is answered by the configured IDs, not the
+    // event's: a cached record holds no connection ID, so a row is only evidence about the host
+    // it names once every connection this session could have cached from has been asked. Scoping
+    // the query to the IDs the event happened to name let a row from one connection evict a
+    // route built from another.
+    queryClientRoutesAndCache(configuredConnectionIds, event.getHostIds());
   }
 
   /**
    * Returns the connection IDs an event names that this driver actually configured, dropping the
    * rest. Scylla broadcasts every changed key, so an event routinely names proxies belonging to
-   * other clients, and until they are dropped they reach {@link #buildQuery} and become the query's
-   * scope verbatim -- unlike the host IDs beside them, which are validated there.
+   * other clients, and what is left here decides only whether the event concerns this session at
+   * all -- an event naming connections, none of them ours, changed no route this session holds and
+   * is dropped without a query.
    *
-   * <p>Two things go wrong when they do. A usable row for an unconfigured connection installs a
-   * route through a proxy this client is not configured to use, addressed as that proxy's clients
-   * address it. An unusable one is read as evidence about a host whose cached route was built from
-   * a different connection's row entirely. Both are the same mistake: a row is only evidence about
-   * the connection it belongs to.
+   * <p>It is deliberately not the query's scope. A usable row for an unconfigured connection would
+   * install a route through a proxy this client is not configured to use, addressed as that proxy's
+   * clients address it; the configured IDs {@link #onClientRoutesUpdateEvent} queries instead
+   * exclude those by construction, and unlike the event's subset they cover every connection a
+   * cached route can have come from, which is what lets absence count as a delete.
    *
    * <p>Empty IDs are dropped as well. {@link ClientRouteProxy} rejects a blank connection ID, so
-   * one can never match, and leaving it in would only widen the {@code IN} list.
+   * one can never match, and an empty string would make this look like a match for nothing.
    */
   @NonNull
   private List<String> allowedConnectionIds(@NonNull List<String> eventConnectionIds) {
@@ -646,28 +660,28 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
    *   <li>Both connection IDs and host IDs present → {@code WHERE connection_id IN (...) AND
    *       host_id IN (...)} — no {@code ALLOW FILTERING} needed (both partition key components
    *       provided)
-   *   <li>Connection IDs only → {@code WHERE connection_id IN (...) ALLOW FILTERING}; uses event
-   *       connection IDs when present, otherwise falls back to all configured connection IDs
+   *   <li>Connection IDs only → {@code WHERE connection_id IN (...) ALLOW FILTERING}; uses the
+   *       caller's connection IDs when present, otherwise falls back to all configured ones
    *   <li>Neither → full scan with {@code ALLOW FILTERING} (should not occur in practice)
    * </ul>
    *
-   * <p>{@code eventConnectionIds} has already been reduced to configured IDs by {@link
-   * #allowedConnectionIds}, so the scope this builds is always inside them. The fallback above
-   * therefore covers two arrivals that differ: an event that named no connection at all, and one
-   * whose IDs were all dropped -- and the second never reaches here, because a pass over our own
-   * connections would answer a question that event did not ask.
+   * <p>Both callers scope the query to the configured connection IDs, so the fallback is a second
+   * route to the same place rather than a different behaviour: {@link #onClientRoutesUpdateEvent}
+   * passes them explicitly, {@link #init()} and {@link #refresh()} pass {@code null} and land on
+   * the fallback. {@link ClientRoutesConfig} requires at least one endpoint, so the list is never
+   * empty and the connection-less branch is unreachable in practice.
    */
   @NonNull
   private static String buildQuery(
       @NonNull ClientRoutesConfig config,
       @NonNull List<String> configuredConnectionIds,
-      @Nullable List<String> eventConnectionIds,
+      @Nullable List<String> queryConnectionIds,
       @Nullable List<String> eventHostIds) {
 
-    // Use event connection IDs when present, otherwise fall back to all configured IDs
+    // Use the caller's connection IDs when present, otherwise fall back to all configured IDs
     List<String> connectionIds =
-        (eventConnectionIds != null && !eventConnectionIds.isEmpty())
-            ? eventConnectionIds
+        (queryConnectionIds != null && !queryConnectionIds.isEmpty())
+            ? queryConnectionIds
             : configuredConnectionIds;
 
     boolean hasConnectionIds = !connectionIds.isEmpty();
