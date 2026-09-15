@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.netty.channel.EventLoop;
+import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.Future;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +34,17 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
 public class RejectionSafeEventExecutorTest {
+
+  @Test
+  public void should_use_event_loops_parent_as_executor_group() {
+    EventLoop eventLoop = mock(EventLoop.class);
+    EventLoopGroup parent = mock(EventLoopGroup.class);
+    when(eventLoop.parent()).thenReturn(parent);
+
+    RejectionSafeEventExecutor executor = new RejectionSafeEventExecutor(eventLoop);
+
+    assertThat(executor.parent()).isSameAs(parent);
+  }
 
   @Test
   public void should_trampoline_nested_tasks_when_event_loop_rejects_them() {

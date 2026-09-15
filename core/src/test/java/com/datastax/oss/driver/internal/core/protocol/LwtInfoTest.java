@@ -20,7 +20,6 @@ package com.datastax.oss.driver.internal.core.protocol;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -108,6 +107,28 @@ public class LwtInfoTest {
   }
 
   @Test
+  public void should_treat_zero_mask_as_matching_every_flag_value() {
+    // (flags & 0) == 0 for any flags, so a mask of 0 makes isLwt universally true
+    LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(supported(MASK_PREFIX + "0"));
+
+    assertThat(lwtInfo.isLwt(0)).isTrue();
+    assertThat(lwtInfo.isLwt(Integer.MIN_VALUE)).isTrue();
+    assertThat(lwtInfo.isLwt(-1)).isTrue();
+  }
+
+  @Test
+  public void should_require_every_mask_bit_to_be_set() {
+    // isLwt is (flags & mask) == mask, not (flags & mask) != 0 -- only a multi-bit mask can tell
+    // the two apart
+    LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(supported(MASK_PREFIX + "3")); // 0b11
+
+    assertThat(lwtInfo.isLwt(0b01)).isFalse();
+    assertThat(lwtInfo.isLwt(0b10)).isFalse();
+    assertThat(lwtInfo.isLwt(0b11)).isTrue();
+    assertThat(lwtInfo.isLwt(0b111)).isTrue();
+  }
+
+  @Test
   public void should_echo_mask_back_in_startup_options() {
     LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(supported(MASK_PREFIX + "32"));
     Map<String, String> options = new LinkedHashMap<>();
@@ -147,8 +168,6 @@ public class LwtInfoTest {
   }
 
   private static List<String> singletonWithNull() {
-    List<String> values = new ArrayList<>();
-    values.add(null);
-    return values;
+    return Collections.singletonList(null);
   }
 }
