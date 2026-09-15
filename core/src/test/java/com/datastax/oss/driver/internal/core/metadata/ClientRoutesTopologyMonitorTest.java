@@ -78,7 +78,11 @@ public class ClientRoutesTopologyMonitorTest {
    * without actually executing admin queries.
    *
    * <p>Also overrides {@link #runAdminQuery} to capture issued query strings and return an empty
-   * result, so tests can verify which queries were executed without touching the network.
+   * result, so tests can verify which client-routes queries were executed without touching the
+   * network. This only intercepts the client-routes query path; queries issued by the inherited
+   * {@code DefaultTopologyMonitor} methods ({@code refreshNode}, {@code refreshNodeList}, {@code
+   * getChannelNodeInfo}, {@code checkSchemaAgreement}) go through the un-overridden {@code
+   * DefaultTopologyMonitor#query} and are not exercised by this test class.
    */
   @SuppressWarnings("NewClassNamingConvention")
   static class TestableClientRoutesTopologyMonitor extends ClientRoutesTopologyMonitor {
@@ -717,16 +721,7 @@ public class ClientRoutesTopologyMonitorTest {
         new TestableClientRoutesTopologyMonitor(context, config);
 
     UUID hostId = UUID.randomUUID();
-    AdminRow row = Mockito.mock(AdminRow.class);
-    when(row.isNull("host_id")).thenReturn(false);
-    when(row.isNull("address")).thenReturn(false);
-    when(row.isNull("port")).thenReturn(false);
-    when(row.getUuid("host_id")).thenReturn(hostId);
-    when(row.getString("address")).thenReturn("original.example.com");
-    when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(true);
-    when(row.isNull("connection_id")).thenReturn(false);
-    when(row.getString("connection_id")).thenReturn(connId);
+    AdminRow row = routeRow(hostId, "original.example.com", 9042, connId);
 
     h.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -748,16 +743,7 @@ public class ClientRoutesTopologyMonitorTest {
         new TestableClientRoutesTopologyMonitor(context, config);
 
     UUID hostId = UUID.randomUUID();
-    AdminRow row = Mockito.mock(AdminRow.class);
-    when(row.isNull("host_id")).thenReturn(false);
-    when(row.isNull("address")).thenReturn(false);
-    when(row.isNull("port")).thenReturn(false);
-    when(row.getUuid("host_id")).thenReturn(hostId);
-    when(row.getString("address")).thenReturn("original.example.com");
-    when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(true);
-    when(row.isNull("connection_id")).thenReturn(false);
-    when(row.getString("connection_id")).thenReturn("conn-2");
+    AdminRow row = routeRow(hostId, "original.example.com", 9042, "conn-2");
 
     h.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -779,14 +765,7 @@ public class ClientRoutesTopologyMonitorTest {
         new TestableClientRoutesTopologyMonitor(context, config);
 
     UUID hostId = UUID.randomUUID();
-    AdminRow row = Mockito.mock(AdminRow.class);
-    when(row.isNull("host_id")).thenReturn(false);
-    when(row.isNull("address")).thenReturn(false);
-    when(row.isNull("port")).thenReturn(false);
-    when(row.getUuid("host_id")).thenReturn(hostId);
-    when(row.getString("address")).thenReturn("original.example.com");
-    when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(false);
+    AdminRow row = routeRow(hostId, "original.example.com");
 
     h.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -873,14 +852,7 @@ public class ClientRoutesTopologyMonitorTest {
     // Default handler has SSL disabled — should pick the regular port column
     UUID hostId = UUID.randomUUID();
 
-    AdminRow row = Mockito.mock(AdminRow.class);
-    when(row.isNull("host_id")).thenReturn(false);
-    when(row.isNull("address")).thenReturn(false);
-    when(row.isNull("port")).thenReturn(false);
-    when(row.getUuid("host_id")).thenReturn(hostId);
-    when(row.getString("address")).thenReturn("127.0.0.1");
-    when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(false);
+    AdminRow row = routeRow(hostId, "127.0.0.1");
 
     handler.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -983,7 +955,6 @@ public class ClientRoutesTopologyMonitorTest {
     handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
 
     // Simulate a full refresh that returns 0 rows (e.g. routes not visible on the queried node)
-    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
 
     handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
@@ -998,7 +969,6 @@ public class ClientRoutesTopologyMonitorTest {
     assertThat(handler.getRoutes()).isEmpty();
 
     // Full refresh with 0 rows when cache is also empty — no-op
-    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
 
     handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
@@ -1013,14 +983,7 @@ public class ClientRoutesTopologyMonitorTest {
     handler.setRoutes(ImmutableMap.of(hostId1, new ClientRouteRecord(hostId1, "127.0.0.1", 9042)));
 
     // Full refresh returns a different route set
-    AdminRow newRow = Mockito.mock(AdminRow.class);
-    when(newRow.isNull("host_id")).thenReturn(false);
-    when(newRow.isNull("address")).thenReturn(false);
-    when(newRow.isNull("port")).thenReturn(false);
-    when(newRow.getUuid("host_id")).thenReturn(hostId2);
-    when(newRow.getString("address")).thenReturn("127.0.0.2");
-    when(newRow.getInteger("port")).thenReturn(9043);
-    when(newRow.contains("connection_id")).thenReturn(false);
+    AdminRow newRow = routeRow(hostId2, "127.0.0.2", 9043, null);
 
     handler.setNextQueryResult(AdminResultTestHelper.mockResult(newRow));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -1118,14 +1081,7 @@ public class ClientRoutesTopologyMonitorTest {
 
     // Simulate a targeted refresh (CLIENT_ROUTES_CHANGE event) that mentions both host IDs,
     // but the query result only returns hostId1 (hostId2 was decommissioned server-side).
-    AdminRow row = Mockito.mock(AdminRow.class);
-    when(row.isNull("host_id")).thenReturn(false);
-    when(row.isNull("address")).thenReturn(false);
-    when(row.isNull("port")).thenReturn(false);
-    when(row.getUuid("host_id")).thenReturn(hostId1);
-    when(row.getString("address")).thenReturn("127.0.0.1");
-    when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(false);
+    AdminRow row = routeRow(hostId1, "127.0.0.1");
 
     handler.setNextQueryResult(AdminResultTestHelper.mockResult(row));
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
@@ -1337,11 +1293,19 @@ public class ClientRoutesTopologyMonitorTest {
 
   // ---- init() / closeAsync() lifecycle ------------------------------------
 
-  /** An {@link EventBus} that counts unregistrations and can close a monitor mid-registration. */
+  /**
+   * An {@link EventBus} that counts unregistrations and can close a monitor mid-registration.
+   *
+   * <p>{@code fire()} is intentionally left un-overridden and delegates straight to the real {@link
+   * EventBus}: nothing here counts or intercepts it. Add that instrumentation here if a future test
+   * needs it — don't assume it already exists.
+   */
   static class CountingEventBus extends EventBus {
     final AtomicInteger unregisterCalls = new AtomicInteger();
     /** Unregistrations that removed a listener, i.e. were passed the key register() returned. */
     final AtomicInteger removals = new AtomicInteger();
+    /** The key passed to each unregister() call, in order, so tests can compare them. */
+    final List<Object> unregisteredKeys = new ArrayList<>();
 
     volatile Runnable onRegister;
     volatile Consumer<?> lastListener;
@@ -1364,6 +1328,7 @@ public class ClientRoutesTopologyMonitorTest {
     @Override
     public <EventT> boolean unregister(Object key, Class<EventT> eventClass) {
       unregisterCalls.incrementAndGet();
+      unregisteredKeys.add(key);
       boolean removed = super.unregister(key, eventClass);
       if (removed) {
         removals.incrementAndGet();
@@ -1437,7 +1402,6 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void should_ignore_route_update_event_delivered_after_close() throws Exception {
     CountingEventBus bus = new CountingEventBus();
     TestableClientRoutesTopologyMonitor closingHandler = handlerOn(bus);
@@ -1449,10 +1413,13 @@ public class ClientRoutesTopologyMonitorTest {
 
     closingHandler.closeAsync();
 
-    // closeAsync() unregisters the listener, but an event already in flight still reaches it
-    Consumer<ClientRoutesUpdateEvent> listener =
-        (Consumer<ClientRoutesUpdateEvent>) bus.lastListener;
-    listener.accept(
+    // closeAsync() really removed the listener from the bus, not just flipped a guard
+    assertThat(bus.removals.get()).isEqualTo(1);
+
+    // Fire through the real bus: if the listener were still registered, this would reach it
+    // and trigger a requery. CountingEventBus does not override fire(), so this exercises the
+    // genuine EventBus dispatch/removal, unlike calling the captured listener directly.
+    bus.fire(
         new ClientRoutesUpdateEvent(
             "UPDATED",
             Collections.singletonList(connectionId),
@@ -1462,13 +1429,36 @@ public class ClientRoutesTopologyMonitorTest {
     assertThat(closingHandler.capturedQueries).hasSize(queriesAfterInit);
   }
 
+  @Test
+  public void should_unregister_again_with_the_same_stale_key_when_closed_twice() throws Exception {
+    // Pins today's behavior: clientRoutesUpdateKey is never cleared after the first
+    // unregister(), so a second closeAsync() call unregisters again with the same stale key.
+    // Harmless because EventBus.unregister() on an absent key just returns false.
+    // See https://github.com/scylladb/java-driver/issues/1095.
+    CountingEventBus bus = new CountingEventBus();
+    TestableClientRoutesTopologyMonitor closingHandler = handlerOn(bus);
+    when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
+    when(controlConnection.init(anyBoolean(), anyBoolean(), anyBoolean()))
+        .thenReturn(CompletableFuture.completedFuture(null));
+    closingHandler.init().toCompletableFuture().get(5, TimeUnit.SECONDS);
+
+    closingHandler.closeAsync();
+    closingHandler.closeAsync();
+
+    assertThat(bus.unregisterCalls.get()).isEqualTo(2);
+    assertThat(bus.unregisteredKeys).hasSize(2);
+    // Same stale key both times: the field is never reset to null after the first unregister()
+    assertThat(bus.unregisteredKeys.get(0)).isSameAs(bus.unregisteredKeys.get(1));
+    // Only the first call actually finds and removes the listener
+    assertThat(bus.removals.get()).isEqualTo(1);
+  }
+
   // ---- consecutive empty results ------------------------------------------
 
   @Test
   public void should_clear_stale_routes_after_three_consecutive_empty_results() throws Exception {
     UUID hostId = UUID.randomUUID();
     handler.setRoutes(ImmutableMap.of(hostId, new ClientRouteRecord(hostId, "127.0.0.1", 9042)));
-    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
 
     // The first two empty results are treated as eventual consistency and leave the cache alone
@@ -1489,7 +1479,6 @@ public class ClientRoutesTopologyMonitorTest {
     when(controlConnection.channel()).thenReturn(Mockito.mock(DriverChannel.class));
 
     // Two empties, then a non-empty result, then two more empties
-    handler.setNextQueryResult(AdminResultTestHelper.mockResult());
     handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
     handler.refresh().toCompletableFuture().get(5, TimeUnit.SECONDS);
 
@@ -1584,14 +1573,23 @@ public class ClientRoutesTopologyMonitorTest {
   }
 
   private static AdminRow routeRow(UUID hostId, String address) {
+    return routeRow(hostId, address, 9042, null);
+  }
+
+  /** Pass {@code null} connectionId to make {@code contains("connection_id")} report false. */
+  private static AdminRow routeRow(UUID hostId, String address, int port, String connectionId) {
     AdminRow row = Mockito.mock(AdminRow.class);
     when(row.isNull("host_id")).thenReturn(false);
     when(row.isNull("address")).thenReturn(false);
     when(row.isNull("port")).thenReturn(false);
     when(row.getUuid("host_id")).thenReturn(hostId);
     when(row.getString("address")).thenReturn(address);
-    when(row.getInteger("port")).thenReturn(9042);
-    when(row.contains("connection_id")).thenReturn(false);
+    when(row.getInteger("port")).thenReturn(port);
+    when(row.contains("connection_id")).thenReturn(connectionId != null);
+    if (connectionId != null) {
+      when(row.isNull("connection_id")).thenReturn(false);
+      when(row.getString("connection_id")).thenReturn(connectionId);
+    }
     return row;
   }
 }

@@ -416,6 +416,6 @@ public class ClientRoutesConfigTest {
   public void should_expose_connection_addr_through_the_deprecated_getter() {
     ClientRouteProxy proxy = new ClientRouteProxy("conn-id-1", "host1");
 
-    assertThat(proxy.getConnectionAddr()).isEqualTo(proxy.getConnectionAddrOverride());
+    assertThat(proxy.getConnectionAddr()).isEqualTo("host1");
   }
 }
