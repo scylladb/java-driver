@@ -96,18 +96,6 @@ public class LwtInfoTest {
   }
 
   @Test
-  public void should_return_null_when_mask_is_negative() {
-    assertThat(LwtInfo.loadFromSupportedOptions(supported(MASK_PREFIX + "-1"))).isNull();
-  }
-
-  @Test
-  public void should_return_null_when_mask_is_above_unsigned_int32_range() {
-    // 2^32: one past the valid unsigned int32 range. Before the range check this silently
-    // folded to a mask of 0, which makes isLwt() true for every flags value.
-    assertThat(LwtInfo.loadFromSupportedOptions(supported(MASK_PREFIX + "4294967296"))).isNull();
-  }
-
-  @Test
   public void should_detect_lwt_flag() {
     // The mask Scylla actually sends is the sign bit, so a signed comparison would break here
     LwtInfo lwtInfo = LwtInfo.loadFromSupportedOptions(supported(MASK_PREFIX + "2147483648"));

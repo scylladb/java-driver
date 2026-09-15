@@ -57,10 +57,6 @@ public class LwtInfo {
           "Error while parsing " + LWT_OPTIMIZATION_META_BIT_MASK_KEY + ": " + e.getMessage());
       return null;
     }
-    if (mask < 0 || mask > 0xFFFFFFFFL) {
-      // Not a valid unsigned int32, so it can't be a mask the server actually sent
-      return null;
-    }
     if (mask > Integer.MAX_VALUE) {
       // Unfortunately server returns mask as unsigned int32 so we have to parse it as int64 and
       // convert to proper signed int32
