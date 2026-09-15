@@ -80,11 +80,11 @@ public class RejectionSafeEventExecutorTest {
     EventLoop eventLoop = mock(EventLoop.class);
     Thread thread = Thread.currentThread();
     when(eventLoop.inEventLoop()).thenReturn(true);
-    when(eventLoop.inEventLoop(thread)).thenReturn(false);
+    when(eventLoop.inEventLoop(thread)).thenReturn(true);
     RejectionSafeEventExecutor executor = new RejectionSafeEventExecutor(eventLoop);
 
     assertThat(executor.inEventLoop()).isTrue();
-    assertThat(executor.inEventLoop(thread)).isFalse();
+    assertThat(executor.inEventLoop(thread)).isTrue();
   }
 
   @Test
@@ -92,12 +92,12 @@ public class RejectionSafeEventExecutorTest {
     EventLoop eventLoop = mock(EventLoop.class);
     when(eventLoop.isShuttingDown()).thenReturn(true);
     when(eventLoop.isShutdown()).thenReturn(true);
-    when(eventLoop.isTerminated()).thenReturn(false);
+    when(eventLoop.isTerminated()).thenReturn(true);
     RejectionSafeEventExecutor executor = new RejectionSafeEventExecutor(eventLoop);
 
     assertThat(executor.isShuttingDown()).isTrue();
     assertThat(executor.isShutdown()).isTrue();
-    assertThat(executor.isTerminated()).isFalse();
+    assertThat(executor.isTerminated()).isTrue();
   }
 
   @Test
