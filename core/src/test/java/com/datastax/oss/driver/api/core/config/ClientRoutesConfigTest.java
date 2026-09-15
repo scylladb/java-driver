@@ -20,6 +20,7 @@ package com.datastax.oss.driver.api.core.config;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Collections;
 import org.junit.Test;
 
 public class ClientRoutesConfigTest {
@@ -330,5 +331,91 @@ public class ClientRoutesConfigTest {
     ClientRouteProxy ep2 = new ClientRouteProxy("conn-id-1", "host1");
     assertThat(ep1).isNotEqualTo(ep2);
     assertThat(ep2).isNotEqualTo(ep1);
+  }
+
+  @Test
+  public void should_carry_shard_awareness_flag() {
+    assertThat(
+            ClientRoutesConfig.builder()
+                .addEndpoint(new ClientRouteProxy("conn-id-1", "host1"))
+                .build()
+                .isShardAwarenessEnabled())
+        .isFalse();
+    assertThat(
+            ClientRoutesConfig.builder()
+                .addEndpoint(new ClientRouteProxy("conn-id-1", "host1"))
+                .withShardAwareness(true)
+                .build()
+                .isShardAwarenessEnabled())
+        .isTrue();
+  }
+
+  @Test
+  public void should_reject_empty_endpoint_list() {
+    assertThatThrownBy(
+            () -> ClientRoutesConfig.builder().withEndpoints(Collections.emptyList()).build())
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("endpoints must not be empty");
+  }
+
+  @Test
+  public void should_reject_native_transport_port_outside_the_valid_range() {
+    assertThatThrownBy(() -> ClientRoutesConfig.builder().withNativeTransportPort(0))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Native transport port must be between 1 and 65535, got 0");
+    assertThatThrownBy(() -> ClientRoutesConfig.builder().withNativeTransportPort(65536))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Native transport port must be between 1 and 65535");
+  }
+
+  @Test
+  public void should_not_equal_an_unrelated_type() {
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRouteProxy("conn-id-1", "host1"))
+            .build();
+
+    assertThat(config).isNotEqualTo("not a config").isNotEqualTo(null);
+    assertThat(config).isEqualTo(config);
+  }
+
+  @Test
+  public void should_print_its_components() {
+    ClientRoutesConfig config =
+        ClientRoutesConfig.builder()
+            .addEndpoint(new ClientRouteProxy("conn-id-1", "host1"))
+            .build();
+
+    assertThat(config.toString())
+        .contains("endpoints=")
+        .contains("conn-id-1")
+        .contains("system.client_routes")
+        .contains("9042");
+  }
+
+  @Test
+  public void should_not_equal_proxy_of_an_unrelated_type() {
+    ClientRouteProxy proxy = new ClientRouteProxy("conn-id-1", "host1");
+
+    assertThat(proxy).isNotEqualTo("not a proxy").isNotEqualTo(null);
+    assertThat(proxy).isEqualTo(proxy);
+  }
+
+  @Test
+  public void should_print_proxy_components_only_when_present() {
+    assertThat(new ClientRouteProxy("conn-id-1", "host1").toString())
+        .isEqualTo("ClientRouteProxy{connectionId='conn-id-1', connectionAddrOverride='host1'}");
+
+    // The override is omitted entirely when it was never set
+    assertThat(new ClientRouteProxy("conn-id-1").toString())
+        .isEqualTo("ClientRouteProxy{connectionId='conn-id-1'}");
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_expose_connection_addr_through_the_deprecated_getter() {
+    ClientRouteProxy proxy = new ClientRouteProxy("conn-id-1", "host1");
+
+    assertThat(proxy.getConnectionAddr()).isEqualTo("host1");
   }
 }
