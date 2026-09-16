@@ -2,18 +2,23 @@ package com.datastax.oss.driver.internal.core.metadata;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.data.TupleValue;
 import com.datastax.oss.driver.api.core.metadata.KeyspaceTableNamePair;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.Tablet;
 import com.datastax.oss.driver.api.core.metadata.TabletMap;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.Test;
 import org.testng.Assert;
 
@@ -253,6 +258,58 @@ public class DefaultTabletMapTest {
         .contains("lastToken=10")
         .contains("replicaNodes=")
         .contains("replicaShards=");
+  }
+
+  // --- Payload parsing -------------------------------------------------------------------------
+
+  @Test
+  public void should_skip_replica_with_unknown_host_id() {
+    DefaultNode known = newNode(1);
+    TupleValue payload =
+        payload(0, 10, replica(UUID.randomUUID(), 3), replica(known.getHostId(), 7));
+
+    Tablet tablet =
+        DefaultTabletMap.DefaultTablet.parseTabletPayloadV1(
+            payload, ImmutableMap.of(known.getHostId(), known));
+
+    assertThat(tablet.getReplicaNodesList()).containsExactly(known);
+    assertThat(tablet.getShardForNode(known)).isEqualTo(7);
+  }
+
+  @Test
+  public void should_list_a_replica_named_twice_only_once() {
+    DefaultNode node = newNode(1);
+    TupleValue payload = payload(0, 10, replica(node.getHostId(), 1), replica(node.getHostId(), 2));
+
+    Tablet tablet =
+        DefaultTabletMap.DefaultTablet.parseTabletPayloadV1(
+            payload, ImmutableMap.of(node.getHostId(), node));
+
+    assertThat(tablet.getReplicaNodesList()).containsExactly(node);
+    // A node can only be recorded on one shard, so the last entry in the payload wins.
+    assertThat(tablet.getShardForNode(node)).isEqualTo(2);
+  }
+
+  private static DefaultNode newNode(int lastIpByte) {
+    InternalDriverContext context = mock(InternalDriverContext.class);
+    when(context.getMetricsFactory()).thenReturn(mock(MetricsFactory.class));
+    return TestNodeFactory.newNode(lastIpByte, context);
+  }
+
+  /** One entry of the replica list in a tablets-routing-v1 payload. */
+  private static TupleValue replica(UUID hostId, int shard) {
+    TupleValue tuple = mock(TupleValue.class);
+    when(tuple.getUuid(0)).thenReturn(hostId);
+    when(tuple.getInt(1)).thenReturn(shard);
+    return tuple;
+  }
+
+  private static TupleValue payload(long firstToken, long lastToken, TupleValue... replicas) {
+    TupleValue payload = mock(TupleValue.class);
+    when(payload.getLong(0)).thenReturn(firstToken);
+    when(payload.getLong(1)).thenReturn(lastToken);
+    when(payload.getList(2, TupleValue.class)).thenReturn(ImmutableList.copyOf(replicas));
+    return payload;
   }
 
   private static boolean contains(Tablet tablet, Node node) {
