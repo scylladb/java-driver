@@ -1565,4 +1565,58 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     verify(channelFactory, never()).connect(argThat(nodeAt(8)), any(DriverChannelOptions.class));
     verify(channelFactory, never()).connect(same(contactPoint), any(DriverChannelOptions.class));
   }
+
+  @Test
+  public void should_fail_the_round_when_a_candidate_connect_throws() {
+    // Given -- a candidate whose connect throws at us instead of failing its future, as a
+    // NettyOptions.afterBootstrapInitialized hook that throws makes it
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(resolvedAddress(1));
+    when(channelFactory.connect(argThat(nodeAt(1)), any(DriverChannelOptions.class)))
+        .thenThrow(new IllegalStateException("bootstrap hook failure"));
+
+    // When
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+
+    // Then -- build() fails, rather than waiting for ever on a round that ended unsettled
+    assertThatStage(initFuture)
+        .isFailed(
+            error -> {
+              assertThat(error).isInstanceOf(AllNodesFailedException.class);
+              assertThat(((AllNodesFailedException) error).getAllErrors().values())
+                  .allSatisfy(
+                      errors ->
+                          assertThat(errors)
+                              .hasSize(1)
+                              .allSatisfy(
+                                  t ->
+                                      assertThat(t)
+                                          .hasMessageContaining("bootstrap hook failure")));
+            });
+  }
+
+  @Test
+  public void should_schedule_another_attempt_when_a_candidate_connect_throws_on_reconnection() {
+    // Given -- initialized on node1, reconnecting through a contact point
+    when(reconnectionSchedule.nextDelay()).thenReturn(Duration.ofNanos(1));
+    DriverChannel channel1 = newMockDriverChannel(1);
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).success(node1, channel1).build();
+    CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+    factoryHelper.waitForCall(node1);
+    assertThatStage(initFuture).isSuccess();
+    DefaultNode contactPoint = hostnameContactPoint();
+    mockQueryPlan(contactPoint);
+    mockResolveAll(resolvedAddress(9));
+    when(channelFactory.connect(argThat(nodeAt(9)), any(DriverChannelOptions.class)))
+        .thenThrow(new IllegalStateException("bootstrap hook failure"));
+
+    // When
+    channel1.close();
+
+    // Then -- the attempt ended, so the next one is scheduled; an attempt that never completes
+    // would leave the reconnection in progress for good
+    verify(reconnectionSchedule, timeout(500).atLeast(2)).nextDelay();
+  }
 }

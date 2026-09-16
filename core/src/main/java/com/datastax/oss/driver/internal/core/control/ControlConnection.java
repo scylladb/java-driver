@@ -659,11 +659,17 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                     tryCandidates(
                         contactPoint, name, addresses, error, nodes, errors, onSuccess, onFailure);
                   }
-                } catch (Exception e) {
-                  // Logged, never retried: this stage is dropped, so a throw would go unseen, and
-                  // dialling again here would repeat an attempt the round has already made.
+                } catch (Throwable t) {
+                  // Failed, never retried: dialling again here would repeat an attempt the round
+                  // has already made, but the round still has to end -- this stage is dropped, so
+                  // a throw would leave init() waiting for good and a Reconnection stuck on an
+                  // attempt that never completes.
                   Loggers.warnWithException(
-                      LOG, "[{}] Unexpected error while expanding {}", logPrefix, contactPoint, e);
+                      LOG, "[{}] Unexpected error while expanding {}", logPrefix, contactPoint, t);
+                  List<Entry<Node, Throwable>> newErrors =
+                      (errors == null) ? new ArrayList<>() : errors;
+                  newErrors.add(new SimpleEntry<>(contactPoint, t));
+                  onFailure.accept(AllNodesFailedException.fromErrors(newErrors));
                 }
               },
               adminExecutor);

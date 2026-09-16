@@ -72,6 +72,9 @@ public interface NettyOptions {
    * read back the {@code AddressResolverGroup} the hook installs (see {@code
    * ChannelFactory#resolveAll}). A hook with side effects of its own should expect that one extra
    * call.
+   *
+   * <p>A throw fails the connection, or the lookup, the hook was called for; it is never raised at
+   * whoever asked for one.
    */
   void afterBootstrapInitialized(Bootstrap bootstrap);
 
