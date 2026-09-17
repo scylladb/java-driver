@@ -18,6 +18,7 @@ BRANCHES = [
     'scylla-3.11.2.x',
     'scylla-3.11.4.x',
     'scylla-3.11.5.x',
+    'scylla-3.x',
     'scylla-4.7.2.x',
     'scylla-4.10.0.x',
     'scylla-4.11.1.x',
@@ -27,10 +28,11 @@ BRANCHES = [
     'scylla-4.15.0.x',
     'scylla-4.17.0.x',
     'scylla-4.18.1.x',
-    'scylla-4.19.0.x'
+    'scylla-4.19.0.x',
+    'scylla-4.x'
 ]
 # Set the latest version.
-LATEST_VERSION = 'scylla-4.19.0.x'
+LATEST_VERSION = 'scylla-4.x'
 # Set which versions are not released yet.
 UNSTABLE_VERSIONS = []
 # Set which versions are deprecated
@@ -40,7 +42,8 @@ DEPRECATED_VERSIONS = [
     'scylla-3.11.0.x',
     'scylla-3.11.2.x',
     'scylla-3.11.4.x',
-    'scylla-3.11.5.x'
+    'scylla-3.11.5.x',
+    'scylla-3.x'
 ]
 
 # Add any Sphinx extension module names here, as strings. They can be
