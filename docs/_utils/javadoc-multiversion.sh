@@ -3,6 +3,13 @@
 # Runs each documented version's javadoc.sh with the JDK that version needs.
 
 case "${SPHINX_MULTIVERSION_NAME:-}" in
+  scylla-3.x | \
+  scylla-3.7.2.x | \
+  scylla-3.10.2.x | \
+  scylla-3.11.0.x | \
+  scylla-3.11.2.x | \
+  scylla-3.11.4.x | \
+  scylla-3.11.5.x | \
   scylla-4.7.2.x | \
   scylla-4.10.0.x | \
   scylla-4.11.1.x | \
@@ -34,4 +41,6 @@ else
     echo "Building javadoc for '${SPHINX_MULTIVERSION_NAME:-?}' with the default JDK (${JDK_HOME_VAR} is not set)"
 fi
 
-exec ./docs/_utils/javadoc.sh
+if ! ./docs/_utils/javadoc.sh; then
+    echo "::warning::javadoc build failed for ${SPHINX_MULTIVERSION_NAME:-?} - its api pages will be missing"
+fi
