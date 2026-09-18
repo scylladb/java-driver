@@ -26,8 +26,6 @@ package com.datastax.oss.driver.core.metadata;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-import com.datastax.dse.driver.internal.core.metadata.schema.DefaultDseKeyspaceMetadata;
-import com.datastax.dse.driver.internal.core.metadata.schema.DefaultDseTableMetadata;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -152,7 +150,7 @@ public class DescribeIT {
         session.getMetadata().getKeyspace(session.getKeyspace().get());
     assertThat(ksOption).isPresent();
     KeyspaceMetadata ks = ksOption.get();
-    assertThat(ks).isInstanceOfAny(DefaultKeyspaceMetadata.class, DefaultDseKeyspaceMetadata.class);
+    assertThat(ks).isInstanceOf(DefaultKeyspaceMetadata.class);
 
     /* Validate that the keyspace metadata is fully populated */
     assertThat(ks.getUserDefinedTypes()).isNotEmpty();
@@ -169,7 +167,7 @@ public class DescribeIT {
     Optional<TableMetadata> tableOption = ks.getTable("rank_by_year_and_name");
     assertThat(tableOption).isPresent();
     TableMetadata table = tableOption.get();
-    assertThat(table).isInstanceOfAny(DefaultTableMetadata.class, DefaultDseTableMetadata.class);
+    assertThat(table).isInstanceOf(DefaultTableMetadata.class);
 
     /* Validate that the table metadata is fully populated */
     assertThat(table.getPartitionKey()).isNotEmpty();

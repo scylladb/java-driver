@@ -23,6 +23,8 @@ under the License.
 
 ### 4.19.2
 
+- [improvement] Remove unused DSE metadata and query-builder extensions (#1031)
+- [improvement] Remove unused DSE Graph support and TinkerPop integration (#1028)
 - [bug] CASSJAVA-116: Retry or Speculative Execution with RequestIdGenerator throws "Duplicate Key"
 
 ### 4.19.1

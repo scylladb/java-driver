@@ -17,7 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -104,8 +103,7 @@ public abstract class RelationParser {
 
   private boolean isCassandra4OrAbove() {
     Node node = rows.getNode();
-    return !node.getExtras().containsKey(DseNodeProperties.DSE_VERSION)
-        && node.getCassandraVersion() != null
+    return node.getCassandraVersion() != null
         && node.getCassandraVersion().nextStable().compareTo(Version.V4_0_0) >= 0;
   }
 

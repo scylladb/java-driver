@@ -17,7 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.metadata.schema.queries;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -54,8 +53,6 @@ public class CassandraSchemaRows implements SchemaRows {
   private final Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> columns;
   private final Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> virtualColumns;
   private final Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> indexes;
-  private final Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> vertices;
-  private final Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> edges;
   private final Map<CqlIdentifier, AdminRow> scyllaKeyspaces;
 
   private CassandraSchemaRows(
@@ -72,8 +69,6 @@ public class CassandraSchemaRows implements SchemaRows {
       Multimap<CqlIdentifier, AdminRow> types,
       Multimap<CqlIdentifier, AdminRow> functions,
       Multimap<CqlIdentifier, AdminRow> aggregates,
-      Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> vertices,
-      Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> edges,
       Map<CqlIdentifier, AdminRow> scyllaKeyspaces) {
     this.node = node;
     this.dataTypeParser = dataTypeParser;
@@ -88,8 +83,6 @@ public class CassandraSchemaRows implements SchemaRows {
     this.types = types;
     this.functions = functions;
     this.aggregates = aggregates;
-    this.vertices = vertices;
-    this.edges = edges;
     this.scyllaKeyspaces = scyllaKeyspaces;
   }
 
@@ -160,16 +153,6 @@ public class CassandraSchemaRows implements SchemaRows {
   }
 
   @Override
-  public Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> vertices() {
-    return vertices;
-  }
-
-  @Override
-  public Map<CqlIdentifier, Multimap<CqlIdentifier, AdminRow>> edges() {
-    return edges;
-  }
-
-  @Override
   public Map<CqlIdentifier, AdminRow> scyllaKeyspaces() {
     return scyllaKeyspaces;
   }
@@ -202,10 +185,6 @@ public class CassandraSchemaRows implements SchemaRows {
         virtualColumnsBuilders = new LinkedHashMap<>();
     private final Map<CqlIdentifier, ImmutableMultimap.Builder<CqlIdentifier, AdminRow>>
         indexesBuilders = new LinkedHashMap<>();
-    private final Map<CqlIdentifier, ImmutableMultimap.Builder<CqlIdentifier, AdminRow>>
-        verticesBuilders = new LinkedHashMap<>();
-    private final Map<CqlIdentifier, ImmutableMultimap.Builder<CqlIdentifier, AdminRow>>
-        edgesBuilders = new LinkedHashMap<>();
     private final ImmutableMap.Builder<CqlIdentifier, AdminRow> scyllaKeyspacesBuilder =
         ImmutableMap.builder();
 
@@ -223,23 +202,13 @@ public class CassandraSchemaRows implements SchemaRows {
     }
 
     private static boolean isCassandraV3OrAbove(Node node) {
-      // We already did those checks in DefaultSchemaQueriesFactory.
-      // We could pass along booleans (isCassandraV3, isDse...), but passing the whole Node is
-      // better for maintainability, in case we need to do more checks in downstream components in
-      // the future.
-      Version dseVersion = (Version) node.getExtras().get(DseNodeProperties.DSE_VERSION);
-      if (dseVersion != null) {
-        dseVersion = dseVersion.nextStable();
-        return dseVersion.compareTo(Version.V5_0_0) >= 0;
+      Version cassandraVersion = node.getCassandraVersion();
+      if (cassandraVersion == null) {
+        cassandraVersion = Version.V3_0_0;
       } else {
-        Version cassandraVersion = node.getCassandraVersion();
-        if (cassandraVersion == null) {
-          cassandraVersion = Version.V3_0_0;
-        } else {
-          cassandraVersion = cassandraVersion.nextStable();
-        }
-        return cassandraVersion.compareTo(Version.V3_0_0) >= 0;
+        cassandraVersion = cassandraVersion.nextStable();
       }
+      return cassandraVersion.compareTo(Version.V3_0_0) >= 0;
     }
 
     public Builder withKeyspaces(Iterable<AdminRow> rows) {
@@ -319,20 +288,6 @@ public class CassandraSchemaRows implements SchemaRows {
       return this;
     }
 
-    public Builder withVertices(Iterable<AdminRow> rows) {
-      for (AdminRow row : rows) {
-        putByKeyspaceAndTable(row, verticesBuilders);
-      }
-      return this;
-    }
-
-    public Builder withEdges(Iterable<AdminRow> rows) {
-      for (AdminRow row : rows) {
-        putByKeyspaceAndTable(row, edgesBuilders);
-      }
-      return this;
-    }
-
     public Builder withScyllaKeyspaces(Iterable<AdminRow> rows) {
       for (AdminRow row : rows) {
         putByKeyspacePk(row, scyllaKeyspacesBuilder);
@@ -401,8 +356,6 @@ public class CassandraSchemaRows implements SchemaRows {
           typesBuilder.build(),
           functionsBuilder.build(),
           aggregatesBuilder.build(),
-          build(verticesBuilders),
-          build(edgesBuilders),
           scyllaKeyspacesBuilder.build());
     }
 
