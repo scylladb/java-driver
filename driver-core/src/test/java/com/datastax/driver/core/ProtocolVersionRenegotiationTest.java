@@ -84,7 +84,7 @@ public class ProtocolVersionRenegotiationTest extends CCMTestsSupport {
 
   /** @jira_ticket JAVA-1367 */
   @Test(groups = "short", enabled = false /* @IntegrationTestDisabledCassandra3Failure */)
-  @CCMConfig(version = "2.1.16", createCluster = false)
+  @CCMConfig(version = "2.1.16", scylla = false, createCluster = false)
   public void should_negotiate_when_no_version_provided() {
     if (protocolVersion.compareTo(ProtocolVersion.NEWEST_SUPPORTED) >= 0) {
       throw new SkipException("Server supports newest protocol version driver supports");
