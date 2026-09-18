@@ -21,7 +21,6 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.SessionBuilder;
 import com.datastax.oss.driver.internal.core.util.Strings;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import java.util.Objects;
 import net.jcip.annotations.ThreadSafe;
 
 /**
@@ -51,37 +50,20 @@ import net.jcip.annotations.ThreadSafe;
  *
  * @see SessionBuilder#withAuthProvider(AuthProvider)
  * @see SessionBuilder#withAuthCredentials(String, String)
- * @see SessionBuilder#withAuthCredentials(String, String, String)
  */
 @ThreadSafe
 public class ProgrammaticPlainTextAuthProvider extends PlainTextAuthProviderBase {
 
   private volatile char[] username;
   private volatile char[] password;
-  private volatile char[] authorizationId;
 
   /** Builds an instance for simple username/password authentication. */
   public ProgrammaticPlainTextAuthProvider(@NonNull String username, @NonNull String password) {
-    this(username, password, "");
-  }
-
-  /**
-   * Builds an instance for username/password authentication, and proxy authentication with the
-   * given authorizationId.
-   *
-   * <p>This feature is only available with DataStax Enterprise. If the target server is Apache
-   * Cassandra, use {@link #ProgrammaticPlainTextAuthProvider(String, String)} instead, or set the
-   * authorizationId to an empty string.
-   */
-  public ProgrammaticPlainTextAuthProvider(
-      @NonNull String username, @NonNull String password, @NonNull String authorizationId) {
     // This will typically be built before the session so we don't know the log prefix yet. Pass an
     // empty string, it's only used in one log message.
     super("");
     this.username = Strings.requireNotEmpty(username, "username").toCharArray();
     this.password = Strings.requireNotEmpty(password, "password").toCharArray();
-    this.authorizationId =
-        Objects.requireNonNull(authorizationId, "authorizationId cannot be null").toCharArray();
   }
 
   /**
@@ -107,21 +89,6 @@ public class ProgrammaticPlainTextAuthProvider extends PlainTextAuthProviderBase
   }
 
   /**
-   * Changes the authorization id.
-   *
-   * <p>The new credentials will be used for all connections initiated after this method was called.
-   *
-   * <p>This feature is only available with DataStax Enterprise. If the target server is Apache
-   * Cassandra, this method should not be used.
-   *
-   * @param authorizationId the new authorization id.
-   */
-  public void setAuthorizationId(@NonNull String authorizationId) {
-    this.authorizationId =
-        Objects.requireNonNull(authorizationId, "authorizationId cannot be null").toCharArray();
-  }
-
-  /**
    * {@inheritDoc}
    *
    * <p>This implementation disregards the endpoint being connected to as well as the authenticator
@@ -131,6 +98,6 @@ public class ProgrammaticPlainTextAuthProvider extends PlainTextAuthProviderBase
   @Override
   protected Credentials getCredentials(
       @NonNull EndPoint endPoint, @NonNull String serverAuthenticator) {
-    return new Credentials(username.clone(), password.clone(), authorizationId.clone());
+    return new Credentials(username.clone(), password.clone());
   }
 }
