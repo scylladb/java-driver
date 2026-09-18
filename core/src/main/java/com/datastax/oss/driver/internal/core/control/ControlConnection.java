@@ -728,9 +728,11 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
      * user configured, and a failure names the address it happened at.
      *
      * <p>The resolver's first answer comes first, always: that is the address a connect would have
-     * used on its own ({@code InetAddress.getByName} is {@code getAllByName(name)[0]}), ranked
-     * first for this client by the platform, so expanding a name can never do worse than not
-     * expanding it. The rest are shuffled and the list is capped at {@code
+     * used on its own, ranked for this client by the platform (RFC 6724 destination selection, then
+     * the JDK's {@code java.net.preferIPv6Addresses} regrouping -- {@code InetAddress.getByName} is
+     * the head of that same array). A resolver that randomises rather than ranks randomises {@code
+     * resolveAll} too, so pinning its first answer costs nothing; either way expanding a name can
+     * never do worse than not expanding it. The rest are shuffled and the list is capped at {@code
      * advanced.connection.max-candidate-addresses}: the cap bounds what one contact point costs a
      * round, and the shuffle is what makes a capped set that missed the live nodes a different set
      * on the next round.

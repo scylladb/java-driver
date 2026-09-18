@@ -1295,9 +1295,10 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     // When
     CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
 
-    // Then -- the resolver's first answer is dialled first, because that is where a connect would
-    // have gone on its own; the rest follow in an order that is not the resolver's, so that a dead
-    // record does not cost every session the same attempt
+    // Then -- the resolver's first answer is dialled first: it is the platform's top-ranked
+    // destination (RFC 6724), which is where a connect would have gone on its own. The rest follow
+    // in an order that is not the resolver's, so a dead record does not cost every session the
+    // same attempt
     assertThatStage(initFuture).isFailed();
     List<String> dialled = new ArrayList<>();
     for (Node node : connectedNodes(5)) {
@@ -1314,7 +1315,8 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
   public void should_try_the_resolvers_first_address_first_when_capping() {
     // Given -- seven records and a cap of five. This seed shuffles the seven into
     // [3, 2, 4, 5, 7, 1, 6], so keeping the first five of a full shuffle would drop the resolver's
-    // first answer altogether -- the address a connect would have used on its own.
+    // first answer altogether -- the platform's top-ranked destination, and the address a connect
+    // would have used on its own.
     long seed = 2;
     when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES))
         .thenReturn(5);
@@ -1331,8 +1333,8 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     // When
     CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
 
-    // Then -- the cap may drop any of the others, never that one, and it goes first: expanding a
-    // name can then never do worse than not expanding it
+    // Then -- the cap may drop any of the others, never that one, and it goes first: the ranking
+    // survives the cap, so expanding a name can never do worse than not expanding it
     assertThatStage(initFuture).isFailed();
     List<Node> dialled = connectedNodes(5);
     assertThat(dialled).hasSize(5);

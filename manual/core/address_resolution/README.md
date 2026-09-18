@@ -49,7 +49,11 @@ that has exhausted the live nodes (see
 `advanced.control-connection.reconnection.fallback-to-original-contact-points` in the
 [control connection](../control_connection/) page) -- the name is resolved to all of its current
 addresses. The first address the resolver returns is tried first -- that is where a connect would
-have gone on its own, so expanding a name never does worse than not expanding it -- and up to
+have gone on its own, because the resolver hands back the platform's destination list ranked for
+this client by [RFC 6724] (and regrouped by `java.net.preferIPv6Addresses`), and
+`InetAddress.getByName` is the head of that same list. A resolver that randomises rather than ranks
+randomises its full answer too, so pinning its first entry costs nothing; either way expanding a
+name never does worse than not expanding it. Up to
 `advanced.connection.max-candidate-addresses - 1` of the others (5 addresses in all by default)
 follow in random order before the contact point is given up on. The cap bounds what one contact
 point can cost a round; shuffling the rest means a capped set that missed the live nodes is a
@@ -324,6 +328,7 @@ domain name of the target instance. Then it performs a forward DNS lookup of the
 private/public switch automatically based on location).
 
 [AddressTranslator]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/addresstranslation/AddressTranslator.html
+[RFC 6724]:          https://www.rfc-editor.org/rfc/rfc6724
 
 [cassandra.yaml]:        https://docs.datastax.com/en/cassandra/3.x/cassandra/configuration/configCassandra_yaml.html
 [rpc_address]:           https://docs.datastax.com/en/cassandra/3.x/cassandra/configuration/configCassandra_yaml.html?scroll=configCassandra_yaml__rpc_address
