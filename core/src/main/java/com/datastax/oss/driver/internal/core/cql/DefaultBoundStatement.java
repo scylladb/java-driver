@@ -55,6 +55,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
   private final String executionProfileName;
   private final DriverExecutionProfile executionProfile;
   private final CqlIdentifier routingKeyspace;
+  private final CqlIdentifier routingTable;
   private final ByteBuffer routingKey;
   private final Token routingToken;
   private final Map<String, ByteBuffer> customPayload;
@@ -79,6 +80,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
       String executionProfileName,
       DriverExecutionProfile executionProfile,
       CqlIdentifier routingKeyspace,
+      CqlIdentifier routingTable,
       ByteBuffer routingKey,
       Token routingToken,
       Map<String, ByteBuffer> customPayload,
@@ -101,6 +103,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
     this.executionProfileName = executionProfileName;
     this.executionProfile = executionProfile;
     this.routingKeyspace = routingKeyspace;
+    this.routingTable = routingTable;
     this.routingKey = routingKey;
     this.routingToken = routingToken;
     this.customPayload = customPayload;
@@ -197,6 +200,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -242,6 +246,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         newConfigProfileName,
         (newConfigProfileName == null) ? executionProfile : null,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -275,6 +280,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         (newProfile == null) ? executionProfileName : null,
         newProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -312,8 +318,49 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
 
   @Override
   public CqlIdentifier getRoutingTable() {
-    ColumnDefinitions definitions = preparedStatement.getVariableDefinitions();
+    // Honor setRoutingTable() when the caller set it.
+    if (routingTable != null) {
+      return routingTable;
+    }
+    CqlIdentifier table = tableOf(preparedStatement.getVariableDefinitions());
+    if (table != null) {
+      return table;
+    }
+    // No bind markers: infer the table from SELECT result columns instead.
+    return tableOf(preparedStatement.getResultSetDefinitions());
+  }
+
+  private static CqlIdentifier tableOf(ColumnDefinitions definitions) {
     return (definitions.size() == 0) ? null : definitions.get(0).getTable();
+  }
+
+  @NonNull
+  @Override
+  public BoundStatement setRoutingTable(@Nullable CqlIdentifier newRoutingTable) {
+    return new DefaultBoundStatement(
+        preparedStatement,
+        variableDefinitions,
+        values,
+        executionProfileName,
+        executionProfile,
+        routingKeyspace,
+        newRoutingTable,
+        routingKey,
+        routingToken,
+        customPayload,
+        idempotent,
+        tracing,
+        timestamp,
+        pagingState,
+        pageSize,
+        consistencyLevel,
+        serialConsistencyLevel,
+        timeout,
+        codecRegistry,
+        protocolVersion,
+        node,
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @NonNull
@@ -326,6 +373,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         newRoutingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -354,6 +402,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -415,6 +464,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         newRoutingKey,
         routingToken,
         customPayload,
@@ -448,6 +498,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         newRoutingToken,
         customPayload,
@@ -482,6 +533,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         newCustomPayload,
@@ -515,6 +567,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -548,6 +601,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -581,6 +635,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -615,6 +670,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -648,6 +704,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -681,6 +738,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -715,6 +773,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -750,6 +809,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -783,6 +843,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,
@@ -832,6 +893,7 @@ public class DefaultBoundStatement implements BoundStatement, RequestRoutingType
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         customPayload,

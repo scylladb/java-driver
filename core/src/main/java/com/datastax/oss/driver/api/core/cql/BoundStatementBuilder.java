@@ -193,6 +193,7 @@ public class BoundStatementBuilder extends StatementBuilder<BoundStatementBuilde
         executionProfileName,
         executionProfile,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         buildCustomPayload(),

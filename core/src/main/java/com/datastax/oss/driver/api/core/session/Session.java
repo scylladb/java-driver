@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
+import com.datastax.oss.driver.api.core.metadata.Tablet;
 import com.datastax.oss.driver.api.core.metrics.Metrics;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.DefaultMavenCoordinates;
@@ -34,6 +35,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
@@ -140,6 +142,19 @@ public interface Session extends AsyncAutoCloseable {
   default Metadata refreshSchema() {
     BlockingOperation.checkNotDriverThread();
     return CompletableFutures.getUninterruptibly(refreshSchemaAsync());
+  }
+
+  /** Replaces one table's cached tablets from current server replicas and returns them in order. */
+  @NonNull
+  CompletionStage<List<Tablet>> refreshTabletsAsync(
+      @NonNull CqlIdentifier keyspace, @NonNull CqlIdentifier table);
+
+  /** Calls {@link #refreshTabletsAsync(CqlIdentifier, CqlIdentifier)} and blocks for the result. */
+  @NonNull
+  default List<Tablet> refreshTablets(
+      @NonNull CqlIdentifier keyspace, @NonNull CqlIdentifier table) {
+    BlockingOperation.checkNotDriverThread();
+    return CompletableFutures.getUninterruptibly(refreshTabletsAsync(keyspace, table));
   }
 
   /**

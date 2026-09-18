@@ -125,6 +125,16 @@ public class DefaultTabletMap implements TabletMap {
     existingTablets.add(tablet);
   }
 
+  @Override
+  public void replaceTablets(
+      CqlIdentifier keyspace, CqlIdentifier table, Iterable<? extends Tablet> tablets) {
+    ConcurrentSkipListSet<Tablet> replacement = new ConcurrentSkipListSet<>();
+    for (Tablet tablet : tablets) {
+      replacement.add(tablet);
+    }
+    mapping.put(new KeyspaceTableNamePair(keyspace, table), replacement);
+  }
+
   /**
    * Removes tablets that contain given node (by reference equality) as one of the replicas.
    *

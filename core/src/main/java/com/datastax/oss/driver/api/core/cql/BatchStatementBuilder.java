@@ -145,6 +145,7 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
         executionProfile,
         keyspace,
         routingKeyspace,
+        routingTable,
         routingKey,
         routingToken,
         buildCustomPayload(),

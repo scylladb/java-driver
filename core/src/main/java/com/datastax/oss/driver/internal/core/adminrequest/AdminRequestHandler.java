@@ -42,6 +42,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -282,6 +283,8 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
       return AdminRow.LIST_OF_TEXT.encode(l, protocolVersion);
     } else if (parameter instanceof Integer) {
       return TypeCodecs.INT.encode((Integer) parameter, protocolVersion);
+    } else if (parameter instanceof UUID) {
+      return TypeCodecs.UUID.encode((UUID) parameter, protocolVersion);
     } else {
       throw new IllegalArgumentException(
           "Unsupported variable type for admin query: " + parameter.getClass());
