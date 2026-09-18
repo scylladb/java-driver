@@ -52,17 +52,19 @@ first node the driver connects to:
 
 *(1) for previous driver versions, see the [3.x documentation][driver3]*
 
-Since version 4.5.0, the driver can also use DSE protocols when all nodes are running a version of
-DSE. The table below shows the protocol matrix for these cases:
+The driver can also use DSE protocols when they are explicitly configured. Automatic negotiation
+only probes standard Cassandra protocol versions, to avoid attempting DSE protocols against
+ScyllaDB. The table below shows the automatically negotiated versions for DSE:
 
 | DSE version         | Negotiated protocol version with driver 4       |
 |---------------------|-------------------------------------------------|
 | 4.7/4.8             | v3                                              |
 | 5.0                 | v4                                              |
-| 5.1                 | DSE_V1 ²                                        |
-| 6.0/6.7/6.8         | DSE_V2 ²                                        |
+| 5.1                 | v4                                              |
+| 6.0/6.7/6.8         | v4                                              |
+| 7.0+                | v5                                              |
 
-*(2) DSE Protocols are chosen before other Cassandra native protocols.*
+To use DSE-specific features, force `DSE_V1` or `DSE_V2` with `advanced.protocol.version`.
 
 ### Controlling the protocol version
 
