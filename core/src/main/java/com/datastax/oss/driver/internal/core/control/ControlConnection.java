@@ -34,18 +34,24 @@ import com.datastax.oss.driver.internal.core.channel.EventCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesUpdateEvent;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
+import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
+import com.datastax.oss.driver.shaded.guava.common.net.InetAddresses;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Event;
@@ -55,13 +61,22 @@ import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.util.concurrent.EventExecutor;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -89,9 +104,13 @@ import org.slf4j.LoggerFactory;
 public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(ControlConnection.class);
 
+  /** No address to expand a contact point into: the caller tries it as it is. */
+  private static final Node[] NO_CANDIDATES = new Node[0];
+
   private final InternalDriverContext context;
   private final String logPrefix;
   private final EventExecutor adminExecutor;
+  private final Random random;
   private final SingleThreaded singleThreaded;
 
   // The single channel used by this connection. This field is accessed concurrently, but only
@@ -99,9 +118,16 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   private volatile DriverChannel channel;
 
   public ControlConnection(InternalDriverContext context) {
+    this(context, new Random());
+  }
+
+  /** {@code random} decides the order in which a contact point's resolved addresses are tried. */
+  @VisibleForTesting
+  ControlConnection(InternalDriverContext context, Random random) {
     this.context = context;
     this.logPrefix = context.getSessionName();
     this.adminExecutor = context.getNettyOptions().adminEventExecutorGroup().next();
+    this.random = random;
     this.singleThreaded = new SingleThreaded(context);
   }
 
@@ -386,10 +412,28 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         List<Entry<Node, Throwable>> errors,
         Runnable onSuccess,
         Consumer<Throwable> onFailure) {
+      connect(nodes, errors, onSuccess, onFailure, true);
+    }
+
+    /**
+     * @param expandContactPoints whether the next node, if it is a contact point given as a
+     *     hostname, is first expanded to every address the name resolves to (see {@link
+     *     #expandContactPoint}). {@code false} only when that expansion was just attempted for it
+     *     and yielded nothing usable: the node is then tried as it is, the way every connect did
+     *     before expansion existed.
+     */
+    private void connect(
+        Queue<Node> nodes,
+        List<Entry<Node, Throwable>> errors,
+        Runnable onSuccess,
+        Consumer<Throwable> onFailure,
+        boolean expandContactPoints) {
       assert adminExecutor.inEventLoop();
       Node node = nodes.poll();
       if (node == null) {
         onFailure.accept(AllNodesFailedException.fromErrors(errors));
+      } else if (expandContactPoints && isExpandableContactPoint(node)) {
+        expandContactPoint(node, nodes, errors, onSuccess, onFailure);
       } else {
         LOG.debug("[{}] Trying to establish a connection to {}", logPrefix, node);
         context
@@ -554,6 +598,210 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                 },
                 adminExecutor);
       }
+    }
+
+    /**
+     * Whether {@code node} is a contact point given as a hostname, which {@link
+     * #expandContactPoint} expands: not identified yet (no host id: an identified node is one
+     * server at one address, and a translator's hostname on one is re-resolved by Netty on every
+     * connect on purpose), an ordinary {@link DefaultEndPoint} (a custom or SNI endpoint keeps its
+     * own semantics), still unresolved, and not an IP literal (under {@code resolve-contact-points
+     * = false} even those are kept unresolved, and there is nothing to expand in one).
+     */
+    private boolean isExpandableContactPoint(Node node) {
+      if (node.getHostId() != null || !(node.getEndPoint() instanceof DefaultEndPoint)) {
+        return false;
+      }
+      SocketAddress address = node.getEndPoint().resolve();
+      if (!(address instanceof InetSocketAddress)) {
+        return false;
+      }
+      InetSocketAddress inetAddress = (InetSocketAddress) address;
+      return inetAddress.isUnresolved()
+          && !InetAddresses.isInetAddress(inetAddress.getHostString());
+    }
+
+    /**
+     * Resolves a contact point given as a hostname to every address the name currently maps to, and
+     * tries those addresses, each as its own temporary node, before the rest of the plan. So a dead
+     * record no longer costs the whole contact point, and every attempt is reported under the
+     * address it was made at. The resolution goes through the resolver Netty would use for the
+     * connect (see {@link
+     * com.datastax.oss.driver.internal.core.channel.ChannelFactory#resolveAll}), which runs it on
+     * an I/O event loop: this executor stays free while it does, and picks the answer back up here.
+     *
+     * <p>When there is nothing to expand into (the resolver failed, or answered with anything other
+     * than resolved IP addresses), the contact point is tried as it is, exactly as before: Netty
+     * resolves it once more inside the connect, and a failure there is recorded against the contact
+     * point as it always was. So a round that cannot resolve pays the resolver twice per hostname
+     * contact point -- the price of never doing worse than a driver without expansion, since that
+     * second lookup is the one every connect made before.
+     */
+    private void expandContactPoint(
+        Node contactPoint,
+        Queue<Node> nodes,
+        List<Entry<Node, Throwable>> errors,
+        Runnable onSuccess,
+        Consumer<Throwable> onFailure) {
+      InetSocketAddress name = (InetSocketAddress) contactPoint.getEndPoint().resolve();
+      LOG.debug("[{}] Resolving contact point {}", logPrefix, contactPoint);
+      context
+          .getChannelFactory()
+          .resolveAll(name)
+          .whenCompleteAsync(
+              (addresses, error) -> {
+                try {
+                  if (closeWasCalled || initFuture.isCancelled()) {
+                    // Abort the way the connect callback does: the round has to complete, or a
+                    // Reconnection would wait on it forever.
+                    onSuccess.run();
+                  } else {
+                    tryCandidates(
+                        contactPoint, name, addresses, error, nodes, errors, onSuccess, onFailure);
+                  }
+                } catch (Throwable t) {
+                  // Failed, never retried: dialling again here would repeat an attempt the round
+                  // has already made, but the round still has to end -- this stage is dropped, so
+                  // a throw would leave init() waiting for good and a Reconnection stuck on an
+                  // attempt that never completes.
+                  Loggers.warnWithException(
+                      LOG, "[{}] Unexpected error while expanding {}", logPrefix, contactPoint, t);
+                  List<Entry<Node, Throwable>> newErrors =
+                      (errors == null) ? new ArrayList<>() : errors;
+                  newErrors.add(new SimpleEntry<>(contactPoint, t));
+                  onFailure.accept(AllNodesFailedException.fromErrors(newErrors));
+                }
+              },
+              adminExecutor);
+    }
+
+    /**
+     * Tries the addresses {@code name} resolved into ahead of the rest of the plan -- or, when
+     * there is nothing usable to expand into, the contact point itself, exactly as every connect
+     * did before expansion existed.
+     */
+    private void tryCandidates(
+        Node contactPoint,
+        InetSocketAddress name,
+        List<SocketAddress> addresses,
+        Throwable error,
+        Queue<Node> nodes,
+        List<Entry<Node, Throwable>> errors,
+        Runnable onSuccess,
+        Consumer<Throwable> onFailure) {
+      Node[] candidates;
+      try {
+        // Only the computation is guarded: a connect() inside this try would be re-entered from
+        // the catch with the same callbacks and an already drained plan.
+        candidates = (error == null) ? candidatesFor(contactPoint, name, addresses) : NO_CANDIDATES;
+      } catch (Throwable t) {
+        Loggers.warnWithException(
+            LOG, "[{}] Could not build candidates for {}", logPrefix, contactPoint, t);
+        candidates = NO_CANDIDATES;
+      }
+      if (candidates.length == 0) {
+        LOG.debug("[{}] Could not expand {}, trying it as is", logPrefix, contactPoint, error);
+        connect(
+            new CompositeQueryPlan(new SimpleQueryPlan(contactPoint), nodes),
+            errors,
+            onSuccess,
+            onFailure,
+            false);
+      } else {
+        LOG.debug(
+            "[{}] {} resolves to {} address(es), trying {}",
+            logPrefix,
+            contactPoint,
+            candidates.length,
+            Arrays.toString(candidates));
+        connect(
+            new CompositeQueryPlan(new SimpleQueryPlan((Object[]) candidates), nodes),
+            errors,
+            onSuccess,
+            onFailure);
+      }
+    }
+
+    /**
+     * One temporary node per distinct address {@code name} resolved to, each labelled with the name
+     * ({@code cluster.example.com/10.0.0.1:9042}): TLS and authentication keep seeing the name the
+     * user configured, and a failure names the address it happened at.
+     *
+     * <p>The resolver's first answer comes first, always: that is the address a connect would have
+     * used on its own, ranked for this client by the platform (RFC 6724 destination selection, then
+     * the JDK's {@code java.net.preferIPv6Addresses} regrouping -- {@code InetAddress.getByName} is
+     * the head of that same array). A resolver that randomises rather than ranks randomises {@code
+     * resolveAll} too, so pinning its first answer costs nothing; either way expanding a name can
+     * never do worse than not expanding it. The rest are shuffled and the list is capped at {@code
+     * advanced.connection.max-candidate-addresses}: the cap bounds what one contact point costs a
+     * round, and the shuffle is what makes a capped set that missed the live nodes a different set
+     * on the next round.
+     *
+     * <p>Empty when any answer is not a resolved IP address, in which case the caller tries the
+     * contact point as it is.
+     */
+    private Node[] candidatesFor(
+        Node contactPoint, InetSocketAddress name, List<SocketAddress> addresses) {
+      // Resolved InetSocketAddresses compare by address bytes and port, and every candidate here
+      // carries the same host string: exact duplicates collapse, nothing else does -- except that
+      // Inet6Address.equals ignores the scope id labelled() kept, so two scope-distinct copies of
+      // one link-local address would collapse as well. No resolver answers one name with those.
+      Set<InetSocketAddress> distinct = new LinkedHashSet<>();
+      for (SocketAddress address : addresses) {
+        if (!(address instanceof InetSocketAddress)
+            || ((InetSocketAddress) address).isUnresolved()) {
+          return NO_CANDIDATES;
+        }
+        InetSocketAddress resolved = (InetSocketAddress) address;
+        try {
+          distinct.add(
+              new InetSocketAddress(
+                  labelled(name.getHostString(), resolved.getAddress()), resolved.getPort()));
+        } catch (UnknownHostException e) {
+          // Only for an address of illegal length, which no resolver produces.
+          return NO_CANDIDATES;
+        }
+      }
+      if (distinct.isEmpty()) {
+        return NO_CANDIDATES;
+      }
+      InetSocketAddress[] all = distinct.toArray(new InetSocketAddress[0]);
+      // Held out of the shuffle, not merely kept: first is where a connect would have gone.
+      InetSocketAddress[] rest = Arrays.copyOfRange(all, 1, all.length);
+      ArrayUtils.shuffleHead(rest, rest.length, random);
+      // Below 1 there is nothing to try, so a smaller value is read as 1 (documented in
+      // reference.conf).
+      int cap =
+          Math.max(
+              1,
+              config
+                  .getDefaultProfile()
+                  .getInt(DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES));
+      int kept = Math.min(cap, all.length);
+      if (kept < all.length) {
+        LOG.debug(
+            "[{}] {} resolves to {} addresses, trying at most {} "
+                + "(advanced.connection.max-candidate-addresses)",
+            logPrefix,
+            contactPoint,
+            all.length,
+            kept);
+      }
+      Node[] candidates = new Node[kept];
+      candidates[0] = DefaultNode.newContactPoint(new DefaultEndPoint(all[0]), context);
+      for (int i = 1; i < kept; i++) {
+        candidates[i] = DefaultNode.newContactPoint(new DefaultEndPoint(rest[i - 1]), context);
+      }
+      return candidates;
+    }
+
+    /** {@code address} relabelled with {@code hostName}, keeping an IPv6 scope id if it has one. */
+    private InetAddress labelled(String hostName, InetAddress address) throws UnknownHostException {
+      if (address instanceof Inet6Address && ((Inet6Address) address).getScopeId() != 0) {
+        return Inet6Address.getByAddress(
+            hostName, address.getAddress(), ((Inet6Address) address).getScopeId());
+      }
+      return InetAddress.getByAddress(hostName, address.getAddress());
     }
 
     /**

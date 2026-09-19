@@ -25,9 +25,11 @@ package com.datastax.oss.driver.core.resolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.CqlSessionBuilder;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
@@ -38,6 +40,7 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.config.typesafe.DefaultProgrammaticDriverConfigLoaderBuilder;
+import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.time.Duration;
@@ -46,6 +49,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.awaitility.Awaitility;
@@ -133,8 +137,103 @@ public class MockResolverIT {
         assertThat(filteredNodes).hasSize(1);
         InetSocketAddress address =
             (InetSocketAddress) filteredNodes.iterator().next().getEndPoint().resolve();
-        assertTrue(address.isUnresolved());
+        // Reached through the contact point, so registered under its name -- and under the address
+        // the name resolved to, now that every address of a contact point is tried on its own.
+        assertFalse(address.isUnresolved());
+        assertThat(address.getHostString()).isEqualTo("test.cluster.fake");
+        assertThat(address.getAddress().getHostAddress()).isEqualTo(ccmBridge.getNodeIpAddress(1));
       }
+    }
+  }
+
+  /**
+   * A loopback address no node is ever started on, outside the {@code 127.0.1.} prefix CCM hands
+   * its nodes: a connection attempt that dials it is refused immediately.
+   */
+  private static final String DEAD_ADDRESS = "127.0.0.11";
+
+  private static final ch.qos.logback.classic.Logger CONTROL_CONNECTION_LOGGER =
+      (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(ControlConnection.class);
+
+  private ListAppender<ILoggingEvent> controlConnectionAppender;
+  private Level originalControlConnectionLevel;
+
+  @Before
+  public void startCapturingControlConnectionLogs() {
+    // The control connection reports an address it gave up on at WARN ("Error connecting to
+    // test.cluster.fake/127.0.0.11:9042, trying next node"), which is the only externally visible
+    // evidence that a dead record was dialled and skipped. The test logging configuration keeps
+    // the driver at ERROR, so open the logger up for the duration of the test.
+    originalControlConnectionLevel = CONTROL_CONNECTION_LOGGER.getLevel();
+    CONTROL_CONNECTION_LOGGER.setLevel(Level.WARN);
+    controlConnectionAppender = new ListAppender<>();
+    // Logged from the admin thread while the test thread reads the list: ListAppender's own
+    // ArrayList is not safe for that.
+    controlConnectionAppender.list = new CopyOnWriteArrayList<>();
+    controlConnectionAppender.start();
+    CONTROL_CONNECTION_LOGGER.addAppender(controlConnectionAppender);
+  }
+
+  @After
+  public void stopCapturingControlConnectionLogs() {
+    CONTROL_CONNECTION_LOGGER.detachAppender(controlConnectionAppender);
+    controlConnectionAppender.stop();
+    CONTROL_CONNECTION_LOGGER.setLevel(originalControlConnectionLevel);
+  }
+
+  private List<String> controlConnectionLogMessages() {
+    return controlConnectionAppender.list.stream()
+        .map(ILoggingEvent::getFormattedMessage)
+        .collect(Collectors.toList());
+  }
+
+  @Test
+  public void should_connect_when_first_dns_entry_is_non_responsive() {
+    final int numberOfNodes = 2;
+    DriverConfigLoader loader =
+        new DefaultProgrammaticDriverConfigLoaderBuilder()
+            .withBoolean(TypedDriverOption.RESOLVE_CONTACT_POINTS.getRawOption(), false)
+            .withStringList(
+                TypedDriverOption.CONTACT_POINTS.getRawOption(),
+                Collections.singletonList("test.cluster.fake:9042"))
+            .build();
+    CqlSessionBuilder builder = new CqlSessionBuilder().withConfigLoader(loader);
+    try (CcmBridge ccmBridge =
+        CcmBridge.builder().withNodes(numberOfNodes).withIpPrefix("127.0.1.").build()) {
+      MultimapHostResolverProvider.removeResolverEntries("test.cluster.fake");
+      // Nothing is ever started on DEAD_ADDRESS, so it is the dead record.
+      MultimapHostResolverProvider.addResolverEntry("test.cluster.fake", DEAD_ADDRESS);
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(1));
+      MultimapHostResolverProvider.addResolverEntry(
+          "test.cluster.fake", ccmBridge.getNodeIpAddress(2));
+      ccmBridge.create();
+      ccmBridge.start();
+
+      // The expanded addresses are shuffled per session, so whether the dead record is dialled
+      // first is a coin toss (1 in 3 here). Every session must come up either way; the loop hunts
+      // for one that demonstrably dialled the dead record and fell through to a live one, which is
+      // what this test exists to pin down. Twenty misses in a row have probability (2/3)^20, about
+      // 0.03%.
+      boolean sawFallback = false;
+      for (int attempt = 0; attempt < 20 && !sawFallback; attempt++) {
+        try (CqlSession session = builder.build()) {
+          waitForAllNodesUp(session, numberOfNodes);
+          ResultSet rs = session.execute("select * from system.local where key='local'");
+          assertThat(rs.one()).isNotNull();
+          assertThat(session.getMetadata().getNodes()).hasSize(numberOfNodes);
+        }
+        sawFallback =
+            controlConnectionLogMessages().stream()
+                .anyMatch(
+                    message ->
+                        message.contains(DEAD_ADDRESS) && message.contains("trying next node"));
+      }
+      assertThat(sawFallback)
+          .as(
+              "expected at least one session to dial %s first and fall through to a live address",
+              DEAD_ADDRESS)
+          .isTrue();
     }
   }
 

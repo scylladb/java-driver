@@ -425,47 +425,49 @@ public class ChannelFactory {
       List<ProtocolVersion> attemptedVersions,
       CompletableFuture<DriverChannel> resultFuture) {
 
-    SocketAddress resolvedAddress;
-    try {
-      resolvedAddress = endPoint.resolve();
-    } catch (Exception e) {
-      resultFuture.completeExceptionally(e);
-      return;
-    }
-
-    NettyOptions nettyOptions = context.getNettyOptions();
-
-    Bootstrap bootstrap =
-        new Bootstrap()
-            .group(nettyOptions.ioEventLoopGroup())
-            .channel(nettyOptions.channelClass())
-            .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
-            .handler(
-                initializer(endPoint, currentVersion, options, nodeMetricUpdater, resultFuture));
-
-    nettyOptions.afterBootstrapInitialized(bootstrap);
-
+    // Everything a caller sees of a connect is the future, so nothing below may throw at it: the
+    // bootstrap hook and the Netty options it reads are user code, and a caller that gets a throw
+    // instead of a failed future either loses the attempt or, from a dropped callback, hangs.
     ChannelFuture connectFuture;
-    if (shardId == null || shardingInfo == null) {
-      if (shardId != null) {
-        LOG.debug(
-            "Requested connection to shard {} but shardingInfo is currently missing for Node at endpoint {}. Falling back to arbitrary local port.",
-            shardId,
-            endPoint);
-      }
-      connectFuture = bootstrap.connect(resolvedAddress);
-    } else {
-      int localPort =
-          PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
-      if (localPort == -1) {
-        LOG.warn(
-            "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
-            shardId,
-            endPoint);
+    try {
+      SocketAddress resolvedAddress = endPoint.resolve();
+
+      NettyOptions nettyOptions = context.getNettyOptions();
+
+      Bootstrap bootstrap =
+          new Bootstrap()
+              .group(nettyOptions.ioEventLoopGroup())
+              .channel(nettyOptions.channelClass())
+              .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
+              .handler(
+                  initializer(endPoint, currentVersion, options, nodeMetricUpdater, resultFuture));
+
+      nettyOptions.afterBootstrapInitialized(bootstrap);
+
+      if (shardId == null || shardingInfo == null) {
+        if (shardId != null) {
+          LOG.debug(
+              "Requested connection to shard {} but shardingInfo is currently missing for Node at endpoint {}. Falling back to arbitrary local port.",
+              shardId,
+              endPoint);
+        }
         connectFuture = bootstrap.connect(resolvedAddress);
       } else {
-        connectFuture = bootstrap.connect(resolvedAddress, new InetSocketAddress(localPort));
+        int localPort =
+            PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
+        if (localPort == -1) {
+          LOG.warn(
+              "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
+              shardId,
+              endPoint);
+          connectFuture = bootstrap.connect(resolvedAddress);
+        } else {
+          connectFuture = bootstrap.connect(resolvedAddress, new InetSocketAddress(localPort));
+        }
       }
+    } catch (Throwable t) {
+      resultFuture.completeExceptionally(t);
+      return;
     }
 
     connectFuture.addListener(
