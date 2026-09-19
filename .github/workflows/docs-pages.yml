@@ -56,7 +56,28 @@ jobs:
       - name: Build docs
         run: make -C docs multiversion
 
+      # deploy.sh rebuilds gh-pages from this run's output and force-pushes, so a
+      # version that built no api/ has its live one deleted rather than left stale.
+      # Record that before deploying and fail the job after, so the versions that did
+      # build still publish while the loss is still loud. A total loss stops here
+      # instead: there would be nothing left to publish.
+      - name: Check javadoc output
+        id: javadoc-check
+        run: ./docs/_utils/check-javadoc-output.sh
+
       - name: Deploy docs to GitHub Pages
         run: ./docs/_utils/deploy.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fail if any version lost content
+        if: steps.javadoc-check.outputs.not-built != '' || steps.javadoc-check.outputs.missing-api != ''
+        env:
+          NOT_BUILT: ${{ steps.javadoc-check.outputs.not-built }}
+          MISSING_API: ${{ steps.javadoc-check.outputs.missing-api }}
+        run: |
+          # A version that never built is gone from the site entirely, which is a
+          # different loss from one that published without its javadoc.
+          [ -z "$NOT_BUILT" ] || echo "::error::Not built, now removed from the site entirely: $NOT_BUILT"
+          [ -z "$MISSING_API" ] || echo "::error::Published without javadoc, their /api/ is now gone from the site: $MISSING_API"
+          exit 1
