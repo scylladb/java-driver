@@ -1,0 +1,6 @@
+com.datastax.driver.core
+com.datastax.driver.core.exceptions
+com.datastax.driver.core.policies
+com.datastax.driver.core.querybuilder
+com.datastax.driver.core.schemabuilder
+com.datastax.driver.core.utils

@@ -1,0 +1,61 @@
+# Scylla Java Driver
+
+> Scylla Java Driver  documentation
+
+
+2026, ScyllaDB. All rights reserved.
+
+## Pages
+
+- [Scylla Java Driver for Scylla and Apache Cassandra®](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/index.md): *If you’re reading this on github.com, please note that this is the readme
+- [Upgrade guide](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/upgrade_guide/index.md): The purpose of this guide is to detail changes made by successive
+- [Manual](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/index.md): Here’s a short program that connects to Cassandra and executes a query:
+- [Changelog](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/changelog/index.md): Note: the 4.x branch's changelog include a copy of this one, please copy over the changes if new
+- [Frequently Asked Questions](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/faq/index.md): When using [native protocol]() version 2 or
+- [Frequently Asked Questions - OSGi](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/faq/osgi/index.md): ```eval_rst
+- [Logging](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/logging/index.md): The driver uses the popular [SLF4J](http://www.slf4j.org) library to emit log messages;
+- [Connection pooling](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/pooling/index.md): The driver communicates with Cassandra over TCP, using the Cassandra
+- [Using Tuples with the Java driver](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/tuples/index.md): Cassandra allows to use `tuple` data types [in tables and user-defined types](https://docs.datastax....
+- [SSL](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/ssl/index.md): You can secure traffic between the driver and Cassandra with SSL. There
+- [Custom Payloads](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/custom_payloads/index.md): The [native protocol]() version 4 introduces a new feature called [Custom Payloads](https://issues.a...
+- [Load balancing](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/load_balancing/index.md): A Cassandra cluster is typically composed of multiple hosts; the [LoadBalancingPolicy](https://java-...
+- [Object Mapper](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/object_mapper/index.md): The driver provides a simple object mapper, which
+- [Asynchronous programming](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/async/index.md): The driver exposes an asynchronous API that allows you to write programs
+- [Compression](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/compression/index.md): Cassandra’s binary protocol supports optional compression of
+- [Query idempotence](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/idempotence/index.md): A query is *idempotent* if it can be applied multiple times without changing the result of the initi...
+- [Native protocol](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/native_protocol/index.md): The native protocol defines the format of the binary messages exchanged
+- [Speculative query execution](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/speculative_execution/index.md): Sometimes a Cassandra node might be experiencing difficulties (ex: long
+- [Retries](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/retries/index.md): When a query fails, it sometimes makes sense to retry it: the error might be temporary, or the query...
+- [Connecting to ScyllaDB Cloud Serverless](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/serverless/index.md): With ScyllaDB Cloud, you can deploy [serverless databases](https://cloud.docs.scylladb.com/stable/se...
+- [Metrics](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/metrics/index.md): The driver exposes measurements of its internal behavior through the popular [Dropwizard Metrics](ht...
+- [Statements](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/statements/index.md): To execute a query, you  create a [Statement](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/...
+- [Custom Codecs](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/custom_codecs/index.md): Custom codecs support transparent, user-configurable mapping of CQL types to arbitrary Java objects.
+- [Authentication](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/auth/index.md): Cassandra’s binary protocol supports [SASL](https://en.wikipedia.org/wiki/Simple_Authentication_and_...
+- [OSGi](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/osgi/index.md): The driver is available as an [OSGi](https://www.osgi.org) bundle. More specifically,
+- [Paging](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/paging/index.md): When a query returns many rows, it would be inefficient to return them
+- [Metadata](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/metadata/index.md): The driver maintains global information about the Cassandra cluster it
+- [Using the shaded JAR](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/shaded_jar/index.md): The default driver JAR depends on [Netty](http://netty.io/), which is
+- [Socket options](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/socket_options/index.md): [SocketOptions](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/api/com/datastax/driver/core/S...
+- [Address resolution](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/address_resolution/index.md): Each node in the Cassandra cluster is uniquely identified by an IP address that the driver will use ...
+- [Query timestamps](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/query_timestamps/index.md): In Cassandra, each mutation has a microsecond-precision timestamp, which
+- [Reconnection](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/reconnection/index.md): If the driver loses a connection to a node, it tries to re-establish it according to a configurable
+- [Control connection](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/control_connection/index.md): The control connection is a dedicated connection used for administrative tasks:
+- [User-defined types](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/udts/index.md): [CQL user-defined types](https://docs.datastax.com/en/cql/3.3/cql/cql_reference/cqlRefUDType.html) a...
+- [Optional codecs](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/custom_codecs/extras/index.md): ```eval_rst
+- [Built statements](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/statements/built/index.md): Built statements are generated via [QueryBuilder](https://java-driver.docs.scylladb.com/scylla-3.11....
+- [Batch statements](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/statements/batch/index.md): Use [BatchStatement](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/api/com/datastax/driver/c...
+- [Prepared statements](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/statements/prepared/index.md): Use [PreparedStatement](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/api/com/datastax/drive...
+- [Simple statements](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/statements/simple/index.md): Use [SimpleStatement](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/api/com/datastax/driver/...
+- [Using custom codecs](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/object_mapper/custom_codecs/index.md): The mapper can take advantage of [custom codecs]()
+- [Using the mapper](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/object_mapper/using/index.md): First, create a [MappingManager](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/api/com/datas...
+- [Definition of mapped classes](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/object_mapper/creating/index.md): The object mapper is configured by annotations on the mapped classes.
+- [Migrating from Astyanax](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/upgrade_guide/migrating_from_astyanax/index.md): This section is a guide for users previously using *Astyanax* and looking for
+- [Queries and Results](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/upgrade_guide/migrating_from_astyanax/queries_and_results/index.md): There are many resources such as [this post](http://www.planetcassandra.org/making-the-change-from-t...
+- [Configuration](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/upgrade_guide/migrating_from_astyanax/configuration/index.md): The two basic components in the Java driver are the `Cluster` and the `Session`.
+- [Language change : from Thrift to CQL](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/upgrade_guide/migrating_from_astyanax/language_level_changes/index.md): The data model changes when using *CQL* (Cassandra Query Language).
+- [API Documentation](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/api.md): Page content
+- [Contents](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/contents.md): Page content
+
+---
+
+For more comprehensive documentation, see [llms-full.txt](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/llms-full.txt)

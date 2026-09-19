@@ -1,0 +1,115 @@
+# Scylla Java Driver
+
+> Scylla Java Driver  documentation
+
+
+2026, ScyllaDB. All rights reserved.
+
+## Pages
+
+- [Java Driver for Scylla and Apache Cassandra®](https://java-driver.docs.scylladb.com/stable/index.md): [![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.scylladb/java-driver-core/bad...
+- [Upgrade guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Manual](https://java-driver.docs.scylladb.com/stable/manual/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Changelog](https://java-driver.docs.scylladb.com/stable/changelog/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Frequently asked questions](https://java-driver.docs.scylladb.com/stable/faq/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Case sensitivity](https://java-driver.docs.scylladb.com/stable/manual/case_sensitivity/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Mapper](https://java-driver.docs.scylladb.com/stable/manual/mapper/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Developer docs](https://java-driver.docs.scylladb.com/stable/manual/developer/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [API conventions](https://java-driver.docs.scylladb.com/stable/manual/api_conventions/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Core driver](https://java-driver.docs.scylladb.com/stable/manual/core/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query builder](https://java-driver.docs.scylladb.com/stable/manual/query_builder/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [OSGi](https://java-driver.docs.scylladb.com/stable/manual/osgi/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [UPDATE](https://java-driver.docs.scylladb.com/stable/manual/query_builder/update/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Relations](https://java-driver.docs.scylladb.com/stable/manual/query_builder/relation/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [SELECT](https://java-driver.docs.scylladb.com/stable/manual/query_builder/select/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Terms](https://java-driver.docs.scylladb.com/stable/manual/query_builder/term/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Idempotence in the query builder](https://java-driver.docs.scylladb.com/stable/manual/query_builder/idempotence/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [INSERT](https://java-driver.docs.scylladb.com/stable/manual/query_builder/insert/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [TRUNCATE](https://java-driver.docs.scylladb.com/stable/manual/query_builder/truncate/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [DELETE](https://java-driver.docs.scylladb.com/stable/manual/query_builder/delete/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Conditions](https://java-driver.docs.scylladb.com/stable/manual/query_builder/condition/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Schema builder](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Materialized View](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/materialized_view/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Aggregate](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/aggregate/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Index](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/index/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Keyspace](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/keyspace/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Table](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/table/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Type](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/type/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Function](https://java-driver.docs.scylladb.com/stable/manual/query_builder/schema/function/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Logging](https://java-driver.docs.scylladb.com/stable/manual/core/logging/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Connection pooling](https://java-driver.docs.scylladb.com/stable/manual/core/pooling/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query tracing](https://java-driver.docs.scylladb.com/stable/manual/core/tracing/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Request tracker](https://java-driver.docs.scylladb.com/stable/manual/core/request_tracker/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Tuples](https://java-driver.docs.scylladb.com/stable/manual/core/tuples/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Authentication](https://java-driver.docs.scylladb.com/stable/manual/core/authentication/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [SSL](https://java-driver.docs.scylladb.com/stable/manual/core/ssl/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Load balancing](https://java-driver.docs.scylladb.com/stable/manual/core/load_balancing/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Request throttling](https://java-driver.docs.scylladb.com/stable/manual/core/throttling/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Asynchronous programming](https://java-driver.docs.scylladb.com/stable/manual/core/async/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Integration](https://java-driver.docs.scylladb.com/stable/manual/core/integration/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Bill of Materials (BOM)](https://java-driver.docs.scylladb.com/stable/manual/core/bom/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Compression](https://java-driver.docs.scylladb.com/stable/manual/core/compression/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query idempotence](https://java-driver.docs.scylladb.com/stable/manual/core/idempotence/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Native protocol](https://java-driver.docs.scylladb.com/stable/manual/core/native_protocol/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Speculative query execution](https://java-driver.docs.scylladb.com/stable/manual/core/speculative_execution/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Retries](https://java-driver.docs.scylladb.com/stable/manual/core/retries/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Configuration](https://java-driver.docs.scylladb.com/stable/manual/core/configuration/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Metrics](https://java-driver.docs.scylladb.com/stable/manual/core/metrics/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Reactive Style Programming](https://java-driver.docs.scylladb.com/stable/manual/core/reactive/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Statements](https://java-driver.docs.scylladb.com/stable/manual/core/statements/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Custom codecs](https://java-driver.docs.scylladb.com/stable/manual/core/custom_codecs/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Paging](https://java-driver.docs.scylladb.com/stable/manual/core/paging/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Metadata](https://java-driver.docs.scylladb.com/stable/manual/core/metadata/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Detachable types](https://java-driver.docs.scylladb.com/stable/manual/core/detachable_types/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Using the shaded JAR](https://java-driver.docs.scylladb.com/stable/manual/core/shaded_jar/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Address resolution](https://java-driver.docs.scylladb.com/stable/manual/core/address_resolution/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query timestamps](https://java-driver.docs.scylladb.com/stable/manual/core/query_timestamps/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [GraalVM native images](https://java-driver.docs.scylladb.com/stable/manual/core/graalvm/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Non-blocking programming](https://java-driver.docs.scylladb.com/stable/manual/core/non_blocking/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Temporal types](https://java-driver.docs.scylladb.com/stable/manual/core/temporal_types/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Reconnection](https://java-driver.docs.scylladb.com/stable/manual/core/reconnection/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Control connection](https://java-driver.docs.scylladb.com/stable/manual/core/control_connection/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Performance](https://java-driver.docs.scylladb.com/stable/manual/core/performance/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [User-defined types](https://java-driver.docs.scylladb.com/stable/manual/core/udts/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Token metadata](https://java-driver.docs.scylladb.com/stable/manual/core/metadata/token/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Node metadata](https://java-driver.docs.scylladb.com/stable/manual/core/metadata/node/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Schema metadata](https://java-driver.docs.scylladb.com/stable/manual/core/metadata/schema/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Per-query keyspace](https://java-driver.docs.scylladb.com/stable/manual/core/statements/per_query_keyspace/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Batch statements](https://java-driver.docs.scylladb.com/stable/manual/core/statements/batch/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Prepared statements](https://java-driver.docs.scylladb.com/stable/manual/core/statements/prepared/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Simple statements](https://java-driver.docs.scylladb.com/stable/manual/core/statements/simple/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Reference configuration](https://java-driver.docs.scylladb.com/stable/manual/core/configuration/reference/index.md): or more contributor license agreements.  See the NOTICE file
+- [Request execution](https://java-driver.docs.scylladb.com/stable/manual/developer/request_execution/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Native protocol layer](https://java-driver.docs.scylladb.com/stable/manual/developer/native_protocol/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Administrative tasks](https://java-driver.docs.scylladb.com/stable/manual/developer/admin/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Netty pipeline](https://java-driver.docs.scylladb.com/stable/manual/developer/netty_pipeline/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Common infrastructure](https://java-driver.docs.scylladb.com/stable/manual/developer/common/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Event bus](https://java-driver.docs.scylladb.com/stable/manual/developer/common/event_bus/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Driver context](https://java-driver.docs.scylladb.com/stable/manual/developer/common/context/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Concurrency](https://java-driver.docs.scylladb.com/stable/manual/developer/common/concurrency/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Mapper interface](https://java-driver.docs.scylladb.com/stable/manual/mapper/mapper/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Integration](https://java-driver.docs.scylladb.com/stable/manual/mapper/config/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [DAOs](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Entities](https://java-driver.docs.scylladb.com/stable/manual/mapper/entities/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Update methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/update/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Increment methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/increment/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Statement attributes](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/statement_attributes/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Select methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/select/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Insert methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/insert/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [SetEntity methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/setentity/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Null saving strategy](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/null_saving/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Delete methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/delete/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Custom result types](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/custom_types/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/query/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [GetEntity methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/getentity/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query provider methods](https://java-driver.docs.scylladb.com/stable/manual/mapper/daos/queryprovider/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Kotlin](https://java-driver.docs.scylladb.com/stable/manual/mapper/config/kotlin/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Lombok](https://java-driver.docs.scylladb.com/stable/manual/mapper/config/lombok/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Java 14 Records](https://java-driver.docs.scylladb.com/stable/manual/mapper/config/record/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Scala](https://java-driver.docs.scylladb.com/stable/manual/mapper/config/scala/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [API Documentation](https://java-driver.docs.scylladb.com/stable/api.md): Page content
+- [Contents](https://java-driver.docs.scylladb.com/stable/contents.md): Page content
+
+---
+
+For more comprehensive documentation, see [llms-full.txt](https://java-driver.docs.scylladb.com/stable/llms-full.txt)
