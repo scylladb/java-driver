@@ -171,6 +171,10 @@ public class GraphTestUtils {
 
   public static void assertThatContainsProperties(
       Map<Object, Object> properties, Object... propsToMatch) {
+    if ((propsToMatch.length % 2) != 0) {
+      throw new IllegalArgumentException(
+          "propsToMatch must contain an even number of elements (key/value pairs)");
+    }
     for (int i = 0; i < propsToMatch.length; i += 2) {
       assertThat(properties).containsEntry(propsToMatch[i], propsToMatch[i + 1]);
     }
