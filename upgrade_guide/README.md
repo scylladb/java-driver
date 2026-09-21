@@ -92,8 +92,13 @@ unknown option and no longer supplies connection information. If that was the on
 setting, the resulting configuration contains no contact points, so the driver falls back to its
 default contact point, `127.0.0.1:9042`.
 
-This is an intentional binary- and source-compatibility break. Applications must replace secure
-connect bundles with explicit `basic.contact-points` configuration or programmatic contact points.
+This is an intentional binary- and source-compatibility break. This driver no longer has built-in
+support for connecting to DataStax Astra. Plain contact points cannot replace an Astra secure
+connect bundle because the bundle also provides TLS identity and trust material, metadata, and SNI
+proxy routing. Applications that need Astra must use a driver release that still supports secure
+connect bundles or migrate to an Astra-compatible driver.
+
+For ScyllaDB deployments, configure explicit `basic.contact-points` or programmatic contact points.
 For supported ScyllaDB private-endpoint deployments, use
 [client routes](../manual/core/address_resolution/) together with an explicit contact point.
 
