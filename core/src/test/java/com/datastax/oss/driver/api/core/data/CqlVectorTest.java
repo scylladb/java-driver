@@ -37,8 +37,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.commons.codec.DecoderException;
-import org.apache.commons.codec.binary.Hex;
 import org.assertj.core.util.Lists;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -242,12 +240,12 @@ public class CqlVectorTest {
   }
 
   @Test
-  public void should_not_use_preallocate_serialized_size() throws DecoderException {
+  public void should_not_use_preallocate_serialized_size() {
     // serialized CqlVector<Float>(1.0f, 2.5f, 3.0f) with size field adjusted to Integer.MAX_VALUE
     byte[] suspiciousBytes =
-        Hex.decodeHex(
-            "aced000573720042636f6d2e64617461737461782e6f73732e6472697665722e6170692e636f72652e646174612e43716c566563746f722453657269616c697a6174696f6e50726f78790000000000000001030000787077047fffffff7372000f6a6176612e6c616e672e466c6f6174daedc9a2db3cf0ec02000146000576616c7565787200106a6176612e6c616e672e4e756d62657286ac951d0b94e08b02000078703f8000007371007e0002402000007371007e00024040000078"
-                .toCharArray());
+        ByteUtils.getArray(
+            ByteUtils.fromHexString(
+                "0xaced000573720042636f6d2e64617461737461782e6f73732e6472697665722e6170692e636f72652e646174612e43716c566563746f722453657269616c697a6174696f6e50726f78790000000000000001030000787077047fffffff7372000f6a6176612e6c616e672e466c6f6174daedc9a2db3cf0ec02000146000576616c7565787200106a6176612e6c616e672e4e756d62657286ac951d0b94e08b02000078703f8000007371007e0002402000007371007e00024040000078"));
     try {
       new ObjectInputStream(new ByteArrayInputStream(suspiciousBytes)).readObject();
       fail("Should not be able to deserialize bytes with incorrect size field");

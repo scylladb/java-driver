@@ -23,9 +23,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.internal.core.TestResponses;
 import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
-import com.datastax.oss.protocol.internal.response.Ready;
 import java.util.concurrent.CompletionStage;
 import org.junit.Test;
 
@@ -47,10 +45,7 @@ public class ChannelFactoryClusterNameTest extends ChannelFactoryTestBase {
             DriverChannelOptions.DEFAULT,
             NoopNodeMetricUpdater.INSTANCE);
 
-    writeInboundFrame(
-        readOutboundFrame(), TestResponses.supportedResponse("mock_key", "mock_value"));
-    writeInboundFrame(readOutboundFrame(), new Ready());
-    writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("mockClusterName"));
+    completeSimpleChannelInit();
 
     // Then
     assertThatStage(channelFuture).isSuccess();
@@ -73,10 +68,7 @@ public class ChannelFactoryClusterNameTest extends ChannelFactoryTestBase {
             DriverChannelOptions.DEFAULT,
             NoopNodeMetricUpdater.INSTANCE);
     // open a first connection that will define the cluster name
-    writeInboundFrame(
-        readOutboundFrame(), TestResponses.supportedResponse("mock_key", "mock_value"));
-    writeInboundFrame(readOutboundFrame(), new Ready());
-    writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("mockClusterName"));
+    completeSimpleChannelInit();
     assertThatStage(channelFuture).isSuccess();
     // open a second connection that returns the same cluster name
     channelFuture =
@@ -86,8 +78,7 @@ public class ChannelFactoryClusterNameTest extends ChannelFactoryTestBase {
             null,
             DriverChannelOptions.DEFAULT,
             NoopNodeMetricUpdater.INSTANCE);
-    writeInboundFrame(readOutboundFrame(), new Ready());
-    writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("mockClusterName"));
+    completeSimpleChannelInit();
 
     // Then
     assertThatStage(channelFuture).isSuccess();
@@ -101,8 +92,7 @@ public class ChannelFactoryClusterNameTest extends ChannelFactoryTestBase {
             null,
             DriverChannelOptions.DEFAULT,
             NoopNodeMetricUpdater.INSTANCE);
-    writeInboundFrame(readOutboundFrame(), new Ready());
-    writeInboundFrame(readOutboundFrame(), TestResponses.clusterNameResponse("wrongClusterName"));
+    completeSimpleChannelInit("wrongClusterName");
 
     // Then
     assertThatStage(channelFuture)

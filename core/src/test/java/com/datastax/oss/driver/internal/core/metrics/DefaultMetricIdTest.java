@@ -19,7 +19,7 @@ package com.datastax.oss.driver.internal.core.metrics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.google.common.collect.ImmutableMap;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import org.junit.Test;
 
 public class DefaultMetricIdTest {

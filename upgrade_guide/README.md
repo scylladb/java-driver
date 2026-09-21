@@ -72,6 +72,36 @@ no longer fails `CqlSession.build()`. What changes:
   (`resolve-contact-points = true`, a programmatic resolved `InetSocketAddress`), custom `EndPoint`s
   and every node discovered from the cluster are tried as they are.
 
+#### DataStax Astra secure-connect-bundle support was removed
+
+This release intentionally removes the DataStax Astra secure-connect-bundle integration and its
+public API. The following members are no longer available:
+
+- `SessionBuilder.withCloudSecureConnectBundle(Path)`
+- `SessionBuilder.withCloudSecureConnectBundle(URL)`
+- `SessionBuilder.withCloudSecureConnectBundle(InputStream)`
+- `SessionBuilder.withCloudProxyAddress(InetSocketAddress)`
+- `ProgrammaticArguments.getCloudProxyAddress()`
+- `ProgrammaticArguments.Builder.withCloudProxyAddress(InetSocketAddress)`
+- `SessionBuilder.ASTRA_PAYLOAD_KEY`
+- `DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
+- `TypedDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
+
+The old `datastax-java-driver.basic.cloud.secure-connect-bundle` configuration key is now an
+unknown option and no longer supplies connection information. If that was the only connection
+setting, the resulting configuration contains no contact points, so the driver falls back to its
+default contact point, `127.0.0.1:9042`.
+
+This is an intentional binary- and source-compatibility break. This driver no longer has built-in
+support for connecting to DataStax Astra. Plain contact points cannot replace an Astra secure
+connect bundle because the bundle also provides TLS identity and trust material, metadata, and SNI
+proxy routing. Applications that need Astra must use a driver release that still supports secure
+connect bundles or migrate to an Astra-compatible driver.
+
+For ScyllaDB deployments, configure explicit `basic.contact-points` or programmatic contact points.
+For supported ScyllaDB private-endpoint deployments, use
+[client routes](../manual/core/address_resolution/) together with an explicit contact point.
+
 ### 4.19.2.1
 
 #### The driver reports a session identifier, and its configuration, at connection time
@@ -160,8 +190,8 @@ datastax-java-driver {
 
 Key points:
 
-- **Mutually exclusive** with a custom `AddressTranslator` and with cloud secure connect bundles —
-  providing both throws `IllegalStateException` at session build time.
+- **Mutually exclusive** with a custom `AddressTranslator` — providing both throws
+  `IllegalStateException` at session build time.
 - **Requires ScyllaDB Enterprise ≥ 2026.1** (scylladb/scylladb#27323). The feature is not
   available on ScyllaDB OSS or Apache Cassandra.
 
