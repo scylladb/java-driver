@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.internal.osgi.support;
 
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
+import com.datastax.oss.driver.api.testinfra.session.SessionTracker;
 import org.junit.AssumptionViolatedException;
 import org.junit.runner.Description;
 import org.junit.runner.notification.Failure;
@@ -26,7 +27,6 @@ import org.junit.runners.model.InitializationError;
 import org.ops4j.pax.exam.junit.PaxExam;
 
 public class CcmPaxExam extends PaxExam {
-
   public CcmPaxExam(Class<?> klass) throws InitializationError {
     super(klass);
   }
@@ -36,7 +36,12 @@ public class CcmPaxExam extends PaxExam {
     Description description = getDescription();
 
     if (BackendRequirementRule.meetsDescriptionRequirements(description)) {
-      super.run(notifier);
+      try {
+        SessionTracker.testStarted(description.getClassName(), description.getMethodName());
+        super.run(notifier);
+      } finally {
+        SessionTracker.testEnded(description.getClassName(), description.getMethodName());
+      }
     } else {
       // requirements not met, throw reasoning assumption to skip test
       AssumptionViolatedException e =
