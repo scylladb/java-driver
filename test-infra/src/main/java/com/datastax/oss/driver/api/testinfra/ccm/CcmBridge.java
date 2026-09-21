@@ -313,6 +313,10 @@ public class CcmBridge implements AutoCloseable {
     return VERSION;
   }
 
+  public Path getConfigDirectory() {
+    return configDirectory;
+  }
+
   public static Version getCassandraVersion() {
     if (isDistributionOf(BackendType.CASSANDRA)) {
       return VERSION;
