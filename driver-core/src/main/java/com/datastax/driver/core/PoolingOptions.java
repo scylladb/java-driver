@@ -462,7 +462,8 @@ public class PoolingOptions {
   }
 
   /**
-   * Returns the maximum number of requests that get enqueued if no connection is available.
+   * Returns the maximum number of requests per shard that get enqueued if no connection is
+   * available.
    *
    * @return the maximum queue size.
    */
