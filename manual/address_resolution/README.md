@@ -78,9 +78,10 @@ addresses retrieved from or sent by Cassandra nodes are.
 When a ScyllaDB Cloud cluster is reached through a private endpoint service, its nodes broadcast
 addresses that the client cannot route to. Java Driver 4.x solves this with *client routes*: it reads
 per-node endpoint mappings from the `system.client_routes` table and opens each connection through the
-private endpoint that serves that node. The feature also goes by the names of the services it fronts —
-AWS PrivateLink (PL), Azure Private Link, GCP Private Service Connect (PSC), private service
-connection — and, after the table it reads, as `client_routes` or clientroutes.
+private endpoint that serves that node. This works regardless of which provider service fronts the
+private endpoint — AWS PrivateLink (PL), Azure Private Link, or GCP Private Service Connect (PSC),
+collectively a private service connection. After the table it reads, the feature itself is also
+called `client_routes` or clientroutes.
 
 **Java Driver 3.x does not support client routes, at any version.** They were added in 4.x and first
 released in 4.19.0.7, and they need ScyllaDB Enterprise 2026.1 or later, which is where
@@ -89,8 +90,9 @@ released in 4.19.0.7, and they need ScyllaDB Enterprise 2026.1 or later, which i
 
 A custom [AddressTranslator] is not an equivalent. It receives an `InetSocketAddress` and translates
 by address, whereas client routes look each node up by its host ID; and 3.x knows nothing of the
-`CLIENT_ROUTES_CHANGE` event, so a translator written here cannot follow a route once the server moves
-it. If you need this, use [Java Driver 4.x][4.x-driver].
+`CLIENT_ROUTES_CHANGE` event, so a translator written here does not automatically receive
+route-change events or refresh `system.client_routes`. If you need this, use
+[Java Driver 4.x][4.x-driver].
 
 ### EC2 multi-region
 
