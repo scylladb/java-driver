@@ -73,6 +73,27 @@ Cluster cluster = Cluster.builder()
 Note: the contact points provided while creating the `Cluster` are not translated, only
 addresses retrieved from or sent by Cassandra nodes are.
 
+### Client routes (PrivateLink / Private Service Connect)
+
+When a ScyllaDB Cloud cluster is reached through a private endpoint service, its nodes broadcast
+addresses that the client cannot route to. Java Driver 4.x solves this with *client routes*: it reads
+per-node endpoint mappings from the `system.client_routes` table and opens each connection through the
+private endpoint that serves that node. This works regardless of which provider service fronts the
+private endpoint — AWS PrivateLink (PL), Azure Private Link, or GCP Private Service Connect (PSC),
+collectively a private service connection. After the table it reads, the feature itself is also
+called `client_routes` or clientroutes.
+
+**Java Driver 3.x does not support client routes, at any version.** They were added in 4.x and first
+released in 4.19.0.7, and they need ScyllaDB Enterprise 2026.1 or later, which is where
+`system.client_routes` appears. The 4.x manual covers them under
+[Address resolution][4.x-address-resolution].
+
+A custom [AddressTranslator] is not an equivalent. It receives an `InetSocketAddress` and translates
+by address, whereas client routes look each node up by its host ID; and 3.x knows nothing of the
+`CLIENT_ROUTES_CHANGE` event, so a translator written here does not automatically receive
+route-change events or refresh `system.client_routes`. If you need this, use
+[Java Driver 4.x][4.x-driver].
+
 ### EC2 multi-region
 
 If you deploy both Cassandra and client applications on Amazon EC2, and your cluster spans multiple regions, you'll have
@@ -101,6 +122,9 @@ domain name of the target instance. Then it performs a forward DNS lookup of the
 private/public switch automatically based on location).
 
 
+
+[4.x-address-resolution]: https://github.com/scylladb/java-driver/blob/scylla-4.x/manual/core/address_resolution/README.md#client-routes-cloud-private-endpoint-deployments
+[4.x-driver]:             https://github.com/scylladb/java-driver/tree/scylla-4.x
 
 [AddressTranslator]:               https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/AddressTranslator.html
 [EC2MultiRegionAddressTranslator]: https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/policies/EC2MultiRegionAddressTranslator.html
