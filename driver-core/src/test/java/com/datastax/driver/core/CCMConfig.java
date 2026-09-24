@@ -50,15 +50,20 @@ public @interface CCMConfig {
   int[] numberOfNodes() default {};
 
   /**
-   * The C* or DSE version to use; defaults to the version defined by the System property {@code
-   * cassandra.version}.
+   * The C*, DSE or Scylla version to use; defaults to the version defined by the System property
+   * {@code cassandra.version}.
    *
    * <p>Note that setting this attribute completely overrides the System properties {@code
    * cassandra.version} and {@code cassandra.directory}.
    *
+   * <p>Which server this version names is decided by {@link #dse()} and {@link #scylla()}, which
+   * default to the flavor of the surrounding run. Set the matching one explicitly whenever this
+   * attribute is set, or a Cassandra version will be installed as Scylla (or vice versa) depending
+   * on how the test run was invoked.
+   *
    * <p>This attribute is ignored if {@link #ccmProvider()} is defined.
    *
-   * @return The C* or DSE version to use
+   * @return The C*, DSE or Scylla version to use
    * @see CCMBridge#getCassandraVersion()
    */
   String version() default "";
@@ -74,6 +79,20 @@ public @interface CCMConfig {
    *     (default).
    */
   boolean[] dse() default {};
+
+  /**
+   * Whether to launch a Scylla instance rather than an OSS C*.
+   *
+   * <p>Note that setting this attribute completely overrides the System property {@code
+   * scylla.version}: only whether Scylla is launched, not which version. Set it together with
+   * {@link #version()} so that an explicitly configured version is installed as the server it
+   * actually names, instead of inheriting the flavor of the surrounding run.
+   *
+   * <p>This attribute is ignored if {@link #ccmProvider()} is defined.
+   *
+   * @return {@code true} to launch a Scylla instance, {@code false} to launch an OSS C* instance.
+   */
+  boolean[] scylla() default {};
 
   /**
    * Configuration items to add to cassandra.yaml configuration file. Each configuration item must
