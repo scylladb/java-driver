@@ -23,6 +23,7 @@ under the License.
 
 ### 4.19.2
 
+- [improvement] Skip DSE protocol versions during automatic protocol negotiation
 - [bug] CASSJAVA-116: Retry or Speculative Execution with RequestIdGenerator throws "Duplicate Key"
 
 ### 4.19.1
