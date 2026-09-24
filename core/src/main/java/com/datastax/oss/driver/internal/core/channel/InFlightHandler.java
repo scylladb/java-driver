@@ -148,16 +148,27 @@ public class InFlightHandler extends ChannelDuplexHandler {
       return;
     }
 
-    LOG.trace("[{}] Writing {} on stream id {}", logPrefix, message.responseCallback, streamId);
-    Frame frame =
-        Frame.forRequest(
-            protocolVersion.getCode(),
-            streamId,
-            message.tracing,
-            message.customPayload,
-            message.request);
+    Frame frame;
+    boolean registered = false;
+    try {
+      LOG.trace("[{}] Writing {} on stream id {}", logPrefix, message.responseCallback, streamId);
+      frame =
+          Frame.forRequest(
+              protocolVersion.getCode(),
+              streamId,
+              message.tracing,
+              message.customPayload,
+              message.request);
 
-    inFlight.put(streamId, message.responseCallback);
+      inFlight.put(streamId, message.responseCallback);
+      registered = true;
+    } finally {
+      // acquire() consumed the caller's reservation. Until the callback is registered, no other
+      // path owns the concrete id, so every synchronous setup failure must release it here.
+      if (!registered) {
+        streamIds.release(streamId);
+      }
+    }
     ChannelFuture writeFuture = ctx.write(frame, promise);
     writeFuture.addListener(
         future -> {
