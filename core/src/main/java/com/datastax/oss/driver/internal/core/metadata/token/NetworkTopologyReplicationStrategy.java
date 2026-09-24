@@ -56,17 +56,17 @@ class NetworkTopologyReplicationStrategy implements ReplicationStrategy {
   }
 
   @Override
-  public Map<Token, Set<Node>> computeReplicasByToken(
+  public Map<Token, List<Node>> computeReplicasListByToken(
       Map<Token, Node> tokenToPrimary, List<Token> ring) {
 
     // The implementation of this method was adapted from
     // org.apache.cassandra.locator.NetworkTopologyStrategy
 
-    ImmutableMap.Builder<Token, Set<Node>> result = ImmutableMap.builder();
+    ImmutableMap.Builder<Token, List<Node>> result = ImmutableMap.builder();
     Map<String, Set<String>> racks = getRacksInDcs(tokenToPrimary.values());
     Map<String, Integer> dcNodeCount = Maps.newHashMapWithExpectedSize(replicationFactors.size());
     Set<String> warnedDcs = Sets.newHashSetWithExpectedSize(replicationFactors.size());
-    CanonicalNodeSetBuilder replicasBuilder = new CanonicalNodeSetBuilder();
+    CanonicalNodeListBuilder replicasBuilder = new CanonicalNodeListBuilder();
 
     // find maximum number of nodes in each DC
     for (Node node : Sets.newHashSet(tokenToPrimary.values())) {

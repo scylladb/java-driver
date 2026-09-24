@@ -23,7 +23,7 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.0.1</version>
+    <version>4.19.0.10-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-guava-shaded</artifactId>
   <name>Scylla Java Driver - guava shaded dep</name>
@@ -50,7 +50,7 @@
     <dependency>
       <groupId>org.graalvm.nativeimage</groupId>
       <artifactId>svm</artifactId>
-      <version>20.0.0</version>
+      <version>20.3.17</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>
@@ -146,7 +146,7 @@
         with Class.forName(). In the end, more packages will be imported in MANIFEST.MF
         and OSGi integration tests will break.
         -->
-        <version>3.5.0</version>
+        <version>3.5.1</version>
         <extensions>true</extensions>
         <executions>
           <execution>

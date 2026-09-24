@@ -43,7 +43,7 @@ public class DcInferringLoadBalancingPolicyQueryPlanTest
               }
 
               @Override
-              protected int diceRoll1d4() {
+              protected int randomNextInt(int bound) {
                 return diceRoll;
               }
             });

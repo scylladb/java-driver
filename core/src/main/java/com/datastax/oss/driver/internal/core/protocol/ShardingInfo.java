@@ -35,18 +35,29 @@ public class ShardingInfo implements NodeShardingInfo {
   private static final String SCYLLA_PARTITIONER = "SCYLLA_PARTITIONER";
   private static final String SCYLLA_SHARDING_ALGORITHM = "SCYLLA_SHARDING_ALGORITHM";
   private static final String SCYLLA_SHARDING_IGNORE_MSB = "SCYLLA_SHARDING_IGNORE_MSB";
+  private static final String SCYLLA_SHARD_AWARE_PORT_PARAM_KEY = "SCYLLA_SHARD_AWARE_PORT";
+  private static final String SCYLLA_SHARD_AWARE_PORT_SSL_PARAM_KEY = "SCYLLA_SHARD_AWARE_PORT_SSL";
 
   private final int shardsCount;
   private final String partitioner;
   private final String shardingAlgorithm;
   private final int shardingIgnoreMSB;
+  private final Integer shardAwarePort;
+  private final Integer shardAwarePortSsl;
 
   private ShardingInfo(
-      int shardsCount, String partitioner, String shardingAlgorithm, int shardingIgnoreMSB) {
+      int shardsCount,
+      String partitioner,
+      String shardingAlgorithm,
+      int shardingIgnoreMSB,
+      Integer shardAwarePort,
+      Integer shardAwarePortSsl) {
     this.shardsCount = shardsCount;
     this.partitioner = partitioner;
     this.shardingAlgorithm = shardingAlgorithm;
     this.shardingIgnoreMSB = shardingIgnoreMSB;
+    this.shardAwarePort = shardAwarePort;
+    this.shardAwarePortSsl = shardAwarePortSsl;
   }
 
   @Override
@@ -78,6 +89,16 @@ public class ShardingInfo implements NodeShardingInfo {
     return (int) (sum >>> 32);
   }
 
+  @Override
+  public Integer getShardAwarePort() {
+    return shardAwarePort;
+  }
+
+  @Override
+  public Integer getShardAwarePortSsl() {
+    return shardAwarePortSsl;
+  }
+
   public static class ConnectionShardingInfo {
     public final int shardId;
     public final ShardingInfo shardingInfo;
@@ -94,6 +115,8 @@ public class ShardingInfo implements NodeShardingInfo {
     String partitioner = parseString(params, SCYLLA_PARTITIONER);
     String shardingAlgorithm = parseString(params, SCYLLA_SHARDING_ALGORITHM);
     Integer shardingIgnoreMSB = parseInt(params, SCYLLA_SHARDING_IGNORE_MSB);
+    Integer shardAwarePort = parseInt(params, SCYLLA_SHARD_AWARE_PORT_PARAM_KEY);
+    Integer shardAwarePortSsl = parseInt(params, SCYLLA_SHARD_AWARE_PORT_SSL_PARAM_KEY);
     if (shardId == null
         || shardsCount == null
         || partitioner == null
@@ -104,7 +127,14 @@ public class ShardingInfo implements NodeShardingInfo {
       return null;
     }
     return new ConnectionShardingInfo(
-        shardId, new ShardingInfo(shardsCount, partitioner, shardingAlgorithm, shardingIgnoreMSB));
+        shardId,
+        new ShardingInfo(
+            shardsCount,
+            partitioner,
+            shardingAlgorithm,
+            shardingIgnoreMSB,
+            shardAwarePort,
+            shardAwarePortSsl));
   }
 
   private static String parseString(Map<String, List<String>> params, String key) {

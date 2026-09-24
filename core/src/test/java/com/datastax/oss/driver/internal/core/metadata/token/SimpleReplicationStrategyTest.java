@@ -25,7 +25,6 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -66,7 +65,8 @@ public class SimpleReplicationStrategyTest {
     SimpleReplicationStrategy strategy = new SimpleReplicationStrategy(new ReplicationFactor(2));
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -87,7 +87,8 @@ public class SimpleReplicationStrategyTest {
     SimpleReplicationStrategy strategy = new SimpleReplicationStrategy(new ReplicationFactor(2));
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -107,7 +108,8 @@ public class SimpleReplicationStrategyTest {
     SimpleReplicationStrategy strategy = new SimpleReplicationStrategy(new ReplicationFactor(2));
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -127,7 +129,8 @@ public class SimpleReplicationStrategyTest {
     SimpleReplicationStrategy strategy = new SimpleReplicationStrategy(new ReplicationFactor(6));
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());
@@ -186,7 +189,8 @@ public class SimpleReplicationStrategyTest {
     SimpleReplicationStrategy strategy = new SimpleReplicationStrategy(new ReplicationFactor(3));
 
     // When
-    Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+    Map<Token, List<Node>> replicasByToken =
+        strategy.computeReplicasListByToken(tokenToPrimary, ring);
 
     // Then
     assertThat(replicasByToken.keySet().size()).isEqualTo(ring.size());

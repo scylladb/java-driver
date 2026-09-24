@@ -175,12 +175,28 @@ public class TypedDriverOption<ValueT> {
   /** Whether to log non-fatal errors when the driver tries to open a new connection. */
   public static final TypedDriverOption<Boolean> CONNECTION_WARN_INIT_ERROR =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR, GenericType.BOOLEAN);
+  /** Whether to use advanced shard awareness */
+  public static final TypedDriverOption<Boolean> CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, GenericType.BOOLEAN);
+  /** Inclusive lower bound of port range to use in advanced shard awareness */
+  public static final TypedDriverOption<Integer> ADVANCED_SHARD_AWARENESS_PORT_LOW =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, GenericType.INTEGER);
+  /** Inclusive upper bound of port range to use in advanced shard awareness */
+  public static final TypedDriverOption<Integer> ADVANCED_SHARD_AWARENESS_PORT_HIGH =
+      new TypedDriverOption<>(
+          DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, GenericType.INTEGER);
   /** The number of connections in the LOCAL pool. */
   public static final TypedDriverOption<Integer> CONNECTION_POOL_LOCAL_SIZE =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, GenericType.INTEGER);
   /** The number of connections in the REMOTE pool. */
   public static final TypedDriverOption<Integer> CONNECTION_POOL_REMOTE_SIZE =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE, GenericType.INTEGER);
+  /** The maximum number of connections to create at once when filling the connection pool. */
+  public static final TypedDriverOption<Integer> CONNECTION_POOL_INIT_BATCH_SIZE =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_POOL_INIT_BATCH_SIZE, GenericType.INTEGER);
   /**
    * Whether to schedule reconnection attempts if all contact points are unreachable on the first
    * initialization attempt.
@@ -916,6 +932,27 @@ public class TypedDriverOption<ValueT> {
           new TypedDriverOption<>(
               DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS,
               GenericType.listOf(String.class));
+
+  /** The request routing method to use in the request routing load balancing policy. */
+  public static final TypedDriverOption<String> LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD =
+      new TypedDriverOption<>(
+          DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
+          GenericType.STRING);
+
+  // Note: DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS intentionally has no typed equivalent here
+  // because its HOCON value is a list of compound objects (not a flat scalar type supported by the
+  // DriverExecutionProfile API); it is excluded from the TypedDriverOptionTest consistency check
+  // accordingly.
+
+  /** The native transport port of the cluster nodes, used for broadcastRpcAddress fallback. */
+  public static final TypedDriverOption<Integer> CLIENT_ROUTES_NATIVE_TRANSPORT_PORT =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, GenericType.INTEGER);
+
+  /** Whether shard awareness is enabled for client-routes deployments. */
+  public static final TypedDriverOption<Boolean> CLIENT_ROUTES_SHARD_AWARENESS_ENABLED =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, GenericType.BOOLEAN);
 
   private static Iterable<TypedDriverOption<?>> introspectBuiltInValues() {
     try {

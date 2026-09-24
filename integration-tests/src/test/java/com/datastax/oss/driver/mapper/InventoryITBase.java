@@ -112,8 +112,9 @@ public abstract class InventoryITBase {
 
   protected static boolean supportsSASI(BaseCcmRule ccmRule) {
     return ccmRule.getCassandraVersion().compareTo(MINIMUM_SASI_VERSION) >= 0
-        && !CcmBridge
-            .SCYLLA_ENABLEMENT /* @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */;
+        && !CcmBridge.isDistributionOf(
+            BackendType
+                .SCYLLA) /* @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex */;
   }
 
   @Entity

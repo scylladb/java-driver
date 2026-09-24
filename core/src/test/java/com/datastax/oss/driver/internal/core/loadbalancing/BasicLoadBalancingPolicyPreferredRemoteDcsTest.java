@@ -31,10 +31,11 @@ import static org.mockito.Mockito.when;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.Test;
@@ -53,10 +54,10 @@ public class BasicLoadBalancingPolicyPreferredRemoteDcsTest
   public void should_prioritize_single_replica() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY)).thenReturn(ImmutableSet.of(node3));
+    when(tokenMap.getReplicasList(KEYSPACE, ROUTING_KEY)).thenReturn(ImmutableList.of(node3));
     // Additional mock. Implementation diverges from upstream enough to call this method instead.
-    when(tokenMap.getReplicas(eq(KEYSPACE), isNull(), eq(ROUTING_KEY)))
-        .thenReturn(ImmutableSet.of(node3));
+    when(tokenMap.getReplicasList(eq(KEYSPACE), isNull(), eq(ROUTING_KEY)))
+        .thenReturn(ImmutableList.of(node3));
 
     // node3 always first, round-robin on the rest
     assertThat(policy.newQueryPlan(request, session))
@@ -83,11 +84,11 @@ public class BasicLoadBalancingPolicyPreferredRemoteDcsTest
   public void should_prioritize_and_shuffle_replicas() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
-        .thenReturn(ImmutableSet.of(node1, node2, node3, node6, node9));
+    when(tokenMap.getReplicasList(KEYSPACE, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node1, node2, node3, node6, node9));
     // Additional mock. Implementation diverges from upstream enough to call this method instead.
-    when(tokenMap.getReplicas(eq(KEYSPACE), isNull(), eq(ROUTING_KEY)))
-        .thenReturn(ImmutableSet.of(node1, node2, node3, node6, node9));
+    when(tokenMap.getReplicasList(eq(KEYSPACE), isNull(), eq(ROUTING_KEY)))
+        .thenReturn(ImmutableList.of(node1, node2, node3, node6, node9));
 
     // node 6 and 9 being in a remote DC, they don't get a boost for being a replica
     assertThat(policy.newQueryPlan(request, session))
@@ -133,14 +134,32 @@ public class BasicLoadBalancingPolicyPreferredRemoteDcsTest
     when(node4.getDatacenter()).thenReturn("dc1");
     when(node5.getDatacenter()).thenReturn("dc1");
     when(node6.getDatacenter()).thenReturn("dc2");
+    when(node6.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.6", 9042)));
     when(node7.getDatacenter()).thenReturn("dc2");
+    when(node7.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.7", 9042)));
     when(node8.getDatacenter()).thenReturn("dc2");
+    when(node8.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.8", 9042)));
     when(node9.getDatacenter()).thenReturn("dc3");
+    when(node9.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.9", 9042)));
     when(node10.getDatacenter()).thenReturn("dc3");
+    when(node10.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.10", 9042)));
     when(node11.getDatacenter()).thenReturn("dc3");
+    when(node11.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.11", 9042)));
     when(node12.getDatacenter()).thenReturn("dc4");
+    when(node12.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.12", 9042)));
     when(node13.getDatacenter()).thenReturn("dc4");
+    when(node13.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.13", 9042)));
     when(node14.getDatacenter()).thenReturn("dc4");
+    when(node14.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.14", 9042)));
 
     // Accept 2 nodes per remote DC
     when(defaultProfile.getInt(

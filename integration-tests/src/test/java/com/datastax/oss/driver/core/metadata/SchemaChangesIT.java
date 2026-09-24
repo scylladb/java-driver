@@ -99,16 +99,15 @@ public class SchemaChangesIT {
         null,
         String.format(
             "CREATE KEYSPACE %s "
-                + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
             newKeyspaceId),
         metadata -> metadata.getKeyspace(newKeyspaceId),
         keyspace -> {
           assertThat(keyspace.getName()).isEqualTo(newKeyspaceId);
           assertThat(keyspace.isDurableWrites()).isTrue();
           assertThat(keyspace.getReplication())
-              .hasSize(2)
-              .containsEntry("class", "org.apache.cassandra.locator.SimpleStrategy")
-              .containsEntry("replication_factor", "1");
+              .containsEntry("class", "org.apache.cassandra.locator.NetworkTopologyStrategy")
+              .containsEntry("dc1", "1");
         },
         (listener, keyspace) -> verify(listener).onKeyspaceCreated(keyspace),
         newKeyspaceId);
@@ -121,7 +120,7 @@ public class SchemaChangesIT {
         ImmutableList.of(
             String.format(
                 "CREATE KEYSPACE %s "
-                    + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                    + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
                 newKeyspaceId.asCql(true))),
         String.format("DROP KEYSPACE %s", newKeyspaceId.asCql(true)),
         metadata -> metadata.getKeyspace(newKeyspaceId),
@@ -136,11 +135,11 @@ public class SchemaChangesIT {
         ImmutableList.of(
             String.format(
                 "CREATE KEYSPACE %s "
-                    + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                    + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
                 newKeyspaceId.asCql(true))),
         String.format(
             "ALTER KEYSPACE %s "
-                + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} "
+                + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1} "
                 + "AND durable_writes = 'false'",
             newKeyspaceId.asCql(true)),
         metadata -> metadata.getKeyspace(newKeyspaceId),
@@ -250,7 +249,8 @@ public class SchemaChangesIT {
   public void should_handle_view_creation() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V3_0_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT).isFalse(); // @IntegrationTestDisabledScyllaFailure
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
+        .isFalse(); // @IntegrationTestDisabledScyllaFailure
     should_handle_creation(
         "CREATE TABLE scores(user text, game text, score int, PRIMARY KEY (user, game))",
         "CREATE MATERIALIZED VIEW highscores "
@@ -325,7 +325,7 @@ public class SchemaChangesIT {
   public void should_handle_function_creation() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_creation(
         null,
@@ -351,7 +351,7 @@ public class SchemaChangesIT {
   public void should_handle_function_drop() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_drop(
         ImmutableList.of(
@@ -369,7 +369,7 @@ public class SchemaChangesIT {
   public void should_handle_function_update() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_update_via_drop_and_recreate(
         ImmutableList.of(
@@ -391,7 +391,7 @@ public class SchemaChangesIT {
   public void should_handle_aggregate_creation() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_creation(
         "CREATE FUNCTION plus(i int, j int) RETURNS NULL ON NULL INPUT RETURNS int "
@@ -419,7 +419,7 @@ public class SchemaChangesIT {
   public void should_handle_aggregate_drop() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_drop(
         ImmutableList.of(
@@ -438,7 +438,7 @@ public class SchemaChangesIT {
   public void should_handle_aggregate_update() {
     assumeThat(CCM_RULE.getCcmBridge().getCassandraVersion().compareTo(Version.V2_2_0) >= 0)
         .isTrue();
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT)
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
         .isFalse(); // @IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUDF
     should_handle_update_via_drop_and_recreate(
         ImmutableList.of(

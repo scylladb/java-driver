@@ -18,12 +18,9 @@ package com.datastax.oss.driver.api.testinfra;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-/**
- * Annotation for a Class or Method that skips it for Cassandra. If the tests are run against
- * Cassandra, the test is skipped.
- */
+/** Annotation for a Class or Method that skips for non-Scylla backend. */
 @Retention(RetentionPolicy.RUNTIME)
-public @interface CassandraSkip {
+public @interface ScyllaOnly {
   /** @return The description returned if this requirement is not met. */
-  String description() default "Disabled for Cassandra.";
+  String description() default "Supported only for Scylla.";
 }

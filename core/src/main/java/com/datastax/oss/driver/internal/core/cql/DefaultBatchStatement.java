@@ -25,6 +25,7 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchType;
@@ -42,12 +43,13 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import net.jcip.annotations.Immutable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Immutable
-public class DefaultBatchStatement implements BatchStatement {
+public class DefaultBatchStatement implements BatchStatement, RequestRoutingTypeAccessor {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultBatchStatement.class);
 
   private final BatchType batchType;
@@ -69,7 +71,8 @@ public class DefaultBatchStatement implements BatchStatement {
   private final Duration timeout;
   private final Node node;
   private final int nowInSeconds;
-  private final Boolean isLWT;
+  @Nullable private final RequestRoutingType requestRoutingType;
+  private RequestRoutingType cachedStatementsRequestRoutingType;
 
   public DefaultBatchStatement(
       BatchType batchType,
@@ -91,7 +94,7 @@ public class DefaultBatchStatement implements BatchStatement {
       Duration timeout,
       Node node,
       int nowInSeconds,
-      Boolean isLWT) {
+      @Nullable RequestRoutingType requestRoutingType) {
     for (BatchableStatement<?> statement : statements) {
       if (statement != null
           && (statement.getConsistencyLevel() != null
@@ -123,7 +126,7 @@ public class DefaultBatchStatement implements BatchStatement {
     this.timeout = timeout;
     this.node = node;
     this.nowInSeconds = nowInSeconds;
-    this.isLWT = isLWT;
+    this.requestRoutingType = requestRoutingType;
   }
 
   @NonNull
@@ -155,7 +158,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @NonNull
@@ -181,7 +184,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @NonNull
@@ -211,7 +214,7 @@ public class DefaultBatchStatement implements BatchStatement {
           timeout,
           node,
           nowInSeconds,
-          isLWT);
+          requestRoutingType);
     }
   }
 
@@ -245,7 +248,7 @@ public class DefaultBatchStatement implements BatchStatement {
           timeout,
           node,
           nowInSeconds,
-          isLWT);
+          requestRoutingType);
     }
   }
 
@@ -277,7 +280,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @NonNull
@@ -314,7 +317,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -345,7 +348,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Nullable
@@ -377,7 +380,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Nullable
@@ -410,7 +413,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -441,7 +444,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -472,7 +475,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -538,7 +541,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @NonNull
@@ -564,7 +567,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         newNode,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Nullable
@@ -611,7 +614,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -652,7 +655,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @NonNull
@@ -684,7 +687,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -721,7 +724,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -752,7 +755,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -783,7 +786,7 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @NonNull
@@ -809,7 +812,7 @@ public class DefaultBatchStatement implements BatchStatement {
         newTimeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   @Override
@@ -840,12 +843,44 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         newNowInSeconds,
-        isLWT);
+        requestRoutingType);
+  }
+
+  /**
+   * Returns the request routing type for this batch statement based on {@link
+   * DefaultBatchStatement#isLWT()} implementation while maintaining non-null contract.
+   *
+   * @return the request routing type, never null
+   */
+  @Nullable
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    if (Objects.nonNull(requestRoutingType)) {
+      return requestRoutingType;
+    } else if (consistencyLevel != null && consistencyLevel.isSerial()) {
+      return RequestRoutingType.LWT;
+    } else if (Objects.isNull(
+        cachedStatementsRequestRoutingType)) { // Immutability of the statement list and statements
+      // allows us to cache the result
+      cachedStatementsRequestRoutingType =
+          statements.stream()
+              .map(Statement::getRequestRoutingType)
+              .filter((rt) -> Objects.nonNull(rt) && rt == RequestRoutingType.LWT)
+              .findFirst()
+              .orElse(RequestRoutingType.REGULAR);
+    }
+    return cachedStatementsRequestRoutingType;
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getConfiguredRequestRoutingType() {
+    return requestRoutingType;
   }
 
   @NonNull
   @Override
-  public BatchStatement setIsLWT(Boolean newIsLWT) {
+  public BatchStatement setRequestRoutingType(RequestRoutingType requestRoutingType) {
     return new DefaultBatchStatement(
         batchType,
         statements,
@@ -866,12 +901,6 @@ public class DefaultBatchStatement implements BatchStatement {
         timeout,
         node,
         nowInSeconds,
-        newIsLWT);
-  }
-
-  @Override
-  public boolean isLWT() {
-    if (isLWT != null) return isLWT;
-    return statements.stream().anyMatch(Statement::isLWT);
+        requestRoutingType);
   }
 }

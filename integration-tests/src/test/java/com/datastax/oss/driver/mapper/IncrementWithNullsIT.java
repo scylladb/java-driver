@@ -46,6 +46,7 @@ import org.junit.rules.TestRule;
 
 @Category(ParallelizableTests.class)
 @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class IncrementWithNullsIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();

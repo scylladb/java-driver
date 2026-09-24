@@ -24,7 +24,6 @@ import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
@@ -42,13 +41,13 @@ class SimpleReplicationStrategy implements ReplicationStrategy {
   }
 
   @Override
-  public Map<Token, Set<Node>> computeReplicasByToken(
+  public Map<Token, List<Node>> computeReplicasListByToken(
       Map<Token, Node> tokenToPrimary, List<Token> ring) {
 
     int rf = Math.min(replicationFactor.fullReplicas(), ring.size());
 
-    ImmutableMap.Builder<Token, Set<Node>> result = ImmutableMap.builder();
-    CanonicalNodeSetBuilder replicasBuilder = new CanonicalNodeSetBuilder();
+    ImmutableMap.Builder<Token, List<Node>> result = ImmutableMap.builder();
+    CanonicalNodeListBuilder replicasBuilder = new CanonicalNodeListBuilder();
 
     for (int i = 0; i < ring.size(); i++) {
       replicasBuilder.clear();

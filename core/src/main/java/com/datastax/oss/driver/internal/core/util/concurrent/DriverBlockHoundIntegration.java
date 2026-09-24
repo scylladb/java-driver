@@ -107,5 +107,11 @@ public final class DriverBlockHoundIntegration implements BlockHoundIntegration 
     builder.allowBlockingCallsInside("io.netty.util.concurrent.GlobalEventExecutor", "addTask");
     builder.allowBlockingCallsInside(
         "io.netty.util.concurrent.SingleThreadEventExecutor", "addTask");
+
+    // Exceptions for scylla-java-driver-matrix
+
+    // Various parallelizable tests sometimes fail due to ConcurrentMap's put.
+    builder.allowBlockingCallsInside(
+        "com.datastax.oss.driver.shaded.guava.common.collect.MapMakerInternalMap", "put");
   }
 }

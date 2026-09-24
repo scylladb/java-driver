@@ -90,7 +90,10 @@ public class HdrReservoir implements Reservoir {
     try {
       recorder.recordValue(value / 1000);
     } catch (ArrayIndexOutOfBoundsException e) {
-      LOG.warn("[{}] Recorded value ({}) is out of bounds, discarding", logPrefix, value);
+      LOG.warn(
+          "[{}] Recorded value ({}) is out of bounds, discarding. Set advanced.metrics.session.cql-requests.highest-latency to maximum possible request timeout to make it not happening.",
+          logPrefix,
+          value);
     }
   }
 

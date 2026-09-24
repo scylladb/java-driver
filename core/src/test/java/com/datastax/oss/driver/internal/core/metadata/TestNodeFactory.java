@@ -24,22 +24,31 @@ import java.util.UUID;
 public class TestNodeFactory {
 
   public static DefaultNode newNode(int lastIpByte, InternalDriverContext context) {
-    DefaultNode node = newContactPoint(lastIpByte, context);
+    DefaultEndPoint endPoint = newEndPoint(lastIpByte);
+    DefaultNode node = new DefaultNode(endPoint, context);
     node.hostId = UUID.randomUUID();
     node.broadcastRpcAddress = ((InetSocketAddress) node.getEndPoint().resolve());
     return node;
   }
 
   public static DefaultNode newNode(int lastIpByte, UUID hostId, InternalDriverContext context) {
-    DefaultNode node = newContactPoint(lastIpByte, context);
+    DefaultEndPoint endPoint = newEndPoint(lastIpByte);
+    DefaultNode node = new DefaultNode(endPoint, context);
     node.hostId = hostId;
     node.broadcastRpcAddress = ((InetSocketAddress) node.getEndPoint().resolve());
     return node;
   }
 
+  public static DefaultNode newNode(NodeInfo nodeInfo, InternalDriverContext context) {
+    DefaultNode node = new DefaultNode(nodeInfo.getEndPoint(), context);
+    node.hostId = nodeInfo.getHostId();
+    nodeInfo.getBroadcastRpcAddress().ifPresent(addr -> node.broadcastRpcAddress = addr);
+    return node;
+  }
+
   public static DefaultNode newContactPoint(int lastIpByte, InternalDriverContext context) {
     DefaultEndPoint endPoint = newEndPoint(lastIpByte);
-    return new DefaultNode(endPoint, context);
+    return DefaultNode.newContactPoint(endPoint, context);
   }
 
   public static DefaultEndPoint newEndPoint(int lastByteOfIp) {

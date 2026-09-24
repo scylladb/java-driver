@@ -19,7 +19,7 @@ public class TabletInfo {
     return enabled;
   }
 
-  public static TabletInfo parseTabletInfo(Map<String, List<String>> supported) {
+  public static TabletInfo loadFromSupportedOptions(Map<String, List<String>> supported) {
     List<String> values = supported.get(SCYLLA_TABLETS_STARTUP_OPTION_KEY);
     return new TabletInfo(
         values != null
@@ -27,7 +27,7 @@ public class TabletInfo {
             && values.get(0).equals(SCYLLA_TABLETS_STARTUP_OPTION_VALUE));
   }
 
-  public static void addOption(Map<String, String> options) {
+  public static void populateStartupOptions(Map<String, String> options) {
     options.put(SCYLLA_TABLETS_STARTUP_OPTION_KEY, SCYLLA_TABLETS_STARTUP_OPTION_VALUE);
   }
 }

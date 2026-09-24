@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -526,6 +527,20 @@ public interface Statement<SelfT extends Statement<SelfT>> extends Request {
   }
 
   /**
+   * Sets the request routing type to use when applying the request (for testing purposes).
+   *
+   * <p>This method's default implementation returns the statement unchanged. The only reason it
+   * exists is to preserve binary compatibility. Internally, the driver overrides it to record the
+   * new value.
+   */
+  @NonNull
+  @CheckReturnValue
+  @SuppressWarnings("unchecked")
+  default SelfT setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
+    return (SelfT) this;
+  }
+
+  /**
    * Informs if this is a prepared LWT query.
    *
    * <p>Not guaranteed to return true for prepared LWT queries (but guaranteed to return false for
@@ -540,7 +555,9 @@ public interface Statement<SelfT extends Statement<SelfT>> extends Request {
    *
    * @see <a href="https://docs.scylladb.com/using-scylla/lwt/">Docs about LWT</a>
    */
-  boolean isLWT();
+  default boolean isLWT() {
+    return getRequestRoutingType() == RequestRoutingType.LWT; // treating null as non-LWT
+  }
 
   /**
    * Calculates the approximate size in bytes that the statement will have when encoded.

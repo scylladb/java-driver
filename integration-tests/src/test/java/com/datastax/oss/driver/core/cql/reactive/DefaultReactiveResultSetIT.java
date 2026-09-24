@@ -41,6 +41,7 @@ import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import com.datastax.oss.driver.internal.core.cql.EmptyColumnDefinitions;
@@ -183,7 +184,8 @@ public class DefaultReactiveResultSetIT {
 
   @Test
   public void should_write_cas() {
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT).isFalse(); // @IntegrationTestDisabledScyllaFailure
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
+        .isFalse(); // @IntegrationTestDisabledScyllaFailure
 
     SimpleStatement statement =
         SimpleStatement.builder(
@@ -243,7 +245,8 @@ public class DefaultReactiveResultSetIT {
 
   @Test
   public void should_write_batch_cas() {
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT).isFalse(); // @IntegrationTestDisabledScyllaFailure
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
+        .isFalse(); // @IntegrationTestDisabledScyllaFailure
 
     BatchStatement batch = createCASBatch();
     CqlSession session = sessionRule.session();

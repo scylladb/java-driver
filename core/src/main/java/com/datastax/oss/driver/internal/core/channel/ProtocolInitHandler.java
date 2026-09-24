@@ -23,8 +23,6 @@
  */
 package com.datastax.oss.driver.internal.core.channel;
 
-import static com.datastax.oss.driver.internal.core.channel.DriverChannel.LWT_INFO_KEY;
-
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.InvalidKeyspaceException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
@@ -39,18 +37,18 @@ import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.DefaultProtocolFeature;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.protocol.BytesToSegmentDecoder;
+import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
+import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameToSegmentEncoder;
-import com.datastax.oss.driver.internal.core.protocol.LwtInfo;
+import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToBytesEncoder;
 import com.datastax.oss.driver.internal.core.protocol.SegmentToFrameDecoder;
-import com.datastax.oss.driver.internal.core.protocol.ShardingInfo;
-import com.datastax.oss.driver.internal.core.protocol.ShardingInfo.ConnectionShardingInfo;
-import com.datastax.oss.driver.internal.core.protocol.TabletInfo;
 import com.datastax.oss.driver.internal.core.util.ProtocolUtils;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.ProtocolConstants.ErrorCode;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.request.AuthResponse;
 import com.datastax.oss.protocol.internal.request.Options;
 import com.datastax.oss.protocol.internal.request.Query;
@@ -96,8 +94,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
   private String logPrefix;
   private ChannelHandlerContext ctx;
   private final boolean querySupportedOptions;
-  private LwtInfo lwtInfo;
-  private TabletInfo tabletInfo;
+  private ProtocolFeatureStore featureStore = ProtocolFeatureStore.EMPTY;
 
   /**
    * @param querySupportedOptions whether to send OPTIONS as the first message, to request which
@@ -173,10 +170,12 @@ class ProtocolInitHandler extends ConnectInitHandler {
     private Message request;
     private Authenticator authenticator;
     private ByteBuffer authResponseToken;
+    private final List<String> registerEventTypes;
 
     InitRequest(ChannelHandlerContext ctx) {
       super(ctx, timeoutMillis);
       this.step = querySupportedOptions ? Step.OPTIONS : Step.STARTUP;
+      this.registerEventTypes = options.eventTypes;
     }
 
     @Override
@@ -192,11 +191,8 @@ class ProtocolInitHandler extends ConnectInitHandler {
           return request = Options.INSTANCE;
         case STARTUP:
           Map<String, String> startupOptions = new HashMap<>(context.getStartupOptions());
-          if (lwtInfo != null) {
-            lwtInfo.addOption(startupOptions);
-          }
-          if (tabletInfo != null && tabletInfo.isEnabled()) {
-            TabletInfo.addOption(startupOptions);
+          if (featureStore != null) {
+            featureStore.populateStartupOptions(startupOptions);
           }
           return request = new Startup(startupOptions);
         case GET_CLUSTER_NAME:
@@ -206,7 +202,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
         case AUTH_RESPONSE:
           return request = new AuthResponse(authResponseToken);
         case REGISTER:
-          return request = new Register(options.eventTypes);
+          return request = new Register(registerEventTypes);
         default:
           throw new AssertionError("unhandled step: " + step);
       }
@@ -227,26 +223,19 @@ class ProtocolInitHandler extends ConnectInitHandler {
           ProtocolUtils.opcodeString(response.opcode));
       try {
         if (step == Step.OPTIONS && response instanceof Supported) {
-          channel.attr(DriverChannel.OPTIONS_KEY).set(((Supported) response).options);
-          Supported res = (Supported) response;
-          ConnectionShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(res.options);
-          if (shardingInfo != null) {
-            channel.attr(DriverChannel.SHARDING_INFO_KEY).set(shardingInfo);
-          }
-          lwtInfo = LwtInfo.parseLwtInfo(res.options);
-          if (lwtInfo != null) {
-            channel.attr(LWT_INFO_KEY).set(lwtInfo);
-          }
-          tabletInfo = TabletInfo.parseTabletInfo(res.options);
+          Supported supported = (Supported) response;
+          channel.attr(DriverChannel.OPTIONS_KEY).set(supported.options);
+          featureStore = ProtocolFeatureStore.parseSupportedOptions(supported.options);
+          featureStore.storeInChannel(channel);
           step = Step.STARTUP;
           send();
         } else if (step == Step.STARTUP && response instanceof Ready) {
-          maybeSwitchToModernFraming();
+          maybeUpdatePipeline();
           context.getAuthProvider().ifPresent(provider -> provider.onMissingChallenge(endPoint));
           step = Step.GET_CLUSTER_NAME;
           send();
         } else if (step == Step.STARTUP && response instanceof Authenticate) {
-          maybeSwitchToModernFraming();
+          maybeUpdatePipeline();
           Authenticate authenticate = (Authenticate) response;
           authenticator = buildAuthenticator(endPoint, authenticate.authenticator);
           authenticator
@@ -336,7 +325,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
             if (options.keyspace != null) {
               step = Step.SET_KEYSPACE;
               send();
-            } else if (!options.eventTypes.isEmpty()) {
+            } else if (!registerEventTypes.isEmpty()) {
               step = Step.REGISTER;
               send();
             } else {
@@ -344,7 +333,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
             }
           }
         } else if (step == Step.SET_KEYSPACE && response instanceof SetKeyspace) {
-          if (!options.eventTypes.isEmpty()) {
+          if (!registerEventTypes.isEmpty()) {
             step = Step.REGISTER;
             send();
           } else {
@@ -372,6 +361,17 @@ class ProtocolInitHandler extends ConnectInitHandler {
           } else if (step == Step.SET_KEYSPACE
               && error.code == ProtocolConstants.ErrorCode.INVALID) {
             fail(new InvalidKeyspaceException(error.message));
+          } else if (step == Step.REGISTER
+              && error.code == ErrorCode.PROTOCOL_ERROR
+              && error.message.contains(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE)) {
+            // The server rejected CLIENT_ROUTES_CHANGE as an unknown event type.
+            // Fail the connection so that the caller (ClientRoutesTopologyMonitor.init())
+            // gets a clear error instead of silently degrading.
+            fail(
+                "Server does not support CLIENT_ROUTES_CHANGE event "
+                    + "(requires ScyllaDB Enterprise >= 2026.1). "
+                    + "Either upgrade the server or remove the client routes configuration.",
+                null);
           } else {
             failOnUnexpected(error);
           }
@@ -412,11 +412,18 @@ class ProtocolInitHandler extends ConnectInitHandler {
   }
 
   /**
-   * Rearranges the pipeline to deal with the new framing structure in protocol v5 and above. The
+   * Conditionally rebuilds pipeline.
+   *
+   * <p>Rearranges the pipeline to deal with the new framing structure in protocol v5 and above. The
    * first messages still use the legacy format, we only do this after a successful response to the
    * first STARTUP message.
+   *
+   * <p>If <code>SCYLLA_USE_METADATA_ID</code> feature was negotiated we need to replace {@link
+   * FrameEncoder} and {@link FrameDecoder} handlers with instances aware of a negotiated protocol
+   * feature.
    */
-  private void maybeSwitchToModernFraming() {
+  private void maybeUpdatePipeline() {
+    ProtocolFeatures protocolFeatures = featureStore.getProtocolFeatures();
     if (context
         .getProtocolVersionRegistry()
         .supports(initialProtocolVersion, DefaultProtocolFeature.MODERN_FRAMING)) {
@@ -444,6 +451,26 @@ class ProtocolInitHandler extends ConnectInitHandler {
           ChannelFactory.BYTES_TO_SEGMENT_DECODER_NAME,
           ChannelFactory.SEGMENT_TO_FRAME_DECODER_NAME,
           new SegmentToFrameDecoder(context.getFrameCodec(), logPrefix));
+    } else if (protocolFeatures.isScyllaUseMetadataId()) {
+      int maxFrameLength =
+          (int)
+              context
+                  .getConfig()
+                  .getDefaultProfile()
+                  .getBytes(DefaultDriverOption.PROTOCOL_MAX_FRAME_LENGTH);
+
+      ChannelPipeline pipeline = ctx.pipeline();
+      pipeline.replace(
+          ChannelFactory.FRAME_TO_BYTES_ENCODER_NAME,
+          ChannelFactory.FRAME_TO_BYTES_ENCODER_NAME,
+          new FrameEncoder(
+              context.getFrameCodec(),
+              protocolFeatures, // Passing updated protocol features to alter codecs behaviors
+              maxFrameLength));
+      pipeline.replace(
+          ChannelFactory.BYTES_TO_FRAME_DECODER_NAME,
+          ChannelFactory.BYTES_TO_FRAME_DECODER_NAME,
+          new FrameDecoder(context.getFrameCodec(), protocolFeatures, maxFrameLength));
     }
   }
 

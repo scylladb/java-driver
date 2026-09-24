@@ -27,6 +27,7 @@ import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
@@ -47,6 +48,7 @@ import com.datastax.oss.driver.internal.core.data.ValuesHelper;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.shaded.guava.common.base.Splitter;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
@@ -56,7 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @ThreadSafe
-public class DefaultPreparedStatement implements PreparedStatement {
+public class DefaultPreparedStatement implements PreparedStatement, RequestRoutingTypeAccessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultPreparedStatement.class);
   private static final Splitter SPACE_SPLITTER = Splitter.onPattern("\\s+");
   private static final Splitter COMMA_SPLITTER = Splitter.onPattern(",");
@@ -82,7 +84,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
   private final ConsistencyLevel serialConsistencyLevelForBoundStatements;
   private final Duration timeoutForBoundStatements;
   private final Partitioner partitioner;
-  private final boolean isLWT;
+  @Nullable private final RequestRoutingType requestRoutingType;
   private volatile boolean skipMetadata;
 
   public DefaultPreparedStatement(
@@ -110,7 +112,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
       boolean areBoundStatementsTracing,
       CodecRegistry codecRegistry,
       ProtocolVersion protocolVersion,
-      boolean isLWT) {
+      @Nullable RequestRoutingType requestRoutingType) {
     this.id = id;
     this.partitionKeyIndices = partitionKeyIndices;
     // It's important that we keep a reference to this object, so that it only gets evicted from
@@ -136,7 +138,7 @@ public class DefaultPreparedStatement implements PreparedStatement {
 
     this.codecRegistry = codecRegistry;
     this.protocolVersion = protocolVersion;
-    this.isLWT = isLWT;
+    this.requestRoutingType = requestRoutingType;
     this.skipMetadata =
         resolveSkipMetadata(
             query, resultMetadataId, resultSetDefinitions, this.executionProfileForBoundStatements);
@@ -188,7 +190,27 @@ public class DefaultPreparedStatement implements PreparedStatement {
 
   @Override
   public boolean isLWT() {
-    return isLWT;
+    return requestRoutingType == RequestRoutingType.LWT;
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    if (requestRoutingType != null) {
+      return requestRoutingType;
+    }
+
+    if (consistencyLevelForBoundStatements != null
+        && consistencyLevelForBoundStatements.isSerial()) {
+      return RequestRoutingType.LWT;
+    }
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getConfiguredRequestRoutingType() {
+    return requestRoutingType;
   }
 
   @Override
@@ -229,7 +251,8 @@ public class DefaultPreparedStatement implements PreparedStatement {
         codecRegistry,
         protocolVersion,
         null,
-        Statement.NO_NOW_IN_SECONDS);
+        Statement.NO_NOW_IN_SECONDS,
+        requestRoutingType);
   }
 
   @NonNull
@@ -255,7 +278,8 @@ public class DefaultPreparedStatement implements PreparedStatement {
         serialConsistencyLevelForBoundStatements,
         timeoutForBoundStatements,
         codecRegistry,
-        protocolVersion);
+        protocolVersion,
+        requestRoutingType);
   }
 
   public RepreparePayload getRepreparePayload() {
@@ -263,8 +287,8 @@ public class DefaultPreparedStatement implements PreparedStatement {
   }
 
   private static class ResultMetadata {
-    private ByteBuffer resultMetadataId;
-    private ColumnDefinitions resultSetDefinitions;
+    private final ByteBuffer resultMetadataId;
+    private final ColumnDefinitions resultSetDefinitions;
 
     private ResultMetadata(ByteBuffer resultMetadataId, ColumnDefinitions resultSetDefinitions) {
       this.resultMetadataId = resultMetadataId;

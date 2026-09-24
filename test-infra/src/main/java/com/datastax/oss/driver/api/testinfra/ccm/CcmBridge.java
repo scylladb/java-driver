@@ -48,6 +48,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
@@ -62,12 +63,11 @@ import org.slf4j.LoggerFactory;
 public class CcmBridge implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CcmBridge.class);
+  private static final AtomicInteger CLUSTER_ID = new AtomicInteger();
 
   public static BackendType DISTRIBUTION =
       BackendType.valueOf(
           System.getProperty("ccm.distribution", BackendType.CASSANDRA.name()).toUpperCase());
-
-  public static final Boolean SCYLLA_ENABLEMENT = Boolean.getBoolean("ccm.scylla");
 
   public static final String CCM_VERSION_PROPERTY = System.getProperty("ccm.version", "4.0.0");
 
@@ -150,13 +150,8 @@ public class CcmBridge implements AutoCloseable {
 
   static {
     Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
-    if (SCYLLA_ENABLEMENT) {
-      LOG.debug("Overriding distribution variable because 'ccm.scylla = true' was passed");
-      DISTRIBUTION = BackendType.SCYLLA;
-
-      if (SCYLLA_ENTERPRISE) {
-        envMap.put("SCYLLA_PRODUCT", "enterprise");
-      }
+    if (isDistributionOf(BackendType.SCYLLA) && SCYLLA_ENTERPRISE) {
+      envMap.put("SCYLLA_PRODUCT", "enterprise");
     }
     LOG.info("CCM Bridge configured with {} version {}", DISTRIBUTION.getFriendlyName(), VERSION);
 
@@ -174,6 +169,7 @@ public class CcmBridge implements AutoCloseable {
     String ccmJavaHome = System.getProperty("ccm.java.home");
     if (ccmJavaHome != null) {
       envMap.put("JAVA_HOME", ccmJavaHome);
+      envMap.put("PYTHONWARNINGS", "ignore");
     }
     ENVIRONMENT_MAP = ImmutableMap.copyOf(envMap);
   }
@@ -209,7 +205,14 @@ public class CcmBridge implements AutoCloseable {
     } else {
       this.nodes = nodes;
     }
-    this.ipPrefix = ipPrefix;
+
+    if (ipPrefix == null || ipPrefix.isEmpty()) {
+      Integer clusterId = CLUSTER_ID.addAndGet(1);
+      this.ipPrefix = String.format("127.%d.%d.", clusterId / 255, (clusterId % 255) + 1);
+    } else {
+      this.ipPrefix = ipPrefix;
+    }
+
     this.cassandraConfiguration = cassandraConfiguration;
     this.dseConfiguration = dseConfiguration;
     this.rawDseYaml = dseConfigurationRawYaml;
@@ -260,7 +263,9 @@ public class CcmBridge implements AutoCloseable {
           CommandLine.parse(
               String.format(
                   "ccm create get_version -n 1 %s --version %s --config-dir=%s",
-                  (SCYLLA_ENABLEMENT ? "--scylla" : " "), versionString, configDir)));
+                  (isDistributionOf(BackendType.SCYLLA) ? "--scylla" : " "),
+                  versionString,
+                  configDir)));
       String output =
           execute(
               CommandLine.parse(
@@ -280,12 +285,14 @@ public class CcmBridge implements AutoCloseable {
     return result;
   }
 
-  public Optional<Version> getScyllaVersion() {
-    return SCYLLA_ENABLEMENT ? Optional.of(VERSION) : Optional.empty();
+  public static Optional<Version> getScyllaVersion() {
+    return isDistributionOf(BackendType.SCYLLA) ? Optional.of(VERSION) : Optional.empty();
   }
 
   public Optional<String> getScyllaUnparsedVersion() {
-    return SCYLLA_ENABLEMENT ? Optional.of(System.getProperty("ccm.version")) : Optional.empty();
+    return isDistributionOf(BackendType.SCYLLA)
+        ? Optional.of(System.getProperty("ccm.version"))
+        : Optional.empty();
   }
 
   public Optional<Version> getDseVersion() {
@@ -321,7 +328,7 @@ public class CcmBridge implements AutoCloseable {
       // If parseCcmVersion has not failed execution it should be usable.
       return propertyString;
     }
-    if (SCYLLA_ENABLEMENT) {
+    if (isDistributionOf(BackendType.SCYLLA)) {
       // Scylla OSS versions before 5.1 had RC versioning scheme of 5.0.rc3.
       // Scylla OSS versions after (and including 5.1) have RC versioning of 5.1.0-rc3.
       // A similar situation occurs with Scylla Enterprise after 2022.2.
@@ -382,7 +389,8 @@ public class CcmBridge implements AutoCloseable {
 
       Version cassandraVersion = getCassandraVersion();
 
-      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0 && !SCYLLA_ENABLEMENT) {
+      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0
+          && !isDistributionOf(BackendType.SCYLLA)) {
         // @IntegrationTestDisabledScyllaJVMArgs @IntegrationTestDisabledScyllaUDF
         cassandraConfiguration.put("enable_user_defined_functions", "true");
       }
@@ -575,7 +583,12 @@ public class CcmBridge implements AutoCloseable {
       executor.setStreamHandler(streamHandler);
       executor.setWatchdog(watchDog);
 
-      int retValue = executor.execute(cli, ENVIRONMENT_MAP);
+      Map<String, String> env = ENVIRONMENT_MAP;
+      if (env == null) {
+        env = Collections.singletonMap("PYTHONWARNINGS", "ignore");
+      }
+
+      int retValue = executor.execute(cli, env);
       if (retValue != 0) {
         logger.error(
             "Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
@@ -617,16 +630,25 @@ public class CcmBridge implements AutoCloseable {
     return f;
   }
 
+  /** Returns the total number of nodes across all data centers. */
+  public int getNodeCount() {
+    int total = 0;
+    for (int n : nodes) {
+      total += n;
+    }
+    return total;
+  }
+
   public String getNodeIpAddress(int nodeId) {
     return ipPrefix + nodeId;
   }
 
-  private static String IN_MS_STR = "_in_ms";
-  private static int IN_MS_STR_LENGTH = IN_MS_STR.length();
-  private static String ENABLE_STR = "enable_";
-  private static int ENABLE_STR_LENGTH = ENABLE_STR.length();
-  private static String IN_KB_STR = "_in_kb";
-  private static int IN_KB_STR_LENGTH = IN_KB_STR.length();
+  private static final String IN_MS_STR = "_in_ms";
+  private static final int IN_MS_STR_LENGTH = IN_MS_STR.length();
+  private static final String ENABLE_STR = "enable_";
+  private static final int ENABLE_STR_LENGTH = ENABLE_STR.length();
+  private static final String IN_KB_STR = "_in_kb";
+  private static final int IN_KB_STR_LENGTH = IN_KB_STR.length();
 
   @SuppressWarnings("unused")
   private String getConfigKey(String originalKey, Object originalValue, Version cassandraVersion) {
@@ -665,7 +687,7 @@ public class CcmBridge implements AutoCloseable {
     private final Map<String, Object> dseConfiguration = new LinkedHashMap<>();
     private final List<String> dseRawYaml = new ArrayList<>();
     private final List<String> jvmArgs = new ArrayList<>();
-    private String ipPrefix = "127.0.0.";
+    private String ipPrefix;
     private final List<String> createOptions = new ArrayList<>();
     private final List<String> dseWorkloads = new ArrayList<>();
 
@@ -723,7 +745,7 @@ public class CcmBridge implements AutoCloseable {
     /** Enables SSL encryption. */
     public Builder withSsl() {
       cassandraConfiguration.put("client_encryption_options.enabled", "true");
-      if (SCYLLA_ENABLEMENT) {
+      if (isDistributionOf(BackendType.SCYLLA)) {
         cassandraConfiguration.put(
             "client_encryption_options.certificate",
             DEFAULT_SERVER_CERT_CHAIN_FILE.getAbsolutePath());
@@ -756,7 +778,7 @@ public class CcmBridge implements AutoCloseable {
     public Builder withSslAuth() {
       withSsl();
       cassandraConfiguration.put("client_encryption_options.require_client_auth", "true");
-      if (SCYLLA_ENABLEMENT) {
+      if (isDistributionOf(BackendType.SCYLLA)) {
         cassandraConfiguration.put(
             "client_encryption_options.truststore",
             DEFAULT_SERVER_TRUSTSTORE_PEM_FILE.getAbsolutePath());

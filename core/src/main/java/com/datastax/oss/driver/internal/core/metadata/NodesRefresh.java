@@ -35,8 +35,7 @@ abstract class NodesRefresh implements MetadataRefresh {
    * @return whether the node's token have changed as a result of this operation (unfortunately we
    *     mutate the tokens in-place, so there is no way to check this after the fact).
    */
-  protected static boolean copyInfos(
-      NodeInfo nodeInfo, DefaultNode node, InternalDriverContext context) {
+  static boolean copyInfos(NodeInfo nodeInfo, DefaultNode node, InternalDriverContext context) {
 
     node.setEndPoint(nodeInfo.getEndPoint(), context);
     node.broadcastRpcAddress = nodeInfo.getBroadcastRpcAddress().orElse(null);

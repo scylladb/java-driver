@@ -17,13 +17,10 @@
  */
 package com.datastax.oss.driver.internal.core.loadbalancing.helper;
 
-import static com.datastax.oss.driver.internal.core.time.Clock.LOG;
-
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.HashSet;
 import java.util.Map;
@@ -31,17 +28,19 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import net.jcip.annotations.ThreadSafe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * An implementation of {@link LocalDcHelper} that fetches the user-supplied datacenter, if any,
  * from the programmatic configuration API, or else, from the driver configuration. If no local
- * datacenter is explicitly defined, this implementation infers the local datacenter from the
- * contact points: if all contact points share the same datacenter, that datacenter is returned. If
- * the contact points are from different datacenters, or if no contact points reported any
- * datacenter, an {@link IllegalStateException} is thrown.
+ * datacenter is explicitly defined, this implementation tries to infer it from the control
+ * connection endpoint. If that fails, an {@link IllegalStateException} is thrown.
  */
 @ThreadSafe
 public class InferringLocalDcHelper extends OptionalLocalDcHelper {
+
+  private static final Logger LOG = LoggerFactory.getLogger(InferringLocalDcHelper.class);
 
   public InferringLocalDcHelper(
       @NonNull InternalDriverContext context,
@@ -58,9 +57,16 @@ public class InferringLocalDcHelper extends OptionalLocalDcHelper {
     if (optionalLocalDc.isPresent()) {
       return optionalLocalDc;
     }
+    // Infer the local DC from the control connection endpoint
+    Optional<String> dcFromControl = inferDcFromControlConnection(nodes);
+    if (dcFromControl.isPresent()) {
+      LOG.info(
+          "[{}] Inferred local DC from control connection: {}", logPrefix, dcFromControl.get());
+      return dcFromControl;
+    }
+    // Fallback: try to infer from all cluster nodes
     Set<String> datacenters = new HashSet<>();
-    Set<DefaultNode> contactPoints = context.getMetadataManager().getContactPoints();
-    for (Node node : contactPoints) {
+    for (Node node : nodes.values()) {
       String datacenter = node.getDatacenter();
       if (datacenter != null) {
         datacenters.add(datacenter);
@@ -68,21 +74,21 @@ public class InferringLocalDcHelper extends OptionalLocalDcHelper {
     }
     if (datacenters.size() == 1) {
       String localDc = datacenters.iterator().next();
-      LOG.info("[{}] Inferred local DC from contact points: {}", logPrefix, localDc);
+      LOG.info("[{}] Inferred local DC from cluster nodes: {}", logPrefix, localDc);
       return Optional.of(localDc);
     }
     if (datacenters.isEmpty()) {
       throw new IllegalStateException(
-          "The local DC could not be inferred from contact points, please set it explicitly (see "
+          "The local DC could not be inferred from cluster nodes, please set it explicitly (see "
               + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
               + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter)");
     }
     throw new IllegalStateException(
         String.format(
-            "No local DC was provided, but the contact points are from different DCs: %s; "
+            "No local DC was provided, but the cluster nodes resolve to nodes in different DCs: %s; "
                 + "please set the local DC explicitly (see "
                 + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
                 + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter)",
-            formatNodesAndDcs(contactPoints)));
+            formatNodesAndDcs(nodes.values())));
   }
 }

@@ -16,16 +16,21 @@ BRANCHES = [
     'scylla-3.10.2.x',
     'scylla-3.11.0.x',
     'scylla-3.11.2.x',
+    'scylla-3.11.4.x',
+    'scylla-3.11.5.x',
     'scylla-4.7.2.x',
     'scylla-4.10.0.x',
     'scylla-4.11.1.x',
     'scylla-4.12.0.x',
     'scylla-4.13.0.x',
     'scylla-4.14.1.x',
-    'scylla-4.15.0.x'
+    'scylla-4.15.0.x',
+    'scylla-4.17.0.x',
+    'scylla-4.18.1.x',
+    'scylla-4.19.0.x'
 ]
 # Set the latest version.
-LATEST_VERSION = 'scylla-4.15.0.x'
+LATEST_VERSION = 'scylla-4.19.0.x'
 # Set which versions are not released yet.
 UNSTABLE_VERSIONS = []
 # Set which versions are deprecated
@@ -52,10 +57,7 @@ templates_path = ['_templates']
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 #
-source_suffix = {
-    '.rst': 'restructuredtext',
-    '.md': 'markdown',
-}
+source_suffix = ['.rst', '.md']
 autosectionlabel_prefix_document = True
 
 # The master toctree document.
@@ -69,7 +71,7 @@ author = u'Scylla Project Contributors'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This patterns also effect to html_static_path and html_extra_path
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '_utils']
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '_utils', '.venv']
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
@@ -92,6 +94,8 @@ scylladb_markdown_recommonmark_versions = [
     'scylla-3.10.2.x',
     'scylla-3.11.0.x',
     'scylla-3.11.2.x',
+    'scylla-3.11.4.x',
+    'scylla-3.11.5.x',
     'scylla-4.7.2.x',
     'scylla-4.10.0.x',
     'scylla-4.11.1.x',
@@ -99,6 +103,9 @@ scylladb_markdown_recommonmark_versions = [
     'scylla-4.13.0.x',
     'scylla-4.14.1.x',
     'scylla-4.15.0.x',
+    'scylla-4.17.0.x',
+    'scylla-4.18.1.x',
+    'scylla-4.19.0.x'
 ]
 suppress_warnings = ["ref.any", "myst.header","myst.xref_missing","autosectionlabel"]
 
@@ -184,7 +191,11 @@ def setup(app):
     current_slug = os.getenv("SPHINX_MULTIVERSION_NAME", "stable")
     replacements = {
         r'docs.datastax.com/en/drivers/java\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/api/",
-        r'java-driver.docs.scylladb.com\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/"
+        r'java-driver.docs.scylladb.com\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/",
+        r'github.com\/apache\/cassandra-java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
+        r'github.com\/apache\/cassandra-java-driver\/tree\/4.x\/': "github.com/scylladb/java-driver/tree/scylla-4.x/",
+        r'github.com\/datastax\/java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
+        r'github.com\/datastax\/java-driver\/tree\/4.x\/': "github.com/scylladb/java-driver/tree/scylla-4.x/"
     }
     app.add_config_value('replacements', replacements, True)
     app.connect('source-read', replace_relative_links)

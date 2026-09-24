@@ -28,7 +28,7 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.0.1</version>
+    <version>4.19.0.10-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-integration-tests</artifactId>
   <packaging>jar</packaging>
@@ -38,18 +38,8 @@
     <skipParallelizableITs>${skipITs}</skipParallelizableITs>
     <skipSerialITs>${skipITs}</skipSerialITs>
     <skipIsolatedITs>${skipITs}</skipIsolatedITs>
+    <test.parallel.threads>16</test.parallel.threads>
   </properties>
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>java-driver-bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
   <dependencies>
     <dependency>
       <groupId>com.scylladb</groupId>
@@ -134,7 +124,7 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.lz4</groupId>
+      <groupId>at.yawk.lz4</groupId>
       <artifactId>lz4-java</artifactId>
       <scope>test</scope>
     </dependency>
@@ -194,7 +184,7 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.datastax.oss.simulacron</groupId>
+      <groupId>com.scylladb.oss.simulacron</groupId>
       <artifactId>simulacron-native-server</artifactId>
       <scope>test</scope>
     </dependency>
@@ -233,6 +223,11 @@
       <artifactId>tools</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -249,7 +244,7 @@
               <jvm>${testing.jvm}/bin/java</jvm>
               <groups>com.datastax.oss.driver.categories.ParallelizableTests</groups>
               <parallel>classes</parallel>
-              <threadCountClasses>8</threadCountClasses>
+              <threadCountClasses>${test.parallel.threads}</threadCountClasses>
               <summaryFile>${project.build.directory}/failsafe-reports/failsafe-summary-parallelized.xml</summaryFile>
               <skipITs>${skipParallelizableITs}</skipITs>
               <argLine>${blockhound.argline}</argLine>
@@ -334,13 +329,6 @@
         <artifactId>maven-deploy-plugin</artifactId>
         <configuration>
           <skip>true</skip>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <configuration>
-          <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
         </configuration>
       </plugin>
     </plugins>

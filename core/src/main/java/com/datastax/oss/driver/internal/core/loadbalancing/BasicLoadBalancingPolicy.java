@@ -25,6 +25,7 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -57,12 +58,15 @@ import com.datastax.oss.driver.internal.core.util.collection.LazyQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.base.Predicates;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
 import com.datastax.oss.driver.shaded.guava.common.collect.Sets;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -71,8 +75,10 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntUnaryOperator;
+import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,6 +119,11 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
 
+  public enum RequestRoutingMethod {
+    REGULAR,
+    PRESERVE_REPLICA_ORDER
+  }
+
   private static final Logger LOG = LoggerFactory.getLogger(BasicLoadBalancingPolicy.class);
 
   protected static final IntUnaryOperator INCREMENT = i -> (i == Integer.MAX_VALUE) ? 0 : i + 1;
@@ -127,6 +138,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   private final int maxNodesPerRemoteDc;
   private final boolean allowDcFailoverForLocalCl;
   private final ConsistencyLevel defaultConsistencyLevel;
+  private final RequestRoutingMethod lwtRequestRoutingMethod;
 
   // private because they should be set in init() and never be modified after
   private volatile DistanceReporter distanceReporter;
@@ -154,6 +166,58 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
         new LinkedHashSet<>(
             profile.getStringList(
                 DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS));
+    this.lwtRequestRoutingMethod = parseLwtRequestRoutingMethod();
+  }
+
+  @NonNull
+  private RequestRoutingMethod parseLwtRequestRoutingMethod() {
+    String methodString =
+        profile.getString(DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD);
+    try {
+      return RequestRoutingMethod.valueOf(methodString.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOG.warn(
+          "[{}] Unknown request routing method '{}', defaulting to PRESERVE_REPLICA_ORDER",
+          logPrefix,
+          methodString);
+      return RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
+    }
+  }
+
+  @NonNull
+  public RequestRoutingMethod getRequestRoutingMethod(@Nullable Request request) {
+    if (request == null) {
+      return RequestRoutingMethod.REGULAR;
+    }
+    RequestRoutingType requestRoutingType = request.getRequestRoutingType();
+    if (requestRoutingType == RequestRoutingType.LWT
+        || (requestRoutingType == null && hasSerialConsistency(request))) {
+      return lwtRequestRoutingMethod;
+    } else {
+      return RequestRoutingMethod.REGULAR;
+    }
+  }
+
+  private boolean hasSerialConsistency(@NonNull Request request) {
+    if (!(request instanceof Statement)) {
+      return false;
+    }
+
+    return getEffectiveConsistency((Statement<?>) request).isSerial();
+  }
+
+  @NonNull
+  private Optional<DriverExecutionProfile> getRequestProfile(@NonNull Request request) {
+    DriverExecutionProfile requestProfile = request.getExecutionProfile();
+    if (requestProfile != null) {
+      return Optional.of(requestProfile);
+    }
+
+    String profileName = request.getExecutionProfileName();
+    if (profileName != null && !profileName.isEmpty()) {
+      return Optional.of(context.getConfig().getProfile(profileName));
+    }
+    return Optional.of(profile);
   }
 
   /**
@@ -260,10 +324,21 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   @NonNull
   @Override
   public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    switch (getRequestRoutingMethod(request)) {
+      case PRESERVE_REPLICA_ORDER:
+        return newQueryPlanPreserveReplicas(request, session);
+      case REGULAR:
+      default:
+        return newQueryPlanRegular(request, session);
+    }
+  }
+
+  @NonNull
+  protected Queue<Node> newQueryPlanRegular(@Nullable Request request, @Nullable Session session) {
     // Take a snapshot since the set is concurrent:
     Object[] currentNodes = liveNodes.dc(localDc).toArray();
 
-    Set<Node> allReplicas = getReplicas(request, session);
+    List<Node> allReplicas = getReplicas(request, session);
     int replicaCount = 0; // in currentNodes
 
     if (!allReplicas.isEmpty()) {
@@ -294,10 +369,133 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     return maybeAddDcFailover(request, plan);
   }
 
+  /**
+   * Builds a query plan that preserves replica order: local replicas, remote replicas, local
+   * non-replicas (rotated), remote non-replicas (rotated).
+   */
   @NonNull
-  protected Set<Node> getReplicas(@Nullable Request request, @Nullable Session session) {
+  protected Queue<Node> newQueryPlanPreserveReplicas(
+      @Nullable Request request, @Nullable Session session) {
+    List<Node> replicas = getReplicas(request, session);
+    String localDc = getLocalDatacenter();
+    List<Node> queryPlan = new ArrayList<>();
+
+    if (localDc == null) {
+      // No local DC: all replicas first, then rotated non-replicas
+      List<Node> allNodes = new ArrayList<>();
+      for (Object obj : getLiveNodes().dc(null).toArray()) {
+        allNodes.add((Node) obj);
+      }
+      replicas = filterNodesIn(replicas, new LinkedHashSet<>(allNodes));
+      queryPlan.addAll(replicas);
+      addRotatedNonReplicas(queryPlan, allNodes, replicas, request);
+    } else {
+      boolean includeRemoteDcs = isDcFailoverAllowedForRequest(request);
+      Map<String, List<Node>> nodesByDc =
+          includeRemoteDcs
+              ? getAllNodesByDc()
+              : Collections.singletonMap(localDc, dcNodeList(localDc));
+      Set<Node> liveNodesForPlan =
+          nodesByDc.values().stream()
+              .flatMap(List::stream)
+              .collect(Collectors.toCollection(LinkedHashSet::new));
+      replicas = filterNodesIn(replicas, liveNodesForPlan);
+      addReplicasByDc(queryPlan, replicas, localDc);
+      addNonReplicasByDc(queryPlan, nodesByDc, replicas, localDc, request);
+    }
+
+    return new SimpleQueryPlan(queryPlan.toArray());
+  }
+
+  private List<Node> filterNodesIn(List<Node> nodes, Set<Node> nodesToKeep) {
+    return nodes.stream().filter(nodesToKeep::contains).collect(Collectors.toList());
+  }
+
+  /** Collect all live nodes grouped by DC, with preferred remote DCs ordered first. */
+  private Map<String, List<Node>> getAllNodesByDc() {
+    Map<String, List<Node>> nodesByDc = new LinkedHashMap<>();
+    Set<String> allDcs = getLiveNodes().dcs();
+    // Add preferred remote DCs first (in configured order)
+    for (String dc : preferredRemoteDcs) {
+      if (allDcs.contains(dc)) {
+        nodesByDc.put(dc, dcNodeList(dc));
+      }
+    }
+    // Add remaining DCs (sorted for deterministic ordering)
+    allDcs.stream()
+        .sorted()
+        .filter(dc -> !nodesByDc.containsKey(dc))
+        .forEach(dc -> nodesByDc.put(dc, dcNodeList(dc)));
+    return nodesByDc;
+  }
+
+  private List<Node> dcNodeList(String dc) {
+    List<Node> dcNodes = new ArrayList<>();
+    for (Object obj : getLiveNodes().dc(dc).toArray()) {
+      dcNodes.add((Node) obj);
+    }
+    return dcNodes;
+  }
+
+  /** Add replicas with local DC first, then remote DCs. */
+  private void addReplicasByDc(List<Node> queryPlan, List<Node> replicas, String localDc) {
+    replicas.stream()
+        .filter(r -> Objects.equals(r.getDatacenter(), localDc))
+        .forEach(queryPlan::add);
+    replicas.stream()
+        .filter(r -> !Objects.equals(r.getDatacenter(), localDc))
+        .forEach(queryPlan::add);
+  }
+
+  /** Add non-replicas with local DC first, then remote DCs (all rotated). */
+  private void addNonReplicasByDc(
+      List<Node> queryPlan,
+      Map<String, List<Node>> nodesByDc,
+      List<Node> replicas,
+      String localDc,
+      Request request) {
+    // Local DC non-replicas first
+    List<Node> localNodes = nodesByDc.get(localDc);
+    if (localNodes != null) {
+      addRotatedNonReplicas(queryPlan, localNodes, replicas, request);
+    }
+    // Remote DC non-replicas
+    for (Map.Entry<String, List<Node>> entry : nodesByDc.entrySet()) {
+      if (!Objects.equals(entry.getKey(), localDc)) {
+        addRotatedNonReplicas(queryPlan, entry.getValue(), replicas, request);
+      }
+    }
+  }
+
+  /** Add non-replica nodes from given list with rotation. */
+  private void addRotatedNonReplicas(
+      List<Node> queryPlan, List<Node> nodes, List<Node> replicas, Request request) {
+    List<Node> nonReplicas =
+        nodes.stream().filter(n -> !replicas.contains(n)).collect(Collectors.toList());
+    if (!nonReplicas.isEmpty()) {
+      rotateNonReplicas(nonReplicas, request);
+      queryPlan.addAll(nonReplicas);
+    }
+  }
+
+  /** Rotates nodes based on routing key (consistent) or randomly. */
+  private void rotateNonReplicas(List<Node> nodes, @Nullable Request request) {
+    if (nodes.size() <= 1) return;
+
+    int rotationAmount =
+        (request != null && request.getRoutingKey() != null)
+            ? (request.getRoutingKey().hashCode() & 0x7fffffff) % nodes.size()
+            : randomNextInt(nodes.size());
+
+    if (rotationAmount > 0) {
+      Collections.rotate(nodes, -rotationAmount);
+    }
+  }
+
+  @NonNull
+  protected List<Node> getReplicas(@Nullable Request request, @Nullable Session session) {
     if (request == null || session == null) {
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
 
     Optional<TokenMap> maybeTokenMap = context.getMetadataManager().getMetadata().getTokenMap();
@@ -321,7 +519,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
         keyspace = session.getKeyspace().get();
       }
       if (keyspace == null) {
-        return Collections.emptySet();
+        return ImmutableList.of();
       }
 
       table = request.getRoutingTable();
@@ -329,7 +527,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
       token = request.getRoutingToken();
       key = (token == null) ? request.getRoutingKey() : null;
       if (token == null && key == null) {
-        return Collections.emptySet();
+        return ImmutableList.of();
       }
 
       partitioner = request.getPartitioner();
@@ -339,7 +537,7 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     } catch (Exception e) {
       // Protect against poorly-implemented Request instances
       LOG.error("Unexpected error while trying to compute query plan", e);
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
 
     if (token == null && partitioner != null) {
@@ -350,25 +548,25 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
         context.getMetadataManager().getMetadata().getKeyspace(keyspace);
     if (ksMetadata.isPresent() && ksMetadata.get().isUsingTablets() && maybeTabletMap.isPresent()) {
       if (table == null) {
-        return Collections.emptySet();
+        return ImmutableList.of();
       }
       if (token instanceof TokenLong64) {
         Tablet targetTablet =
             maybeTabletMap.get().getTablet(keyspace, table, ((TokenLong64) token).getValue());
         if (targetTablet != null) {
-          return targetTablet.getReplicaNodes();
+          return targetTablet.getReplicaNodesList();
         }
       }
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
 
     if (!maybeTokenMap.isPresent()) {
-      return Collections.emptySet();
+      return ImmutableList.of();
     }
     TokenMap tokenMap = maybeTokenMap.get();
     return token != null
-        ? tokenMap.getReplicas(keyspace, token)
-        : tokenMap.getReplicas(keyspace, partitioner, key);
+        ? tokenMap.getReplicasList(keyspace, token)
+        : tokenMap.getReplicasList(keyspace, partitioner, key);
   }
 
   @NonNull
@@ -376,20 +574,36 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     if (maxNodesPerRemoteDc <= 0 || localDc == null) {
       return local;
     }
-    if (!allowDcFailoverForLocalCl && request instanceof Statement) {
-      Statement<?> statement = (Statement<?>) request;
-      ConsistencyLevel consistency = statement.getConsistencyLevel();
-      if (consistency == null) {
-        consistency = defaultConsistencyLevel;
-      }
-      if (consistency.isDcLocal()) {
-        return local;
-      }
+    if (!isDcFailoverAllowedForRequest(request)) {
+      return local;
     }
     if (preferredRemoteDcs.isEmpty()) {
       return new CompositeQueryPlan(local, buildRemoteQueryPlanAll());
     }
     return new CompositeQueryPlan(local, buildRemoteQueryPlanPreferred());
+  }
+
+  private boolean isDcFailoverAllowedForRequest(@Nullable Request request) {
+    if (!allowDcFailoverForLocalCl && request instanceof Statement) {
+      return !getEffectiveConsistency((Statement<?>) request).isDcLocal();
+    }
+    return true;
+  }
+
+  @NonNull
+  private ConsistencyLevel getEffectiveConsistency(@NonNull Statement<?> statement) {
+    ConsistencyLevel consistency = statement.getConsistencyLevel();
+    if (consistency != null) {
+      return consistency;
+    }
+
+    return getRequestProfile(statement)
+        .map(
+            requestProfile ->
+                context
+                    .getConsistencyLevelRegistry()
+                    .nameToLevel(requestProfile.getString(DefaultDriverOption.REQUEST_CONSISTENCY)))
+        .orElse(defaultConsistencyLevel);
   }
 
   private QueryPlan buildRemoteQueryPlanAll() {
@@ -439,6 +653,11 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
             .toArray(QueryPlan[]::new);
 
     return new CompositeQueryPlan(queryPlans);
+  }
+
+  /** Exposed as a protected method so that it can be accessed by tests */
+  protected int randomNextInt(int bound) {
+    return ThreadLocalRandom.current().nextInt(bound);
   }
 
   /** Exposed as a protected method so that it can be accessed by tests */

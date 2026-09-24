@@ -39,7 +39,6 @@ import com.datastax.oss.driver.api.mapper.annotations.Mapper;
 import com.datastax.oss.driver.api.mapper.annotations.Select;
 import com.datastax.oss.driver.api.mapper.annotations.Update;
 import com.datastax.oss.driver.api.mapper.entity.saving.NullSavingStrategy;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
@@ -61,9 +60,6 @@ import org.junit.rules.TestRule;
     type = BackendType.CASSANDRA,
     minInclusive = "3.6",
     description = "Uses UDT fields in IF conditions (CASSANDRA-7423)")
-@ScyllaSkip(
-    description =
-        "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality @IntegrationTestDisabledScyllaUnsupportedIndex")
 public class UpdateReactiveIT extends InventoryITBase {
 
   private static CcmRule ccmRule = CcmRule.getInstance();

@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import java.net.InetSocketAddress;
@@ -113,10 +114,31 @@ public interface TopologyMonitor extends AsyncAutoCloseable {
   CompletionStage<Iterable<NodeInfo>> refreshNodeList();
 
   /**
+   * Resolves the full identity and metadata of the node at the other end of the given channel by
+   * querying system.local. This is used by the control connection after establishing a channel to
+   * resolve the contact point's full identity (hostId, datacenter, rack, endpoint, etc.).
+   *
+   * @param channel the channel to query system.local on.
+   * @return a future that completes with the resolved node info.
+   */
+  CompletionStage<NodeInfo> getChannelNodeInfo(DriverChannel channel);
+
+  /**
    * Checks whether the nodes in the cluster agree on a common schema version.
    *
    * <p>This should typically be implemented with a few retries and a timeout, as the schema can
    * take a while to replicate across nodes.
    */
   CompletionStage<Boolean> checkSchemaAgreement();
+
+  /**
+   * Resets any cached column name sets learned from previous system table query responses.
+   *
+   * <p>Called by the control connection on reconnect so that the next topology refresh re-learns
+   * the available columns via {@code SELECT *} instead of reusing a potentially stale projection.
+   *
+   * <p>The default implementation is a no-op; implementations that cache column names (such as
+   * {@link DefaultTopologyMonitor}) should override this method.
+   */
+  default void resetColumnCaches() {}
 }

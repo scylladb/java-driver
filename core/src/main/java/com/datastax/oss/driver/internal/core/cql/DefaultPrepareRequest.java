@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.cql;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.PrepareRequest;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
@@ -195,6 +196,12 @@ public class DefaultPrepareRequest implements PrepareRequest {
   public Node getNode() {
     // never target prepare requests
     return null;
+  }
+
+  @NonNull
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    return RequestRoutingType.REGULAR;
   }
 
   @Override

@@ -32,6 +32,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRequestHandler;
 import com.datastax.oss.driver.internal.core.adminrequest.ThrottledAdminRequestHandler;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.protocol.LwtInfo;
+import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.ShardingInfo;
 import com.datastax.oss.driver.internal.core.protocol.ShardingInfo.ConnectionShardingInfo;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
@@ -61,9 +62,6 @@ public class DriverChannel {
   static final AttributeKey<String> CLUSTER_NAME_KEY = AttributeKey.valueOf("cluster_name");
   static final AttributeKey<Map<String, List<String>>> OPTIONS_KEY =
       AttributeKey.valueOf("options");
-  static final AttributeKey<ConnectionShardingInfo> SHARDING_INFO_KEY =
-      AttributeKey.valueOf("sharding_info");
-  static final AttributeKey<LwtInfo> LWT_INFO_KEY = AttributeKey.valueOf("lwt_info");
 
   @SuppressWarnings("RedundantStringConstructorCall")
   static final Object GRACEFUL_CLOSE_MESSAGE = new String("GRACEFUL_CLOSE_MESSAGE");
@@ -71,13 +69,14 @@ public class DriverChannel {
   @SuppressWarnings("RedundantStringConstructorCall")
   static final Object FORCEFUL_CLOSE_MESSAGE = new String("FORCEFUL_CLOSE_MESSAGE");
 
-  private final EndPoint endPoint;
+  private volatile EndPoint endPoint;
   private final Channel channel;
   private final InFlightHandler inFlightHandler;
   private final WriteCoalescer writeCoalescer;
   private final ProtocolVersion protocolVersion;
   private final AtomicBoolean closing = new AtomicBoolean();
   private final AtomicBoolean forceClosing = new AtomicBoolean();
+  private ProtocolFeatureStore featureStore;
 
   DriverChannel(
       EndPoint endPoint,
@@ -148,18 +147,35 @@ public class DriverChannel {
     return channel.attr(OPTIONS_KEY).get();
   }
 
+  public ProtocolFeatureStore getSupportedFeatures() {
+    if (featureStore != null) {
+      return featureStore;
+    }
+
+    ProtocolFeatureStore fromChannel = ProtocolFeatureStore.loadFromChannel(channel);
+    if (fromChannel == null) {
+      return ProtocolFeatureStore.EMPTY;
+    }
+    // Features can't be renegotiated.
+    // Once features is populated into channel it is enough to update cache and no need to
+    // invalidate it further.
+
+    featureStore = fromChannel;
+    return featureStore;
+  }
+
   public int getShardId() {
-    return channel.hasAttr(SHARDING_INFO_KEY) ? channel.attr(SHARDING_INFO_KEY).get().shardId : 0;
+    ConnectionShardingInfo info = getSupportedFeatures().getShardingInfo();
+    return info != null ? info.shardId : 0;
   }
 
   public ShardingInfo getShardingInfo() {
-    return channel.hasAttr(SHARDING_INFO_KEY)
-        ? channel.attr(SHARDING_INFO_KEY).get().shardingInfo
-        : null;
+    ConnectionShardingInfo info = getSupportedFeatures().getShardingInfo();
+    return info != null ? info.shardingInfo : null;
   }
 
   public LwtInfo getLwtInfo() {
-    return channel.attr(LWT_INFO_KEY).get();
+    return getSupportedFeatures().getLwtFeatureInfo();
   }
 
   /**
@@ -232,6 +248,11 @@ public class DriverChannel {
   /** The endpoint that was used to establish the connection. */
   public EndPoint getEndPoint() {
     return endPoint;
+  }
+
+  /** Updates the endpoint, e.g. after resolving the node's identity from system.local. */
+  public void setEndPoint(EndPoint endPoint) {
+    this.endPoint = endPoint;
   }
 
   public SocketAddress localAddress() {

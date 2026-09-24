@@ -24,6 +24,7 @@
 package com.datastax.oss.driver.core.cql;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
@@ -37,7 +38,7 @@ import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
@@ -72,6 +73,7 @@ public class ExecutionInfoWarningsIT {
           // set the warn threshold to 5Kb (default is 64Kb in newer versions)
           .withCassandraConfiguration("batch_size_warn_threshold_in_kb", "5")
           .build();
+
   private SessionRule<CqlSession> sessionRule =
       SessionRule.builder(ccmRule)
           .withConfigLoader(
@@ -131,9 +133,7 @@ public class ExecutionInfoWarningsIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "3.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaDifferentText")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_execute_query_and_log_server_side_warnings() {
     final String query = "SELECT count(*) FROM test;";
     Statement<?> st = SimpleStatement.builder(query).build();
@@ -142,6 +142,11 @@ public class ExecutionInfoWarningsIT {
     ExecutionInfo executionInfo = result.getExecutionInfo();
     assertThat(executionInfo).isNotNull();
     List<String> warnings = executionInfo.getWarnings();
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(warnings).isEmpty();
+      verify(appender, after(100).times(0)).doAppend(loggingEventCaptor.capture());
+      return;
+    }
     assertThat(warnings).isNotEmpty();
     String warning = warnings.get(0);
     assertThat(warning).isEqualTo("Aggregation query used without partition key");
@@ -158,9 +163,7 @@ public class ExecutionInfoWarningsIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "3.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaDifferentText")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_execute_query_and_not_log_server_side_warnings() {
     final String query = "SELECT count(*) FROM test;";
     Statement<?> st =
@@ -170,6 +173,11 @@ public class ExecutionInfoWarningsIT {
     ExecutionInfo executionInfo = result.getExecutionInfo();
     assertThat(executionInfo).isNotNull();
     List<String> warnings = executionInfo.getWarnings();
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(warnings).isEmpty();
+      verify(appender, after(100).times(0)).doAppend(loggingEventCaptor.capture());
+      return;
+    }
     assertThat(warnings).isNotEmpty();
     String warning = warnings.get(0);
     assertThat(warning).isEqualTo("Aggregation query used without partition key");
@@ -179,9 +187,7 @@ public class ExecutionInfoWarningsIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaDifferentText")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_expose_warnings_on_execution_info() {
     // the default batch size warn threshold is 5 * 1024 bytes, but after CASSANDRA-10876 there must
     // be multiple mutations in a batch to trigger this warning so the batch includes 2 different
@@ -198,6 +204,11 @@ public class ExecutionInfoWarningsIT {
     ExecutionInfo executionInfo = result.getExecutionInfo();
     assertThat(executionInfo).isNotNull();
     List<String> warnings = executionInfo.getWarnings();
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(warnings).isEmpty();
+      verify(appender, after(100).times(0)).doAppend(loggingEventCaptor.capture());
+      return;
+    }
     assertThat(warnings).isNotEmpty();
     // verify the log was generated
     verify(appender, timeout(500).atLeast(1)).doAppend(loggingEventCaptor.capture());

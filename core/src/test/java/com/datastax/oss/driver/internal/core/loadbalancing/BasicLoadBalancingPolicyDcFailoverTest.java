@@ -33,12 +33,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
+import java.net.InetSocketAddress;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.Test;
@@ -56,11 +60,50 @@ public class BasicLoadBalancingPolicyDcFailoverTest extends BasicLoadBalancingPo
   @Mock protected DefaultNode node9;
 
   @Test
+  public void should_not_add_remote_nodes_for_preserve_routing_with_local_serial_consistency() {
+    when(defaultProfile.getString(
+            DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+        .thenReturn("PRESERVE_REPLICA_ORDER");
+    policy = createAndInitPolicy();
+    SimpleStatement statement =
+        SimpleStatement.newInstance("SELECT * FROM ks.foo")
+            .setConsistencyLevel(DefaultConsistencyLevel.LOCAL_SERIAL)
+            .setRoutingKeyspace(KEYSPACE)
+            .setRoutingKey(ROUTING_KEY);
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node7, node1, node2));
+
+    assertThat(policy.newQueryPlan(statement, session))
+        .containsOnlyElementsOf(policy.getLiveNodes().dc("dc1"));
+  }
+
+  @Test
+  public void should_ignore_down_replicas_for_preserve_routing_with_local_serial_consistency() {
+    when(defaultProfile.getString(
+            DefaultDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD))
+        .thenReturn("PRESERVE_REPLICA_ORDER");
+    policy = createAndInitPolicy();
+    SimpleStatement statement =
+        SimpleStatement.newInstance("SELECT * FROM ks.foo")
+            .setConsistencyLevel(DefaultConsistencyLevel.LOCAL_SERIAL)
+            .setRoutingKeyspace(KEYSPACE)
+            .setRoutingKey(ROUTING_KEY);
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node7, node1, node2));
+
+    for (Node node : ImmutableList.copyOf(policy.getLiveNodes().dc("dc1"))) {
+      policy.onDown(node);
+    }
+
+    assertThat(policy.newQueryPlan(statement, session)).isEmpty();
+  }
+
+  @Test
   @Override
   public void should_prioritize_single_replica() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY)).thenReturn(ImmutableSet.of(node3));
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY)).thenReturn(ImmutableList.of(node3));
 
     // node3 always first, round-robin on the rest, then remote nodes
     assertThat(policy.newQueryPlan(request, session))
@@ -81,8 +124,8 @@ public class BasicLoadBalancingPolicyDcFailoverTest extends BasicLoadBalancingPo
   public void should_prioritize_and_shuffle_replicas() {
     when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
     when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
-    when(tokenMap.getReplicas(KEYSPACE, null, ROUTING_KEY))
-        .thenReturn(ImmutableSet.of(node2, node3, node5, node8));
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY))
+        .thenReturn(ImmutableList.of(node2, node3, node5, node8));
 
     // node 5 and 8 being in a remote DC, they don't get a boost for being a replica
     assertThat(policy.newQueryPlan(request, session))
@@ -120,9 +163,17 @@ public class BasicLoadBalancingPolicyDcFailoverTest extends BasicLoadBalancingPo
     when(node4.getDatacenter()).thenReturn("dc2");
     when(node5.getDatacenter()).thenReturn("dc2");
     when(node6.getDatacenter()).thenReturn("dc2");
+    when(node6.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.6", 9042)));
     when(node7.getDatacenter()).thenReturn("dc3");
+    when(node7.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.7", 9042)));
     when(node8.getDatacenter()).thenReturn("dc3");
+    when(node8.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.8", 9042)));
     when(node9.getDatacenter()).thenReturn("dc3");
+    when(node9.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.9", 9042)));
     // Accept 2 nodes per remote DC
     when(defaultProfile.getInt(
             DefaultDriverOption.LOAD_BALANCING_DC_FAILOVER_MAX_NODES_PER_REMOTE_DC))

@@ -19,10 +19,37 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public interface ReplicationStrategy {
-  Map<Token, Set<Node>> computeReplicasByToken(Map<Token, Node> tokenToPrimary, List<Token> ring);
+
+  /**
+   * Computes the replicas for each token in the ring.
+   *
+   * @param tokenToPrimary mapping from token to its primary replica node
+   * @param ring ordered list of tokens representing the ring
+   * @return a map where keys are tokens and values are the sets of replica nodes for each token
+   * @deprecated Use {@link #computeReplicasListByToken(Map, List)} instead.
+   */
+  @Deprecated
+  default Map<Token, Set<Node>> computeReplicasByToken(
+      Map<Token, Node> tokenToPrimary, List<Token> ring) {
+    return computeReplicasListByToken(tokenToPrimary, ring).entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> new HashSet<>(e.getValue())));
+  }
+
+  /**
+   * Computes the replicas for each token in the ring.
+   *
+   * @param tokenToPrimary mapping from token to its primary replica node
+   * @param ring ordered list of tokens representing the ring
+   * @return a map where keys are tokens and values are the ordered lists of replica nodes for each
+   *     token
+   */
+  Map<Token, List<Node>> computeReplicasListByToken(
+      Map<Token, Node> tokenToPrimary, List<Token> ring);
 }

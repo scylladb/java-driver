@@ -280,13 +280,4 @@ public interface BatchStatement extends Statement<BatchStatement>, Iterable<Batc
 
     return size;
   }
-
-  /**
-   * Overrides LWT state to a specific value. If unset or set to {@code null} the {@link
-   * Statement#isLWT()} method will infer result from the statments in the batch.
-   *
-   * @param newIsLWT new Boolean to set
-   * @return new BatchStatement with updated isLWT field.
-   */
-  BatchStatement setIsLWT(Boolean newIsLWT);
 }

@@ -48,9 +48,9 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metrics.MetricsFactory;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
-import com.datastax.oss.driver.shaded.guava.common.collect.Iterators;
 import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
@@ -232,11 +232,13 @@ public class DefaultTopologyMonitorTest {
             });
     // The rpc_address in each row should have been tried, only the last row should have been
     // converted
+    // Note: getUuid("host_id") is called once in findInPeers for comparison
     verify(peer3).getUuid("host_id");
     verify(peer3, never()).getString(anyString());
 
     verify(peer2, times(2)).getUuid("host_id");
     verify(peer2).getString("data_center");
+    verify(peer2).getString("rack");
   }
 
   @Test
@@ -267,6 +269,7 @@ public class DefaultTopologyMonitorTest {
 
     verify(peer2, times(2)).getUuid("host_id");
     verify(peer2).getString("data_center");
+    verify(peer2).getString("rack");
   }
 
   @Test
@@ -300,6 +303,7 @@ public class DefaultTopologyMonitorTest {
 
     verify(peer1).getInetAddress("rpc_address");
     verify(peer1).getString("data_center");
+    verify(peer1).getString("rack");
   }
 
   @Test
@@ -333,6 +337,7 @@ public class DefaultTopologyMonitorTest {
 
     verify(peer1).getInetAddress("native_address");
     verify(peer1).getString("data_center");
+    verify(peer1).getString("rack");
   }
 
   @Test
@@ -417,6 +422,25 @@ public class DefaultTopologyMonitorTest {
         Level.WARN,
         "[null] Found invalid row in system.peers_v2 for peer: /127.0.0.2. "
             + "This is likely a gossip or snitch issue, this node will be ignored.");
+  }
+
+  @Test
+  public void should_fail_get_channel_node_info_if_local_result_is_empty() {
+    // Given
+    topologyMonitor.stubQueries(
+        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult()));
+
+    // When
+    CompletionStage<NodeInfo> futureNodeInfo = topologyMonitor.getChannelNodeInfo(channel);
+
+    // Then
+    assertThatStage(futureNodeInfo)
+        .isFailed(
+            error -> {
+              assertThat(error).isInstanceOf(IllegalStateException.class);
+              assertThat(error.getMessage())
+                  .contains("Expected a row in system.local for node info resolution");
+            });
   }
 
   @Test
@@ -589,6 +613,119 @@ public class DefaultTopologyMonitorTest {
               assertThat(peer1nodeInfo.getEndPoint().resolve())
                   .isEqualTo(new InetSocketAddress("127.0.0.2", 9043));
             });
+  }
+
+  @Test
+  public void should_use_projected_query_on_second_refresh_node_list_call() {
+    // Given — first call uses SELECT * and teaches the monitor the available columns
+    AdminRow local = mockLocalRow(1, node1.getHostId());
+    AdminRow peer2 = mockPeersV2Row(2, node2.getHostId());
+    ImmutableList<String> localCols = ImmutableList.of("rpc_address", "data_center", "host_id");
+    ImmutableList<String> peersCols = ImmutableList.of("native_address", "native_port", "host_id");
+    topologyMonitor.isSchemaV2 = true;
+    topologyMonitor.stubQueries(
+        // First call — SELECT *
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'",
+            AdminResultTestHelper.mockResultWithColumns(localCols, local)),
+        new StubbedQuery(
+            "SELECT * FROM system.peers_v2",
+            AdminResultTestHelper.mockResultWithColumns(peersCols, peer2)));
+    topologyMonitor.refreshNodeList().toCompletableFuture().join();
+
+    // Second call — caches are warm, should use projected query with learned columns
+    AdminRow local2 = mockLocalRow(1, node1.getHostId());
+    AdminRow peer2b = mockPeersV2Row(2, node2.getHostId());
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT " + String.join(", ", localCols) + " FROM system.local WHERE key='local'",
+            AdminResultTestHelper.mockResultWithColumns(localCols, local2)),
+        new StubbedQuery(
+            "SELECT " + String.join(", ", peersCols) + " FROM system.peers_v2",
+            AdminResultTestHelper.mockResultWithColumns(peersCols, peer2b)));
+
+    // When
+    CompletionStage<Iterable<NodeInfo>> futureInfos = topologyMonitor.refreshNodeList();
+
+    // Then
+    assertThatStage(futureInfos).isSuccess(infos -> assertThat(infos).hasSize(2));
+  }
+
+  @Test
+  public void should_revert_to_select_star_after_reset_column_caches() {
+    // Given — warm the caches with a first call
+    AdminRow local = mockLocalRow(1, node1.getHostId());
+    AdminRow peer2 = mockPeersV2Row(2, node2.getHostId());
+    ImmutableList<String> localCols = ImmutableList.of("rpc_address", "data_center", "host_id");
+    ImmutableList<String> peersCols = ImmutableList.of("native_address", "native_port", "host_id");
+    topologyMonitor.isSchemaV2 = true;
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'",
+            AdminResultTestHelper.mockResultWithColumns(localCols, local)),
+        new StubbedQuery(
+            "SELECT * FROM system.peers_v2",
+            AdminResultTestHelper.mockResultWithColumns(peersCols, peer2)));
+    topologyMonitor.refreshNodeList().toCompletableFuture().join();
+
+    // Reset the caches (as done on reconnect)
+    topologyMonitor.resetColumnCaches();
+
+    // Second call must revert to SELECT * since caches were cleared
+    AdminRow local2 = mockLocalRow(1, node1.getHostId());
+    AdminRow peer2b = mockPeersV2Row(2, node2.getHostId());
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'",
+            AdminResultTestHelper.mockResultWithColumns(localCols, local2)),
+        new StubbedQuery(
+            "SELECT * FROM system.peers_v2",
+            AdminResultTestHelper.mockResultWithColumns(peersCols, peer2b)));
+
+    // When
+    CompletionStage<Iterable<NodeInfo>> futureInfos = topologyMonitor.refreshNodeList();
+
+    // Then
+    assertThatStage(futureInfos).isSuccess(infos -> assertThat(infos).hasSize(2));
+  }
+
+  @Test
+  public void should_not_cache_empty_column_set_from_zero_row_peers_result() {
+    // Given — single-node cluster where system.peers_v2 returns 0 rows and empty column metadata.
+    // The driver must NOT cache the empty set; the next call must still use SELECT *.
+    AdminRow local = mockLocalRow(1, node1.getHostId());
+    topologyMonitor.isSchemaV2 = true;
+
+    // First call: system.peers_v2 returns 0 rows with an empty column set (simulates a
+    // single-node cluster whose server omits column metadata for empty result sets).
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT * FROM system.local WHERE key='local'",
+            AdminResultTestHelper.mockResultWithColumns(
+                ImmutableList.of("rpc_address", "data_center", "host_id"), local)),
+        new StubbedQuery(
+            "SELECT * FROM system.peers_v2",
+            AdminResultTestHelper.mockResultWithColumns(
+                Collections.emptyList() /* empty column metadata */)));
+    topologyMonitor.refreshNodeList().toCompletableFuture().join();
+
+    // Second call must still use SELECT * for system.peers_v2 because the empty list was not
+    // cached.
+    AdminRow local2 = mockLocalRow(1, node1.getHostId());
+    ImmutableList<String> localCols = ImmutableList.of("rpc_address", "data_center", "host_id");
+    topologyMonitor.stubQueries(
+        new StubbedQuery(
+            "SELECT " + String.join(", ", localCols) + " FROM system.local WHERE key='local'",
+            AdminResultTestHelper.mockResultWithColumns(localCols, local2)),
+        new StubbedQuery(
+            "SELECT * FROM system.peers_v2",
+            AdminResultTestHelper.mockResultWithColumns(Collections.emptyList())));
+
+    // When
+    CompletionStage<Iterable<NodeInfo>> futureInfos = topologyMonitor.refreshNodeList();
+
+    // Then — driver still starts up successfully even though peers are absent
+    assertThatStage(futureInfos).isSuccess(infos -> assertThat(infos).hasSize(1));
   }
 
   @DataProvider
@@ -782,9 +919,7 @@ public class DefaultTopologyMonitorTest {
   }
 
   private AdminResult mockResult(AdminRow... rows) {
-    AdminResult result = mock(AdminResult.class);
-    when(result.iterator()).thenReturn(Iterators.forArray(rows));
-    return result;
+    return AdminResultTestHelper.mockResult(rows);
   }
 
   private void assertLog(Level level, String message) {

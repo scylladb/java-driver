@@ -26,9 +26,11 @@ package com.datastax.oss.driver.core.cql;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.junit.Assert.assertThrows;
 
 import com.codahale.metrics.Gauge;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
@@ -42,9 +44,8 @@ import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException;
 import com.datastax.oss.driver.api.core.type.DataTypes;
-import com.datastax.oss.driver.api.testinfra.CassandraSkip;
-import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
+import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
@@ -58,11 +59,12 @@ import com.datastax.oss.protocol.internal.util.Bytes;
 import com.google.common.collect.ImmutableList;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import junit.framework.TestCase;
 import org.assertj.core.api.AbstractThrowableAssert;
 import org.junit.Before;
-import org.junit.Ignore;
+import org.junit.ClassRule;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -80,9 +82,12 @@ import org.junit.rules.TestRule;
 @Category(ParallelizableTests.class)
 public class PreparedStatementIT {
 
-  private CcmRule ccmRule = CcmRule.getInstance();
+  private static final Version SCYLLA_METADATA_ID_SUPPORT_VERSION =
+      Objects.requireNonNull(Version.parse("2025.3"));
 
-  private SessionRule<CqlSession> sessionRule =
+  private static final CcmRule ccmRule = CcmRule.getInstance();
+
+  private static final SessionRule<CqlSession> sessionRule =
       SessionRule.builder(ccmRule)
           .withConfigLoader(
               SessionUtils.configLoaderBuilder()
@@ -91,19 +96,31 @@ public class PreparedStatementIT {
                   .build())
           .build();
 
-  @Rule public TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
+  @ClassRule public static TestRule classChain = RuleChain.outerRule(ccmRule).around(sessionRule);
+
+  // CcmRule as @Rule for per-method @ScyllaOnly / @BackendRequirement annotation checking
+  @Rule public TestRule methodChain = ccmRule;
+
+  // When true, @Before will DROP+CREATE the table (needed after tests that ALTER TABLE).
+  // Starts as true so the table is created on first run.
+  private static boolean needsTableRecreate = true;
 
   @Before
   public void setupSchema() {
+    if (needsTableRecreate) {
+      executeDdl("DROP TABLE IF EXISTS prepared_statement_test");
+      executeDdl("CREATE TABLE prepared_statement_test (a int PRIMARY KEY, b int, c int)");
+      needsTableRecreate = false;
+    } else {
+      executeDdl("TRUNCATE prepared_statement_test");
+    }
     for (String query :
         ImmutableList.of(
-            "DROP TABLE IF EXISTS prepared_statement_test",
-            "CREATE TABLE prepared_statement_test (a int PRIMARY KEY, b int, c int)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (1, 1, 1)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (2, 2, 2)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (3, 3, 3)",
             "INSERT INTO prepared_statement_test (a, b, c) VALUES (4, 4, 4)")) {
-      executeDdl(query);
+      sessionRule.session().execute(query);
     }
   }
 
@@ -160,14 +177,19 @@ public class PreparedStatementIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(description = "@IntegrationTestDisabledScyllaFailure")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_update_metadata_when_schema_changed_across_executions() {
     // Given
     CqlSession session = sessionRule.session();
     PreparedStatement ps = session.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
     ByteBuffer idBefore = ps.getResultMetadataId();
+    if (hasNoScyllaMetadataIdSupport()) {
+      // Scylla does not support CQL5 extensions and metadata id
+      assertThat(idBefore).isNull();
+    }
 
     // When
+    needsTableRecreate = true;
     session.execute(
         SimpleStatement.builder("ALTER TABLE prepared_statement_test ADD d int")
             .setExecutionProfile(sessionRule.slowProfile())
@@ -177,6 +199,20 @@ public class PreparedStatementIT {
 
     // Then
     ByteBuffer idAfter = ps.getResultMetadataId();
+    if (hasNoScyllaMetadataIdSupport()) {
+      // Scylla does not support CQL5 extensions and metadata id
+      assertThat(idAfter).isNull();
+      for (ColumnDefinitions columnDefinitions :
+          ImmutableList.of(
+              ps.getResultSetDefinitions(), bs.getPreparedStatement().getResultSetDefinitions())) {
+        assertThat(columnDefinitions).hasSize(3);
+        assertThat(columnDefinitions.contains("d")).isFalse();
+      }
+      assertThat(rows.getColumnDefinitions()).hasSize(4);
+      assertThat(rows.getColumnDefinitions().contains("d")).isTrue();
+      return;
+    }
+
     assertThat(Bytes.toHexString(idAfter)).isNotEqualTo(Bytes.toHexString(idBefore));
     for (ColumnDefinitions columnDefinitions :
         ImmutableList.of(
@@ -190,12 +226,16 @@ public class PreparedStatementIT {
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(description = "@IntegrationTestDisabledScyllaFailure")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_update_metadata_when_schema_changed_across_pages() {
     // Given
     CqlSession session = sessionRule.session();
     PreparedStatement ps = session.prepare("SELECT * FROM prepared_statement_test");
     ByteBuffer idBefore = ps.getResultMetadataId();
+    if (hasNoScyllaMetadataIdSupport()) {
+      // Scylla does not support CQL5 and result metadata id
+      assertThat(idBefore).isNull();
+    }
     assertThat(ps.getResultSetDefinitions()).hasSize(3);
 
     CompletionStage<AsyncResultSet> future = session.executeAsync(ps.bind());
@@ -213,6 +253,7 @@ public class PreparedStatementIT {
     }
 
     // When
+    needsTableRecreate = true;
     session.execute(
         SimpleStatement.builder("ALTER TABLE prepared_statement_test ADD d int")
             .setExecutionProfile(sessionRule.slowProfile())
@@ -229,67 +270,96 @@ public class PreparedStatementIT {
     assertThat(rows.getColumnDefinitions().get("d").getType()).isEqualTo(DataTypes.INT);
     // Should have updated the prepared statement too
     ByteBuffer idAfter = ps.getResultMetadataId();
-    assertThat(Bytes.toHexString(idAfter)).isNotEqualTo(Bytes.toHexString(idBefore));
-    assertThat(ps.getResultSetDefinitions()).hasSize(4);
-    assertThat(ps.getResultSetDefinitions().get("d").getType()).isEqualTo(DataTypes.INT);
+    if (hasNoScyllaMetadataIdSupport()) {
+      // Scylla does not support CQL5 and result metadata id
+      assertThat(idAfter).isNull();
+      assertThat(ps.getResultSetDefinitions()).hasSize(3);
+      assertThat(ps.getResultSetDefinitions().contains("d")).isFalse();
+    } else {
+      assertThat(Bytes.toHexString(idAfter)).isNotEqualTo(Bytes.toHexString(idBefore));
+      assertThat(ps.getResultSetDefinitions()).hasSize(4);
+      assertThat(ps.getResultSetDefinitions().get("d").getType()).isEqualTo(DataTypes.INT);
+    }
   }
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(description = "@IntegrationTestDisabledScyllaFailure")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_update_metadata_when_schema_changed_across_sessions() {
-    // Given
-    CqlSession session1 = sessionRule.session();
-    CqlSession session2 = SessionUtils.newSession(ccmRule, sessionRule.keyspace());
+    // Use fresh sessions to avoid prepare cache interference from other tests that use the
+    // same query string on the shared session.
+    try (CqlSession session1 = SessionUtils.newSession(ccmRule, sessionRule.keyspace());
+        CqlSession session2 = SessionUtils.newSession(ccmRule, sessionRule.keyspace())) {
+      // Given
+      PreparedStatement ps1 = session1.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
+      PreparedStatement ps2 = session2.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
 
-    PreparedStatement ps1 = session1.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
-    PreparedStatement ps2 = session2.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
+      ByteBuffer id1a = ps1.getResultMetadataId();
+      ByteBuffer id2a = ps2.getResultMetadataId();
+      if (hasNoScyllaMetadataIdSupport()) {
+        // Scylla does not support CQL5 extensions and metadata id
+        assertThat(id1a).isNull();
+        assertThat(id2a).isNull();
+      }
 
-    ByteBuffer id1a = ps1.getResultMetadataId();
-    ByteBuffer id2a = ps2.getResultMetadataId();
+      ResultSet rows1 = session1.execute(ps1.bind(1));
+      ResultSet rows2 = session2.execute(ps2.bind(1));
 
-    ResultSet rows1 = session1.execute(ps1.bind(1));
-    ResultSet rows2 = session2.execute(ps2.bind(1));
+      assertThat(rows1.getColumnDefinitions()).hasSize(3);
+      assertThat(rows1.getColumnDefinitions().contains("d")).isFalse();
+      assertThat(rows2.getColumnDefinitions()).hasSize(3);
+      assertThat(rows2.getColumnDefinitions().contains("d")).isFalse();
 
-    assertThat(rows1.getColumnDefinitions()).hasSize(3);
-    assertThat(rows1.getColumnDefinitions().contains("d")).isFalse();
-    assertThat(rows2.getColumnDefinitions()).hasSize(3);
-    assertThat(rows2.getColumnDefinitions().contains("d")).isFalse();
+      // When
+      needsTableRecreate = true;
+      session1.execute("ALTER TABLE prepared_statement_test ADD d int");
 
-    // When
-    session1.execute("ALTER TABLE prepared_statement_test ADD d int");
+      rows1 = session1.execute(ps1.bind(1));
+      rows2 = session2.execute(ps2.bind(1));
 
-    rows1 = session1.execute(ps1.bind(1));
-    rows2 = session2.execute(ps2.bind(1));
+      ByteBuffer id1b = ps1.getResultMetadataId();
+      ByteBuffer id2b = ps2.getResultMetadataId();
 
-    ByteBuffer id1b = ps1.getResultMetadataId();
-    ByteBuffer id2b = ps2.getResultMetadataId();
+      // Then
+      if (hasNoScyllaMetadataIdSupport()) {
+        // Scylla does not support CQL5 extensions and metadata id
+        assertThat(id1b).isNull();
+        assertThat(id2b).isNull();
 
-    // Then
-    assertThat(Bytes.toHexString(id1b)).isNotEqualTo(Bytes.toHexString(id1a));
-    assertThat(Bytes.toHexString(id2b)).isNotEqualTo(Bytes.toHexString(id2a));
+        assertThat(ps1.getResultSetDefinitions()).hasSize(3);
+        assertThat(ps1.getResultSetDefinitions().contains("d")).isFalse();
+        assertThat(ps2.getResultSetDefinitions()).hasSize(3);
+        assertThat(ps2.getResultSetDefinitions().contains("d")).isFalse();
 
-    assertThat(ps1.getResultSetDefinitions()).hasSize(4);
-    assertThat(ps1.getResultSetDefinitions().contains("d")).isTrue();
-    assertThat(ps2.getResultSetDefinitions()).hasSize(4);
-    assertThat(ps2.getResultSetDefinitions().contains("d")).isTrue();
+        assertThat(rows1.getColumnDefinitions()).hasSize(4);
+        assertThat(rows1.getColumnDefinitions().contains("d")).isTrue();
+        assertThat(rows2.getColumnDefinitions()).hasSize(4);
+        assertThat(rows2.getColumnDefinitions().contains("d")).isTrue();
 
-    assertThat(rows1.getColumnDefinitions()).hasSize(4);
-    assertThat(rows1.getColumnDefinitions().contains("d")).isTrue();
-    assertThat(rows2.getColumnDefinitions()).hasSize(4);
-    assertThat(rows2.getColumnDefinitions().contains("d")).isTrue();
+        return;
+      }
+      assertThat(Bytes.toHexString(id1b)).isNotEqualTo(Bytes.toHexString(id1a));
+      assertThat(Bytes.toHexString(id2b)).isNotEqualTo(Bytes.toHexString(id2a));
 
-    session2.close();
+      assertThat(ps1.getResultSetDefinitions()).hasSize(4);
+      assertThat(ps1.getResultSetDefinitions().contains("d")).isTrue();
+      assertThat(ps2.getResultSetDefinitions()).hasSize(4);
+      assertThat(ps2.getResultSetDefinitions().contains("d")).isTrue();
+
+      assertThat(rows1.getColumnDefinitions()).hasSize(4);
+      assertThat(rows1.getColumnDefinitions().contains("d")).isTrue();
+      assertThat(rows2.getColumnDefinitions()).hasSize(4);
+      assertThat(rows2.getColumnDefinitions().contains("d")).isTrue();
+    }
   }
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(
-      description =
-          "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaDifferentText")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_fail_to_reprepare_if_query_becomes_invalid() {
     // Given
     CqlSession session = sessionRule.session();
+    needsTableRecreate = true;
     session.execute("ALTER TABLE prepared_statement_test ADD d int");
     PreparedStatement ps =
         session.prepare("SELECT a, b, c, d FROM prepared_statement_test WHERE a = ?");
@@ -301,19 +371,22 @@ public class PreparedStatementIT {
     // Then
     assertThat(t)
         .isInstanceOf(InvalidQueryException.class)
-        .hasMessageContaining("Undefined column name d");
+        .hasMessageContaining(
+            CcmBridge.isDistributionOf(BackendType.SCYLLA)
+                ? "Unrecognized name d"
+                : "Undefined column name d");
   }
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0")
-  @ScyllaSkip(description = "@IntegrationTestDisabledScyllaFailure")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_not_store_metadata_for_conditional_updates() {
     should_not_store_metadata_for_conditional_updates(sessionRule.session());
   }
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
-  @ScyllaSkip(description = "@IntegrationTestDisabledScyllaFailure")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_not_store_metadata_for_conditional_updates_in_legacy_protocol() {
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
@@ -325,7 +398,6 @@ public class PreparedStatementIT {
     }
   }
 
-  @ScyllaSkip(description = "@IntegrationTestDisabledScyllaFailure")
   private void should_not_store_metadata_for_conditional_updates(CqlSession session) {
     // Given
     PreparedStatement ps =
@@ -335,7 +407,11 @@ public class PreparedStatementIT {
     // Never store metadata in the prepared statement for conditional updates, since the result set
     // can change
     // depending on the outcome.
-    assertThat(ps.getResultSetDefinitions()).hasSize(0);
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(ps.getResultSetDefinitions()).hasSize(4);
+    } else {
+      assertThat(ps.getResultSetDefinitions()).hasSize(0);
+    }
     ByteBuffer idBefore = ps.getResultMetadataId();
 
     // When
@@ -344,10 +420,18 @@ public class PreparedStatementIT {
     // Then
     // Successful conditional update => only contains the [applied] column
     assertThat(rs.wasApplied()).isTrue();
-    assertThat(rs.getColumnDefinitions()).hasSize(1);
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(rs.getColumnDefinitions()).hasSize(4);
+    } else {
+      assertThat(rs.getColumnDefinitions()).hasSize(1);
+    }
     assertThat(rs.getColumnDefinitions().get("[applied]").getType()).isEqualTo(DataTypes.BOOLEAN);
     // However the prepared statement shouldn't have changed
-    assertThat(ps.getResultSetDefinitions()).hasSize(0);
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(ps.getResultSetDefinitions()).hasSize(4);
+    } else {
+      assertThat(ps.getResultSetDefinitions()).hasSize(0);
+    }
     assertThat(Bytes.toHexString(ps.getResultMetadataId())).isEqualTo(Bytes.toHexString(idBefore));
 
     // When
@@ -363,25 +447,47 @@ public class PreparedStatementIT {
     assertThat(row.getInt("b")).isEqualTo(5);
     assertThat(row.getInt("c")).isEqualTo(5);
     // The prepared statement still shouldn't have changed
-    assertThat(ps.getResultSetDefinitions()).hasSize(0);
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(ps.getResultSetDefinitions()).hasSize(4);
+    } else {
+      assertThat(ps.getResultSetDefinitions()).hasSize(0);
+    }
     assertThat(Bytes.toHexString(ps.getResultMetadataId())).isEqualTo(Bytes.toHexString(idBefore));
 
     // When
+    needsTableRecreate = true;
     session.execute("ALTER TABLE prepared_statement_test ADD d int");
     rs = session.execute(ps.bind(5, 5, 5));
 
     // Then
     // Failed conditional update => regular metadata that should also contain the new column
     assertThat(rs.wasApplied()).isFalse();
-    assertThat(rs.getColumnDefinitions()).hasSize(5);
-    row = rs.one();
-    assertThat(row.getBoolean("[applied]")).isFalse();
-    assertThat(row.getInt("a")).isEqualTo(5);
-    assertThat(row.getInt("b")).isEqualTo(5);
-    assertThat(row.getInt("c")).isEqualTo(5);
-    assertThat(row.isNull("d")).isTrue();
-    assertThat(ps.getResultSetDefinitions()).hasSize(0);
-    assertThat(Bytes.toHexString(ps.getResultMetadataId())).isEqualTo(Bytes.toHexString(idBefore));
+    if (hasNoScyllaMetadataIdSupport()) {
+      // Scylla does not update column definitions is such case
+      assertThat(rs.getColumnDefinitions()).hasSize(4);
+    } else {
+      assertThat(rs.getColumnDefinitions()).hasSize(5);
+    }
+    final Row nextRow = rs.one();
+    assertThat(nextRow.getBoolean("[applied]")).isFalse();
+    assertThat(nextRow.getInt("a")).isEqualTo(5);
+    assertThat(nextRow.getInt("b")).isEqualTo(5);
+    if (hasNoScyllaMetadataIdSupport()) {
+      // Scylla does not support CQL5 and metadata id, that is why response metadata does not
+      // contain "d"
+      assertThrows(IllegalArgumentException.class, () -> nextRow.isNull("d"));
+      assertThat(ps.getResultSetDefinitions()).hasSize(4);
+    } else if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      assertThat(nextRow.isNull("d")).isTrue();
+      assertThat(ps.getResultSetDefinitions()).hasSize(5);
+      assertThat(Bytes.toHexString(ps.getResultMetadataId()))
+          .isNotEqualTo(Bytes.toHexString(idBefore));
+    } else {
+      assertThat(nextRow.isNull("d")).isTrue();
+      assertThat(ps.getResultSetDefinitions()).hasSize(0);
+      assertThat(Bytes.toHexString(ps.getResultMetadataId()))
+          .isEqualTo(Bytes.toHexString(idBefore));
+    }
   }
 
   @Test
@@ -476,6 +582,7 @@ public class PreparedStatementIT {
       session.execute("USE " + sessionRule.keyspace().asCql(false));
 
       // Drop and recreate the table to invalidate the prepared statement server-side
+      needsTableRecreate = true;
       executeDdl("DROP TABLE prepared_statement_test");
       executeDdl("CREATE TABLE prepared_statement_test (a int PRIMARY KEY, b int, c int)");
 
@@ -485,6 +592,7 @@ public class PreparedStatementIT {
 
   // Add version bounds to the DSE requirement if there is a version containing fix for
   // CASSANDRA-15252
+
   @BackendRequirement(
       type = BackendType.DSE,
       description = "No DSE version contains fix for CASSANDRA-15252")
@@ -494,8 +602,8 @@ public class PreparedStatementIT {
       minInclusive = "3.11.0",
       maxExclusive = "3.11.12")
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0.0", maxExclusive = "4.0.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   @Test
-  @Ignore("@IntegrationTestDisabledCassandra3Failure")
   public void should_fail_fast_if_id_changes_on_reprepare() {
     assertableReprepareAfterIdChange()
         .isInstanceOf(IllegalStateException.class)
@@ -511,12 +619,18 @@ public class PreparedStatementIT {
       minInclusive = "3.11.12",
       maxExclusive = "4.0.0")
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "4.0.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   @Test
-  @ScyllaSkip(
-      description =
-          "It seems Scylla always will reprepare with different ID when reproducing CASSANDRA-15252 scenario")
   public void handle_id_changes_on_reprepare() {
-    assertableReprepareAfterIdChange().doesNotThrowAnyException();
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      // Scylla does not support CQL 5 and metadata id therefore it updates prepared statement id
+      // as result this driver throws java.lang.IllegalStateException: ID mismatch while trying to
+      // reprepare
+      assertableReprepareAfterIdChange()
+          .hasMessageContaining("ID mismatch while trying to reprepare");
+    } else {
+      assertableReprepareAfterIdChange().doesNotThrowAnyException();
+    }
   }
 
   @Test
@@ -532,11 +646,6 @@ public class PreparedStatementIT {
   }
 
   @Test
-  @CassandraSkip // Functionality only available in Scylla
-  @ScyllaRequirement(
-      minEnterprise = "2021.0.0",
-      minOSS = "4.3.rc0",
-      description = "Requires LWT_ADD_METADATA_MARK extension")
   public void scylla_should_recognize_prepared_lwt_query() {
     CqlSession session = sessionRule.session();
     PreparedStatement statementNonLWT =
@@ -545,22 +654,12 @@ public class PreparedStatementIT {
         session.prepare("UPDATE prepared_statement_test SET b = 3 WHERE a = 1 IF b = 5");
 
     assertThat(statementNonLWT.isLWT()).isFalse();
-    assertThat(statementLWT.isLWT()).isTrue();
-  }
-
-  @Test
-  @ScyllaSkip // Scylla behaves differently - see `scylla_should_recognize_prepared_lwt_query` test
-  // This test is just to check that no crashes or other weird behaviour occur when this feature is
-  // not supported.
-  public void cassandra_should_not_recognize_prepared_lwt_query() {
-    CqlSession session = sessionRule.session();
-    PreparedStatement statementNonLWT =
-        session.prepare("UPDATE prepared_statement_test SET b = 3 WHERE a = 1");
-    PreparedStatement statementLWT =
-        session.prepare("UPDATE prepared_statement_test SET b = 3 WHERE a = 1 IF b = 5");
-
-    assertThat(statementNonLWT.isLWT()).isFalse();
-    assertThat(statementLWT.isLWT()).isFalse();
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      // Scylla recognize LWT statement and report it to driver
+      assertThat(statementLWT.isLWT()).isTrue();
+    } else {
+      assertThat(statementLWT.isLWT()).isFalse();
+    }
   }
 
   private void should_infer_routing_information_when_partition_key_is_bound(String queryString) {
@@ -601,6 +700,38 @@ public class PreparedStatementIT {
     assertThat(boundStatement.getRoutingKey()).isNull();
   }
 
+  /**
+   * Verifies driver behavior when a prepared statement is created on a node that does not support
+   * the metadata ID feature, but later executed on a node that does. In this scenario, the metadata
+   * ID is {@code null}, yet the feature flag is enabled. The test ensures that such a mixed-node
+   * situation is handled gracefully without errors.
+   */
+  @Test
+  @ScyllaOnly
+  @SuppressWarnings("ConstantConditions")
+  public void should_handle_empty_metadata_id_when_executing_statement_when_supported() {
+    // given
+    CqlSession session = sessionRule.session();
+    PreparedStatement preparedStatement =
+        session.prepare("SELECT * FROM prepared_statement_test WHERE a = ?");
+    if (hasNoScyllaMetadataIdSupport()) {
+      assertThat(preparedStatement.getResultMetadataId()).isNull();
+    } else {
+      assertThat(preparedStatement.getResultMetadataId()).isNotNull();
+      preparedStatement.setResultMetadata(null, preparedStatement.getResultSetDefinitions());
+    }
+
+    // when
+    session.execute(preparedStatement.bind(1));
+
+    // then
+    if (hasNoScyllaMetadataIdSupport()) {
+      assertThat(preparedStatement.getResultMetadataId()).isNull();
+    } else {
+      assertThat(preparedStatement.getResultMetadataId()).isNotNull();
+    }
+  }
+
   private static Iterable<Row> firstPageOf(CompletionStage<AsyncResultSet> stage) {
     return CompletableFutures.getUninterruptibly(stage).currentPage();
   }
@@ -629,5 +760,11 @@ public class PreparedStatementIT {
                 new AssertionError(
                     "Could not access metric "
                         + DefaultSessionMetric.CQL_PREPARED_CACHE_SIZE.getPath()));
+  }
+
+  private static boolean hasNoScyllaMetadataIdSupport() {
+    return CcmBridge.isDistributionOf(BackendType.SCYLLA)
+        && CcmBridge.getScyllaVersion().isPresent()
+        && CcmBridge.getScyllaVersion().get().compareTo(SCYLLA_METADATA_ID_SUPPORT_VERSION) < 0;
   }
 }

@@ -19,6 +19,59 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.0.7
+
+#### Cloud private-endpoint support via client routes
+
+The driver now supports automatic address translation for cloud private-endpoint deployments
+(e.g. AWS PrivateLink, Azure Private Link, GCP Private Service Connect)
+through the new client routes feature. When enabled, the driver reads endpoint mappings from the
+`system.client_routes` system table and translates peer addresses transparently at connection time,
+with automatic refresh on `CLIENT_ROUTES_CHANGE` events.
+
+Configure it programmatically on the session builder:
+
+```java
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
+import com.datastax.oss.driver.api.core.config.ClientRouteProxy;
+import java.net.InetSocketAddress;
+
+ClientRoutesConfig config = ClientRoutesConfig.builder()
+    .addEndpoint(new ClientRouteProxy(
+        "<connection-id>",
+        "my-cluster.region.provider.scylladb.com"))
+    .build();
+
+CqlSession session = CqlSession.builder()
+    .addContactPoint(new InetSocketAddress("my-cluster.region.provider.scylladb.com", 9042))
+    .withClientRoutesConfig(config)
+    .withLocalDatacenter("datacenter1")
+    .build();
+```
+
+Or via HOCON configuration file:
+
+```
+datastax-java-driver {
+  advanced.client-routes {
+    endpoints = [
+      { connection-id = "<connection-id>",
+        connection-addr = "my-cluster.region.provider.scylladb.com" }
+    ]
+  }
+}
+```
+
+Key points:
+
+- **Mutually exclusive** with a custom `AddressTranslator` and with cloud secure connect bundles —
+  providing both throws `IllegalStateException` at session build time.
+- **Requires ScyllaDB Enterprise ≥ 2026.1** (scylladb/scylladb#27323). The feature is not
+  available on ScyllaDB OSS or Apache Cassandra.
+
+See [Address resolution — Client Routes](../manual/core/address_resolution/) for full details.
+
 ### 4.18.1
 
 #### Keystore reloading in DefaultSslEngineFactory

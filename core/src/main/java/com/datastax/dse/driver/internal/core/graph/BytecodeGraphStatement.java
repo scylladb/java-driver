@@ -19,9 +19,11 @@ package com.datastax.dse.driver.internal.core.graph;
 
 import com.datastax.dse.driver.api.core.graph.FluentGraphStatement;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
@@ -126,5 +128,11 @@ public class BytecodeGraphStatement extends GraphStatementBase<BytecodeGraphStat
         consistencyLevel,
         readConsistencyLevel,
         writeConsistencyLevel);
+  }
+
+  @NonNull
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    return RequestRoutingType.REGULAR;
   }
 }

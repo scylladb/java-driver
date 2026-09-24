@@ -5,7 +5,7 @@ name: "Docs / Publish"
 on:
   push:
     branches:
-    - scylla-3.x
+    - scylla-4.x
     - 'scylla-**'
     paths:
     - 'docs/**'
@@ -17,29 +17,43 @@ on:
 
 jobs:
   release:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
+    concurrency:
+      group: single
+      cancel-in-progress: true
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
           fetch-depth: 0
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
-          python-version: '3.10'
+          python-version: '3.13'
+
       - name: Set up JDK 8.0
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           java-version: '8'
           distribution: 'temurin'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+
       - name: Set up env
         run: make -C docs setupenv
+
       - name: Build redirects
         run: make -C docs redirects
+
       - name: Build docs
         run: make -C docs multiversion
+
       - name: Deploy docs to GitHub Pages
         run: ./docs/_utils/deploy.sh
         env:

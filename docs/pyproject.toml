@@ -1,22 +1,20 @@
-[tool.poetry]
+[project]
 name = "java-driver"
-version = "3.7.1"
-description = "ScyllaDB Java Driver"
-authors = ["Java Driver Contributors"]
-package-mode = false
+description = "ScyllaDB Java Driver Documentation"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "pygments>=2.18.0",
+    "sphinx-scylladb-theme>=1.9.1",
+    "myst-parser>=5.0.0",
+    "sphinx-autobuild>=2025.4.8",
+    "sphinx>=9.0",
+    "sphinx-multiversion-scylla>=0.3.7",
+    "sphinx-sitemap>=2.9.0",
+    "redirects_cli>=0.1.3",
+    "wheel>=0.45.0",
+    "sphinx-scylladb-markdown>=0.1.2",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-pygments = "^2.18.0"
-redirects_cli ="^0.1.3"
-sphinx-scylladb-theme = "^1.8.6"
-sphinx-sitemap = "^2.6.0"
-sphinx-autobuild = "^2024.4.19"
-Sphinx = "^7.3.7"
-sphinx-multiversion-scylla = "^0.3.1"
-wheel = "^0.38.4"
-sphinx-scylladb-markdown = "^0.1.2"
-
-[build-system]
-requires = ["poetry>=1.8"]
-build-backend = "poetry.masonry.api"
+[tool.uv]
+package = false

@@ -44,7 +44,10 @@ public class TypedDriverOptionTest {
         ImmutableSet.of(
             DefaultDriverOption.LOAD_BALANCING_POLICY,
             DefaultDriverOption.RETRY_POLICY,
-            DefaultDriverOption.SPECULATIVE_EXECUTION_POLICY);
+            DefaultDriverOption.SPECULATIVE_EXECUTION_POLICY,
+            // CLIENT_ROUTES_ENDPOINTS is a HOCON list-of-objects: it cannot be represented as a
+            // flat TypedDriverOption scalar/list, so it is excluded from this check.
+            DefaultDriverOption.CLIENT_ROUTES_ENDPOINTS);
 
     for (DriverOption option :
         ImmutableSet.<DriverOption>builder()

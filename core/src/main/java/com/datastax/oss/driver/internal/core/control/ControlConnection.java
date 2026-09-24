@@ -24,6 +24,7 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
@@ -31,6 +32,9 @@ import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.DriverChannelOptions;
 import com.datastax.oss.driver.internal.core.channel.EventCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
+import com.datastax.oss.driver.internal.core.metadata.ClientRoutesUpdateEvent;
+import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
@@ -45,6 +49,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Event;
+import com.datastax.oss.protocol.internal.response.event.ClientRoutesChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.SchemaChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
@@ -56,6 +61,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -144,6 +150,14 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   }
 
   /**
+   * The node currently associated with the control channel, or {@code null} if the control
+   * connection is not established or the node has not been resolved yet.
+   */
+  public Node controlNode() {
+    return singleThreaded.controlNodeState.current;
+  }
+
+  /**
    * Forces an immediate reconnect: if we were connected to a node, that connection will be closed;
    * if we were already reconnecting, the next attempt is started immediately, without waiting for
    * the next scheduled interval; in all cases, a new query plan is fetched from the load balancing
@@ -189,6 +203,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           break;
         case ProtocolConstants.EventType.SCHEMA_CHANGE:
           processSchemaChange(event);
+          break;
+        case ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE:
+          processClientRoutesChange(event);
           break;
         default:
           LOG.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
@@ -242,6 +259,14 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             });
   }
 
+  private void processClientRoutesChange(Event event) {
+    ClientRoutesChangeEvent crce = (ClientRoutesChangeEvent) event;
+    LOG.debug("[{}] Received CLIENT_ROUTES_CHANGE event: {}", logPrefix, crce);
+    context
+        .getEventBus()
+        .fire(new ClientRoutesUpdateEvent(crce.changeType, crce.connectionIds, crce.hostIds));
+  }
+
   private class SingleThreaded {
     private final InternalDriverContext context;
     private final DriverConfig config;
@@ -252,6 +277,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     private final ReconnectionPolicy reconnectionPolicy;
     private final Reconnection reconnection;
     private DriverChannelOptions channelOptions;
+    private volatile ControlNodeState controlNodeState = ControlNodeState.NONE;
     // The last events received for each node
     private final Map<Node, NodeDistance> lastNodeDistance = new WeakHashMap<>();
     private final Map<Node, NodeState> lastNodeState = new WeakHashMap<>();
@@ -292,7 +318,10 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       }
       initWasCalled = true;
       try {
-        ImmutableList<String> eventTypes = buildEventTypes(listenToClusterEvents);
+        boolean listenClientRoutesEvents =
+            context.getTopologyMonitor() instanceof ClientRoutesTopologyMonitor;
+        ImmutableList<String> eventTypes =
+            buildEventTypes(listenToClusterEvents, listenClientRoutesEvents);
         LOG.debug("[{}] Initializing with event types {}", logPrefix, eventTypes);
         channelOptions =
             DriverChannelOptions.builder()
@@ -346,7 +375,9 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             result.complete(true);
             onSuccessfulReconnect();
           },
-          error -> result.complete(false));
+          error -> {
+            result.complete(false);
+          });
       return result;
     }
 
@@ -429,24 +460,61 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                       LOG.debug("[{}] New channel opened {}", logPrefix, channel);
                       DriverChannel previousChannel = ControlConnection.this.channel;
                       ControlConnection.this.channel = channel;
-                      if (previousChannel != null) {
-                        // We were reconnecting: make sure previous channel gets closed (it may
-                        // still be open if reconnection was forced)
+                      controlNodeState = new ControlNodeState(null, node);
+                      if (previousChannel != null && previousChannel != channel) {
                         LOG.debug(
                             "[{}] Forcefully closing previous channel {}",
                             logPrefix,
                             previousChannel);
                         previousChannel.forceClose();
                       }
-                      context.getEventBus().fire(ChannelEvent.channelOpened(node));
-                      channel
-                          .closeFuture()
-                          .addListener(
-                              f ->
-                                  adminExecutor
-                                      .submit(() -> onChannelClosed(channel, node))
-                                      .addListener(UncaughtExceptions::log));
-                      onSuccess.run();
+                      resolveChannelNodeIfNeeded(channel, (DefaultNode) node)
+                          .whenCompleteAsync(
+                              (resolvedNode, fetchError) -> {
+                                if (fetchError != null) {
+                                  controlNodeState = ControlNodeState.NONE;
+                                  LOG.debug(
+                                      "[{}] Failed to resolve control node endpoint from {}, "
+                                          + "trying next node",
+                                      logPrefix,
+                                      node,
+                                      fetchError);
+                                  // Null out before forceClose() so that onChannelClosed() does not
+                                  // start a redundant reconnection on top of the connect() retry
+                                  // below.
+                                  ControlConnection.this.channel = null;
+                                  channel.forceClose();
+                                  List<Entry<Node, Throwable>> newErrors =
+                                      (errors == null) ? new ArrayList<>() : errors;
+                                  newErrors.add(new SimpleEntry<>(node, fetchError));
+                                  connect(nodes, newErrors, onSuccess, onFailure);
+                                } else if (channel.closeFuture().isDone()) {
+                                  controlNodeState = ControlNodeState.NONE;
+                                  ControlConnection.this.channel = null;
+                                  List<Entry<Node, Throwable>> newErrors =
+                                      (errors == null) ? new ArrayList<>() : errors;
+                                  newErrors.add(
+                                      new SimpleEntry<>(
+                                          node,
+                                          new Exception("Channel closed during endpoint resolve")));
+                                  connect(nodes, newErrors, onSuccess, onFailure);
+                                } else {
+                                  controlNodeState = new ControlNodeState(resolvedNode, null);
+                                  context
+                                      .getEventBus()
+                                      .fire(ChannelEvent.channelOpened(resolvedNode));
+                                  channel
+                                      .closeFuture()
+                                      .addListener(
+                                          f ->
+                                              adminExecutor
+                                                  .submit(
+                                                      () -> onChannelClosed(channel, resolvedNode))
+                                                  .addListener(UncaughtExceptions::log));
+                                  onSuccess.run();
+                                }
+                              },
+                              adminExecutor);
                     }
                   } catch (Exception e) {
                     Loggers.warnWithException(
@@ -460,55 +528,132 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       }
     }
 
+    /**
+     * Resolves the identity of the node at the other end of the channel. For contact point nodes
+     * (no hostId), queries system.local and registers a new metadata node. For nodes that already
+     * have a hostId, returns the node as-is.
+     */
+    private CompletionStage<Node> resolveChannelNodeIfNeeded(
+        DriverChannel channel, DefaultNode node) {
+      if (node.getHostId() != null) {
+        return CompletableFuture.completedFuture(node);
+      }
+      return context
+          .getTopologyMonitor()
+          .getChannelNodeInfo(channel)
+          .thenComposeAsync(
+              nodeInfo -> {
+                EndPoint resolvedEp = nodeInfo.getEndPoint();
+                if (resolvedEp != null && !resolvedEp.equals(channel.getEndPoint())) {
+                  channel.setEndPoint(resolvedEp);
+                  LOG.debug("[{}] Control channel endpoint upgraded to {}", logPrefix, resolvedEp);
+                }
+                return context.getMetadataManager().registerNode(nodeInfo);
+              },
+              adminExecutor);
+    }
+
     private void onSuccessfulReconnect() {
+      assert adminExecutor.inEventLoop();
       // If reconnectOnFailure was true and we've never connected before, complete the future now to
-      // signal that the initialization is complete.
+      // signal that the initialization is complete. Schema refresh and LBP initialization for the
+      // first connection are handled by the session initialization path (DefaultSession.init), not
+      // here, so we skip the full refresh below.
       boolean isFirstConnection = initFuture.complete(null);
+      if (isFirstConnection) {
+        return;
+      }
 
       // Otherwise, perform a full refresh (we don't know how long we were disconnected)
-      if (!isFirstConnection) {
-        context
-            .getMetadataManager()
-            .refreshNodes()
-            .whenComplete(
-                (result, error) -> {
-                  if (error != null) {
-                    LOG.debug("[{}] Error while refreshing node list", logPrefix, error);
-                  } else {
-                    try {
-                      // A failed node list refresh at startup is not fatal, so this might be the
-                      // first successful refresh; make sure the LBP gets initialized (this is a
-                      // no-op if it was initialized already).
-                      context.getLoadBalancingPolicyWrapper().init();
-                      context
-                          .getMetadataManager()
-                          .refreshSchema(null, false, true)
-                          .whenComplete(
-                              (metadata, schemaError) -> {
-                                if (schemaError != null) {
-                                  Loggers.warnWithException(
-                                      LOG,
-                                      "[{}] Unexpected error while refreshing schema after a "
-                                          + "successful reconnection, keeping previous version",
-                                      logPrefix,
-                                      schemaError);
-                                }
-                              });
-                    } catch (Throwable t) {
-                      Loggers.warnWithException(
-                          LOG,
-                          "[{}] Unexpected error on control connection reconnect",
-                          logPrefix,
-                          t);
-                    }
-                  }
-                });
+      // Reset any cached column projections so the next topology refresh re-learns what
+      // columns are available via SELECT * (the cluster may have changed after reconnect).
+      context.getTopologyMonitor().resetColumnCaches();
+
+      // If client routes are active, wait for the routes refresh to complete before refreshing
+      // nodes, so that buildNodeEndPoint sees up-to-date route data.
+      CompletionStage<Void> routesReady;
+      if (context.getTopologyMonitor() instanceof ClientRoutesTopologyMonitor) {
+        routesReady = ((ClientRoutesTopologyMonitor) context.getTopologyMonitor()).refresh();
+      } else {
+        routesReady = CompletableFuture.completedFuture(null);
       }
+
+      routesReady.whenComplete(
+          (routesResult, routesError) -> {
+            if (routesError != null) {
+              LOG.debug(
+                  "[{}] Error while refreshing client routes on reconnect", logPrefix, routesError);
+            }
+            context
+                .getMetadataManager()
+                .refreshNodes()
+                .whenCompleteAsync(
+                    (result, error) -> {
+                      assert adminExecutor.inEventLoop();
+                      if (error != null) {
+                        LOG.debug("[{}] Error while refreshing node list", logPrefix, error);
+                      } else {
+                        try {
+                          // A failed node list refresh at startup is not fatal, so this might
+                          // be the first successful refresh; make sure the LBP gets initialized
+                          // (this is a no-op if it was initialized already).
+                          context.getLoadBalancingPolicyWrapper().init();
+                          Node controlNode = controlNodeState.current;
+                          if (controlNode != null && controlNode.getHostId() != null) {
+                            if (!context
+                                .getMetadataManager()
+                                .getMetadata()
+                                .getNodes()
+                                .containsKey(controlNode.getHostId())) {
+                              LOG.debug(
+                                  "[{}] Control node {} is no longer in metadata after "
+                                      + "reconnect refresh, triggering reconnection",
+                                  logPrefix,
+                                  controlNode);
+                              controlNodeState = ControlNodeState.NONE;
+                              DriverChannel ch = ControlConnection.this.channel;
+                              ControlConnection.this.channel = null;
+                              if (ch != null) {
+                                ch.forceClose();
+                              }
+                              reconnection.start();
+                              return;
+                            }
+                          }
+                          context
+                              .getMetadataManager()
+                              .refreshSchema(null, false, true)
+                              .whenComplete(
+                                  (metadata, schemaError) -> {
+                                    if (schemaError != null) {
+                                      Loggers.warnWithException(
+                                          LOG,
+                                          "[{}] Unexpected error while refreshing schema after"
+                                              + " a successful reconnection, keeping previous"
+                                              + " version",
+                                          logPrefix,
+                                          schemaError);
+                                    }
+                                  });
+                        } catch (Throwable t) {
+                          Loggers.warnWithException(
+                              LOG,
+                              "[{}] Unexpected error on control connection reconnect",
+                              logPrefix,
+                              t);
+                        }
+                      }
+                    },
+                    adminExecutor);
+          });
     }
 
     private void onChannelClosed(DriverChannel channel, Node node) {
       assert adminExecutor.inEventLoop();
       if (!closeWasCalled) {
+        if (channel == ControlConnection.this.channel) {
+          controlNodeState = ControlNodeState.NONE;
+        }
         context.getEventBus().fire(ChannelEvent.channelClosed(node));
         // If this channel is the current control channel, we must start a
         // reconnection attempt to get a new control channel.
@@ -534,13 +679,28 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       }
     }
 
+    private boolean isControlNode(Node eventNode) {
+      ControlNodeState state = controlNodeState;
+      if (state.current != null
+          && eventNode.getHostId() != null
+          && eventNode.getHostId().equals(state.current.getHostId())) {
+        return true;
+      }
+      if (state.current == null
+          && state.pending != null
+          && Objects.equals(eventNode.getEndPoint(), state.pending.getEndPoint())) {
+        return true;
+      }
+      return false;
+    }
+
     private void onDistanceEvent(DistanceEvent event) {
       assert adminExecutor.inEventLoop();
       this.lastNodeDistance.put(event.node, event.distance);
       if (event.distance == NodeDistance.IGNORED
           && channel != null
           && !channel.closeFuture().isDone()
-          && event.node.getEndPoint().equals(channel.getEndPoint())) {
+          && isControlNode(event.node)) {
         LOG.debug(
             "[{}] Control node {} became IGNORED, reconnecting to a different node",
             logPrefix,
@@ -555,7 +715,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
       if ((event.newState == null /*(removed)*/ || event.newState == NodeState.FORCED_DOWN)
           && channel != null
           && !channel.closeFuture().isDone()
-          && event.node.getEndPoint().equals(channel.getEndPoint())) {
+          && isControlNode(event.node)) {
         LOG.debug(
             "[{}] Control node {} was removed or forced down, reconnecting to a different node",
             logPrefix,
@@ -595,7 +755,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     if (error instanceof AllNodesFailedException) {
       Collection<List<Throwable>> errors =
           ((AllNodesFailedException) error).getAllErrors().values();
-      if (errors.size() == 0) {
+      if (errors.isEmpty()) {
         return false;
       }
       for (List<Throwable> nodeErrors : errors) {
@@ -609,13 +769,38 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     return true;
   }
 
-  private static ImmutableList<String> buildEventTypes(boolean listenClusterEvents) {
+  /**
+   * Immutable snapshot of the control node state. Reads from any thread see a consistent pair of
+   * (current, pending) via a single volatile read of the enclosing reference.
+   */
+  static final class ControlNodeState {
+    static final ControlNodeState NONE = new ControlNodeState(null, null);
+
+    /**
+     * The resolved control node, or {@code null} if resolution is pending or no channel is open.
+     */
+    final Node current;
+
+    /** The node whose channel is open but not yet resolved, or {@code null} otherwise. */
+    final Node pending;
+
+    ControlNodeState(Node current, Node pending) {
+      this.current = current;
+      this.pending = pending;
+    }
+  }
+
+  private static ImmutableList<String> buildEventTypes(
+      boolean listenClusterEvents, boolean listenClientRoutesEvents) {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     builder.add(ProtocolConstants.EventType.SCHEMA_CHANGE);
     if (listenClusterEvents) {
       builder
           .add(ProtocolConstants.EventType.STATUS_CHANGE)
           .add(ProtocolConstants.EventType.TOPOLOGY_CHANGE);
+    }
+    if (listenClientRoutesEvents) {
+      builder.add(ProtocolConstants.EventType.CLIENT_ROUTES_CHANGE);
     }
     return builder.build();
   }

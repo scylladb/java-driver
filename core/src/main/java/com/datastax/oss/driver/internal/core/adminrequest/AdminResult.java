@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.adminrequest;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.AbstractIterator;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.response.result.ColumnSpec;
 import com.datastax.oss.protocol.internal.response.result.Rows;
@@ -69,6 +70,12 @@ public class AdminResult implements Iterable<AdminRow> {
             : new AdminRow(columnSpecs, rowData, protocolVersion);
       }
     };
+  }
+
+  /** Returns the names of all columns in this result set, in response metadata order. */
+  @NonNull
+  public List<String> getColumnNames() {
+    return ImmutableList.copyOf(columnSpecs.keySet());
   }
 
   public boolean hasNextPage() {

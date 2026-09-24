@@ -25,6 +25,7 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -41,7 +42,7 @@ import java.util.Objects;
 import net.jcip.annotations.Immutable;
 
 @Immutable
-public class DefaultSimpleStatement implements SimpleStatement {
+public class DefaultSimpleStatement implements SimpleStatement, RequestRoutingTypeAccessor {
 
   private final String query;
   private final List<Object> positionalValues;
@@ -64,6 +65,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
   private final Duration timeout;
   private final Node node;
   private final int nowInSeconds;
+  @Nullable private final RequestRoutingType requestRoutingType;
 
   /** @see SimpleStatement#builder(String) */
   public DefaultSimpleStatement(
@@ -86,7 +88,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
       ConsistencyLevel serialConsistencyLevel,
       Duration timeout,
       Node node,
-      int nowInSeconds) {
+      int nowInSeconds,
+      @Nullable RequestRoutingType requestRoutingType) {
     if (!positionalValues.isEmpty() && !namedValues.isEmpty()) {
       throw new IllegalArgumentException("Can't have both positional and named values");
     }
@@ -110,6 +113,7 @@ public class DefaultSimpleStatement implements SimpleStatement {
     this.timeout = timeout;
     this.node = node;
     this.nowInSeconds = nowInSeconds;
+    this.requestRoutingType = requestRoutingType;
   }
 
   @NonNull
@@ -141,7 +145,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @NonNull
@@ -173,7 +178,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @NonNull
@@ -205,7 +211,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -237,7 +244,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -269,7 +277,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -301,7 +310,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -333,7 +343,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @NonNull
@@ -359,7 +370,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         newNode,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -397,7 +409,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -429,7 +442,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @NonNull
@@ -461,7 +475,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -493,7 +508,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Override
@@ -524,7 +540,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Override
@@ -555,7 +572,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -587,7 +605,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         newTimeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -619,7 +638,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Override
@@ -650,7 +670,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -682,7 +703,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Nullable
@@ -715,7 +737,8 @@ public class DefaultSimpleStatement implements SimpleStatement {
         newSerialConsistencyLevel,
         timeout,
         node,
-        nowInSeconds);
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Override
@@ -746,12 +769,58 @@ public class DefaultSimpleStatement implements SimpleStatement {
         serialConsistencyLevel,
         timeout,
         node,
-        newNowInSeconds);
+        newNowInSeconds,
+        requestRoutingType);
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    if (requestRoutingType != null) {
+      return requestRoutingType;
+    }
+    if (consistencyLevel != null && consistencyLevel.isSerial()) {
+      return RequestRoutingType.LWT;
+    }
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public RequestRoutingType getConfiguredRequestRoutingType() {
+    return requestRoutingType;
+  }
+
+  @NonNull
+  @Override
+  public SimpleStatement setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
+    return new DefaultSimpleStatement(
+        query,
+        positionalValues,
+        namedValues,
+        executionProfileName,
+        executionProfile,
+        keyspace,
+        routingKeyspace,
+        routingKey,
+        routingToken,
+        customPayload,
+        idempotent,
+        tracing,
+        timestamp,
+        pagingState,
+        pageSize,
+        consistencyLevel,
+        serialConsistencyLevel,
+        timeout,
+        node,
+        nowInSeconds,
+        requestRoutingType);
   }
 
   @Override
   public boolean isLWT() {
-    return false;
+    return requestRoutingType == RequestRoutingType.LWT;
   }
 
   public static Map<CqlIdentifier, Object> wrapKeys(Map<String, Object> namedValues) {

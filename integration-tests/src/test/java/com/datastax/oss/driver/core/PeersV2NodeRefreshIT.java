@@ -87,9 +87,10 @@ public class PeersV2NodeRefreshIT {
   private boolean hasNodeRefreshQuery() {
     for (QueryLog log : cluster.getLogs().getQueryLogs()) {
       if (log.getFrame().message instanceof Query) {
+        // Match both the legacy "SELECT *" form and the optimized projected-column form;
+        // only the WHERE clause suffix is stable regardless of which columns are selected.
         if (((Query) log.getFrame().message)
-            .query.contains(
-                "SELECT * FROM system.peers_v2 WHERE peer = :address and peer_port = :port")) {
+            .query.contains("FROM system.peers_v2 WHERE peer = :address and peer_port = :port")) {
           return true;
         }
       }

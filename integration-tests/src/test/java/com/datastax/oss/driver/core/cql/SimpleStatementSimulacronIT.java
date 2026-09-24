@@ -98,6 +98,6 @@ public class SimpleStatementSimulacronIT {
 
     assertThat(t)
         .isInstanceOf(DriverTimeoutException.class)
-        .hasMessage("Query timed out after PT1S");
+        .hasMessageStartingWith("Query timed out after PT1S");
   }
 }

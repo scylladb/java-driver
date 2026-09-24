@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -287,6 +288,7 @@ public class StatementSizeTest {
         CodecRegistry.DEFAULT,
         DefaultProtocolVersion.V5,
         null,
-        Statement.NO_NOW_IN_SECONDS);
+        Statement.NO_NOW_IN_SECONDS,
+        RequestRoutingType.REGULAR);
   }
 }

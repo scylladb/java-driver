@@ -21,11 +21,9 @@ import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
@@ -34,14 +32,8 @@ import org.slf4j.LoggerFactory;
 /**
  * An implementation of {@link LocalDcHelper} that fetches the user-supplied datacenter, if any,
  * from the programmatic configuration API, or else, from the driver configuration. If no local
- * datacenter is explicitly defined, this implementation will consider two distinct situations:
- *
- * <ol>
- *   <li>If no explicit contact points were provided, this implementation will infer the local
- *       datacenter from the implicit contact point (localhost).
- *   <li>If explicit contact points were provided however, this implementation will throw {@link
- *       IllegalStateException}.
- * </ol>
+ * datacenter is explicitly defined, this implementation tries to infer it from the control
+ * connection endpoint. If that fails, an {@link IllegalStateException} is thrown.
  */
 @ThreadSafe
 public class MandatoryLocalDcHelper extends OptionalLocalDcHelper {
@@ -63,34 +55,18 @@ public class MandatoryLocalDcHelper extends OptionalLocalDcHelper {
     if (optionalLocalDc.isPresent()) {
       return optionalLocalDc;
     }
-    Set<DefaultNode> contactPoints = context.getMetadataManager().getContactPoints();
-    if (context.getMetadataManager().wasImplicitContactPoint()) {
-      // We only allow automatic inference of the local DC in this specific case
-      assert contactPoints.size() == 1;
-      Node contactPoint = contactPoints.iterator().next();
-      String localDc = contactPoint.getDatacenter();
-      if (localDc != null) {
-        LOG.debug(
-            "[{}] Local DC set from implicit contact point {}: {}",
-            logPrefix,
-            contactPoint,
-            localDc);
-        return Optional.of(localDc);
-      } else {
-        throw new IllegalStateException(
-            "The local DC could not be inferred from implicit contact point, please set it explicitly (see "
-                + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
-                + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter)");
-      }
-    } else {
-      throw new IllegalStateException(
-          "Since you provided explicit contact points, the local DC must be explicitly set (see "
-              + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
-              + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter). "
-              + "Current contact points are: "
-              + formatNodesAndDcs(contactPoints)
-              + ". Current DCs in this cluster are: "
-              + formatDcs(nodes.values()));
+    // Infer the local DC from the control connection endpoint
+    Optional<String> dcFromControl = inferDcFromControlConnection(nodes);
+    if (dcFromControl.isPresent()) {
+      LOG.debug("[{}] Local DC set from control connection: {}", logPrefix, dcFromControl.get());
+      return dcFromControl;
     }
+    throw new IllegalStateException(
+        "Could not infer the local DC from the control connection, "
+            + "the local DC must be explicitly set (see "
+            + DefaultDriverOption.LOAD_BALANCING_LOCAL_DATACENTER.getPath()
+            + " in the config, or set it programmatically with SessionBuilder.withLocalDatacenter). "
+            + "Current DCs in this cluster are: "
+            + formatDcs(nodes.values()));
   }
 }

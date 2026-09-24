@@ -31,8 +31,13 @@ import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
 import com.datastax.oss.driver.shaded.guava.common.base.Predicates;
 import com.datastax.oss.driver.shaded.guava.common.cache.Cache;
+import com.datastax.oss.driver.shaded.guava.common.cache.CacheBuilder;
 import com.datastax.oss.driver.shaded.guava.common.collect.Iterables;
+import java.lang.reflect.Field;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.awaitility.Awaitility;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -99,14 +104,19 @@ public class PreparedStatementCancellationIT {
     CompletableFuture<PreparedStatement> cf2 = toCompletableFuture(session, cql);
     assertThat(cache.size()).isEqualTo(1);
 
-    CompletableFuture<PreparedStatement> future = Iterables.get(cache.asMap().values(), 0);
-    PreparedStatement stmt = future.get();
+    // Wait for cf1 and cf2 directly — they are dependent futures wrapping the cached future,
+    // so the cached future completing does not synchronously guarantee cf1/cf2 are done yet.
+    PreparedStatement stmt1 = cf1.get(30, TimeUnit.SECONDS);
+    PreparedStatement stmt2 = cf2.get(30, TimeUnit.SECONDS);
 
     assertThat(cf1.isDone()).isTrue();
     assertThat(cf2.isDone()).isTrue();
 
-    assertThat(cf1.join()).isEqualTo(stmt);
-    assertThat(cf2.join()).isEqualTo(stmt);
+    CompletableFuture<PreparedStatement> future = Iterables.get(cache.asMap().values(), 0);
+    PreparedStatement stmt = future.get(30, TimeUnit.SECONDS);
+
+    assertThat(stmt1).isEqualTo(stmt);
+    assertThat(stmt2).isEqualTo(stmt);
   }
 
   // A holdover from work done on JAVA-3055.  This probably isn't _desired_ behaviour but this test
@@ -118,6 +128,20 @@ public class PreparedStatementCancellationIT {
 
     CqlSession session = SessionUtils.newSession(ccmRule, sessionRule.keyspace());
     CqlPrepareAsyncProcessor processor = findProcessor(session);
+    AtomicInteger removals = new AtomicInteger();
+
+    // Forcibly replace the cache with one that has a removal listener
+    Field cacheField = CqlPrepareAsyncProcessor.class.getDeclaredField("cache");
+    cacheField.setAccessible(true);
+    Cache<PrepareRequest, CompletableFuture<PreparedStatement>> newCache =
+        CacheBuilder.newBuilder()
+            .removalListener(
+                (evt) -> {
+                  removals.incrementAndGet();
+                })
+            .weakValues()
+            .build();
+    cacheField.set(processor, newCache);
     Cache<PrepareRequest, CompletableFuture<PreparedStatement>> cache = processor.getCache();
     assertThat(cache.size()).isEqualTo(0);
 
@@ -133,8 +157,9 @@ public class PreparedStatementCancellationIT {
       fail();
     } catch (Exception e) {
     }
-
-    assertThat(cache.size()).isEqualTo(1);
+    cache.cleanUp();
+    // If an entry was evicted, it had to be cached first
+    Awaitility.await().atMost(5, TimeUnit.SECONDS).until(() -> removals.get() == 1);
   }
 
   @Test

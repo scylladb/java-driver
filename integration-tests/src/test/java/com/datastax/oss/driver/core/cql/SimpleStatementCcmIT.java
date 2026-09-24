@@ -375,7 +375,7 @@ public class SimpleStatementCcmIT {
     SESSION_RULE
         .session()
         .execute(
-            "CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+            "CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION = {'class': 'NetworkTopologyStrategy', 'dc1': 1}");
 
     SESSION_RULE
         .session()

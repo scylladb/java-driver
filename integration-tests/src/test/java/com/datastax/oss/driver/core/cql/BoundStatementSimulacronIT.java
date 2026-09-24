@@ -151,7 +151,7 @@ public class BoundStatementSimulacronIT {
 
       assertThat(t)
           .isInstanceOf(DriverTimeoutException.class)
-          .hasMessage("Query timed out after PT1S");
+          .hasMessageStartingWith("Query timed out after PT1S");
     }
   }
 
@@ -185,7 +185,7 @@ public class BoundStatementSimulacronIT {
 
       assertThat(t)
           .isInstanceOf(DriverTimeoutException.class)
-          .hasMessage("Query timed out after PT0.15S");
+          .hasMessageStartingWith("Query timed out after PT0.15S");
     }
   }
 }

@@ -142,6 +142,17 @@ public enum DefaultDriverOption implements DriverOption {
    */
   CONNECTION_WARN_INIT_ERROR("advanced.connection.warn-on-init-error"),
   /**
+   * Whether to use advanced shard awareness.
+   *
+   * <p>Value-type: boolean
+   */
+  CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED(
+      "advanced.connection.advanced-shard-awareness.enabled"),
+  /** Inclusive lower bound of port range to use in advanced shard awareness */
+  ADVANCED_SHARD_AWARENESS_PORT_LOW("advanced.connection.advanced-shard-awareness.port-low"),
+  /** Inclusive upper bound of port range to use in advanced shard awareness */
+  ADVANCED_SHARD_AWARENESS_PORT_HIGH("advanced.connection.advanced-shard-awareness.port-high"),
+  /**
    * The number of connections in the LOCAL pool.
    *
    * <p>Value-type: int
@@ -153,6 +164,21 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: int
    */
   CONNECTION_POOL_REMOTE_SIZE("advanced.connection.pool.remote.size"),
+
+  /**
+   * The maximum number of connections to create at once when filling the connection pool. Relevant
+   * during channel pool creation and reconnections.
+   *
+   * <p>Value 0 means unlimited - all missing channels will be created at once. Any other value
+   * means that driver will create connections in batches of at most that size and the batches will
+   * be handled sequentially one after another. The actual batch size may be smaller, to ensure that
+   * at least two batches are created.
+   *
+   * <p>It is advised to use advanced shard awareness with this feature.
+   *
+   * <p>Value-type: int
+   */
+  CONNECTION_POOL_INIT_BATCH_SIZE("advanced.connection.pool.init-batch-size"),
 
   /**
    * Whether to schedule reconnection attempts if all contact points are unreachable on the first
@@ -692,7 +718,7 @@ public enum DefaultDriverOption implements DriverOption {
 
   /**
    * CQL 4.x has a known issue where prepared statement invalidation may be bypassed on the client
-   * side. Reference: https://github.com/scylladb/scylladb/issues/20860
+   * side. Reference: <a href="https://github.com/scylladb/scylladb/issues/20860">link</a>
    *
    * <p>When this occurs, the client's metadata can become outdated, leading to various
    * deserialization errors.
@@ -1037,7 +1063,63 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value type: {@link java.util.List List}&#60;{@link String}&#62;
    */
   LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS(
-      "advanced.load-balancing-policy.dc-failover.preferred-remote-dcs");
+      "advanced.load-balancing-policy.dc-failover.preferred-remote-dcs"),
+
+  /**
+   * The default routing method to use for LWT (Lightweight Transaction) requests. REGULAR uses the
+   * standard load balancing algorithm with slow replica avoidance and shuffling.
+   * PRESERVE_REPLICA_ORDER maintains the replica order from the partitioner.
+   *
+   * <p>Value-type: string
+   */
+  LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD(
+      "advanced.load-balancing-policy.default-lwt-request-routing-method"),
+
+  /**
+   * The list of client-routes endpoints for cloud private-endpoint deployments (e.g. AWS
+   * PrivateLink, Azure Private Link, GCP Private Service Connect).
+   *
+   * <p>Each element is a HOCON object with the following fields:
+   *
+   * <ul>
+   *   <li>{@code connection-id} (string, required) – opaque string that identifies the cloud
+   *       private-endpoint connection in the {@code system.client_routes} table.
+   *   <li>{@code connection-addr} (string, optional) – DNS name or IP address that overrides the
+   *       {@code address} column from the {@code system.client_routes} table for the matching
+   *       {@code connection_id}. Must not include a port (e.g. {@code "host.example.com"} or {@code
+   *       "10.0.1.5"}).
+   * </ul>
+   *
+   * <p>This option is read as a raw HOCON list-of-objects; it cannot be read via the flat {@link
+   * com.datastax.oss.driver.api.core.config.DriverExecutionProfile} typed getters. Parsing is
+   * performed directly from the underlying Typesafe {@code Config} object inside {@code
+   * DefaultDriverContext}.
+   *
+   * <p>Value type: list of HOCON objects
+   */
+  CLIENT_ROUTES_ENDPOINTS("advanced.client-routes.endpoints"),
+
+  /**
+   * The native transport port of the cluster nodes.
+   *
+   * <p>Used as the fallback port for {@code broadcastRpcAddress} when system tables lack port
+   * columns. Only needed for clusters using a non-standard native transport port. Defaults to 9042.
+   *
+   * <p>Value type: {@link Integer}
+   */
+  CLIENT_ROUTES_NATIVE_TRANSPORT_PORT("advanced.client-routes.native-transport-port"),
+
+  /**
+   * Whether NLB shard awareness is enabled for client-routes deployments.
+   *
+   * <p>When {@code true}, the driver assumes the NLB is configured to forward the driver's original
+   * source port to ScyllaDB (e.g. via Proxy Protocol v2), enabling shard-aware connection routing
+   * end-to-end through the NLB. Requires {@code advanced-shard-awareness.enabled = true} (the
+   * default).
+   *
+   * <p>Value type: boolean
+   */
+  CLIENT_ROUTES_SHARD_AWARENESS_ENABLED("advanced.client-routes.shard-awarness-enabled");
 
   private final String path;
 

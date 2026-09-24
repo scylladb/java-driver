@@ -19,23 +19,22 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
 class LocalReplicationStrategy implements ReplicationStrategy {
 
   @Override
-  public Map<Token, Set<Node>> computeReplicasByToken(
+  public Map<Token, List<Node>> computeReplicasListByToken(
       Map<Token, Node> tokenToPrimary, List<Token> ring) {
-    ImmutableMap.Builder<Token, Set<Node>> result = ImmutableMap.builder();
+    ImmutableMap.Builder<Token, List<Node>> result = ImmutableMap.builder();
     // Each token maps to exactly one node
     for (Map.Entry<Token, Node> entry : tokenToPrimary.entrySet()) {
-      result.put(entry.getKey(), ImmutableSet.of(entry.getValue()));
+      result.put(entry.getKey(), ImmutableList.of(entry.getValue()));
     }
     return result.build();
   }

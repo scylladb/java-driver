@@ -19,6 +19,7 @@ package com.datastax.dse.driver.internal.core.graph;
 
 import com.datastax.dse.driver.api.core.graph.BatchGraphStatement;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -150,5 +151,11 @@ public class DefaultBatchGraphStatement extends GraphStatementBase<BatchGraphSta
   @Override
   public Iterator<GraphTraversal> iterator() {
     return this.traversals.iterator();
+  }
+
+  @NonNull
+  @Override
+  public RequestRoutingType getRequestRoutingType() {
+    return RequestRoutingType.REGULAR;
   }
 }

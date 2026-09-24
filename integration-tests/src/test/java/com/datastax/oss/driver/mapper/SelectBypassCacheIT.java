@@ -39,7 +39,7 @@ import com.datastax.oss.driver.api.mapper.annotations.Insert;
 import com.datastax.oss.driver.api.mapper.annotations.Mapper;
 import com.datastax.oss.driver.api.mapper.annotations.PartitionKey;
 import com.datastax.oss.driver.api.mapper.annotations.Select;
-import com.datastax.oss.driver.api.testinfra.CassandraSkip;
+import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
@@ -54,7 +54,7 @@ import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
 @Category(ParallelizableTests.class)
-@CassandraSkip(description = "BYPASS CACHE clause is a ScyllaDB CQL Extension")
+@ScyllaOnly(description = "BYPASS CACHE clause is a ScyllaDB CQL Extension")
 @ScyllaRequirement(
     minOSS = "3.1.0",
     minEnterprise = "2020.1.0",

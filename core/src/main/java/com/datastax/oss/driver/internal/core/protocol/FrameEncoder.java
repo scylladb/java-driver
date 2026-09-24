@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.protocol;
 import com.datastax.oss.driver.api.core.connection.FrameTooLongException;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -32,17 +33,20 @@ import net.jcip.annotations.ThreadSafe;
 public class FrameEncoder extends MessageToMessageEncoder<Frame> {
 
   private final FrameCodec<ByteBuf> frameCodec;
+  private final ProtocolFeatures protocolFeatures;
   private final int maxFrameLength;
 
-  public FrameEncoder(FrameCodec<ByteBuf> frameCodec, int maxFrameLength) {
+  public FrameEncoder(
+      FrameCodec<ByteBuf> frameCodec, ProtocolFeatures protocolFeatures, int maxFrameLength) {
     super(Frame.class);
     this.frameCodec = frameCodec;
+    this.protocolFeatures = protocolFeatures;
     this.maxFrameLength = maxFrameLength;
   }
 
   @Override
   protected void encode(ChannelHandlerContext ctx, Frame frame, List<Object> out) throws Exception {
-    ByteBuf buffer = frameCodec.encode(frame);
+    ByteBuf buffer = frameCodec.encode(frame, protocolFeatures);
     int actualLength = buffer.readableBytes();
     if (actualLength > maxFrameLength) {
       throw new FrameTooLongException(

@@ -19,9 +19,11 @@ package com.datastax.oss.driver.api.core.cql;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
+import com.datastax.oss.driver.internal.core.cql.RequestRoutingTypeAccessor;
 import com.datastax.oss.driver.internal.core.util.RoutingKey;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -61,6 +63,7 @@ public abstract class StatementBuilder<
   @Nullable protected Duration timeout;
   @Nullable protected Node node;
   protected int nowInSeconds = Statement.NO_NOW_IN_SECONDS;
+  @Nullable protected RequestRoutingType requestRoutingType;
 
   protected StatementBuilder() {
     // nothing to do
@@ -87,6 +90,15 @@ public abstract class StatementBuilder<
     this.timeout = template.getTimeout();
     this.node = template.getNode();
     this.nowInSeconds = template.getNowInSeconds();
+    this.requestRoutingType = getConfiguredRequestRoutingType(template);
+  }
+
+  @Nullable
+  private RequestRoutingType getConfiguredRequestRoutingType(StatementT template) {
+    if (template instanceof RequestRoutingTypeAccessor) {
+      return ((RequestRoutingTypeAccessor) template).getConfiguredRequestRoutingType();
+    }
+    return template.getRequestRoutingType();
   }
 
   /** @see Statement#setExecutionProfileName(String) */
@@ -279,6 +291,12 @@ public abstract class StatementBuilder<
   /** @see Statement#setNowInSeconds(int) */
   public SelfT setNowInSeconds(int nowInSeconds) {
     this.nowInSeconds = nowInSeconds;
+    return self;
+  }
+
+  @NonNull
+  public SelfT setRequestRoutingType(@Nullable RequestRoutingType requestRoutingType) {
+    this.requestRoutingType = requestRoutingType;
     return self;
   }
 

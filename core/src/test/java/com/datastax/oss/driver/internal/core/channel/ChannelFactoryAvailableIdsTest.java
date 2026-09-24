@@ -61,7 +61,11 @@ public class ChannelFactoryAvailableIdsTest extends ChannelFactoryTestBase {
     // When
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
-            SERVER_ADDRESS, DriverChannelOptions.builder().build(), NoopNodeMetricUpdater.INSTANCE);
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.builder().build(),
+            NoopNodeMetricUpdater.INSTANCE);
     completeSimpleChannelInit();
 
     // Then

@@ -69,7 +69,7 @@ public class MailboxServiceImpl implements MailboxService {
   protected void createSchema() {
     session.execute("DROP KEYSPACE IF EXISTS test_osgi");
     session.execute(
-        "CREATE KEYSPACE IF NOT EXISTS test_osgi with replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}");
+        "CREATE KEYSPACE IF NOT EXISTS test_osgi with replication = {'class': 'NetworkTopologyStrategy', 'dc1' : 1}");
     session.execute(
         "CREATE TABLE "
             + keyspace

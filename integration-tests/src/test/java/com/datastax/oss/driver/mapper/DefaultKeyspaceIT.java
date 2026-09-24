@@ -75,7 +75,7 @@ public class DefaultKeyspaceIT {
     session.execute(
         SimpleStatement.builder(
                 String.format(
-                    "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+                    "CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}",
                     DEFAULT_KEYSPACE))
             .setExecutionProfile(SESSION_RULE.slowProfile())
             .build());

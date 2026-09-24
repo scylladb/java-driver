@@ -28,7 +28,7 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.0.1</version>
+    <version>4.19.0.10-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-distribution-source</artifactId>
   <packaging>pom</packaging>
@@ -71,13 +71,6 @@
           <skip>true</skip>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <configuration>
-          <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
   <profiles>
@@ -107,7 +100,6 @@
           <plugin>
             <groupId>net.nicoulaj.maven.plugins</groupId>
             <artifactId>checksum-maven-plugin</artifactId>
-            <version>1.7</version>
             <executions>
               <execution>
                 <goals>

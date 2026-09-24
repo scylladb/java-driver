@@ -61,7 +61,8 @@ class KeyspaceTokenMap {
     try {
       ReplicationStrategy strategy = replicationStrategyFactory.newInstance(replicationConfig);
 
-      Map<Token, Set<Node>> replicasByToken = strategy.computeReplicasByToken(tokenToPrimary, ring);
+      Map<Token, List<Node>> replicasByToken =
+          strategy.computeReplicasListByToken(tokenToPrimary, ring);
       SetMultimap<Node, TokenRange> tokenRangesByNode;
       if (ring.size() == 1) {
         // We forced the single range to ]minToken,minToken], make sure to use that instead of
@@ -87,13 +88,13 @@ class KeyspaceTokenMap {
 
   private final List<Token> ring;
   private final SetMultimap<Node, TokenRange> tokenRangesByNode;
-  private final Map<Token, Set<Node>> replicasByToken;
+  private final Map<Token, List<Node>> replicasByToken;
   private final TokenFactory tokenFactory;
 
   private KeyspaceTokenMap(
       List<Token> ring,
       SetMultimap<Node, TokenRange> tokenRangesByNode,
-      Map<Token, Set<Node>> replicasByToken,
+      Map<Token, List<Node>> replicasByToken,
       TokenFactory tokenFactory) {
     this.ring = ring;
     this.tokenRangesByNode = tokenRangesByNode;
@@ -105,16 +106,16 @@ class KeyspaceTokenMap {
     return tokenRangesByNode.get(replica);
   }
 
-  Set<Node> getReplicas(Partitioner partitioner, ByteBuffer partitionKey) {
+  List<Node> getReplicas(Partitioner partitioner, ByteBuffer partitionKey) {
     if (partitioner == null) {
       partitioner = tokenFactory;
     }
     return getReplicas(partitioner.hash(partitionKey));
   }
 
-  Set<Node> getReplicas(Token token) {
+  List<Node> getReplicas(Token token) {
     // If the token happens to be one of the "primary" tokens, get result directly
-    Set<Node> nodes = replicasByToken.get(token);
+    List<Node> nodes = replicasByToken.get(token);
     if (nodes != null) {
       return nodes;
     }
@@ -130,7 +131,7 @@ class KeyspaceTokenMap {
   }
 
   private static SetMultimap<Node, TokenRange> buildTokenRangesByNode(
-      Set<TokenRange> tokenRanges, Map<Token, Set<Node>> replicasByToken) {
+      Set<TokenRange> tokenRanges, Map<Token, List<Node>> replicasByToken) {
     ImmutableSetMultimap.Builder<Node, TokenRange> result = ImmutableSetMultimap.builder();
     for (TokenRange range : tokenRanges) {
       for (Node node : replicasByToken.get(range.getEnd())) {

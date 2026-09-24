@@ -113,15 +113,15 @@ public class DefaultTokenMapTest {
     assertThat(tokenMap.getTokenRanges(KS1, node3)).containsOnly(RANGE23, RANGE12);
     assertThat(tokenMap.getTokenRanges(KS1, node4)).containsOnly(RANGE34, RANGE23);
 
-    assertThat(tokenMap.getReplicas(KS1, RANGE12)).containsOnly(node2, node3);
-    assertThat(tokenMap.getReplicas(KS1, RANGE23)).containsOnly(node3, node4);
-    assertThat(tokenMap.getReplicas(KS1, RANGE34)).containsOnly(node1, node4);
-    assertThat(tokenMap.getReplicas(KS1, RANGE41)).containsOnly(node1, node2);
+    assertThat(tokenMap.getReplicasList(KS1, RANGE12)).containsOnly(node2, node3);
+    assertThat(tokenMap.getReplicasList(KS1, RANGE23)).containsOnly(node3, node4);
+    assertThat(tokenMap.getReplicasList(KS1, RANGE34)).containsOnly(node1, node4);
+    assertThat(tokenMap.getReplicasList(KS1, RANGE41)).containsOnly(node1, node2);
 
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY12)).containsOnly(node2, node3);
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY23)).containsOnly(node3, node4);
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY34)).containsOnly(node1, node4);
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY41)).containsOnly(node1, node2);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY12)).containsOnly(node2, node3);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY23)).containsOnly(node3, node4);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY34)).containsOnly(node1, node4);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY41)).containsOnly(node1, node2);
 
     // KS2 is only replicated on DC1
     assertThat(tokenMap.getTokenRanges(KS2, node1)).containsOnly(RANGE41, RANGE34);
@@ -129,15 +129,15 @@ public class DefaultTokenMapTest {
     assertThat(tokenMap.getTokenRanges(KS2, node2)).isEmpty();
     assertThat(tokenMap.getTokenRanges(KS2, node4)).isEmpty();
 
-    assertThat(tokenMap.getReplicas(KS2, RANGE12)).containsOnly(node3);
-    assertThat(tokenMap.getReplicas(KS2, RANGE23)).containsOnly(node3);
-    assertThat(tokenMap.getReplicas(KS2, RANGE34)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS2, RANGE41)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, RANGE12)).containsOnly(node3);
+    assertThat(tokenMap.getReplicasList(KS2, RANGE23)).containsOnly(node3);
+    assertThat(tokenMap.getReplicasList(KS2, RANGE34)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, RANGE41)).containsOnly(node1);
 
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY12)).containsOnly(node3);
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY23)).containsOnly(node3);
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY34)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY41)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY12)).containsOnly(node3);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY23)).containsOnly(node3);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY34)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY41)).containsOnly(node1);
   }
 
   @Test
@@ -157,18 +157,18 @@ public class DefaultTokenMapTest {
     assertThat(tokenMap.getTokenRanges()).containsExactly(FULL_RING);
 
     assertThat(tokenMap.getTokenRanges(KS1, node1)).containsOnly(FULL_RING);
-    assertThat(tokenMap.getReplicas(KS1, FULL_RING)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY12)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY23)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY34)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS1, ROUTING_KEY41)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS1, FULL_RING)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY12)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY23)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY34)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS1, ROUTING_KEY41)).containsOnly(node1);
 
     assertThat(tokenMap.getTokenRanges(KS2, node1)).containsOnly(FULL_RING);
-    assertThat(tokenMap.getReplicas(KS2, FULL_RING)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY12)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY23)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY34)).containsOnly(node1);
-    assertThat(tokenMap.getReplicas(KS2, ROUTING_KEY41)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, FULL_RING)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY12)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY23)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY34)).containsOnly(node1);
+    assertThat(tokenMap.getReplicasList(KS2, ROUTING_KEY41)).containsOnly(node1);
   }
 
   @Test

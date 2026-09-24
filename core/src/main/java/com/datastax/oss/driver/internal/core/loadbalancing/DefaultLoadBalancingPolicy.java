@@ -38,16 +38,15 @@ import com.datastax.oss.driver.shaded.guava.common.collect.MapMaker;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.BitSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Queue;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLongArray;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
@@ -68,7 +67,7 @@ import org.slf4j.LoggerFactory;
  * }
  * </pre>
  *
- * See {@code reference.conf} (in the manual or core driver JAR) for more details.
+ * <p>See {@code reference.conf} (in the manual or core driver JAR) for more details.
  *
  * <p><b>Local datacenter</b>: This implementation requires a local datacenter to be defined,
  * otherwise it will throw an {@link IllegalStateException}. A local datacenter can be supplied
@@ -128,116 +127,27 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     return new MandatoryLocalDcHelper(context, profile, logPrefix).discoverLocalDc(nodes);
   }
 
+  /**
+   * Builds a query plan that prioritizes local replicas, shuffles them for balance, and then
+   * round-robins the remaining local nodes.
+   */
   @NonNull
   @Override
-  public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
-    if (!avoidSlowReplicas) {
-      return super.newQueryPlan(request, session);
-    }
-
-    // Take a snapshot since the set is concurrent:
+  protected Queue<Node> newQueryPlanRegular(@Nullable Request request, @Nullable Session session) {
+    List<Node> replicas = getReplicas(request, session);
     Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();
-
-    Set<Node> allReplicas = getReplicas(request, session);
     int replicaCount = 0; // in currentNodes
-    int localRackReplicaCount = 0; // in currentNodes
-    String localRack = getLocalRack();
+    if (!replicas.isEmpty()) {
+      int[] counts = moveReplicasToFront(currentNodes, replicas);
+      replicaCount = counts[0];
 
-    if (!allReplicas.isEmpty()) {
-
-      // Move replicas to the beginning of the plan
-      // Replicas in local rack should precede other replicas
-      for (int i = 0; i < currentNodes.length; i++) {
-        Node node = (Node) currentNodes[i];
-        if (allReplicas.contains(node)) {
-          if (Objects.equals(node.getRack(), localRack)
-              && Objects.equals(node.getDatacenter(), getLocalDatacenter())) {
-            ArrayUtils.bubbleUp(currentNodes, i, localRackReplicaCount);
-            localRackReplicaCount++;
-          } else {
-            ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
-          }
-          replicaCount++;
-        }
-      }
+      int localRackReplicaCount = counts[1]; // in currentNodes
 
       if (replicaCount > 1) {
-        if (localRack != null && localRackReplicaCount > 0) {
-          // Shuffle only replicas that are in the local rack
-          shuffleHead(currentNodes, localRackReplicaCount);
-          // Shuffles only replicas that are not in local rack
-          shuffleInRange(currentNodes, localRackReplicaCount, replicaCount - 1);
-        } else {
-          shuffleHead(currentNodes, replicaCount);
-        }
+        shuffleLocalRackReplicasAndReplicas(currentNodes, replicaCount, localRackReplicaCount);
 
-        if (replicaCount > 2) {
-
-          assert session != null;
-
-          // Test replicas health
-          Node newestUpReplica = null;
-          BitSet unhealthyReplicas = null; // bit mask storing indices of unhealthy replicas
-          long mostRecentUpTimeNanos = -1;
-          long now = nanoTime();
-          for (int i = 0; i < replicaCount; i++) {
-            Node node = (Node) currentNodes[i];
-            assert node != null;
-            Long upTimeNanos = upTimes.get(node);
-            if (upTimeNanos != null
-                && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
-                && upTimeNanos - mostRecentUpTimeNanos > 0) {
-              newestUpReplica = node;
-              mostRecentUpTimeNanos = upTimeNanos;
-            }
-            if (newestUpReplica == null && isUnhealthy(node, session, now)) {
-              if (unhealthyReplicas == null) {
-                unhealthyReplicas = new BitSet(replicaCount);
-              }
-              unhealthyReplicas.set(i);
-            }
-          }
-
-          // When:
-          // - there isn't any newly UP replica and
-          // - there is one or more unhealthy replicas and
-          // - there is a majority of healthy replicas
-          int unhealthyReplicasCount =
-              unhealthyReplicas == null ? 0 : unhealthyReplicas.cardinality();
-          if (newestUpReplica == null
-              && unhealthyReplicasCount > 0
-              && unhealthyReplicasCount < (replicaCount / 2.0)) {
-
-            // Reorder the unhealthy replicas to the back of the list
-            // Start from the back of the replicas, then move backwards;
-            // stop once all unhealthy replicas are moved to the back.
-            int counter = 0;
-            for (int i = replicaCount - 1; i >= 0 && counter < unhealthyReplicasCount; i--) {
-              if (unhealthyReplicas.get(i)) {
-                ArrayUtils.bubbleDown(currentNodes, i, replicaCount - 1 - counter);
-                counter++;
-              }
-            }
-          }
-
-          // When:
-          // - there is a newly UP replica and
-          // - the replica in first or second position is the most recent replica marked as UP and
-          // - dice roll 1d4 != 1
-          else if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
-              && diceRoll1d4() != 1) {
-
-            // Send it to the back of the replicas
-            ArrayUtils.bubbleDown(
-                currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
-          }
-
-          // Reorder the first two replicas in the shuffled list based on the number of
-          // in-flight requests
-          if (getInFlight((Node) currentNodes[0], session)
-              > getInFlight((Node) currentNodes[1], session)) {
-            ArrayUtils.swap(currentNodes, 0, 1);
-          }
+        if (replicaCount > 2 && avoidSlowReplicas) {
+          avoidSlowReplicas(Objects.requireNonNull(session), currentNodes, replicaCount);
         }
       }
     }
@@ -253,6 +163,102 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
 
     QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
     return maybeAddDcFailover(request, plan);
+  }
+
+  private int[] moveReplicasToFront(Object[] currentNodes, List<Node> allReplicas) {
+    int replicaCount = 0, localRackReplicaCount = 0;
+    for (int i = 0; i < currentNodes.length; i++) {
+      Node node = (Node) currentNodes[i];
+      if (allReplicas.contains(node)) {
+        if (Objects.equals(node.getRack(), getLocalRack())
+            && Objects.equals(node.getDatacenter(), getLocalDatacenter())) {
+          ArrayUtils.bubbleUp(currentNodes, i, localRackReplicaCount);
+          localRackReplicaCount++;
+        } else {
+          ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
+        }
+        replicaCount++;
+      }
+    }
+    return new int[] {replicaCount, localRackReplicaCount};
+  }
+
+  private void shuffleLocalRackReplicasAndReplicas(
+      Object[] currentNodes, int replicaCount, int localRackReplicaCount) {
+    if (getLocalRack() != null && localRackReplicaCount > 0) {
+      // Shuffle only replicas that are in the local rack
+      shuffleHead(currentNodes, localRackReplicaCount);
+      // Shuffles only replicas that are not in local rack
+      shuffleInRange(currentNodes, localRackReplicaCount, replicaCount - 1);
+    } else {
+      shuffleHead(currentNodes, replicaCount);
+    }
+  }
+
+  private void avoidSlowReplicas(
+      @NonNull Session session, Object[] currentNodes, int replicaCount) {
+    // Test replicas health
+    Node newestUpReplica = null;
+    BitSet unhealthyReplicas = null; // bit mask storing indices of unhealthy replicas
+    long mostRecentUpTimeNanos = -1;
+    long now = nanoTime();
+    for (int i = 0; i < replicaCount; i++) {
+      Node node = (Node) currentNodes[i];
+      assert node != null;
+      Long upTimeNanos = upTimes.get(node);
+      if (upTimeNanos != null
+          && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
+          && upTimeNanos - mostRecentUpTimeNanos > 0) {
+        newestUpReplica = node;
+        mostRecentUpTimeNanos = upTimeNanos;
+      }
+      if (newestUpReplica == null && isUnhealthy(node, session, now)) {
+        if (unhealthyReplicas == null) {
+          unhealthyReplicas = new BitSet(replicaCount);
+        }
+        unhealthyReplicas.set(i);
+      }
+    }
+
+    // When:
+    // - there isn't any newly UP replica and
+    // - there is one or more unhealthy replicas and
+    // - there is a majority of healthy replicas
+    int unhealthyReplicasCount = unhealthyReplicas == null ? 0 : unhealthyReplicas.cardinality();
+    if (newestUpReplica == null
+        && unhealthyReplicasCount > 0
+        && unhealthyReplicasCount < (replicaCount / 2.0)) {
+
+      // Reorder the unhealthy replicas to the back of the list
+      // Start from the back of the replicas, then move backwards;
+      // stop once all unhealthy replicas are moved to the back.
+      int counter = 0;
+      for (int i = replicaCount - 1; i >= 0 && counter < unhealthyReplicasCount; i--) {
+        if (unhealthyReplicas.get(i)) {
+          ArrayUtils.bubbleDown(currentNodes, i, replicaCount - 1 - counter);
+          counter++;
+        }
+      }
+    }
+
+    // When:
+    // - there is a newly UP replica and
+    // - the replica in first or second position is the most recent replica marked as UP and
+    // - dice roll 1d4 != 1
+    else if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
+        && randomNextInt(4) != 1) {
+
+      // Send it to the back of the replicas
+      ArrayUtils.bubbleDown(
+          currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
+    }
+
+    // Reorder the first two replicas in the shuffled list based on the number of
+    // in-flight requests
+    if (getInFlight((Node) currentNodes[0], session)
+        > getInFlight((Node) currentNodes[1], session)) {
+      ArrayUtils.swap(currentNodes, 0, 1);
+    }
   }
 
   @Override
@@ -279,11 +285,6 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   /** Exposed as a protected method so that it can be accessed by tests */
   protected long nanoTime() {
     return System.nanoTime();
-  }
-
-  /** Exposed as a protected method so that it can be accessed by tests */
-  protected int diceRoll1d4() {
-    return ThreadLocalRandom.current().nextInt(4);
   }
 
   protected boolean isUnhealthy(@NonNull Node node, @NonNull Session session, long now) {
@@ -325,8 +326,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     @VisibleForTesting protected final OptionalLong newest;
 
     private NodeResponseRateSample() {
-      long now = nanoTime();
-      this.oldest = now;
+      this.oldest = nanoTime();
       this.newest = OptionalLong.empty();
     }
 

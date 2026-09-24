@@ -30,8 +30,10 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
-import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
@@ -40,16 +42,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
 
-@ScyllaSkip(
-    description = "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledCCMFailure")
 public class AddedNodeIT {
+  @Rule public final BackendRequirementRule backendRequirementRule = new BackendRequirementRule();
 
   @ClassRule
   public static final CustomCcmRule CCM_RULE = CustomCcmRule.builder().withNodes(3).build();
 
   @Test
+  @BackendRequirement(type = BackendType.SCYLLA)
+  // It is broken for cassandra: https://github.com/scylladb/java-driver/issues/575
   public void should_signal_and_create_pool_when_node_gets_added() {
     AddListener addListener = new AddListener();
     try (CqlSession session = SessionUtils.newSession(CCM_RULE, null, addListener, null, null)) {

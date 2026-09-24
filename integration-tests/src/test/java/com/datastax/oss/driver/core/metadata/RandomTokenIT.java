@@ -27,6 +27,8 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
+import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.metadata.token.RandomToken;
@@ -36,9 +38,9 @@ import org.junit.ClassRule;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TestRule;
 
-@ScyllaSkip(
-    description =
-        "@IntegrationTestDisabledScyllaFailure @IntegrationTestDisabledScyllaUnsupportedFunctionality")
+@ScyllaSkip(description = "scylladb/java-driver#568 - fails to start scylla")
+@BackendRequirement(type = BackendType.CASSANDRA)
+@BackendRequirement(type = BackendType.DSE)
 public class RandomTokenIT extends TokenITBase {
 
   private static final CustomCcmRule CCM_RULE =

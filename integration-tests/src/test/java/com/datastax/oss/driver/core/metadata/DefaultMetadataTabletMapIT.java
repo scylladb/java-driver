@@ -1,7 +1,12 @@
 package com.datastax.oss.driver.core.metadata;
 
+import static org.awaitility.Awaitility.await;
+
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
+import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
@@ -10,8 +15,9 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.KeyspaceTableNamePair;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.Tablet;
-import com.datastax.oss.driver.api.testinfra.CassandraSkip;
+import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
@@ -20,13 +26,16 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -40,12 +49,15 @@ import org.slf4j.LoggerFactory;
     minOSS = "6.0.0",
     minEnterprise = "2024.2",
     description = "Needs to support tablets")
-@CassandraSkip(description = "Tablets are ScyllaDB-only extension")
+@ScyllaOnly(description = "Tablets are ScyllaDB-only extension")
 public class DefaultMetadataTabletMapIT {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultMetadataTabletMapIT.class);
   private static final CustomCcmRule CCM_RULE =
       CustomCcmRule.builder()
-          .withNodes(2)
+          // Drop nodes back to 2 once https://github.com/scylladb/scylladb/issues/29874 is fixed
+          // After 2026.1 Scylla does not send tablet hint on a wrong-shard for LWT queries
+          // 3rd node makes one node completely incorrect, that is when Scylla sends tablet hint
+          .withNodes(3)
           .withCassandraConfiguration(
               "experimental_features", "['consistent-topology-changes','tablets']")
           .build();
@@ -63,6 +75,8 @@ public class DefaultMetadataTabletMapIT {
   private static final int INITIAL_TABLETS = 32;
   private static final int QUERIES = 1600;
   private static final int REPLICATION_FACTOR = 2;
+  private static final Version SCYLLA_LWT_TABLETS_SUPPORT_VERSION =
+      Objects.requireNonNull(Version.parse("2026.1"));
   private static final String KEYSPACE_NAME = "tabletsTest";
   private static final String TABLE_NAME = "tabletsTable";
   private static final String CREATE_KEYSPACE_QUERY =
@@ -115,6 +129,14 @@ public class DefaultMetadataTabletMapIT {
 
   private static final SimpleStatement STMT_SELECT_CK_CONCRETE =
       buildStatement("SELECT pk, ck FROM %s.%s WHERE pk = ? AND ck = 1");
+
+  private static final SimpleStatement STMT_SELECT_LOCAL_SERIAL =
+      buildStatement("SELECT pk,ck FROM %s.%s WHERE pk = ? AND ck = ?")
+          .setConsistencyLevel(DefaultConsistencyLevel.LOCAL_SERIAL);
+
+  private static final SimpleStatement STMT_SELECT_SERIAL =
+      buildStatement("SELECT pk,ck FROM %s.%s WHERE pk = ? AND ck = ?")
+          .setConsistencyLevel(DefaultConsistencyLevel.SERIAL);
 
   private static final SimpleStatement STMT_UPDATE =
       buildStatement("UPDATE %s.%s SET val = 1 WHERE pk = ? AND ck = ?");
@@ -191,6 +213,9 @@ public class DefaultMetadataTabletMapIT {
     statements.put("SELECT_CONCRETE_PREPARED", s -> s.prepare(STMT_SELECT_CONCRETE).bind());
     statements.put("SELECT_PK_CONCRETE_PREPARED", s -> s.prepare(STMT_SELECT_PK_CONCRETE).bind(2));
     statements.put("SELECT_CK_CONCRETE_PREPARED", s -> s.prepare(STMT_SELECT_CK_CONCRETE).bind(2));
+    statements.put(
+        "SELECT_LOCAL_SERIAL_PREPARED", s -> s.prepare(STMT_SELECT_LOCAL_SERIAL).bind(2, 2));
+    statements.put("SELECT_SERIAL_PREPARED", s -> s.prepare(STMT_SELECT_SERIAL).bind(2, 2));
     statements.put("INSERT_CONCRETE", s -> STMT_INSERT_CONCRETE);
     statements.put("INSERT_PREPARED", s -> s.prepare(STMT_INSERT).bind(2, 2));
     statements.put("INSERT_NO_KS_PREPARED", s -> s.prepare(STMT_INSERT_NO_KS).bind(2, 2));
@@ -223,55 +248,75 @@ public class DefaultMetadataTabletMapIT {
           // Scylla does not return tablet info for queries with PK built into query
           continue;
         }
-        if (stmtEntry.getKey().contains("LWT")) {
-          // LWT is not yet supported by scylla on tables with tablets
+        if ((stmtEntry.getKey().contains("LWT") || stmtEntry.getKey().contains("SERIAL"))
+            && !isLWTTabletsSupported()) {
+          // LWT is supported on tables with tablets starting with Scylla 2026.1.
           continue;
         }
         if (sessionEntry.getKey().equals("REGULAR") && stmtEntry.getKey().contains("NO_KS")) {
           // Preparation of the statements without KS will fail on the session with no ks specified
           continue;
         }
-        CqlSession session = sessionEntry.getValue().get();
-        // Empty out tablets information
-        if (session.getMetadata().getTabletMap().isPresent()) {
-          session
-              .getMetadata()
-              .getTabletMap()
-              .get()
-              .removeByKeyspace(CqlIdentifier.fromCql(KEYSPACE_NAME));
-        }
-        Statement stmt;
-        try {
-          stmt = stmtEntry.getValue().apply(session);
-        } catch (Exception e) {
-          RuntimeException ex =
-              new RuntimeException(
+        try (CqlSession session = sessionEntry.getValue().get()) {
+          // Empty out tablets information
+          if (session.getMetadata().getTabletMap().isPresent()) {
+            session
+                .getMetadata()
+                .getTabletMap()
+                .get()
+                .removeByKeyspace(CqlIdentifier.fromCql(KEYSPACE_NAME));
+          }
+          Statement stmt;
+          try {
+            stmt = stmtEntry.getValue().apply(session);
+          } catch (Exception e) {
+            RuntimeException ex =
+                new RuntimeException(
+                    String.format(
+                        "Failed to build statement %s on session %s",
+                        stmtEntry.getKey(), sessionEntry.getKey()));
+            ex.addSuppressed(e);
+            throw ex;
+          }
+
+          if (stmtEntry.getKey().contains("SERIAL")) {
+            if (stmt.getRequestRoutingType() != RequestRoutingType.LWT) {
+              testErrors.add(
                   String.format(
-                      "Failed to build statement %s on session %s",
+                      "Statement %s on session %s is routed as regular query",
                       stmtEntry.getKey(), sessionEntry.getKey()));
-          ex.addSuppressed(e);
-          throw ex;
-        }
-        try {
-          if (!executeOnAllHostsAndReturnIfResultHasTabletsInfo(session, stmt)) {
+              continue;
+            }
+          }
+
+          try {
+            if (!executeOnAllHostsAndReturnIfResultHasTabletsInfo(session, stmt)) {
+              testErrors.add(
+                  String.format(
+                      "Statement %s on session %s got no tablet info",
+                      stmtEntry.getKey(), sessionEntry.getKey()));
+              continue;
+            }
+          } catch (Exception e) {
             testErrors.add(
                 String.format(
-                    "Statement %s on session %s got no tablet info",
+                    "Failed to execute statement %s on session %s: %s",
+                    stmtEntry.getKey(), sessionEntry.getKey(), e));
+            continue;
+          }
+          if (!waitSessionLearnedTabletInfo(session)) {
+            testErrors.add(
+                String.format(
+                    "Statement %s on session %s did not trigger session tablets update",
                     stmtEntry.getKey(), sessionEntry.getKey()));
             continue;
           }
-        } catch (Exception e) {
-          testErrors.add(
-              String.format(
-                  "Failed to execute statement %s on session %s: %s",
-                  stmtEntry.getKey(), sessionEntry.getKey(), e));
-          continue;
-        }
-        if (!waitSessionLearnedTabletInfo(session)) {
-          testErrors.add(
-              String.format(
-                  "Statement %s on session %s did not trigger session tablets update",
-                  stmtEntry.getKey(), sessionEntry.getKey()));
+          if (!checkIfRoutedProperly(session, stmt)) {
+            testErrors.add(
+                String.format(
+                    "Statement %s on session %s was routed to different nodes",
+                    stmtEntry.getKey(), sessionEntry.getKey()));
+          }
         }
       }
     }
@@ -284,61 +329,89 @@ public class DefaultMetadataTabletMapIT {
   }
 
   @Test
-  public void should_receive_each_tablet_exactly_once() {
-    CqlSession session =
-        CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build();
+  public void should_receive_all_tablets_and_stop_receiving_tablet_info() {
     int counter = 0;
-    PreparedStatement preparedStatement = session.prepare(STMT_INSERT);
-    for (int i = 1; i <= QUERIES; i++) {
-      if (executeAndReturnIfResultHasTabletsInfo(session, preparedStatement.bind(i, i))) {
-        counter++;
+    try (CqlSession session =
+        CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build()) {
+      PreparedStatement preparedStatement = session.prepare(STMT_INSERT);
+      for (int i = 1; i <= QUERIES; i++) {
+        if (executeAndReturnIfResultHasTabletsInfo(session, preparedStatement.bind(i, i))) {
+          counter++;
+        }
       }
-    }
-    Assert.assertEquals(INITIAL_TABLETS, counter);
-    assertSessionTabletMapIsFilled(session);
-    session.close();
-
-    session = CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build();
-    counter = 0;
-    preparedStatement = session.prepare(STMT_SELECT);
-    for (int i = 1; i <= QUERIES; i++) {
-      if (executeAndReturnIfResultHasTabletsInfo(session, preparedStatement.bind(i, i))) {
-        counter++;
-      }
+      assertReceivedAtLeastOnePayloadPerTablet(counter);
+      assertSessionTabletMapIsFilled(session);
     }
 
-    LOG.debug("Ran first set of queries");
+    try (CqlSession session =
+        CqlSession.builder().addContactEndPoints(CCM_RULE.getContactPoints()).build()) {
+      counter = 0;
+      PreparedStatement preparedStatement = session.prepare(STMT_SELECT);
+      for (int i = 1; i <= QUERIES; i++) {
+        if (executeAndReturnIfResultHasTabletsInfo(session, preparedStatement.bind(i, i))) {
+          counter++;
+        }
+      }
 
-    // With enough queries we should hit a wrong node for each tablet exactly once.
-    Assert.assertEquals(INITIAL_TABLETS, counter);
-    assertSessionTabletMapIsFilled(session);
+      LOG.debug("Ran first set of queries");
 
-    // All tablet information should be available by now (unless for some reason cluster did sth on
-    // its own)
-    // We should not receive any tablet payloads now, since they are sent only on mismatch.
-    for (int i = 1; i <= QUERIES; i++) {
+      // With enough queries we should hit a wrong node for each tablet at least once.
+      assertReceivedAtLeastOnePayloadPerTablet(counter);
+      assertSessionTabletMapIsFilled(session);
 
-      ResultSet rs = session.execute(preparedStatement.bind(i, i));
-      Map<String, ByteBuffer> payload = rs.getExecutionInfo().getIncomingPayload();
+      // All tablet information should be available by now (unless for some reason cluster did sth
+      // on its own). We should not receive any tablet payloads now, since they are sent only on
+      // mismatch.
+      for (int i = 1; i <= QUERIES; i++) {
 
-      if (payload.containsKey(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY)) {
-        throw new RuntimeException(
-            "Received non empty payload with tablets routing information: " + payload);
+        ResultSet rs = session.execute(preparedStatement.bind(i, i));
+        Map<String, ByteBuffer> payload = rs.getExecutionInfo().getIncomingPayload();
+
+        if (payload.containsKey(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY)) {
+          throw new RuntimeException(
+              "Received non empty payload with tablets routing information: " + payload);
+        }
       }
     }
   }
 
+  private static void assertReceivedAtLeastOnePayloadPerTablet(int payloadsCount) {
+    Assert.assertTrue(
+        String.format(
+            "Expected at least %d tablet payloads, got %d", INITIAL_TABLETS, payloadsCount),
+        payloadsCount >= INITIAL_TABLETS);
+  }
+
   private static boolean waitSessionLearnedTabletInfo(CqlSession session) {
-    if (isSessionLearnedTabletInfo(session)) {
-      return true;
-    }
-    // Wait till tablet update, which is async, is completed
     try {
-      Thread.sleep(200);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .pollInterval(Duration.ofMillis(50))
+          .until(() -> isSessionLearnedTabletInfo(session));
+      return true;
+    } catch (ConditionTimeoutException e) {
+      return false;
     }
-    return isSessionLearnedTabletInfo(session);
+  }
+
+  private static boolean isLWTTabletsSupported() {
+    return CcmBridge.getScyllaVersion()
+        .map(version -> version.compareTo(SCYLLA_LWT_TABLETS_SUPPORT_VERSION) >= 0)
+        .orElse(false);
+  }
+
+  private static boolean checkIfRoutedProperly(CqlSession session, Statement stmt) {
+    // DefaultLoadBalancingPolicy suppose to prioritize nodes from replica list randomly shuffling
+    // them
+    // If routing goes wrong you will see more than REPLICATION_FACTOR unique first nodes in
+    // execution plan
+
+    int expectedNodesCount = stmt.isLWT() ? 1 : REPLICATION_FACTOR;
+    Set<Node> nodes = new HashSet<>();
+    for (int i = 0; i < REPLICATION_FACTOR * 3; i++) {
+      nodes.add(session.execute(stmt).getExecutionInfo().getCoordinator());
+    }
+    return nodes.size() <= expectedNodesCount;
   }
 
   private static boolean isSessionLearnedTabletInfo(CqlSession session) {

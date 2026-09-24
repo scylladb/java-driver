@@ -71,7 +71,7 @@ public class DseProxyAuthenticationIT {
             session.execute(
                 "CREATE ROLE IF NOT EXISTS steve WITH PASSWORD = 'fakePasswordForSteve' AND LOGIN = TRUE");
             session.execute(
-                "CREATE KEYSPACE IF NOT EXISTS aliceks WITH REPLICATION = {'class':'SimpleStrategy', 'replication_factor':'1'}");
+                "CREATE KEYSPACE IF NOT EXISTS aliceks WITH REPLICATION = {'class':'NetworkTopologyStrategy', 'dc1':'1'}");
             session.execute(
                 "CREATE TABLE IF NOT EXISTS aliceks.alicetable (key text PRIMARY KEY, value text)");
             session.execute(

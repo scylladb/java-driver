@@ -26,14 +26,16 @@ package com.datastax.oss.driver.api.testinfra.ccm;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.Version;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
-import com.datastax.oss.driver.api.testinfra.CassandraSkip;
-import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
+import com.datastax.oss.driver.api.testinfra.ScyllaOnly;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirementRule;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
-import java.util.Objects;
-import java.util.Optional;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.Set;
 import org.junit.AssumptionViolatedException;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
@@ -67,37 +69,12 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     ccmBridge.close();
   }
 
-  private Statement buildErrorStatement(
-      Version requirement, String description, boolean lessThan, boolean dse) {
-    return new Statement() {
-
-      @Override
-      public void evaluate() {
-        throw new AssumptionViolatedException(
-            String.format(
-                "Test requires %s %s %s but %s is configured.  Description: %s",
-                lessThan ? "less than" : "at least",
-                dse ? "DSE" : (CcmBridge.SCYLLA_ENABLEMENT ? "SCYLLA" : "C*"),
-                requirement,
-                dse
-                    ? ccmBridge.getDseVersion().orElse(null)
-                    : (CcmBridge.SCYLLA_ENABLEMENT
-                        ? ccmBridge.getScyllaVersion().orElse(null)
-                        : ccmBridge.getCassandraVersion()),
-                description));
-      }
-    };
-  }
-
   @Override
   public Statement apply(Statement base, Description description) {
-
-    // Legacy skipping:
-
     // Scylla-specific annotations
     ScyllaSkip scyllaSkip = description.getAnnotation(ScyllaSkip.class);
     if (scyllaSkip != null) {
-      if (CcmBridge.SCYLLA_ENABLEMENT) {
+      if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         return new Statement() {
 
           @Override
@@ -110,62 +87,19 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
       }
     }
 
-    CassandraSkip cassandraSkip = description.getAnnotation(CassandraSkip.class);
-    if (cassandraSkip != null) {
-      if (!CcmBridge.SCYLLA_ENABLEMENT) {
+    ScyllaOnly scyllaOnly = description.getAnnotation(ScyllaOnly.class);
+    if (scyllaOnly != null) {
+      if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         return new Statement() {
 
           @Override
           public void evaluate() {
             throw new AssumptionViolatedException(
                 String.format(
-                    "Test skipped when running with Cassandra.  Description: %s", description));
+                    "Test skipped when running against non-scylla backend.  Description: %s",
+                    description));
           }
         };
-      }
-    }
-
-    ScyllaRequirement scyllaRequirement = description.getAnnotation(ScyllaRequirement.class);
-    if (scyllaRequirement != null) {
-      Optional<Version> scyllaVersionOption = ccmBridge.getScyllaVersion();
-      if (!scyllaVersionOption.isPresent()) {
-        return new Statement() {
-          @Override
-          public void evaluate() {
-            throw new AssumptionViolatedException(
-                "Test has Scylla version requirement, but CCMBridge is not configured for Scylla.");
-          }
-        };
-      }
-      Version scyllaVersion = scyllaVersionOption.get();
-      if (CcmBridge.SCYLLA_ENTERPRISE) {
-        if (!scyllaRequirement.minEnterprise().isEmpty()) {
-          Version minVersion =
-              Objects.requireNonNull(Version.parse(scyllaRequirement.minEnterprise()));
-          if (minVersion.compareTo(scyllaVersion) > 0) {
-            return buildErrorStatement(minVersion, scyllaRequirement.description(), false, false);
-          }
-        }
-        if (!scyllaRequirement.maxEnterprise().isEmpty()) {
-          Version maxVersion =
-              Objects.requireNonNull(Version.parse(scyllaRequirement.maxEnterprise()));
-          if (maxVersion.compareTo(scyllaVersion) <= 0) {
-            return buildErrorStatement(maxVersion, scyllaRequirement.description(), true, false);
-          }
-        }
-      } else {
-        if (!scyllaRequirement.minOSS().isEmpty()) {
-          Version minVersion = Objects.requireNonNull(Version.parse(scyllaRequirement.minOSS()));
-          if (minVersion.compareTo(scyllaVersion) > 0) {
-            return buildErrorStatement(minVersion, scyllaRequirement.description(), false, false);
-          }
-        }
-        if (!scyllaRequirement.maxOSS().isEmpty()) {
-          Version maxVersion = Objects.requireNonNull(Version.parse(scyllaRequirement.maxOSS()));
-          if (maxVersion.compareTo(CcmBridge.VERSION) <= 0) {
-            return buildErrorStatement(maxVersion, scyllaRequirement.description(), true, false);
-          }
-        }
       }
     }
 
@@ -210,5 +144,19 @@ public abstract class BaseCcmRule extends CassandraResourceRule {
     } else {
       return DefaultProtocolVersion.V3;
     }
+  }
+
+  @Override
+  public Set<EndPoint> getContactPoints() {
+    return Collections.singleton(
+        new DefaultEndPoint(new InetSocketAddress(ccmBridge.getNodeIpAddress(1), 9042)));
+  }
+
+  public Set<EndPoint> getContactPointsWithShardAwarePort() {
+    if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      throw new UnsupportedOperationException("Shard aware port is only supported in Scylla");
+    }
+    return Collections.singleton(
+        new DefaultEndPoint(new InetSocketAddress(ccmBridge.getNodeIpAddress(1), 19042)));
   }
 }

@@ -39,7 +39,6 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @Nullable private CqlIdentifier keyspace;
   @NonNull private ImmutableList.Builder<BatchableStatement<?>> statementsBuilder;
   private int statementsCount;
-  @Nullable private Boolean isLWT = null;
 
   public BatchStatementBuilder(@NonNull BatchType batchType) {
     this.batchType = batchType;
@@ -74,19 +73,6 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
   @NonNull
   public BatchStatementBuilder setKeyspace(@NonNull String keyspaceName) {
     return setKeyspace(CqlIdentifier.fromCql(keyspaceName));
-  }
-
-  /**
-   * Forces driver to see this batch as LWT or non-LWT. Note that if never explicitly set or set to
-   * {@code null}, the resulting {@code DefaultBatchStatement} will decide its LWT state based on
-   * contained statements.
-   *
-   * @return this builder; never {@code null}.
-   */
-  @NonNull
-  public BatchStatementBuilder setIsLWT(Boolean newIsLWT) {
-    this.isLWT = newIsLWT;
-    return this;
   }
 
   /**
@@ -172,7 +158,7 @@ public class BatchStatementBuilder extends StatementBuilder<BatchStatementBuilde
         timeout,
         node,
         nowInSeconds,
-        isLWT);
+        requestRoutingType);
   }
 
   public int getStatementsCount() {

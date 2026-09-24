@@ -16,4 +16,18 @@ public interface NodeShardingInfo {
    * to the Node.
    */
   public int shardId(Token t);
+
+  /**
+   * Returns shard aware port number where Scylla is listening for CQL connections. If present, it
+   * works almost the same way as port 9042 typically does; the difference is that client-side port
+   * number is used as an indicator to which shard client wants to connect.
+   */
+  public Integer getShardAwarePort();
+
+  /**
+   * Returns shard aware SSL port number where Scylla is listening for encrypted CQL connections. If
+   * present, it works almost the same way as port 9142 typically does; the difference is that
+   * client-side port number is used as an indicator to which shard client wants to connect.
+   */
+  public Integer getShardAwarePortSsl();
 }

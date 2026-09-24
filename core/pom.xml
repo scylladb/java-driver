@@ -28,25 +28,14 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.0.1</version>
+    <version>4.19.0.10-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-core</artifactId>
   <packaging>bundle</packaging>
   <name>Java driver for Scylla and Apache Cassandra(R) - core</name>
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>java-driver-bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
   <dependencies>
     <dependency>
-      <groupId>com.datastax.oss</groupId>
+      <groupId>com.scylladb</groupId>
       <artifactId>native-protocol</artifactId>
     </dependency>
     <dependency>
@@ -78,7 +67,7 @@
       <optional>true</optional>
     </dependency>
     <dependency>
-      <groupId>org.lz4</groupId>
+      <groupId>at.yawk.lz4</groupId>
       <artifactId>lz4-java</artifactId>
       <optional>true</optional>
     </dependency>

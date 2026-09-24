@@ -64,6 +64,7 @@ import org.junit.rules.TestRule;
     type = BackendType.CASSANDRA,
     minInclusive = "3.6",
     description = "Uses PER PARTITION LIMIT")
+@BackendRequirement(type = BackendType.SCYLLA)
 public class SelectOtherClausesIT {
 
   private static final CcmRule CCM_RULE = CcmRule.getInstance();
@@ -111,7 +112,8 @@ public class SelectOtherClausesIT {
 
   @Test
   public void should_select_with_per_partition_limit() {
-    assumeThat(CcmBridge.SCYLLA_ENABLEMENT).isFalse(); // @IntegrationTestDisabledScyllaFailure
+    assumeThat(CcmBridge.isDistributionOf(BackendType.SCYLLA))
+        .isFalse(); // @IntegrationTestDisabledScyllaFailure
 
     PagingIterable<Simple> elements = dao.selectWithPerPartitionLimit(5);
     assertThat(elements.isFullyFetched()).isTrue();

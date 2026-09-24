@@ -273,9 +273,13 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONNECTION_SET_KEYSPACE_TIMEOUT, initQueryTimeout);
     map.put(TypedDriverOption.CONNECTION_POOL_LOCAL_SIZE, 1);
     map.put(TypedDriverOption.CONNECTION_POOL_REMOTE_SIZE, 1);
+    map.put(TypedDriverOption.CONNECTION_POOL_INIT_BATCH_SIZE, 0);
     map.put(TypedDriverOption.CONNECTION_MAX_REQUESTS, 1024);
     map.put(TypedDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS, 256);
     map.put(TypedDriverOption.CONNECTION_WARN_INIT_ERROR, true);
+    map.put(TypedDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true);
+    map.put(TypedDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, 10000);
+    map.put(TypedDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, 65535);
     map.put(TypedDriverOption.RECONNECT_ON_INIT, false);
     map.put(TypedDriverOption.RECONNECTION_POLICY_CLASS, "ExponentialReconnectionPolicy");
     map.put(TypedDriverOption.RECONNECTION_BASE_DELAY, Duration.ofSeconds(1));
@@ -288,7 +292,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.TIMESTAMP_GENERATOR_FORCE_JAVA_CLOCK, false);
     map.put(TypedDriverOption.REQUEST_THROTTLER_CLASS, "PassThroughRequestThrottler");
     map.put(TypedDriverOption.ADDRESS_TRANSLATOR_CLASS, "PassThroughAddressTranslator");
-    map.put(TypedDriverOption.RESOLVE_CONTACT_POINTS, true);
+    map.put(TypedDriverOption.RESOLVE_CONTACT_POINTS, false);
     map.put(TypedDriverOption.PROTOCOL_MAX_FRAME_LENGTH, 256L * 1024 * 1024);
     map.put(TypedDriverOption.REQUEST_WARN_IF_SET_KEYSPACE, true);
     map.put(TypedDriverOption.REQUEST_TRACE_ATTEMPTS, 5);
@@ -389,6 +393,13 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.METRICS_GENERATE_AGGREGABLE_HISTOGRAMS, true);
     map.put(
         TypedDriverOption.LOAD_BALANCING_DC_FAILOVER_PREFERRED_REMOTE_DCS, ImmutableList.of(""));
+    map.put(
+        TypedDriverOption.LOAD_BALANCING_DEFAULT_LWT_REQUEST_ROUTING_METHOD,
+        "PRESERVE_REPLICA_ORDER");
+    // CLIENT_ROUTES_ENDPOINTS is intentionally omitted: it is a list-of-objects (compound HOCON
+    // values) with no sensible scalar default, analogous to how CONFIG_RELOAD_INTERVAL is omitted.
+    map.put(TypedDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, 9042);
+    map.put(TypedDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, false);
   }
 
   @Immutable

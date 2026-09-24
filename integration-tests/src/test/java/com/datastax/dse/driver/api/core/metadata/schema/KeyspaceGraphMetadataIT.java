@@ -51,7 +51,7 @@ public class KeyspaceGraphMetadataIT {
     CqlSession session = SESSION_RULE.session();
     session.execute(
         "CREATE KEYSPACE keyspace_metadata_it_graph_engine "
-            + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} "
+            + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1} "
             + "AND graph_engine = 'Core'");
     Metadata metadata = session.getMetadata();
     assertThat(metadata.getKeyspace("keyspace_metadata_it_graph_engine"))
@@ -66,7 +66,7 @@ public class KeyspaceGraphMetadataIT {
     CqlSession session = SESSION_RULE.session();
     session.execute(
         "CREATE KEYSPACE keyspace_metadata_it_graph_engine_alter "
-            + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+            + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1}");
     assertThat(session.getMetadata().getKeyspace("keyspace_metadata_it_graph_engine_alter"))
         .hasValueSatisfying(
             keyspaceMetadata ->
@@ -89,7 +89,7 @@ public class KeyspaceGraphMetadataIT {
             () ->
                 session.execute(
                     "CREATE KEYSPACE keyspace_metadata_it_graph_engine_classic "
-                        + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} "
+                        + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1} "
                         + "AND graph_engine = 'Classic'"))
         .hasMessageContaining("Invalid/unknown graph engine name 'Classic'");
   }
@@ -99,7 +99,7 @@ public class KeyspaceGraphMetadataIT {
     CqlSession session = SESSION_RULE.session();
     session.execute(
         "CREATE KEYSPACE keyspace_metadata_it_graph_engine_core "
-            + "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1} "
+            + "WITH replication = {'class': 'NetworkTopologyStrategy', 'dc1': 1} "
             + "AND graph_engine = 'Core'");
     Metadata metadata = session.getMetadata();
     assertThat(metadata.getKeyspace("keyspace_metadata_it_graph_engine_core"))

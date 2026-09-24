@@ -31,6 +31,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
@@ -43,6 +44,7 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.servererrors.InvalidQueryException;
+import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
 import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement;
@@ -54,7 +56,8 @@ import com.datastax.oss.driver.internal.core.cql.DefaultBatchStatement;
 import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import java.util.Iterator;
 import java.util.List;
-import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
@@ -66,18 +69,21 @@ import org.junit.rules.TestRule;
 @Category(ParallelizableTests.class)
 public class BatchStatementIT {
 
-  private CcmRule ccmRule = CcmRule.getInstance();
+  private static final CcmRule CCM_RULE = CcmRule.getInstance();
 
-  private SessionRule<CqlSession> sessionRule = SessionRule.builder(ccmRule).build();
+  private static final SessionRule<CqlSession> SESSION_RULE = SessionRule.builder(CCM_RULE).build();
 
-  @Rule public TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
+  @ClassRule public static TestRule classChain = RuleChain.outerRule(CCM_RULE).around(SESSION_RULE);
+
+  // CcmRule as @Rule for per-method @BackendRequirement annotation checking
+  @Rule public TestRule methodChain = CCM_RULE;
 
   @Rule public TestName name = new TestName();
 
   private static final int batchCount = 100;
 
-  @Before
-  public void createTable() {
+  @BeforeClass
+  public static void createTable() {
     String[] schemaStatements =
         new String[] {
           "CREATE TABLE test (k0 text, k1 int, v int, PRIMARY KEY (k0, k1))",
@@ -89,11 +95,11 @@ public class BatchStatementIT {
     SchemaChangeSynchronizer.withLock(
         () -> {
           for (String schemaStatement : schemaStatements) {
-            sessionRule
+            SESSION_RULE
                 .session()
                 .execute(
                     SimpleStatement.newInstance(schemaStatement)
-                        .setExecutionProfile(sessionRule.slowProfile()));
+                        .setExecutionProfile(SESSION_RULE.slowProfile()));
           }
         });
   }
@@ -103,7 +109,7 @@ public class BatchStatementIT {
     SimpleStatement simpleStatement =
         SimpleStatement.builder("INSERT INTO test (k0, k1, v) values ('123123', ?, ?)").build();
 
-    try (CqlSession session = SessionUtils.newSession(ccmRule, sessionRule.keyspace())) {
+    try (CqlSession session = SessionUtils.newSession(CCM_RULE, SESSION_RULE.keyspace())) {
       PreparedStatement prep = session.prepare(simpleStatement);
       BatchStatementBuilder batch = BatchStatement.builder(DefaultBatchType.UNLOGGED);
       batch.addStatement(prep.bind(1, 2).setConsistencyLevel(ConsistencyLevel.QUORUM));
@@ -139,7 +145,7 @@ public class BatchStatementIT {
     }
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
 
     verifyBatchInsert();
   }
@@ -154,20 +160,21 @@ public class BatchStatementIT {
                 String.format(
                     "INSERT INTO test (k0, k1, v) values ('%s', ? , ?)", name.getMethodName()))
             .build();
-    PreparedStatement preparedStatement = sessionRule.session().prepare(insert);
+    PreparedStatement preparedStatement = SESSION_RULE.session().prepare(insert);
 
     for (int i = 0; i < batchCount; i++) {
       builder.addStatement(preparedStatement.bind(i, i + 1));
     }
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
 
     verifyBatchInsert();
   }
 
   @Test
   @BackendRequirement(type = BackendType.CASSANDRA, minInclusive = "2.2")
+  @BackendRequirement(type = BackendType.SCYLLA)
   public void should_execute_batch_of_bound_statements_with_unset_values() {
     // Build a batch of batchCount statements with bound statements, each with their own positional
     // variables.
@@ -177,14 +184,14 @@ public class BatchStatementIT {
                 String.format(
                     "INSERT INTO test (k0, k1, v) values ('%s', ? , ?)", name.getMethodName()))
             .build();
-    PreparedStatement preparedStatement = sessionRule.session().prepare(insert);
+    PreparedStatement preparedStatement = SESSION_RULE.session().prepare(insert);
 
     for (int i = 0; i < batchCount; i++) {
       builder.addStatement(preparedStatement.bind(i, i + 1));
     }
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
 
     verifyBatchInsert();
 
@@ -195,17 +202,17 @@ public class BatchStatementIT {
       if (i % 20 == 0) {
         boundStatement = boundStatement.unset(1);
       }
-      builder.addStatement(boundStatement);
+      builder2.addStatement(boundStatement);
     }
 
-    sessionRule.session().execute(builder2.build());
+    SESSION_RULE.session().execute(builder2.build());
 
     Statement<?> select =
         SimpleStatement.builder("SELECT * from test where k0 = ?")
             .addPositionalValue(name.getMethodName())
             .build();
 
-    ResultSet result = sessionRule.session().execute(select);
+    ResultSet result = SESSION_RULE.session().execute(select);
 
     List<Row> rows = result.all();
     assertThat(rows).hasSize(100);
@@ -229,7 +236,7 @@ public class BatchStatementIT {
     // variable values.
     BatchStatementBuilder builder = BatchStatement.builder(DefaultBatchType.UNLOGGED);
     PreparedStatement preparedStatement =
-        sessionRule.session().prepare("INSERT INTO test (k0, k1, v) values (:k0, :k1, :v)");
+        SESSION_RULE.session().prepare("INSERT INTO test (k0, k1, v) values (:k0, :k1, :v)");
 
     for (int i = 0; i < batchCount; i++) {
       builder.addStatement(
@@ -242,7 +249,7 @@ public class BatchStatementIT {
     }
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
 
     verifyBatchInsert();
   }
@@ -256,7 +263,7 @@ public class BatchStatementIT {
                 String.format(
                     "INSERT INTO test (k0, k1, v) values ('%s', ? , ?)", name.getMethodName()))
             .build();
-    PreparedStatement preparedStatement = sessionRule.session().prepare(insert);
+    PreparedStatement preparedStatement = SESSION_RULE.session().prepare(insert);
 
     for (int i = 0; i < batchCount; i++) {
       if (i % 2 == 1) {
@@ -273,7 +280,7 @@ public class BatchStatementIT {
     }
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
 
     verifyBatchInsert();
   }
@@ -283,25 +290,53 @@ public class BatchStatementIT {
     // Build a batch with CAS operations on the same partition.
     BatchStatementBuilder builder = BatchStatement.builder(DefaultBatchType.UNLOGGED);
     SimpleStatement insert =
-        SimpleStatement.builder(
-                String.format(
-                    "INSERT INTO test (k0, k1, v) values ('%s', ? , ?) IF NOT EXISTS",
-                    name.getMethodName()))
+        SimpleStatement.builder("INSERT INTO test (k0, k1, v) values (?, ?, ?) IF NOT EXISTS")
             .build();
-    PreparedStatement preparedStatement = sessionRule.session().prepare(insert);
+    PreparedStatement preparedStatement = SESSION_RULE.session().prepare(insert);
 
     for (int i = 0; i < batchCount; i++) {
-      builder.addStatement(preparedStatement.bind(i, i + 1));
+      builder.addStatement(preparedStatement.bind(name.getMethodName(), i, i + 1));
+    }
+
+    // Ensure LWT routing has a concrete routing key to compute replicas.
+    BoundStatement routingKeyStmt = preparedStatement.bind(name.getMethodName(), 0, 1);
+    builder.setRoutingKey(routingKeyStmt.getRoutingKey());
+    builder.setSerialConsistencyLevel(ConsistencyLevel.SERIAL);
+    // Enforce LWT routing only for Cassandra where prepare metadata lacks LWT flags.
+    if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
+      builder.setRequestRoutingType(RequestRoutingType.LWT);
     }
 
     BatchStatement batchStatement = builder.build();
-    ResultSet result = sessionRule.session().execute(batchStatement);
+    // Validate serial consistency and LWT routing on the batch itself.
+    assertThat(batchStatement.getSerialConsistencyLevel()).isEqualTo(ConsistencyLevel.SERIAL);
+    assertThat(batchStatement.isLWT()).isEqualTo(true);
+    assertThat(batchStatement.getRoutingKey()).isNotNull();
+
+    ResultSet result = SESSION_RULE.session().execute(batchStatement);
+    // Validate that executed request preserved serial consistency level.
+    assertThat(result.getExecutionInfo().getRequest()).isInstanceOf(Statement.class);
+    assertThat(((Statement<?>) result.getExecutionInfo().getRequest()).getSerialConsistencyLevel())
+        .isEqualTo(ConsistencyLevel.SERIAL);
     assertThat(result.wasApplied()).isTrue();
 
     verifyBatchInsert();
 
-    // re execute same batch and ensure wasn't applied.
-    result = sessionRule.session().execute(batchStatement);
+    // Rebuild an equivalent batch and ensure it isn't applied.
+    BatchStatementBuilder rerunBuilder = BatchStatement.builder(DefaultBatchType.UNLOGGED);
+    rerunBuilder.setSerialConsistencyLevel(ConsistencyLevel.SERIAL);
+    for (int i = 0; i < batchCount; i++) {
+      rerunBuilder.addStatement(preparedStatement.bind(name.getMethodName(), i, i + 1));
+    }
+    // Use the same routing key to target the same partition for LWT.
+    rerunBuilder.setRoutingKey(routingKeyStmt.getRoutingKey());
+    // Enforce LWT routing only for Cassandra where prepare metadata lacks LWT flags.
+    if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
+      rerunBuilder.setRequestRoutingType(RequestRoutingType.LWT);
+    }
+    BatchStatement rerunBatch = rerunBuilder.build();
+    assertThat(rerunBatch.isLWT()).isEqualTo(true);
+    result = SESSION_RULE.session().execute(rerunBatch);
     assertThat(result.wasApplied()).isFalse();
   }
 
@@ -321,11 +356,11 @@ public class BatchStatementIT {
     }
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
 
     for (int i = 1; i <= 3; i++) {
       ResultSet result =
-          sessionRule
+          SESSION_RULE
               .session()
               .execute(
                   String.format(
@@ -355,7 +390,7 @@ public class BatchStatementIT {
     }
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
   }
 
   @Test(expected = InvalidQueryException.class)
@@ -382,7 +417,7 @@ public class BatchStatementIT {
     builder.addStatement(simpleInsert);
 
     BatchStatement batchStatement = builder.build();
-    sessionRule.session().execute(batchStatement);
+    SESSION_RULE.session().execute(batchStatement);
   }
 
   @Test
@@ -393,13 +428,13 @@ public class BatchStatementIT {
         SessionUtils.configLoaderBuilder()
             .withString(DefaultDriverOption.PROTOCOL_VERSION, "V3")
             .build();
-    try (CqlSession v3Session = SessionUtils.newSession(ccmRule, loader)) {
+    try (CqlSession v3Session = SessionUtils.newSession(CCM_RULE, loader)) {
       // Intentionally use fully qualified table here to avoid warnings as these are not supported
       // by v3 protocol version, see JAVA-3068
       PreparedStatement prepared =
           v3Session.prepare(
               String.format(
-                  "INSERT INTO %s.test (k0, k1, v) values (?, ?, ?)", sessionRule.keyspace()));
+                  "INSERT INTO %s.test (k0, k1, v) values (?, ?, ?)", SESSION_RULE.keyspace()));
 
       BatchStatementBuilder builder = BatchStatement.builder(DefaultBatchType.LOGGED);
       builder.addStatements(
@@ -426,7 +461,7 @@ public class BatchStatementIT {
             .addPositionalValue(name.getMethodName())
             .build();
 
-    ResultSet result = sessionRule.session().execute(select);
+    ResultSet result = SESSION_RULE.session().execute(select);
 
     List<Row> rows = result.all();
     assertThat(rows).hasSize(100);

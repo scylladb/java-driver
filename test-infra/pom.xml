@@ -28,27 +28,25 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.0.1</version>
+    <version>4.19.0.10-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-test-infra</artifactId>
   <packaging>bundle</packaging>
   <name>Java driver for Scylla and Apache Cassandra(R) - test infrastructure tools</name>
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>java-driver-bom</artifactId>
-        <version>${project.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+  <description>Supporting utilities and fixtures used by ScyllaDB Java Driver integration and performance tests.</description>
+  <url>https://github.com/scylladb/java-driver</url>
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+      <comments>Apache License Version 2.0</comments>
+    </license>
+  </licenses>
   <dependencies>
     <dependency>
       <groupId>com.scylladb</groupId>
       <artifactId>java-driver-core</artifactId>
-      <version>${project.parent.version}</version>
     </dependency>
     <dependency>
       <groupId>com.github.spotbugs</groupId>
@@ -65,7 +63,7 @@
     </dependency>
     <!-- only required for Simulacron tests -->
     <dependency>
-      <groupId>com.datastax.oss.simulacron</groupId>
+      <groupId>com.scylladb.oss.simulacron</groupId>
       <artifactId>simulacron-native-server</artifactId>
       <optional>true</optional>
     </dependency>

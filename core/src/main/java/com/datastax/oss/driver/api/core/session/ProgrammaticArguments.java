@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.api.core.session;
 
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
+import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistanceEvaluator;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
@@ -71,6 +72,7 @@ public class ProgrammaticArguments {
   private final String startupApplicationVersion;
   private final MutableCodecRegistry codecRegistry;
   private final Object metricRegistry;
+  private final ClientRoutesConfig clientRoutesConfig;
 
   private ProgrammaticArguments(
       @NonNull List<TypeCodec<?>> typeCodecs,
@@ -88,7 +90,8 @@ public class ProgrammaticArguments {
       @Nullable String startupApplicationName,
       @Nullable String startupApplicationVersion,
       @Nullable MutableCodecRegistry codecRegistry,
-      @Nullable Object metricRegistry) {
+      @Nullable Object metricRegistry,
+      @Nullable ClientRoutesConfig clientRoutesConfig) {
 
     this.typeCodecs = typeCodecs;
     this.nodeStateListener = nodeStateListener;
@@ -106,6 +109,7 @@ public class ProgrammaticArguments {
     this.startupApplicationVersion = startupApplicationVersion;
     this.codecRegistry = codecRegistry;
     this.metricRegistry = metricRegistry;
+    this.clientRoutesConfig = clientRoutesConfig;
   }
 
   @NonNull
@@ -190,6 +194,11 @@ public class ProgrammaticArguments {
     return metricRegistry;
   }
 
+  @Nullable
+  public ClientRoutesConfig getClientRoutesConfig() {
+    return clientRoutesConfig;
+  }
+
   public static class Builder {
 
     private final ImmutableList.Builder<TypeCodec<?>> typeCodecsBuilder = ImmutableList.builder();
@@ -210,6 +219,7 @@ public class ProgrammaticArguments {
     private String startupApplicationVersion;
     private MutableCodecRegistry codecRegistry;
     private Object metricRegistry;
+    private ClientRoutesConfig clientRoutesConfig;
 
     @NonNull
     public Builder addTypeCodecs(@NonNull TypeCodec<?>... typeCodecs) {
@@ -411,6 +421,12 @@ public class ProgrammaticArguments {
     }
 
     @NonNull
+    public Builder withClientRoutesConfig(@Nullable ClientRoutesConfig clientRoutesConfig) {
+      this.clientRoutesConfig = clientRoutesConfig;
+      return this;
+    }
+
+    @NonNull
     public ProgrammaticArguments build() {
       return new ProgrammaticArguments(
           typeCodecsBuilder.build(),
@@ -428,7 +444,8 @@ public class ProgrammaticArguments {
           startupApplicationName,
           startupApplicationVersion,
           codecRegistry,
-          metricRegistry);
+          metricRegistry,
+          clientRoutesConfig);
     }
   }
 }

@@ -25,6 +25,7 @@ package com.datastax.oss.driver.api.core.cql;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -132,6 +133,10 @@ public interface PreparedStatement {
    * @see <a href="https://docs.scylladb.com/using-scylla/lwt/">Docs about LWT</a>
    */
   boolean isLWT();
+
+  /** Returns the request routing type for this prepared statement. */
+  @Nullable
+  RequestRoutingType getRequestRoutingType();
 
   /**
    * Updates {@link #getResultMetadataId()} and {@link #getResultSetDefinitions()} atomically.

@@ -40,7 +40,7 @@ public class BundleOptions {
             mavenBundle("org.slf4j", "slf4j-api").versionAsInProject(),
             mavenBundle("org.hdrhistogram", "HdrHistogram").versionAsInProject(),
             mavenBundle("com.typesafe", "config").versionAsInProject(),
-            mavenBundle("com.datastax.oss", "native-protocol").versionAsInProject(),
+            mavenBundle("com.scylladb", "native-protocol").versionAsInProject(),
             logbackBundles(),
             debugOptions());
   }
@@ -117,7 +117,7 @@ public class BundleOptions {
   public static CompositeOption lz4Bundle() {
     return () ->
         options(
-            mavenBundle("org.lz4", "lz4-java").versionAsInProject(),
+            mavenBundle("at.yawk.lz4", "lz4-java").versionAsInProject(),
             systemProperty("cassandra.compression").value("LZ4"));
   }
 

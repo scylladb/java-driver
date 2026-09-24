@@ -51,12 +51,16 @@ public class DefaultSchemaQueriesFactory implements SchemaQueriesFactory {
             .getMetadataManager()
             .getMetadata()
             .findNode(channel.getEndPoint())
-            .orElseThrow(
+            .orElseGet(
                 () ->
-                    new IllegalStateException(
-                        "Could not find control node metadata "
-                            + channel.getEndPoint()
-                            + ", aborting schema refresh"));
+                    context.getMetadataManager().getMetadata().getNodes().values().stream()
+                        .findFirst()
+                        .orElseThrow(
+                            () ->
+                                new IllegalStateException(
+                                    "Could not find control node metadata "
+                                        + channel.getEndPoint()
+                                        + ", aborting schema refresh")));
     return newInstance(node, channel);
   }
 

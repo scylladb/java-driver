@@ -50,7 +50,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // When
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
-            SERVER_ADDRESS, DriverChannelOptions.DEFAULT, NoopNodeMetricUpdater.INSTANCE);
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
 
     completeSimpleChannelInit();
 
@@ -72,7 +76,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // When
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
-            SERVER_ADDRESS, DriverChannelOptions.DEFAULT, NoopNodeMetricUpdater.INSTANCE);
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
 
     Frame requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Options.class);
@@ -107,7 +115,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // When
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
-            SERVER_ADDRESS, DriverChannelOptions.DEFAULT, NoopNodeMetricUpdater.INSTANCE);
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
 
     Frame requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Options.class);
@@ -144,7 +156,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // When
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
-            SERVER_ADDRESS, DriverChannelOptions.DEFAULT, NoopNodeMetricUpdater.INSTANCE);
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
 
     Frame requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Options.class);
@@ -176,7 +192,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // When
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
-            SERVER_ADDRESS, DriverChannelOptions.DEFAULT, NoopNodeMetricUpdater.INSTANCE);
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
 
     Frame requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Options.class);
@@ -219,7 +239,11 @@ public class ChannelFactoryProtocolNegotiationTest extends ChannelFactoryTestBas
     // When
     CompletionStage<DriverChannel> channelFuture =
         factory.connect(
-            SERVER_ADDRESS, DriverChannelOptions.DEFAULT, NoopNodeMetricUpdater.INSTANCE);
+            SERVER_ADDRESS,
+            null,
+            null,
+            DriverChannelOptions.DEFAULT,
+            NoopNodeMetricUpdater.INSTANCE);
 
     Frame requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Options.class);
