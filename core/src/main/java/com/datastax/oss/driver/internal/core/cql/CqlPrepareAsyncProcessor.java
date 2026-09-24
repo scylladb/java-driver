@@ -164,15 +164,16 @@ public class CqlPrepareAsyncProcessor
                       mine.completeExceptionally(error);
                       cache.invalidate(request); // Make sure failure isn't cached indefinitely
                     } else {
+                      // Anchor the cache entry on the statement, so that it survives for as long as
+                      // the application holds the statement. The cache holds its values weakly, and
+                      // callers routinely keep only the statement, not the future we return here.
+                      if (preparedStatement instanceof PrepareCacheAnchor) {
+                        ((PrepareCacheAnchor) preparedStatement).setPrepareCacheAnchor(mine);
+                      }
                       mine.complete(preparedStatement);
                     }
                   });
         }
-      }
-      // If the future is already completed, return it directly to maintain a strong reference
-      // in the cache and avoid premature GC with weakValues() (ScyllaDB PR #892).
-      if (result.isDone()) {
-        return result;
       }
       // Return a defensive copy. So if a client cancels its request, the cache won't be impacted
       // nor a potential concurrent request.
