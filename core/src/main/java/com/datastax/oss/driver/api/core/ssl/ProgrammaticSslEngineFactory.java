@@ -133,20 +133,6 @@ public class ProgrammaticSslEngineFactory implements SslEngineFactory {
     return engine;
   }
 
-  /**
-   * Whether {@link #newSslEngine} configures the engine to validate the server certificate against
-   * the node's host name, as passed to the constructor.
-   *
-   * <p>A diagnostic accessor, read by the driver-configuration report sent to the server at
-   * connection time. Deliberately not on {@link SslEngineFactory}: an arbitrary factory can neither
-   * be assumed to validate host names nor be assumed not to, and a default answer on the interface
-   * would misdescribe a security control for every implementation that never considered the
-   * question. The report names the factories it recognizes and says nothing about the rest.
-   */
-  public boolean isHostnameValidationRequired() {
-    return requireHostnameValidation;
-  }
-
   @Override
   public void close() {
     // nothing to do

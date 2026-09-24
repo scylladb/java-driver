@@ -19,40 +19,88 @@ package com.datastax.oss.driver.internal.core.ssl;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.util.AttributeKey;
+import java.lang.ref.WeakReference;
 import javax.net.ssl.SSLEngine;
 import net.jcip.annotations.ThreadSafe;
 
 /** SSL handler factory used when JDK-based SSL was configured through the driver's public API. */
 @ThreadSafe
 public class JdkSslHandlerFactory implements SslHandlerFactory {
+  private static final AttributeKey<HandlerReference> HANDLER_REFERENCE =
+      AttributeKey.valueOf(JdkSslHandlerFactory.class, "sslHandler");
+
   private final SslEngineFactory sslEngineFactory;
 
   public JdkSslHandlerFactory(SslEngineFactory sslEngineFactory) {
     this.sslEngineFactory = sslEngineFactory;
   }
 
-  /**
-   * The engine factory this handler factory actually builds its engines from.
-   *
-   * <p>Not necessarily the one behind {@code DriverContext#getSslEngineFactory()}: a context that
-   * overrides {@code buildSslHandlerFactory()} may wrap an engine factory of its own choosing, in
-   * which case the configured one is never consulted on the connection path. Diagnostics that want
-   * to describe the engine in force must read it from here rather than from the context.
-   */
-  public SslEngineFactory getSslEngineFactory() {
-    return sslEngineFactory;
-  }
-
   @Override
   public SslHandler newSslHandler(Channel channel, EndPoint remoteEndpoint) {
     SSLEngine engine = sslEngineFactory.newSslEngine(remoteEndpoint);
-    return new SslHandler(engine);
+    SslHandler handler = new SslHandler(engine);
+    // ChannelFactory calls this before NettyOptions.afterChannelInitialized(), so the first handler
+    // recorded here is the one installed by the driver even if the hook adds more SSL handlers.
+    channel.attr(HANDLER_REFERENCE).setIfAbsent(new HandlerReference(this, handler));
+    return handler;
+  }
+
+  /**
+   * Whether the SSL engine built for {@code channel} verifies host names, or {@code null} when it
+   * cannot be determined.
+   *
+   * <p>This deliberately records the exact handler returned by {@link #newSslHandler} through a
+   * weak reference, and reads its engine lazily only while that handler remains in the channel
+   * pipeline. Engine introspection is diagnostic work and belongs under the configuration
+   * reporter's fail-safe; doing it while the handler is created would let a user-supplied engine
+   * that throws from {@code getSSLParameters()} prevent every connection, even when reporting is
+   * disabled.
+   */
+  @Nullable
+  public Boolean getHostnameValidationRequired(Channel channel) {
+    HandlerReference reference = channel.attr(HANDLER_REFERENCE).get();
+    if (reference == null || reference.factory != this) {
+      return null;
+    }
+    SslHandler handler = reference.handler.get();
+    if (handler == null || channel.pipeline().context(handler) == null) {
+      return null;
+    }
+    if (!isHostnameValidationKnown()) {
+      return null;
+    }
+    String endpointIdentificationAlgorithm =
+        handler.engine().getSSLParameters().getEndpointIdentificationAlgorithm();
+    return endpointIdentificationAlgorithm != null && !endpointIdentificationAlgorithm.isEmpty();
+  }
+
+  private boolean isHostnameValidationKnown() {
+    if (sslEngineFactory.getClass() == DefaultSslEngineFactory.class) {
+      return ((DefaultSslEngineFactory) sslEngineFactory).isHostnameValidationKnown();
+    } else if (sslEngineFactory.getClass() == SniSslEngineFactory.class) {
+      return ((SniSslEngineFactory) sslEngineFactory).isHostnameValidationKnown();
+    }
+    // ProgrammaticSslEngineFactory and arbitrary factories can wrap a custom trust manager that
+    // ignores a nonempty endpoint-identification algorithm or verifies names without one.
+    return false;
   }
 
   @Override
   public void close() throws Exception {
     sslEngineFactory.close();
+  }
+
+  private static final class HandlerReference {
+    private final JdkSslHandlerFactory factory;
+    private final WeakReference<SslHandler> handler;
+
+    private HandlerReference(JdkSslHandlerFactory factory, SslHandler handler) {
+      this.factory = factory;
+      this.handler = new WeakReference<>(handler);
+    }
   }
 }

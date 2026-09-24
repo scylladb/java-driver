@@ -138,7 +138,12 @@ public class CloudConfigFactory {
     InetSocketAddress sniProxyAddress = getSniProxyAddress(proxyMetadataJson);
     List<EndPoint> endPoints = getEndPoints(proxyMetadataJson, sniProxyAddress);
     String localDatacenter = getLocalDatacenter(proxyMetadataJson);
-    SniSslEngineFactory sslEngineFactory = new SniSslEngineFactory(sslContext);
+    // A subclass can override the protected SSL-context/trust-manager builders, so only the exact
+    // built-in path can promise diagnostics that the endpoint-identification algorithm is honored.
+    SniSslEngineFactory sslEngineFactory =
+        getClass() == CloudConfigFactory.class
+            ? SniSslEngineFactory.forCloudBundle(sslContext)
+            : new SniSslEngineFactory(sslContext);
     validateIfBundleContainsUsernamePassword(configJson);
     return new CloudConfig(sniProxyAddress, endPoints, localDatacenter, sslEngineFactory);
   }

@@ -17,6 +17,8 @@
  */
 package com.datastax.oss.driver.internal.core.context;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import io.netty.channel.Channel;
 import java.util.Map;
 import net.jcip.annotations.ThreadSafe;
 
@@ -41,7 +43,8 @@ import net.jcip.annotations.ThreadSafe;
 public class NoopDriverConfigReporter implements DriverConfigReporter {
 
   @Override
-  public void populateControlConnectionOptions(Map<String, String> startupOptions) {
+  public void populateControlConnectionOptions(
+      @NonNull Map<String, String> startupOptions, @NonNull Channel channel) {
     // nothing to do
   }
 }
