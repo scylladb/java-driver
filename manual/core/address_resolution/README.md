@@ -27,8 +27,10 @@ topologies, an address translation component can be plugged in.
 * `advanced.address-translator` in the configuration.
 * none by default. Also available: a fixed proxy hostname, one proxy per subnet, EC2-specific
   (for deployments that span multiple regions), or write your own.
-* behind a cloud private endpoint no translator of your own is needed -- see
-  [client routes](../connectivity/client_routes/).
+* behind a cloud private endpoint that publishes a per-node endpoint mapping (ScyllaDB Enterprise
+  2026.1 or later) no translator of your own is needed -- see
+  [client routes](../connectivity/client_routes/); a single hostname in front of every node needs
+  the fixed proxy hostname translator.
 
 -----
 
@@ -123,8 +125,10 @@ retrieved from or sent by Cassandra nodes are.
 ### Client routes (cloud private endpoint deployments)
 
 Deployments reached through a cloud private endpoint -- AWS PrivateLink, Azure Private Link, GCP
-Private Service Connect -- do not need a translator of your own: the cluster publishes a per-node
-endpoint mapping and the driver applies it. See [client routes](../connectivity/client_routes/).
+Private Service Connect -- that publishes a per-node endpoint mapping (ScyllaDB Enterprise 2026.1 or
+later) do not need a translator of your own: the driver applies the mapping. See
+[client routes](../connectivity/client_routes/). One hostname for every node, a single-endpoint
+PrivateLink included, is covered by the next section.
 
 ### Fixed proxy hostname
 
@@ -136,9 +140,15 @@ address a node has but still using its native transport port.
 To use it, specify the following in the [configuration](../configuration):
 
 ```
-datastax-java-driver.advanced.address-translator.class = FixedHostNameAddressTranslator
-advertised-hostname = proxyhostname
+datastax-java-driver.advanced.address-translator {
+  class = FixedHostNameAddressTranslator
+  advertised-hostname = proxyhostname
+}
 ```
+
+Every node keeps its own port, which on ScyllaDB is the same for every node, so unless the proxy
+gives each node its own port, the proxy rather than the driver picks the node and token-aware and
+shard-aware routing stop working.
 
 ### Fixed proxy hostname per subnet
 
