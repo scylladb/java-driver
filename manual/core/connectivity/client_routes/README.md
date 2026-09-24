@@ -36,6 +36,7 @@ endpoints rather than direct IP addresses, and the driver's built-in client rout
 the address translation automatically. It works regardless of which provider service fronts the
 private endpoint — AWS PrivateLink (PL), Azure Private Link, or GCP Private Service Connect (PSC),
 collectively a private service connection — and equally for ScyllaDB Cloud and similar technologies.
+The feature is also written as `client_routes` or `clientroutes`.
 
 Client routes can be configured either **programmatically** or via **HOCON configuration files**.
 Note that `OptionsMap`-based configuration does not support client routes — use the programmatic
@@ -60,7 +61,7 @@ ClientRoutesConfig config = ClientRoutesConfig.builder()
     .build();
 
 CqlSession session = CqlSession.builder()
-    .addContactPoint(new InetSocketAddress("my-cluster-endpoint.example.com", 9042))
+    .addContactPoint(InetSocketAddress.createUnresolved("my-cluster-endpoint.example.com", 9042))
     .withClientRoutesConfig(config)
     .withLocalDatacenter("datacenter1")
     .build();
@@ -106,11 +107,14 @@ The [reference configuration](../../configuration/reference/) documents every op
 DNS is resolved at connection time (not at route discovery time). The driver delegates to
 `InetAddress.getByName()`, which is a blocking call that uses the JVM's built-in DNS cache. How
 long a successful lookup is cached is JVM-dependent -- commonly 30 s, but indefinitely when a
-security manager is installed. Because this runs on Netty I/O threads, slow or unresponsive
-DNS can block connection establishment and impact driver throughput. To mitigate this, configure
-the JVM DNS cache TTL via the `networkaddress.cache.ttl` security property (e.g. in
+security manager is installed. The lookup blocks the thread opening the connection, usually one of
+the driver's two admin threads, which also run pool management, the control connection and metadata
+refreshes, so slow or unresponsive DNS stalls all of them. To mitigate this, configure the JVM DNS
+cache TTL via the `networkaddress.cache.ttl` security property (e.g. in
 `$JAVA_HOME/conf/security/java.security` or programmatically with
-`java.security.Security.setProperty("networkaddress.cache.ttl", "60")`).
+`java.security.Security.setProperty("networkaddress.cache.ttl", "60")`). The JDK reads this
+property once, at its first DNS lookup, so set it in `java.security` or at the very start of `main`,
+before anything resolves a name.
 
 Refreshing the route map does **not** flush the DNS cache; new hostnames are resolved on first use.
 
@@ -123,6 +127,6 @@ Refreshing the route map does **not** flush the DNS cache; new hostnames are res
   configuring either one alongside client routes throws an `IllegalStateException`.
 
 A deployment that is *not* fronted by a per-node endpoint mapping -- one proxy hostname for the
-whole cluster, one proxy per subnet, or EC2 multi-region -- needs an address translator instead, and
-those are described on the
+whole cluster, or EC2 multi-region -- needs an address translator instead, and those are described
+on the
 [address resolution](../../address_resolution/#driver-side-address-translation) page.

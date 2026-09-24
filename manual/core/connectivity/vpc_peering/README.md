@@ -26,8 +26,9 @@ address translation at all.
 
 * contact points and `withLocalDatacenter` are the whole of the connectivity configuration.
 * covers VPC peering, AWS Transit Gateway and direct connections over the public internet.
-* leave `advanced.address-translator` unset -- see [client routes](../client_routes/) if the nodes
-  are *not* reachable at their broadcast addresses.
+* leave `advanced.address-translator` unset -- see
+  [when the broadcast addresses are not reachable](#when-the-broadcast-addresses-are-not-reachable)
+  if the nodes are *not* reachable at their broadcast addresses.
 
 -----
 
@@ -61,15 +62,14 @@ cluster, or when your topology already has a Transit Gateway.
 
 ### Direct connection over the public internet
 
-Clusters are reachable on the public internet by default, encrypted with TLS, with access limited to
-the addresses on the cluster's allowlist. It needs no network setup, which makes it the right choice
-for local development and for evaluating a trial cluster, and the wrong one for production traffic.
+Clusters are reachable on the public internet by default, with access limited to the addresses on
+the cluster's allowlist. It needs no network setup, which makes it the right choice for local
+development and for evaluating a trial cluster, and the wrong one for production traffic.
 
 Two things matter more here than on a private network: configure [SSL](../../ssl/), and remember
 that ScyllaDB Cloud hands you node *hostnames* rather than addresses. A hostname contact point is
-resolved afresh each time the control connection falls back to it, and the driver will try several
-of the addresses it resolves to -- see
-[contact points given as hostnames](../../address_resolution/#contact-points-given-as-hostnames).
+looked up when the session first connects to it, and only the first address the lookup returns is
+tried, so give the session every hostname from the connect page rather than just one.
 
 ### Connecting
 
@@ -79,22 +79,38 @@ cluster's connect page, name the local datacenter, and add credentials:
 ```java
 CqlSession session = CqlSession.builder()
     .addContactPoint(InetSocketAddress.createUnresolved(
-        "node-0.aws-eu-west-1.example.clusters.scylla.cloud", 9042))
+        "node-0.aws-eu-west-1.example.clusters.scylla.cloud", 9142))
+    .addContactPoint(InetSocketAddress.createUnresolved(
+        "node-1.aws-eu-west-1.example.clusters.scylla.cloud", 9142))
+    .addContactPoint(InetSocketAddress.createUnresolved(
+        "node-2.aws-eu-west-1.example.clusters.scylla.cloud", 9142))
     .withLocalDatacenter("AWS_EU_WEST_1")
     .withAuthCredentials("scylla", "...")
     .build();
 ```
 
-`createUnresolved` is what keeps the contact point a name. `new InetSocketAddress(host, port)`
-resolves on construction, so the session is frozen to the one address that lookup returned, and a
-hostname that later points somewhere else is never followed -- see
-[contact points given as hostnames](../../address_resolution/#contact-points-given-as-hostnames).
+`createUnresolved` defers that lookup until the session connects;
+`new InetSocketAddress(host, port)` does it on construction, so the contact point is fixed to
+whatever that one lookup returned. Either way the name matters only at startup: the driver soon
+reaches each node at the address the cluster reports for it, so a DNS change after startup is not
+followed.
 
-ScyllaDB Cloud encrypts client traffic with TLS, so the session needs an engine factory as well. The
-JVM's default truststore is enough when the cluster certificate is signed by a public CA:
+Port 9142 is the TLS port; 9042 stays open for unencrypted traffic unless the cluster enforces
+encryption. The cluster certificate is signed by a per-cluster CA, not a public one: download it
+from the cluster's details page ("Download CA public key") and import it into a truststore:
 
 ```
-datastax-java-driver.advanced.ssl-engine-factory.class = DefaultSslEngineFactory
+keytool -import -v -trustcacerts -alias CARoot -file scylladb_cluster_ca.pem -keystore client.truststore
+```
+
+Then point the engine factory at that truststore:
+
+```
+datastax-java-driver.advanced.ssl-engine-factory {
+  class = DefaultSslEngineFactory
+  truststore-path = /path/to/client.truststore
+  truststore-password = password123
+}
 ```
 
 [SSL](../../ssl/) covers truststores, hostname validation and client certificates.
@@ -114,8 +130,7 @@ driver has two answers for it:
 * the cluster is behind a cloud private endpoint and publishes a per-node endpoint mapping -- AWS
   PrivateLink, Azure Private Link or GCP Private Service Connect: use
   [client routes](../client_routes/);
-* everything else -- one proxy hostname for the whole cluster, a proxy per subnet, or EC2
-  multi-region: use an
+* everything else -- one proxy hostname for the whole cluster, or EC2 multi-region: use an
   [address translator](../../address_resolution/#driver-side-address-translation).
 
 Two queries separate the two. The first shows the addresses the driver is being handed, and needs
@@ -123,7 +138,7 @@ both halves because `system.peers` never lists the node you are connected to:
 
 ```
 cqlsh> select peer, rpc_address from system.peers;
-cqlsh> select broadcast_address from system.local;
+cqlsh> select rpc_address from system.local;
 ```
 
 The second decides which answer applies -- a row per node means the cluster publishes the mapping
