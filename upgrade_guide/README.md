@@ -3,6 +3,10 @@
 The purpose of this guide is to detail changes made by successive
 versions of the Java driver.
 
+Note that Java Driver 3.x is in maintenance mode and receives critical bug fixes only. If you are
+moving to Java Driver 4.x rather than between 3.x versions, see the
+[4.x migration guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/) instead.
+
 ### 3.11.5.19
 
 1.  `ColumnDefinitions` now reports a double-quoted name whose case matches no definition as absent,
