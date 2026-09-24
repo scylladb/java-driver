@@ -24,6 +24,7 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodecs;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
+import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
 import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
 import com.datastax.oss.protocol.internal.Frame;
@@ -101,8 +102,8 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
   private final Class<? extends Result> expectedResponseType;
   protected final CompletableFuture<ResultT> result = new CompletableFuture<>();
 
-  // This is only ever accessed on the channel's event loop, so it doesn't need to be volatile
-  private ScheduledFuture<?> timeoutFuture;
+  private volatile ScheduledFuture<?> timeoutFuture;
+  private volatile boolean writeSubmitted;
 
   protected AdminRequestHandler(
       DriverChannel channel,
@@ -134,7 +135,7 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
       boolean writeSubmitted = false;
       try {
         Future<Void> writeFuture = channel.write(message, false, customPayload, this);
-        writeSubmitted = true;
+        this.writeSubmitted = writeSubmitted = true;
         writeFuture.addListener(this::onWriteComplete);
       } finally {
         if (!writeSubmitted) {
@@ -161,13 +162,22 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
 
   private void onWriteComplete(Future<? super Void> future) {
     if (future.isSuccess()) {
+      if (result.isDone()) {
+        cancelSubmittedRequest();
+        return;
+      }
       LOG.debug("[{}] Successfully wrote {}, waiting for response", logPrefix, this);
       if (timeout.toNanos() > 0) {
-        timeoutFuture =
+        ScheduledFuture<?> timeoutFuture =
             channel
                 .eventLoop()
                 .schedule(this::fireTimeout, timeout.toNanos(), TimeUnit.NANOSECONDS);
+        this.timeoutFuture = timeoutFuture;
         timeoutFuture.addListener(UncaughtExceptions::log);
+        // Terminal completion can race with timeout installation after the check above.
+        if (result.isDone()) {
+          cancelSubmittedRequest();
+        }
       }
     } else {
       setFinalError(future.cause());
@@ -177,8 +187,27 @@ public class AdminRequestHandler<ResultT> implements ResponseCallback {
   private void fireTimeout() {
     setFinalError(
         new DriverTimeoutException(String.format("%s timed out after %s", debugString, timeout)));
-    if (!channel.closeFuture().isDone()) {
-      channel.cancel(this);
+    cancelSubmittedRequest();
+  }
+
+  /** Cancels this callback if its write was submitted, along with any installed timeout. */
+  protected final void cancelSubmittedRequest() {
+    if (!writeSubmitted) {
+      return;
+    }
+    try {
+      if (timeoutFuture != null) {
+        timeoutFuture.cancel(true);
+      }
+    } catch (Throwable t) {
+      Loggers.warnWithException(LOG, "[{}] Error cancelling timeout for {}", logPrefix, this, t);
+    }
+    try {
+      if (!channel.closeFuture().isDone()) {
+        channel.cancel(this);
+      }
+    } catch (Throwable t) {
+      Loggers.warnWithException(LOG, "[{}] Error cancelling {}", logPrefix, this, t);
     }
   }
 

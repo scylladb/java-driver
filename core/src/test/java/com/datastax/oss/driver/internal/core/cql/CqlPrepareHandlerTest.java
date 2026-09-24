@@ -20,12 +20,13 @@ package com.datastax.oss.driver.internal.core.cql;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static com.datastax.oss.driver.internal.core.cql.CqlRequestHandlerTestBase.defaultFrameOf;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,6 +42,8 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
@@ -364,18 +367,26 @@ public class CqlPrepareHandlerTest {
     RuntimeException failure = new RuntimeException("mock failure");
     DefaultPrepareRequest prepareRequest = spy(new DefaultPrepareRequest("mock query"));
     doThrow(failure).when(prepareRequest).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
     RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
     PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
 
     try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
-      assertThatThrownBy(
-              () ->
-                  new CqlPrepareHandler(
-                      prepareRequest, harness.getSession(), harness.getContext(), "test"))
-          .isSameAs(failure);
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlPrepareHandler handler =
+          new CqlPrepareHandler(prepareRequest, harness.getSession(), harness.getContext(), "test");
 
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
+      verify(throttler).signalError(handler, failure);
     }
   }
 

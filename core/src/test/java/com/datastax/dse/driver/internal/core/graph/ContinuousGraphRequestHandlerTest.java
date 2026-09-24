@@ -23,8 +23,11 @@ import static com.datastax.dse.driver.internal.core.graph.GraphTestUtils.tenGrap
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -40,8 +43,11 @@ import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
 import com.datastax.dse.driver.api.core.metrics.DseSessionMetric;
 import com.datastax.dse.driver.internal.core.graph.binary.GraphBinaryModule;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
+import com.datastax.oss.driver.api.core.RequestThrottlingException;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.cql.PoolBehavior;
 import com.datastax.oss.driver.internal.core.cql.RequestHandlerTestHarness;
@@ -55,6 +61,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -190,6 +197,115 @@ public class ContinuousGraphRequestHandlerTest {
       assertThatThrownBy(() -> page1Future.toCompletableFuture().get())
           .hasRootCauseExactlyInstanceOf(DriverTimeoutException.class)
           .hasMessageContaining("Query timed out after " + defaultTimeout);
+    }
+  }
+
+  @Test
+  public void should_not_schedule_timeout_after_immediate_setup_failure() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    Duration defaultTimeout = Duration.ofSeconds(1);
+    GraphSupportChecker supportChecker = mock(GraphSupportChecker.class);
+    when(supportChecker.inferGraphProtocol(any(), any(), any())).thenThrow(failure);
+
+    RequestHandlerTestHarness.Builder builder =
+        GraphRequestHandlerTestHarness.builder().withGraphTimeout(defaultTimeout);
+    PoolBehavior node1Behavior = builder.customBehavior(node);
+
+    try (RequestHandlerTestHarness harness = builder.build()) {
+      ContinuousGraphRequestHandler handler =
+          new ContinuousGraphRequestHandler(
+              ScriptGraphStatement.newInstance("mockQuery"),
+              harness.getSession(),
+              harness.getContext(),
+              "test",
+              createGraphBinaryModule(mockContext),
+              supportChecker);
+
+      CompletionStage<AsyncGraphResultSet> result = handler.handle();
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout()).isNull();
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+    }
+  }
+
+  @Test
+  public void should_cancel_timeout_after_delayed_setup_failure() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    Duration defaultTimeout = Duration.ofSeconds(1);
+    GraphSupportChecker supportChecker = mock(GraphSupportChecker.class);
+    when(supportChecker.inferGraphProtocol(any(), any(), any())).thenThrow(failure);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AtomicReference<Throttled> registeredRequest = new AtomicReference<>();
+    doAnswer(
+            invocation -> {
+              registeredRequest.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+
+    RequestHandlerTestHarness.Builder builder =
+        GraphRequestHandlerTestHarness.builder().withGraphTimeout(defaultTimeout);
+    PoolBehavior node1Behavior = builder.customBehavior(node);
+
+    try (RequestHandlerTestHarness harness = builder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      ContinuousGraphRequestHandler handler =
+          new ContinuousGraphRequestHandler(
+              ScriptGraphStatement.newInstance("mockQuery"),
+              harness.getSession(),
+              harness.getContext(),
+              "test",
+              createGraphBinaryModule(mockContext),
+              supportChecker);
+      CompletionStage<AsyncGraphResultSet> result = handler.handle();
+      CapturedTimeout globalTimeout = harness.nextScheduledTimeout();
+
+      registeredRequest.get().onThrottleReady(true);
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(globalTimeout.isCancelled()).isTrue();
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_cancel_timeout_when_queued_request_is_rejected() {
+    Duration defaultTimeout = Duration.ofSeconds(1);
+    RequestThrottlingException failure = new RequestThrottlingException("mock failure");
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AtomicReference<Throttled> registeredRequest = new AtomicReference<>();
+    doAnswer(
+            invocation -> {
+              registeredRequest.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+
+    RequestHandlerTestHarness.Builder builder =
+        GraphRequestHandlerTestHarness.builder().withGraphTimeout(defaultTimeout);
+    try (RequestHandlerTestHarness harness = builder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      ContinuousGraphRequestHandler handler =
+          new ContinuousGraphRequestHandler(
+              ScriptGraphStatement.newInstance("mockQuery"),
+              harness.getSession(),
+              harness.getContext(),
+              "test",
+              createGraphBinaryModule(mockContext),
+              new GraphSupportChecker());
+
+      CompletionStage<AsyncGraphResultSet> result = handler.handle();
+      CapturedTimeout globalTimeout = harness.nextScheduledTimeout();
+      registeredRequest.get().onThrottleFailure(failure);
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(globalTimeout.isCancelled()).isTrue();
     }
   }
 

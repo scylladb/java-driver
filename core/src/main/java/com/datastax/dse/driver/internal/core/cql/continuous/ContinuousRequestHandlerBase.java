@@ -149,6 +149,8 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
   /** The callback selected to stream results back to the client. */
   private final CompletableFuture<NodeResponseCallback> chosenCallback = new CompletableFuture<>();
 
+  private final AtomicBoolean terminal = new AtomicBoolean();
+
   /**
    * How many speculative executions are currently running (including the initial execution). We
    * track this in order to know when to fail the request if all executions have reached the end of
@@ -254,22 +256,32 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(initialStatement, context);
-    if (wasDelayed
-        // avoid call to nanoTime() if metric is disabled:
-        && sessionMetricUpdater.isEnabled(
-            DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
-      session
-          .getMetricUpdater()
-          .updateTimer(
-              DefaultSessionMetric.THROTTLING_DELAY,
-              executionProfile.getName(),
-              System.nanoTime() - startTimeNanos,
-              TimeUnit.NANOSECONDS);
+    try {
+      DriverExecutionProfile executionProfile =
+          Conversions.resolveExecutionProfile(initialStatement, context);
+      if (wasDelayed
+          // avoid call to nanoTime() if metric is disabled:
+          && sessionMetricUpdater.isEnabled(
+              DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
+        session
+            .getMetricUpdater()
+            .updateTimer(
+                DefaultSessionMetric.THROTTLING_DELAY,
+                executionProfile.getName(),
+                System.nanoTime() - startTimeNanos,
+                TimeUnit.NANOSECONDS);
+      }
+      activeExecutionsCount.incrementAndGet();
+      sendRequest(initialStatement, null, 0, 0, specExecEnabled);
+    } catch (Throwable t) {
+      // The concurrency throttler contains ready-callback exceptions. Complete and release here so
+      // failures before sendRequest's guarded setup path cannot strand an admitted request.
+      if (abortGlobalRequestOrChosenCallback(t) && !(t instanceof CancellationException)) {
+        // Cancellation is propagated through the fetched result, whose cancellation listener owns
+        // the single signalCancel call.
+        throttler.signalError(this, t);
+      }
     }
-    activeExecutionsCount.incrementAndGet();
-    sendRequest(initialStatement, null, 0, 0, specExecEnabled);
   }
 
   @Override
@@ -283,6 +295,8 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
   }
 
   private boolean abortGlobalRequestOrChosenCallback(@NonNull Throwable error) {
+    terminal.set(true);
+    cancelGlobalTimeout();
     boolean completedChosenCallback = chosenCallback.completeExceptionally(error);
     if (!completedChosenCallback) {
       chosenCallback.thenAccept(callback -> callback.abort(error, false));
@@ -291,7 +305,16 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
   }
 
   public CompletionStage<ResultSetT> handle() {
-    globalTimeout = scheduleGlobalTimeout();
+    // Immediate admission happens in the continuous graph handler's constructor. If setup failed
+    // there, chosenCallback is already terminal and there is no live request to time out.
+    if (!terminal.get()) {
+      globalTimeout = scheduleGlobalTimeout();
+      // Admission can race with handle() after the check above but before globalTimeout is
+      // assigned. Ensure a synchronous terminal setup failure cannot leave that timeout behind.
+      if (terminal.get()) {
+        cancelGlobalTimeout();
+      }
+    }
     return fetchNextPage();
   }
 
@@ -370,7 +393,7 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
       }
     } else if (!chosenCallback.isDone()) {
       boolean writeSubmitted = false;
-      Throwable terminalPreWriteFailure = null;
+      Throwable terminalSetupFailure = null;
       NodeResponseCallback nodeResponseCallback = null;
       try {
         nodeResponseCallback =
@@ -392,12 +415,15 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
         writeSubmitted = true;
         writeFuture.addListener(nodeResponseCallback);
       } catch (Throwable t) {
-        if (!writeSubmitted && activeExecutionsCount.decrementAndGet() == 0) {
-          if (abortGlobalRequestOrChosenCallback(t)) {
-            terminalPreWriteFailure = t;
+        recordError(node, t);
+        if (activeExecutionsCount.decrementAndGet() == 0) {
+          if (abortGlobalRequestOrChosenCallback(t) && !(t instanceof CancellationException)) {
+            terminalSetupFailure = t;
           }
+        } else {
+          Loggers.warnWithException(
+              LOG, "[{}] Request setup failed, another execution is still active", logPrefix, t);
         }
-        throw t;
       } finally {
         if (!writeSubmitted) {
           if (nodeResponseCallback != null) {
@@ -405,12 +431,18 @@ public abstract class ContinuousRequestHandlerBase<StatementT extends Request, R
           }
           try {
             channel.cancelPreAcquireId();
-          } finally {
-            if (terminalPreWriteFailure != null) {
-              throttler.signalError(this, terminalPreWriteFailure);
+          } catch (Throwable cleanupFailure) {
+            if (terminalSetupFailure != null && terminalSetupFailure != cleanupFailure) {
+              terminalSetupFailure.addSuppressed(cleanupFailure);
+            } else {
+              Loggers.warnWithException(
+                  LOG, "[{}] Failed to cancel stream ID reservation", logPrefix, cleanupFailure);
             }
           }
         }
+      }
+      if (terminalSetupFailure != null) {
+        throttler.signalError(this, terminalSetupFailure);
       }
     } else {
       channel.cancelPreAcquireId();
