@@ -1,8 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-# Install dependencies
-mvn install -DskipTests -Dmaven.javadoc.skip=true -T 1C
+# Restricting the reactor to the modules that are published keeps coverage-report out of
+# it: it needs integration-tests, whose install is skipped, and javadoc:javadoc is a
+# standalone goal so it resolves from the repository, not the reactor.
+JAVADOC_MODULES=(core query-builder mapper-runtime)
+JAVADOC_PL="$(IFS=,; echo "${JAVADOC_MODULES[*]}")"
+
+# Install what those modules need, and nothing else: in a full parallel reactor, examples
+# can compile before mapper-processor is installed, since it names that module as an
+# annotation processor path rather than a dependency.
+mvn install -DskipTests -Dmaven.javadoc.skip=true -pl "$JAVADOC_PL" -am -T 1C
 
 # Define output folder
 OUTPUT_DIR="docs/_build/dirhtml/api"
@@ -11,10 +19,6 @@ if [[ "${SPHINX_MULTIVERSION_OUTPUTDIR:-}" != "" ]]; then
     echo "HTML_OUTPUT = $OUTPUT_DIR" >> doxyfile
 fi
 
-# Generate javadoc. Restricting the reactor to the modules that are published also keeps
-# coverage-report out of it: it needs integration-tests, whose install is skipped, and
-# javadoc:javadoc is a standalone goal so it resolves from the repository, not the reactor.
-JAVADOC_MODULES=(core query-builder mapper-runtime)
 # The api/ package each module contributes. check-javadoc-output.sh only checks that
 # api/index.html is non-empty, and the copy below always takes that file from the first
 # module, so a module that produced nothing would otherwise be invisible downstream.
@@ -26,7 +30,8 @@ for module in "${JAVADOC_MODULES[@]}"; do
     rm -rf "$module/target/reports/apidocs" "$module/target/site/apidocs"
 done
 
-mvn javadoc:javadoc -pl "$(IFS=,; echo "${JAVADOC_MODULES[*]}")" -T 1C
+# Generate javadoc.
+mvn javadoc:javadoc -pl "$JAVADOC_PL" -T 1C
 
 # maven-javadoc-plugin writes to target/reports from 3.11 on, and to target/site before it.
 apidocs_dir() {
