@@ -25,8 +25,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -264,14 +262,6 @@ public class MicrometerNodeMetricUpdaterTest {
         DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_DIGITS,
         DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_SLO,
         DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_PUBLISH_PERCENTILES,
-      },
-      {
-        DseNodeMetric.GRAPH_MESSAGES,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_LOWEST,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_SLO,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES,
       },
     };
   }

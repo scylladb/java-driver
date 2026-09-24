@@ -17,12 +17,12 @@
  */
 package com.datastax.dse.driver.internal.core.insights;
 
-import static com.datastax.dse.driver.api.core.DseProtocolVersion.DSE_V2;
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockDefaultExecutionProfile;
 import static com.datastax.dse.driver.internal.core.insights.ExecutionProfileMockUtil.mockNonDefaultRequestTimeoutExecutionProfile;
 import static com.datastax.dse.driver.internal.core.insights.PackageUtil.DEFAULT_AUTH_PROVIDER_PACKAGE;
 import static com.datastax.dse.driver.internal.core.insights.PackageUtil.DEFAULT_LOAD_BALANCING_PACKAGE;
 import static com.datastax.dse.driver.internal.core.insights.PackageUtil.DEFAULT_SPECULATIVE_EXECUTION_PACKAGE;
+import static com.datastax.oss.driver.api.core.DefaultProtocolVersion.V5;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -174,7 +174,7 @@ public class InsightsClientTest {
     assertThat(insightData.getInitialControlConnection()).isEqualTo("127.0.0.1:10");
     assertThat(insightData.getLocalAddress()).isEqualTo("127.0.0.1");
     assertThat(insightData.getHostName()).isNotEmpty();
-    assertThat(insightData.getProtocolVersion()).isEqualTo(DSE_V2.getCode());
+    assertThat(insightData.getProtocolVersion()).isEqualTo(V5.getCode());
     assertThat(insightData.getExecutionProfiles())
         .isEqualTo(
             ImmutableMap.of(
@@ -190,10 +190,9 @@ public class InsightsClientTest {
                         ImmutableMap.of("maxSpeculativeExecutions", 100, "delay", 20),
                         DEFAULT_SPECULATIVE_EXECUTION_PACKAGE),
                     "LOCAL_ONE",
-                    "SERIAL",
-                    ImmutableMap.of("source", "src-graph")),
+                    "SERIAL"),
                 "non-default",
-                new SpecificExecutionProfile(50, null, null, null, null, null)));
+                new SpecificExecutionProfile(50, null, null, null, null)));
     assertThat(insightData.getPoolSizeByHostDistance())
         .isEqualTo(new PoolSizeByHostDistance(2, 1, 0));
     assertThat(insightData.getHeartbeatInterval()).isEqualTo(100);
@@ -482,7 +481,7 @@ public class InsightsClientTest {
     startupOptions.put(StartupOptionsBuilder.DRIVER_NAME_KEY, "DataStax Enterprise Java Driver");
 
     when(context.getStartupOptions()).thenReturn(startupOptions);
-    when(context.getProtocolVersion()).thenReturn(DSE_V2);
+    when(context.getProtocolVersion()).thenReturn(V5);
     DefaultNode contactPoint = mock(DefaultNode.class);
     EndPoint contactEndPoint = mock(EndPoint.class);
     when(contactEndPoint.resolve()).thenReturn(new InetSocketAddress("127.0.0.1", 9999));

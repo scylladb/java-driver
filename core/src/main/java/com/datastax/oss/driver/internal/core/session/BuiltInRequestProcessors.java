@@ -18,16 +18,8 @@
 package com.datastax.oss.driver.internal.core.session;
 
 import static com.datastax.oss.driver.internal.core.util.Dependency.REACTIVE_STREAMS;
-import static com.datastax.oss.driver.internal.core.util.Dependency.TINKERPOP;
 
-import com.datastax.dse.driver.internal.core.cql.continuous.ContinuousCqlRequestAsyncProcessor;
-import com.datastax.dse.driver.internal.core.cql.continuous.ContinuousCqlRequestSyncProcessor;
-import com.datastax.dse.driver.internal.core.cql.continuous.reactive.ContinuousCqlRequestReactiveProcessor;
 import com.datastax.dse.driver.internal.core.cql.reactive.CqlRequestReactiveProcessor;
-import com.datastax.dse.driver.internal.core.graph.GraphRequestAsyncProcessor;
-import com.datastax.dse.driver.internal.core.graph.GraphRequestSyncProcessor;
-import com.datastax.dse.driver.internal.core.graph.GraphSupportChecker;
-import com.datastax.dse.driver.internal.core.graph.reactive.ReactiveGraphRequestProcessor;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareSyncProcessor;
@@ -47,20 +39,11 @@ public class BuiltInRequestProcessors {
   public static List<RequestProcessor<?, ?>> createDefaultProcessors(DefaultDriverContext context) {
     List<RequestProcessor<?, ?>> processors = new ArrayList<>();
     addBasicProcessors(processors, context);
-    if (DefaultDependencyChecker.isPresent(TINKERPOP)) {
-      addGraphProcessors(context, processors);
-    } else {
-      LOG.debug("Tinkerpop was not found on the classpath: graph extensions will not be available");
-    }
     if (DefaultDependencyChecker.isPresent(REACTIVE_STREAMS)) {
       addReactiveProcessors(processors);
     } else {
       LOG.debug(
           "Reactive Streams was not found on the classpath: reactive extensions will not be available");
-    }
-    if (DefaultDependencyChecker.isPresent(REACTIVE_STREAMS)
-        && DefaultDependencyChecker.isPresent(TINKERPOP)) {
-      addGraphReactiveProcessors(context, processors);
     }
     return processors;
   }
@@ -81,40 +64,11 @@ public class BuiltInRequestProcessors {
         new CqlPrepareSyncProcessor(cqlPrepareAsyncProcessor);
     processors.add(cqlPrepareAsyncProcessor);
     processors.add(cqlPrepareSyncProcessor);
-
-    // continuous requests (sync and async)
-    ContinuousCqlRequestAsyncProcessor continuousCqlRequestAsyncProcessor =
-        new ContinuousCqlRequestAsyncProcessor();
-    ContinuousCqlRequestSyncProcessor continuousCqlRequestSyncProcessor =
-        new ContinuousCqlRequestSyncProcessor(continuousCqlRequestAsyncProcessor);
-    processors.add(continuousCqlRequestAsyncProcessor);
-    processors.add(continuousCqlRequestSyncProcessor);
-  }
-
-  public static void addGraphProcessors(
-      DefaultDriverContext context, List<RequestProcessor<?, ?>> processors) {
-    GraphRequestAsyncProcessor graphRequestAsyncProcessor =
-        new GraphRequestAsyncProcessor(context, new GraphSupportChecker());
-    GraphRequestSyncProcessor graphRequestSyncProcessor =
-        new GraphRequestSyncProcessor(graphRequestAsyncProcessor);
-    processors.add(graphRequestAsyncProcessor);
-    processors.add(graphRequestSyncProcessor);
   }
 
   public static void addReactiveProcessors(List<RequestProcessor<?, ?>> processors) {
     CqlRequestReactiveProcessor cqlRequestReactiveProcessor =
         new CqlRequestReactiveProcessor(new CqlRequestAsyncProcessor());
-    ContinuousCqlRequestReactiveProcessor continuousCqlRequestReactiveProcessor =
-        new ContinuousCqlRequestReactiveProcessor(new ContinuousCqlRequestAsyncProcessor());
     processors.add(cqlRequestReactiveProcessor);
-    processors.add(continuousCqlRequestReactiveProcessor);
-  }
-
-  public static void addGraphReactiveProcessors(
-      DefaultDriverContext context, List<RequestProcessor<?, ?>> processors) {
-    ReactiveGraphRequestProcessor reactiveGraphRequestProcessor =
-        new ReactiveGraphRequestProcessor(
-            new GraphRequestAsyncProcessor(context, new GraphSupportChecker()));
-    processors.add(reactiveGraphRequestProcessor);
   }
 }

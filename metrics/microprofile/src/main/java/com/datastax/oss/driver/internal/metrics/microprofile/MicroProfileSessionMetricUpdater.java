@@ -17,7 +17,6 @@
  */
 package com.datastax.oss.driver.internal.metrics.microprofile;
 
-import com.datastax.dse.driver.api.core.metrics.DseSessionMetric;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.SessionMetric;
@@ -45,12 +44,9 @@ public class MicroProfileSessionMetricUpdater extends MicroProfileMetricUpdater<
 
     initializeCounter(DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, profile);
     initializeCounter(DefaultSessionMetric.THROTTLING_ERRORS, profile);
-    initializeCounter(DseSessionMetric.GRAPH_CLIENT_TIMEOUTS, profile);
 
     initializeTimer(DefaultSessionMetric.CQL_REQUESTS, profile);
     initializeTimer(DefaultSessionMetric.THROTTLING_DELAY, profile);
-    initializeTimer(DseSessionMetric.CONTINUOUS_CQL_REQUESTS, profile);
-    initializeTimer(DseSessionMetric.GRAPH_REQUESTS, profile);
   }
 
   @Override
