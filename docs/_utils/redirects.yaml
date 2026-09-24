@@ -1,0 +1,14 @@
+# Roots of versions no longer published. Deep links into them 404.
+/scylla-3.7.2.x/index.html: /scylla-3.11.5.x/
+/scylla-3.10.2.x/index.html: /scylla-3.11.5.x/
+/scylla-3.11.0.x/index.html: /scylla-3.11.5.x/
+/scylla-3.11.2.x/index.html: /scylla-3.11.5.x/
+/scylla-3.11.4.x/index.html: /scylla-3.11.5.x/
+/scylla-4.7.2.x/index.html: /stable/
+/scylla-4.10.0.x/index.html: /stable/
+/scylla-4.11.1.x/index.html: /stable/
+/scylla-4.12.0.x/index.html: /stable/
+/scylla-4.13.0.x/index.html: /stable/
+/scylla-4.14.1.x/index.html: /stable/
+/scylla-4.15.0.x/index.html: /stable/
+/scylla-4.17.0.x/index.html: /stable/
