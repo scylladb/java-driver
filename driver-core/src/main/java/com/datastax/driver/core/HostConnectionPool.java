@@ -27,6 +27,7 @@ import static com.datastax.driver.core.Connection.State.RESURRECTING;
 import static com.datastax.driver.core.Connection.State.TRASHED;
 
 import com.datastax.driver.core.exceptions.AuthenticationException;
+import com.datastax.driver.core.exceptions.BusyConnectionException;
 import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
@@ -38,6 +39,7 @@ import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
@@ -300,18 +302,24 @@ class HostConnectionPool implements Connection.Owner {
         maxConnections / shardsCount + (maxConnections % shardsCount > 0 ? 1 : 0);
     int toCreate = shardsCount * connectionsPerShard;
 
-    this.connections = new List[shardsCount];
-    scheduledForCreation = new AtomicInteger[shardsCount];
-    open = new AtomicInteger[shardsCount];
-    trash = new Set[shardsCount];
-    pendingBorrows = new Queue[shardsCount];
+    List<Connection>[] connectionsByShard = new List[shardsCount];
+    AtomicInteger[] scheduledForCreationByShard = new AtomicInteger[shardsCount];
+    AtomicInteger[] openByShard = new AtomicInteger[shardsCount];
+    Set<Connection>[] trashByShard = new Set[shardsCount];
+    Queue<PendingBorrow>[] pendingBorrowsByShard = new Queue[shardsCount];
     for (int i = 0; i < shardsCount; ++i) {
-      this.connections[i] = new CopyOnWriteArrayList<Connection>();
-      scheduledForCreation[i] = new AtomicInteger();
-      open[i] = new AtomicInteger();
-      trash[i] = new CopyOnWriteArraySet<Connection>();
-      pendingBorrows[i] = new ConcurrentLinkedQueue<PendingBorrow>();
+      connectionsByShard[i] = new CopyOnWriteArrayList<Connection>();
+      scheduledForCreationByShard[i] = new AtomicInteger();
+      openByShard[i] = new AtomicInteger();
+      trashByShard[i] = new CopyOnWriteArraySet<Connection>();
+      pendingBorrowsByShard[i] = new ConcurrentLinkedQueue<PendingBorrow>();
     }
+
+    this.connections = connectionsByShard;
+    scheduledForCreation = scheduledForCreationByShard;
+    open = openByShard;
+    trash = trashByShard;
+    pendingBorrows = pendingBorrowsByShard;
 
     final List<Connection> connections = Lists.newArrayListWithCapacity(toCreate);
     final List<ListenableFuture<Void>> connectionFutures =
@@ -372,7 +380,7 @@ class HostConnectionPool implements Connection.Owner {
         manager.cluster.manager.configuration.getPoolingOptions().getInitializationExecutor();
     final ListenableFuture<List<Void>> allConnectionsFuture = Futures.allAsList(connectionFutures);
 
-    GuavaCompatibility.INSTANCE.addCallback(
+    Futures.addCallback(
         allConnectionsFuture,
         new FutureCallback<List<Void>>() {
           @Override
@@ -449,8 +457,9 @@ class HostConnectionPool implements Connection.Owner {
 
   private ListenableFuture<Void> handleErrors(
       ListenableFuture<Void> connectionInitFuture, Executor executor) {
-    return GuavaCompatibility.INSTANCE.withFallback(
+    return Futures.catchingAsync(
         connectionInitFuture,
+        Throwable.class,
         new AsyncFunction<Throwable, Void>() {
           @Override
           public ListenableFuture<Void> apply(Throwable t) throws Exception {
@@ -603,7 +612,22 @@ class HostConnectionPool implements Connection.Owner {
       if (totalInFlightCount > currentCapacity) maybeSpawnNewConnection(shardId);
     }
 
-    return leastBusy.setKeyspaceAsync(manager.poolsState.keyspace);
+    final Connection borrowedConnection = leastBusy;
+    ListenableFuture<Connection> setKeyspaceFuture =
+        borrowedConnection.setKeyspaceAsync(manager.poolsState.keyspace);
+    Futures.addCallback(
+        setKeyspaceFuture,
+        new FutureCallback<Connection>() {
+          @Override
+          public void onSuccess(Connection connection) {}
+
+          @Override
+          public void onFailure(Throwable t) {
+            borrowedConnection.release(t instanceof BusyConnectionException);
+          }
+        },
+        MoreExecutors.directExecutor());
+    return setKeyspaceFuture;
   }
 
   private ListenableFuture<Connection> enqueue(
@@ -708,7 +732,7 @@ class HostConnectionPool implements Connection.Owner {
         } else {
           // Otherwise the keyspace did need to be set, tie the pendingBorrow future to the set
           // keyspace completion.
-          GuavaCompatibility.INSTANCE.addCallback(
+          Futures.addCallback(
               setKeyspaceFuture,
               new FutureCallback<Connection>() {
 
@@ -726,7 +750,8 @@ class HostConnectionPool implements Connection.Owner {
                   pendingBorrow.setException(t);
                   connection.inFlight.decrementAndGet();
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
         }
       }
     }
@@ -992,54 +1017,88 @@ class HostConnectionPool implements Connection.Owner {
   }
 
   int opened() {
+    AtomicInteger[] open = this.open;
+    if (open == null) {
+      return 0;
+    }
+
     int result = 0;
     for (AtomicInteger o : open) {
-      result += o.get();
+      if (o != null) {
+        result += o.get();
+      }
     }
     return result;
   }
 
   int trashed() {
+    Set<Connection>[] trash = this.trash;
+    if (trash == null) {
+      return 0;
+    }
+
     int size = 0;
     for (final Set<Connection> shardConnections : trash) {
-      size += shardConnections.size();
+      if (shardConnections != null) {
+        size += shardConnections.size();
+      }
     }
     return size;
   }
 
   private List<CloseFuture> discardAvailableConnections() {
-    // Note: if this gets called before initialization has completed, both connections and trash
-    // will be empty,
-    // so this will return an empty list
+    List<Connection>[] connections = this.connections;
+    Set<Connection>[] trash = this.trash;
+    if (connections == null || trash == null) {
+      return new ArrayList<CloseFuture>(0);
+    }
+
+    // Note: if this gets called before initialization has completed, connections and trash might
+    // still be partially populated, so null entries are ignored and this still returns a valid list
 
     int size = 0;
     for (final Set<Connection> shardConnections : trash) {
-      size += shardConnections.size();
+      if (shardConnections != null) {
+        size += shardConnections.size();
+      }
     }
     for (final List<Connection> shardConnections : connections) {
-      size += shardConnections.size();
+      if (shardConnections != null) {
+        size += shardConnections.size();
+      }
     }
     List<CloseFuture> futures = new ArrayList<CloseFuture>(size);
 
     for (final List<Connection> shardConnections : connections) {
+      if (shardConnections == null) {
+        continue;
+      }
       for (final Connection connection : shardConnections) {
         CloseFuture future = connection.closeAsync();
         future.addListener(
             new Runnable() {
               @Override
               public void run() {
-                if (connection.state.compareAndSet(OPEN, GONE)) {
-                  open[connection.shardId()].decrementAndGet();
+                AtomicInteger[] open = HostConnectionPool.this.open;
+                AtomicInteger openCount =
+                    open != null && connection.shardId() < open.length
+                        ? open[connection.shardId()]
+                        : null;
+                if (openCount != null && connection.state.compareAndSet(OPEN, GONE)) {
+                  openCount.decrementAndGet();
                 }
               }
             },
-            GuavaCompatibility.INSTANCE.sameThreadExecutor());
+            MoreExecutors.directExecutor());
         futures.add(future);
       }
     }
 
     // Some connections in the trash might still be open if they hadn't reached their idle timeout
     for (final Set<Connection> shardConnections : trash) {
+      if (shardConnections == null) {
+        continue;
+      }
       for (final Connection connection : shardConnections) {
         futures.add(connection.closeAsync());
       }

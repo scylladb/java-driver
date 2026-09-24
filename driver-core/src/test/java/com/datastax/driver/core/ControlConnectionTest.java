@@ -119,13 +119,14 @@ public class ControlConnectionTest extends CCMTestsSupport {
     Cluster cluster = register(createClusterBuilder().build());
     Session session = cluster.connect();
     session.execute(
-        "create keyspace ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
-    session.execute("create type ks.foo (i int)");
+        "create keyspace ControlConnectionTest_ks WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}");
+    session.execute("create type ControlConnectionTest_ks.foo (i int)");
     cluster.close();
 
     // Second driver instance: read UDT definition
     Cluster cluster2 = register(createClusterBuilder().build());
-    UserType fooType = cluster2.getMetadata().getKeyspace("ks").getUserType("foo");
+    UserType fooType =
+        cluster2.getMetadata().getKeyspace("ControlConnectionTest_ks").getUserType("foo");
 
     assertThat(fooType.getFieldNames()).containsExactly("i");
   }
@@ -378,7 +379,12 @@ public class ControlConnectionTest extends CCMTestsSupport {
             .extractingResultOf("getAddress")
             .doesNotContain(node2Address);
 
-        assertThat(log).containsOnlyOnce(expectedError);
+        if (columns.equals("tokens")) {
+          // For zero token nodes driver does not log an error
+          assertThat(log).doesNotContain(expectedError);
+        } else {
+          assertThat(log).containsOnlyOnce(expectedError);
+        }
       }
     } finally {
       cLogger.removeAppender(logs);
@@ -450,6 +456,9 @@ public class ControlConnectionTest extends CCMTestsSupport {
               .build();
 
       scassandras.node(1).primingClient().clearAllPrimes();
+      // Reset the column caches so the driver re-discovers columns via SELECT * rather than
+      // sending projected queries against the now-cleared Scassandra primes.
+      cluster.manager.controlConnection.resetColumnCaches();
 
       // the driver will attempt to locate host2 in system.peers by its old broadcast address, and
       // that will fail

@@ -43,7 +43,7 @@ public class Host {
   static final Logger statesLogger = LoggerFactory.getLogger(Host.class.getName() + ".STATES");
 
   // The address we'll use to connect to the node
-  private EndPoint endPoint;
+  private final EndPoint endPoint;
 
   // The broadcast RPC address, as reported in system tables.
   // Note that, unlike previous versions of the driver, this address is NOT TRANSLATED.
@@ -64,26 +64,21 @@ public class Host {
 
   private volatile UUID schemaVersion;
 
-  // Can be set concurrently but the value should always be the same.
-  private volatile ShardingInfo shardingInfo = null;
-
-  // Can be set concurrently but the value should always be the same.
-  private volatile LwtInfo lwtInfo = null;
-
-  // Whether host supports TABLETS_ROUTING_V1
-  private volatile TabletInfo tabletInfo = null;
+  private volatile ProtocolFeatureStore protocolFeatureStore;
 
   enum State {
     ADDED,
     DOWN,
-    UP
+    UP;
   }
 
   volatile State state;
+
   /** Ensures state change notifications for that host are handled serially */
   final ReentrantLock notificationsLock = new ReentrantLock(true);
 
   final ConvictionPolicy convictionPolicy;
+
   private final Cluster.Manager manager;
 
   // Tracks later reconnection attempts to that host so we avoid adding multiple tasks.
@@ -181,10 +176,6 @@ public class Host {
   /** Returns information to connect to the node. */
   public EndPoint getEndPoint() {
     return endPoint;
-  }
-
-  public void setEndPoint(EndPoint endPoint) {
-    this.endPoint = endPoint;
   }
 
   /**
@@ -437,29 +428,41 @@ public class Host {
     this.tokens = tokens;
   }
 
-  public ShardingInfo getShardingInfo() {
-    return shardingInfo;
+  public ProtocolFeatureStore getProtocolFeatureStore() {
+    return protocolFeatureStore;
   }
 
-  public void setShardingInfo(ShardingInfo shardingInfo) {
-    this.shardingInfo = shardingInfo;
+  protected void setProtocolFeatureStore(ProtocolFeatureStore protocolFeatureStore) {
+    this.protocolFeatureStore = protocolFeatureStore;
   }
+
+  public ShardingInfo getShardingInfo() {
+    return protocolFeatureStore != null && protocolFeatureStore.getConnectionShardingInfo() != null
+        ? protocolFeatureStore.getConnectionShardingInfo().shardingInfo
+        : null;
+  }
+
+  /**
+   * Does nothing. shardingInfo should not be manipulated.
+   *
+   * @param shardingInfo a {@code ShardingInfo} instance.
+   * @deprecated shardingInfo should not be manipulated.
+   */
+  @Deprecated
+  public void setShardingInfo(ShardingInfo shardingInfo) {}
 
   public LwtInfo getLwtInfo() {
-    return lwtInfo;
+    return protocolFeatureStore != null ? protocolFeatureStore.getLwtInfo() : null;
   }
 
-  public void setLwtInfo(LwtInfo lwtInfo) {
-    this.lwtInfo = lwtInfo;
-  }
-
-  public TabletInfo getTabletInfo() {
-    return tabletInfo;
-  }
-
-  public void setTabletInfo(TabletInfo tabletInfo) {
-    this.tabletInfo = tabletInfo;
-  }
+  /**
+   * Does nothing, lwtInfo should not be manipulated.
+   *
+   * @param lwtInfo a {@code LwtInfo} instance.
+   * @deprecated lwtInfo should not be manipulated.
+   */
+  @Deprecated
+  public void setLwtInfo(LwtInfo lwtInfo) {}
 
   /**
    * Returns whether the host is considered up by the driver.

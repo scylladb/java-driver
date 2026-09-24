@@ -35,6 +35,7 @@ import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.testng.annotations.Test;
 
@@ -75,12 +76,19 @@ public abstract class TokenIntegrationTest extends CCMTestsSupport {
   public void onTestContextInitialized() {
     ks1 = TestUtils.generateIdentifier("ks_");
     ks2 = TestUtils.generateIdentifier("ks_");
+    // Disable tablets on ks1 when running against Scylla. With tablets enabled (the default on
+    // modern Scylla), replica placement is controlled by the tablet map rather than the token map,
+    // so getReplicasList(ks, null, null, key) returns an empty list and the assertions fail.
+    // Cassandra does not support the tablets property, so the clause is omitted there.
+    boolean isScylla = Objects.nonNull(ccm().getScyllaVersion());
     execute(
         String.format(
-            "CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+            "CREATE KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy',"
+                + " 'datacenter1': 1}"
+                + (isScylla ? " AND tablets = {'enabled': false}" : ""),
             ks1),
         String.format(
-            "CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2}",
+            "CREATE KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 2}",
             ks2),
         String.format("USE %s", ks1),
         "CREATE TABLE foo(i int primary key)",

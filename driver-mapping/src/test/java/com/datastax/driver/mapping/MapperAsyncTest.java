@@ -21,7 +21,6 @@ import static org.testng.Assert.fail;
 
 import com.datastax.driver.core.CCMTestsSupport;
 import com.datastax.driver.core.Cluster;
-import com.datastax.driver.core.GuavaCompatibility;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.utils.MoreFutures.SuccessCallback;
 import com.datastax.driver.core.utils.MoreObjects;
@@ -30,7 +29,9 @@ import com.datastax.driver.mapping.annotations.Column;
 import com.datastax.driver.mapping.annotations.PartitionKey;
 import com.datastax.driver.mapping.annotations.Table;
 import com.google.common.base.Function;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -75,16 +76,17 @@ public class MapperAsyncTest extends CCMTestsSupport {
                 .build());
 
     ListenableFuture<MappingManager> mappingManagerFuture =
-        GuavaCompatibility.INSTANCE.transform(
+        Futures.transform(
             cluster2.connectAsync(),
             new Function<Session, MappingManager>() {
               @Override
               public MappingManager apply(Session session) {
                 return new MappingManager(session);
               }
-            });
+            },
+            MoreExecutors.directExecutor());
 
-    GuavaCompatibility.INSTANCE.addCallback(
+    Futures.addCallback(
         mappingManagerFuture,
         new SuccessCallback<MappingManager>() {
 
@@ -93,34 +95,38 @@ public class MapperAsyncTest extends CCMTestsSupport {
 
             final Mapper<User> mapper = manager.mapper(User.class);
             ListenableFuture<Void> saveFuture = mapper.saveAsync(paul);
-            GuavaCompatibility.INSTANCE.addCallback(
+            Futures.addCallback(
                 saveFuture,
                 new SuccessCallback<Void>() {
 
                   @Override
                   public void onSuccess(Void result) {
                     ListenableFuture<User> getFuture = mapper.getAsync(paul.getUserId());
-                    GuavaCompatibility.INSTANCE.addCallback(
+                    Futures.addCallback(
                         getFuture,
                         new SuccessCallback<User>() {
 
                           @Override
                           public void onSuccess(User paul) {
 
-                            GuavaCompatibility.INSTANCE.addCallback(
+                            Futures.addCallback(
                                 mapper.deleteAsync(paul),
                                 new SuccessCallback<Void>() {
                                   @Override
                                   public void onSuccess(Void result) {
                                     latch.countDown();
                                   }
-                                });
+                                },
+                                MoreExecutors.directExecutor());
                           }
-                        });
+                        },
+                        MoreExecutors.directExecutor());
                   }
-                });
+                },
+                MoreExecutors.directExecutor());
           }
-        });
+        },
+        MoreExecutors.directExecutor());
 
     try {
       Uninterruptibles.awaitUninterruptibly(latch, 5, MINUTES);

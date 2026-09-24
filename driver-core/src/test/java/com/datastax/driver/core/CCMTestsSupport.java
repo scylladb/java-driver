@@ -161,11 +161,6 @@ public class CCMTestsSupport {
     }
 
     @Override
-    public int getSniPort() {
-      return delegate.getSniPort();
-    }
-
-    @Override
     public void setKeepLogs(boolean keepLogs) {
       delegate.setKeepLogs(keepLogs);
     }
@@ -495,14 +490,6 @@ public class CCMTestsSupport {
       return false;
     }
 
-    @SuppressWarnings("SimplifiableIfStatement")
-    private boolean startSniProxy() {
-      for (CCMConfig ann : annotations) {
-        if (ann != null && ann.startSniProxy().length > 0) return ann.startSniProxy()[0];
-      }
-      return false;
-    }
-
     private CCMBridge.Builder ccmBuilder(Object testInstance) throws Exception {
       if (ccmBuilder == null) {
         ccmBuilder = ccmProvider(testInstance);
@@ -520,7 +507,6 @@ public class CCMTestsSupport {
         if (dse != null) ccmBuilder.withDSE(dse);
         if (ssl()) ccmBuilder.withSSL();
         if (auth()) ccmBuilder.withAuth();
-        if (startSniProxy()) ccmBuilder.withSniProxy();
         for (Map.Entry<String, Object> entry : config().entrySet()) {
           ccmBuilder.withCassandraConfiguration(entry.getKey(), entry.getValue());
         }
@@ -651,6 +637,10 @@ public class CCMTestsSupport {
    * @throws Exception
    */
   public void beforeTestClass(Object testInstance) throws Exception {
+    // Check for class-level skip conditions before setting up CCM cluster
+    // When SkipException is thrown from @BeforeClass, TestNG should skip the entire test class
+    TestListener.checkForSkipConditions(testInstance.getClass());
+
     testMode = determineTestMode(testInstance.getClass());
     if (testMode == PER_CLASS) {
       closer = Closer.create();
@@ -760,30 +750,6 @@ public class CCMTestsSupport {
    */
   public Cluster.Builder createClusterBuilderNoDebouncing() {
     return createClusterBuilder().withQueryOptions(TestUtils.nonDebouncingQueryOptions());
-  }
-
-  /**
-   * Returns the cluster builder to test against Scylla Cloud (sniProxy enabled).
-   *
-   * <p>This implementation returns a vanilla builder with contact points and port that match
-   * datacenter description in CCM generated yaml configuration file. This configuration may contain
-   * domain names that cannot be resolved on local machine, therefore we overwrite EndPointFactory
-   * afterwards and add sniProxy contact point using raw ip addresses (with ports from configuration
-   * file). It's not required to call {@link Cluster.Builder#addContactPointsWithPorts}, it will be
-   * done automatically.
-   *
-   * @return The cluster builder to use for the tests.
-   */
-  public Cluster.Builder createClusterBuilderScyllaCloud() throws IOException {
-    assert ccmTestConfig.startSniProxy();
-    Cluster.Builder builder = Cluster.builder();
-
-    File ccmdir = ccm.getCcmDir();
-    File clusterFile = new File(ccmdir, ccm.getClusterName());
-    File yamlFile = new File(clusterFile, "config_data.yaml");
-
-    builder.withScyllaCloudConnectionConfig(yamlFile);
-    return builder;
   }
 
   /**
@@ -1041,6 +1007,12 @@ public class CCMTestsSupport {
   protected void initTestSession() throws Exception {
     if (ccmTestConfig.createCcm() && ccmTestConfig.createCluster() && ccmTestConfig.createSession())
       session = register(cluster.connect());
+  }
+
+  public Session newSession() {
+    if (ccmTestConfig.createCcm() && ccmTestConfig.createCluster() && ccmTestConfig.createSession())
+      return register(cluster.connect());
+    return null;
   }
 
   protected void initTestKeyspace() {

@@ -100,7 +100,7 @@ public class TupleTest extends CCMTestsSupport {
     session()
         .execute(
             "CREATE KEYSPACE test_tuple_type "
-                + "WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}");
+                + "WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1'}");
     session().execute("USE test_tuple_type");
     session()
         .execute("CREATE TABLE mytable (a int PRIMARY KEY, b frozen<tuple<ascii, int, boolean>>)");
@@ -169,7 +169,7 @@ public class TupleTest extends CCMTestsSupport {
     session()
         .execute(
             "CREATE KEYSPACE test_tuple_type_varying_lengths "
-                + "WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}");
+                + "WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1'}");
     session().execute("USE test_tuple_type_varying_lengths");
 
     // programmatically create the table with tuples of said sizes
@@ -226,7 +226,7 @@ public class TupleTest extends CCMTestsSupport {
     session()
         .execute(
             "CREATE KEYSPACE test_tuple_subtypes "
-                + "WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}");
+                + "WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1'}");
     session().execute("USE test_tuple_subtypes");
 
     // programmatically create the table with a tuple of all datatypes
@@ -294,7 +294,7 @@ public class TupleTest extends CCMTestsSupport {
     session()
         .execute(
             "CREATE KEYSPACE test_tuple_non_primitive_subtypes "
-                + "WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}");
+                + "WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1'}");
     session().execute("USE test_tuple_non_primitive_subtypes");
 
     ArrayList<String> values = new ArrayList<String>();
@@ -471,7 +471,7 @@ public class TupleTest extends CCMTestsSupport {
     session()
         .execute(
             "CREATE KEYSPACE test_nested_tuples "
-                + "WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}");
+                + "WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1'}");
     session().execute("USE test_nested_tuples");
 
     // create a table with multiple sizes of nested tuples
@@ -519,7 +519,7 @@ public class TupleTest extends CCMTestsSupport {
     session()
         .execute(
             "CREATE KEYSPACE testTuplesWithNulls "
-                + "WITH replication = { 'class' : 'SimpleStrategy', 'replication_factor': '1'}");
+                + "WITH replication = { 'class' : 'NetworkTopologyStrategy', 'datacenter1': '1'}");
     session().execute("USE testTuplesWithNulls");
 
     // create UDT

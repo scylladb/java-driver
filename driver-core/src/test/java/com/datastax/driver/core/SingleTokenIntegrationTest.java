@@ -24,9 +24,13 @@ package com.datastax.driver.core;
 import static com.datastax.driver.core.Assertions.assertThat;
 
 import com.datastax.driver.core.utils.Bytes;
+import com.google.common.base.Throwables;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 @CCMConfig(
@@ -35,6 +39,36 @@ import org.testng.annotations.Test;
     config = "initial_token:1",
     clusterProvider = "createClusterBuilderNoDebouncing")
 public class SingleTokenIntegrationTest extends CCMTestsSupport {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SingleTokenIntegrationTest.class);
+
+  /**
+   * Override to create the keyspace with tablets disabled when running against Scylla. This test
+   * exercises token-range and token-map based replica lookup (getReplicasList with table == null).
+   * With tablets enabled (the default on modern Scylla), replica placement is controlled by the
+   * tablet map and getReplicasList returns an empty list when the table is unknown, breaking the
+   * test assertions. Cassandra does not support the tablets property.
+   */
+  @Override
+  protected void initTestKeyspace() {
+    try {
+      keyspace = TestUtils.generateIdentifier("ks_");
+      LOGGER.debug("Using keyspace " + keyspace);
+      boolean isScylla = Objects.nonNull(ccm().getScyllaVersion());
+      session()
+          .execute(
+              String.format(
+                  "CREATE KEYSPACE %s WITH replication = {'class': 'NetworkTopologyStrategy',"
+                      + " 'datacenter1': 1}"
+                      + (isScylla ? " AND tablets = {'enabled': false}" : ""),
+                  keyspace));
+      useKeyspace(keyspace);
+    } catch (Exception e) {
+      errorOut();
+      LOGGER.error("Could not create test keyspace", e);
+      Throwables.propagate(e);
+    }
+  }
 
   /** JAVA-684: Empty TokenRange returned in a one token cluster */
   @Test(groups = "short")

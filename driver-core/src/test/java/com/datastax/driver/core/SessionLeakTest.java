@@ -50,7 +50,12 @@ public class SessionLeakTest extends CCMTestsSupport {
     assertOpenConnections(1, cluster);
 
     // ensure sessions.size() returns with 1 control connection + core pool size.
-    int corePoolSize = TestUtils.numberOfLocalCoreConnections(cluster);
+    int corePoolSize;
+    if (ccm().getScyllaVersion() != null) {
+      corePoolSize = TestUtils.numberOfLocalCoreConnectionsSharded(cluster);
+    } else {
+      corePoolSize = TestUtils.numberOfLocalCoreConnections(cluster);
+    }
     Session session = cluster.connect();
 
     assertThat(cluster.manager.sessions.size()).isEqualTo(1);
@@ -114,13 +119,21 @@ public class SessionLeakTest extends CCMTestsSupport {
     // Ensure no channels remain open.
     channelMonitor.stop();
     channelMonitor.report();
-    assertThat(channelMonitor.openChannels(ccm().addressOfNode(1), ccm().addressOfNode(2)).size())
+    assertThat(
+            channelMonitor
+                .openChannelsPortAgnostic(
+                    ccm().addressOfNode(1).getAddress(), ccm().addressOfNode(2).getAddress())
+                .size())
         .isEqualTo(0);
   }
 
   private void assertOpenConnections(int expected, Cluster cluster) {
     assertThat(cluster.getMetrics().getOpenConnections().getValue()).isEqualTo(expected);
-    assertThat(channelMonitor.openChannels(ccm().addressOfNode(1), ccm().addressOfNode(2)).size())
+    assertThat(
+            channelMonitor
+                .openChannelsPortAgnostic(
+                    ccm().addressOfNode(1).getAddress(), ccm().addressOfNode(2).getAddress())
+                .size())
         .isEqualTo(expected);
   }
 }

@@ -75,18 +75,23 @@ public abstract class SSLTestBase extends CCMTestsSupport {
 
   enum SslImplementation {
     JDK,
-    NETTY_OPENSSL
+    NETTY_OPENSSL,
+    NETTY_OPENSSL_DEBUG
   }
 
   /**
    * @param sslImplementation the SSL implementation to use
    * @param clientAuth whether the client should authenticate
    * @param trustingServer whether the client should trust the server's certificate
+   * @param protocol SSLContext protocol to use, e.g. TLSv1.2
    * @return {@link com.datastax.driver.core.SSLOptions} with the given configuration for server
    *     certificate validation and client certificate authentication.
    */
   public SSLOptions getSSLOptions(
-      SslImplementation sslImplementation, boolean clientAuth, boolean trustingServer)
+      SslImplementation sslImplementation,
+      boolean clientAuth,
+      boolean trustingServer,
+      String protocol)
       throws Exception {
 
     TrustManagerFactory tmf = null;
@@ -113,7 +118,7 @@ public abstract class SSLTestBase extends CCMTestsSupport {
           kmf.init(ks, CCMBridge.DEFAULT_CLIENT_KEYSTORE_PASSWORD.toCharArray());
         }
 
-        SSLContext sslContext = SSLContext.getInstance("TLS");
+        SSLContext sslContext = SSLContext.getInstance(protocol);
         sslContext.init(
             kmf != null ? kmf.getKeyManagers() : null,
             tmf != null ? tmf.getTrustManagers() : null,
@@ -122,18 +127,42 @@ public abstract class SSLTestBase extends CCMTestsSupport {
         return RemoteEndpointAwareJdkSSLOptions.builder().withSSLContext(sslContext).build();
 
       case NETTY_OPENSSL:
+      case NETTY_OPENSSL_DEBUG:
         SslContextBuilder builder =
             SslContextBuilder.forClient().sslProvider(OPENSSL).trustManager(tmf);
+
+        if (protocol.equals("TLS") || protocol.isEmpty()) {
+          // There is no netty constant for "TLS". Use defaults.
+          // see
+          // https://netty.io/4.1/api/constant-values.html#io.netty.handler.ssl.SslProtocols.SSL_v2
+        } else {
+          builder.protocols(protocol);
+        }
 
         if (clientAuth) {
           builder.keyManager(
               CCMBridge.DEFAULT_CLIENT_CERT_CHAIN_FILE, CCMBridge.DEFAULT_CLIENT_PRIVATE_KEY_FILE);
         }
 
-        return new RemoteEndpointAwareNettySSLOptions(builder.build());
+        if (sslImplementation.equals(NETTY_OPENSSL)) {
+          return new RemoteEndpointAwareNettySSLOptions(builder.build());
+        } else {
+          return new TestableNettySSLOptions(builder.build());
+        }
       default:
         fail("Unsupported SSL implementation: " + sslImplementation);
         return null;
     }
+  }
+
+  /**
+   * Legacy method using "TLS" as the protocol.
+   *
+   * @see SSLTestBase#getSSLOptions(SslImplementation, boolean, boolean, String)
+   */
+  public SSLOptions getSSLOptions(
+      SslImplementation sslImplementation, boolean clientAuth, boolean trustingServer)
+      throws Exception {
+    return getSSLOptions(sslImplementation, clientAuth, trustingServer, "TLS");
   }
 }

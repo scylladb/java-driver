@@ -17,6 +17,8 @@ package com.datastax.driver.core;
 
 import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -30,7 +32,7 @@ class ChainedResultSetFuture extends AbstractFuture<ResultSet> implements Result
   void setSource(ResultSetFuture source) {
     if (this.isCancelled()) source.cancel(false);
     this.source = source;
-    GuavaCompatibility.INSTANCE.addCallback(
+    Futures.addCallback(
         source,
         new FutureCallback<ResultSet>() {
           @Override
@@ -42,7 +44,8 @@ class ChainedResultSetFuture extends AbstractFuture<ResultSet> implements Result
           public void onFailure(Throwable t) {
             ChainedResultSetFuture.this.setException(t);
           }
-        });
+        },
+        MoreExecutors.directExecutor());
   }
 
   @Override

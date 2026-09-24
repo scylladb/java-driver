@@ -40,6 +40,7 @@ import com.datastax.driver.core.policies.ReconnectionPolicy;
 import com.datastax.driver.core.policies.RetryPolicy;
 import com.datastax.driver.core.policies.SpeculativeExecutionPolicy;
 import com.datastax.driver.core.utils.MoreFutures;
+import com.google.common.annotations.Beta;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
 import com.google.common.base.Predicates;
@@ -60,14 +61,9 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.URL;
 import java.net.UnknownHostException;
-import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -124,8 +120,6 @@ public class Cluster implements Closeable {
 
   static {
     logDriverVersion();
-    // Force initialization to fail fast if there is an issue detecting the version
-    GuavaCompatibility.init();
   }
 
   @VisibleForTesting
@@ -404,17 +398,19 @@ public class Cluster implements Closeable {
     } else {
       final String useQuery = "USE " + keyspace;
       ListenableFuture<ResultSet> keyspaceSet =
-          GuavaCompatibility.INSTANCE.transformAsync(
+          Futures.transformAsync(
               sessionInitialized,
               new AsyncFunction<Session, ResultSet>() {
                 @Override
                 public ListenableFuture<ResultSet> apply(Session session) throws Exception {
                   return session.executeAsync(useQuery);
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
       ListenableFuture<ResultSet> withErrorHandling =
-          GuavaCompatibility.INSTANCE.withFallback(
+          Futures.catchingAsync(
               keyspaceSet,
+              Throwable.class,
               new AsyncFunction<Throwable, ResultSet>() {
                 @Override
                 public ListenableFuture<ResultSet> apply(Throwable t) throws Exception {
@@ -432,8 +428,10 @@ public class Cluster implements Closeable {
                   }
                   throw Throwables.propagate(t);
                 }
-              });
-      return GuavaCompatibility.INSTANCE.transform(withErrorHandling, Functions.constant(session));
+              },
+              MoreExecutors.directExecutor());
+      return Futures.transform(
+          withErrorHandling, Functions.constant(session), MoreExecutors.directExecutor());
     }
   }
 
@@ -1385,92 +1383,6 @@ public class Cluster implements Closeable {
     }
 
     /**
-     * Configure for Scylla Cloud Serverless cluster using configuration bundle.
-     *
-     * @param configurationFile configuration bundle file.
-     * @return this builder.
-     * @throws IOException
-     * @see Builder#withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig)
-     */
-    public Builder withScyllaCloudConnectionConfig(File configurationFile) throws IOException {
-      return withScyllaCloudConnectionConfig(configurationFile.toURI().toURL());
-    }
-
-    /**
-     * Configure for Scylla Cloud Serverless cluster using URL to configuration bundle.
-     *
-     * @param configurationUrl URL from which configuration bundle can be read.
-     * @return this builder.
-     * @throws IOException
-     * @see Builder#withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig)
-     */
-    public Builder withScyllaCloudConnectionConfig(URL configurationUrl) throws IOException {
-      return withScyllaCloudConnectionConfig(configurationUrl.openStream());
-    }
-
-    /**
-     * Configure for Scylla Cloud Serverless cluster using InputStream of configuration bundle.
-     *
-     * @param inputStream input stream containing configuration bundle format data.
-     * @return this builder.
-     * @throws IOException
-     * @see Builder#withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig)
-     */
-    public Builder withScyllaCloudConnectionConfig(InputStream inputStream) throws IOException {
-      return withScyllaCloudConnectionConfig(
-          ScyllaCloudConnectionConfig.fromInputStream(inputStream));
-    }
-
-    /**
-     * Sets a collection of options for connecting to Scylla Cloud Serverless cluster.
-     *
-     * <p>Sets several options according to provided {@link ScyllaCloudConnectionConfig}. This
-     * includes calling {@link Builder#withEndPointFactory(EndPointFactory)}, {@link
-     * Builder#withSSL(SSLOptions)}, {@link Builder#withAuthProvider(AuthProvider)}, {@link
-     * Builder#withoutAdvancedShardAwareness()} with parameters derived from the config.
-     *
-     * <p>Cannot be combined with {@link Builder#addContactPoint}. All contact points should already
-     * be provided in {@link ScyllaCloudConnectionConfig}.
-     *
-     * @param config instantiated ScyllaCloudConnectionConfig.
-     * @return this builder.
-     */
-    protected Builder withScyllaCloudConnectionConfig(ScyllaCloudConnectionConfig config) {
-      try {
-        ScyllaCloudDatacenter currentDatacenter = config.getCurrentDatacenter();
-        InetSocketAddress proxyAddress = currentDatacenter.getServer();
-
-        Builder builder =
-            withEndPointFactory(
-                    new ScyllaCloudSniEndPointFactory(
-                        proxyAddress, currentDatacenter.getNodeDomain()))
-                .withSSL(
-                    (config.getCurrentDatacenter().isInsecureSkipTlsVerify()
-                        ? config.createBundle().getInsecureSSLOptions()
-                        : config.createBundle().getSSLOptions()))
-                .withAuthProvider(
-                    new PlainTextAuthProvider(
-                        config.getCurrentAuthInfo().getUsername(),
-                        config.getCurrentAuthInfo().getPassword()))
-                .withoutAdvancedShardAwareness();
-
-        if (builder.rawHostContactPoints.size() > 0
-            || builder.rawHostAndPortContactPoints.size() > 0
-            || builder.contactPoints.size() > 0) {
-          throw new IllegalStateException(
-              "Can't use withCloudSecureConnectBundle if you've already called addContactPoint(s)");
-        }
-        builder.addContactPoint(new SniEndPoint(proxyAddress, currentDatacenter.getNodeDomain()));
-
-        return builder;
-      } catch (IOException e) {
-        throw new IllegalStateException("Cannot construct cloud config", e);
-      } catch (GeneralSecurityException e) {
-        throw new IllegalStateException("Cannot construct cloud config", e);
-      }
-    }
-
-    /**
      * Disables advanced shard awareness. By default, this driver chooses local port while making a
      * connection to node, to signal which shard it wants to connect to. This allows driver to
      * estabilish connection pool faster, especially when there are multiple clients connecting
@@ -1518,6 +1430,38 @@ public class Cluster implements Closeable {
 
       this.localPortLow = low;
       this.localPortHigh = high;
+      return this;
+    }
+
+    /**
+     * Sets application information provider, every connection on startup sends this information to
+     * the server.
+     *
+     * @param applicationInfo an application information provider.
+     */
+    public Builder withApplicationInfo(ApplicationInfo applicationInfo) {
+      configurationBuilder.withApplicationInfo(applicationInfo);
+      return this;
+    }
+
+    /**
+     * Enables or disables driver configuration reporting, i.e. whether the control connection sends
+     * a {@code DRIVER_CONFIG} JSON blob describing the effective driver configuration in its
+     * startup options. <b>Enabled by default.</b>
+     *
+     * <p>The server stores it in {@code system.clients.client_options} — a per-node table, so only
+     * the node holding the control connection stores {@code DRIVER_CONFIG}; consumers must query
+     * and aggregate across all nodes.
+     *
+     * <p>This does not govern the {@code SESSION_ID} startup option, which every connection always
+     * sends (so the server can group every connection opened from this {@link Cluster}, across all
+     * of its {@link Session}s), regardless of this setting.
+     *
+     * @param enabled whether driver configuration reporting is enabled.
+     */
+    @Beta
+    public Builder withDriverConfigReporting(boolean enabled) {
+      configurationBuilder.withDriverConfigReporting(enabled);
       return this;
     }
 
@@ -1675,6 +1619,8 @@ public class Cluster implements Closeable {
                 .withThreadingOptions(configuration.getThreadingOptions())
                 .withNettyOptions(configuration.getNettyOptions())
                 .withCodecRegistry(configuration.getCodecRegistry())
+                .withApplicationInfo(configuration.getApplicationInfo())
+                .withDriverConfigReporting(configuration.isDriverConfigReportingEnabled())
                 .build();
       } else {
         this.configuration = configuration;
@@ -2775,7 +2721,7 @@ public class Cluster implements Closeable {
                         future.setResult(rs);
                       }
                     },
-                    GuavaCompatibility.INSTANCE.sameThreadExecutor());
+                    MoreExecutors.directExecutor());
 
               } catch (Exception e) {
                 logger.warn("Error while waiting for schema agreement", e);
@@ -3215,7 +3161,7 @@ public class Cluster implements Closeable {
                 @Override
                 public void runMayThrow() throws Exception {
                   ListenableFuture<?> f = execute(task);
-                  GuavaCompatibility.INSTANCE.addCallback(
+                  Futures.addCallback(
                       f,
                       new FutureCallback<Object>() {
                         @Override
@@ -3227,7 +3173,8 @@ public class Cluster implements Closeable {
                         public void onFailure(Throwable t) {
                           future.setException(t);
                         }
-                      });
+                      },
+                      MoreExecutors.directExecutor());
                 }
               },
               NEW_NODE_DELAY_SECONDS,

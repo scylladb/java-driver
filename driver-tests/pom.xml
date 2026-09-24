@@ -26,7 +26,7 @@
     <parent>
         <groupId>com.scylladb</groupId>
         <artifactId>scylla-driver-parent</artifactId>
-        <version>3.11.5.7</version>
+        <version>3.11.5.19-SNAPSHOT</version>
     </parent>
 
     <artifactId>scylla-driver-tests-parent</artifactId>
@@ -90,24 +90,5 @@
         </plugins>
 
     </build>
-
-    <profiles>
-
-        <profile>
-            <id>release</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <configuration>
-                            <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-    </profiles>
 
 </project>

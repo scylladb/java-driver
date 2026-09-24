@@ -26,7 +26,7 @@
     <parent>
         <groupId>com.scylladb</groupId>
         <artifactId>scylla-driver-parent</artifactId>
-        <version>3.11.5.7</version>
+        <version>3.11.5.19-SNAPSHOT</version>
     </parent>
 
     <artifactId>scylla-driver-core</artifactId>
@@ -78,7 +78,7 @@
         </dependency>
 
         <dependency>
-            <groupId>org.lz4</groupId>
+            <groupId>at.yawk.lz4</groupId>
             <artifactId>lz4-java</artifactId>
             <optional>true</optional>
         </dependency>
@@ -164,6 +164,7 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <!-- Used by DefaultDriverConfigReporter to build the DRIVER_CONFIG JSON blob -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
@@ -171,28 +172,6 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.dataformat</groupId>
-            <artifactId>jackson-dataformat-yaml</artifactId>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk15on -->
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcprov-jdk18on</artifactId>
-            <version>1.78.1</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcpkix-jdk15on -->
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcpkix-jdk18on</artifactId>
-            <version>1.78.1</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcutil-jdk15on -->
-        <dependency>
-            <groupId>org.bouncycastle</groupId>
-            <artifactId>bcutil-jdk18on</artifactId>
-            <version>1.78.1</version>
         </dependency>
 
         <!-- added for easier DNS hostname resolution mocking -->
@@ -202,6 +181,17 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
 
@@ -307,6 +297,7 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <configuration>
                     <shadedArtifactAttached>true</shadedArtifactAttached>
+                    <createDependencyReducedPom>false</createDependencyReducedPom>
                     <artifactSet>
                         <includes>
                             <include>io.netty:*</include>

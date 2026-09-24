@@ -27,6 +27,7 @@ import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -56,6 +57,11 @@ import org.slf4j.LoggerFactory;
  * but those are always tried after the local nodes. In other words, this policy guarantees that no
  * host in a remote data center will be queried unless no host in the local data center can be
  * reached.
+ *
+ * <p>For LWT (Lightweight Transaction) queries (where {@link Statement#isLWT()} returns {@code
+ * true}), the policy skips local rack prioritization and treats all hosts in the local datacenter
+ * equally, distributing queries in round-robin fashion across the entire local DC. Remote
+ * datacenters are still only used as fallback after all local DC hosts have been tried.
  */
 public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
 
@@ -73,18 +79,20 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
   private static final String UNSET = "";
 
   private final ConcurrentMap<String, CopyOnWriteArrayList<Host>> perDcLiveHosts =
-      new ConcurrentHashMap<String, CopyOnWriteArrayList<Host>>();
-  private final CopyOnWriteArrayList<Host> liveHostsLocalRackLocalDC =
-      new CopyOnWriteArrayList<Host>();
+      new ConcurrentHashMap<>();
+  private final CopyOnWriteArrayList<Host> liveHostsAllLocalDC = new CopyOnWriteArrayList<>();
+  private final CopyOnWriteArrayList<Host> liveHostsLocalRackLocalDC = new CopyOnWriteArrayList<>();
   private final CopyOnWriteArrayList<Host> liveHostsRemoteRacksLocalDC =
-      new CopyOnWriteArrayList<Host>();
-  private final AtomicInteger index = new AtomicInteger();
+      new CopyOnWriteArrayList<>();
+  @VisibleForTesting final AtomicInteger index = new AtomicInteger();
 
   @VisibleForTesting volatile String localDc;
   @VisibleForTesting volatile String localRack;
 
   private final int usedHostsPerRemoteDc;
   private final boolean dontHopForLocalCL;
+  private final boolean localDcExplicit;
+  private final boolean localRackExplicit;
 
   private volatile Configuration configuration;
 
@@ -104,6 +112,56 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
     this.localRack = localRack == null ? UNSET : localRack;
     this.usedHostsPerRemoteDc = usedHostsPerRemoteDc;
     this.dontHopForLocalCL = !allowRemoteDCsForLocalConsistencyLevel;
+    this.localDcExplicit = !Strings.isNullOrEmpty(localDc);
+    this.localRackExplicit = !Strings.isNullOrEmpty(localRack);
+  }
+
+  /**
+   * The datacenter this policy considers local, or {@code null} if it has neither been configured
+   * explicitly nor inferred yet. When {@link #isLocalDcExplicit()} is {@code false}, this is the
+   * datacenter inferred from the first contacted node, which is only available once the policy has
+   * been initialized.
+   *
+   * @return the local datacenter name, or {@code null}.
+   */
+  @Beta
+  public String getLocalDc() {
+    String dc = localDc;
+    return Strings.isNullOrEmpty(dc) ? null : dc;
+  }
+
+  /**
+   * The rack this policy considers local, or {@code null} if it has neither been configured
+   * explicitly nor inferred yet.
+   *
+   * @return the local rack name, or {@code null}.
+   */
+  @Beta
+  public String getLocalRack() {
+    String rack = localRack;
+    return Strings.isNullOrEmpty(rack) ? null : rack;
+  }
+
+  /**
+   * Whether the local datacenter was configured explicitly (as opposed to being inferred from the
+   * first contacted node).
+   *
+   * @return {@code true} if the local datacenter was set explicitly.
+   */
+  @Beta
+  public boolean isLocalDcExplicit() {
+    return localDcExplicit;
+  }
+
+  /**
+   * Whether the local rack was configured explicitly (as opposed to being inferred from the first
+   * contacted node).
+   *
+   * @return {@code true} if the local rack was set explicitly.
+   */
+  @Beta
+  public boolean isLocalRackExplicit() {
+    return localRackExplicit;
   }
 
   @Override
@@ -147,6 +205,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
       else prev.addIfAbsent(host);
 
       if (dc.equals(localDc)) {
+        liveHostsAllLocalDC.add(host);
         if (rack.equals(localRack)) {
           liveHostsLocalRackLocalDC.add(host);
         } else {
@@ -205,7 +264,13 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
   @Override
   public HostDistance distance(Host host) {
     String dc = dc(host);
-    if (dc == UNSET || dc.equals(localDc)) return HostDistance.LOCAL;
+    String rack = rack(host);
+    if (dc == UNSET || dc.equals(localDc)) {
+      if (rack == UNSET || rack.equals(localRack)) {
+        return HostDistance.LOCAL;
+      }
+      return HostDistance.REMOTE;
+    }
 
     CopyOnWriteArrayList<Host> dcHosts = perDcLiveHosts.get(dc);
     if (dcHosts == null || usedHostsPerRemoteDc == 0) return HostDistance.IGNORED;
@@ -234,10 +299,25 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
   @Override
   public Iterator<Host> newQueryPlan(String loggedKeyspace, final Statement statement) {
 
-    CopyOnWriteArrayList<Host> localLiveHosts = perDcLiveHosts.get(localDc);
-    // Clone for thread safety
-    final List<Host> copyLiveHostsLocalRackLocalDC = cloneList(liveHostsLocalRackLocalDC);
-    final List<Host> copyLiveHostsRemoteRacksLocalDC = cloneList(liveHostsRemoteRacksLocalDC);
+    // For LWT queries or serial consistency queries, skip rack prioritization and use all local DC
+    // hosts equally
+    ConsistencyLevel defaultCl =
+        configuration != null ? configuration.getQueryOptions().getConsistencyLevel() : null;
+    ConsistencyLevel effectiveCl =
+        statement != null && statement.getConsistencyLevel() != null
+            ? statement.getConsistencyLevel()
+            : defaultCl;
+    final boolean isLWT =
+        statement != null && (statement.isLWT() || (effectiveCl != null && effectiveCl.isSerial()));
+
+    // For LWT queries, include all local DC hosts in the first part of the plan, not just those in
+    // the local rack
+    final List<Host> copyLiveHostsLocalRackLocalDC =
+        isLWT ? cloneList(liveHostsAllLocalDC) : cloneList(liveHostsLocalRackLocalDC);
+    // For LWT queries, skip the second part of the plan that includes hosts in remote racks of the
+    // local DC
+    final List<Host> copyLiveHostsRemoteRacksLocalDC =
+        isLWT ? Collections.emptyList() : cloneList(liveHostsRemoteRacksLocalDC);
     final int startIdx = index.getAndIncrement();
 
     return new AbstractIterator<Host>() {
@@ -282,7 +362,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
           }
 
           ConsistencyLevel cl =
-              statement.getConsistencyLevel() == null
+              statement == null || statement.getConsistencyLevel() == null
                   ? configuration.getQueryOptions().getConsistencyLevel()
                   : statement.getConsistencyLevel();
 
@@ -342,6 +422,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
     dcHosts.addIfAbsent(host);
 
     if (dc.equals(localDc)) {
+      liveHostsAllLocalDC.addIfAbsent(host);
       if (rack.equals(localRack)) {
         liveHostsLocalRackLocalDC.add(host);
       } else {
@@ -359,6 +440,7 @@ public class RackAwareRoundRobinPolicy implements LoadBalancingPolicy {
     if (dcHosts != null) dcHosts.remove(host);
 
     if (dc.equals(localDc)) {
+      liveHostsAllLocalDC.remove(host);
       if (rack.equals(localRack)) {
         liveHostsLocalRackLocalDC.remove(host);
       } else {

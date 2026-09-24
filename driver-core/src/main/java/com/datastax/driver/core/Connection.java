@@ -34,6 +34,7 @@ import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.exceptions.FrameTooLongException;
 import com.datastax.driver.core.exceptions.OperationTimedOutException;
+import com.datastax.driver.core.exceptions.QueryValidationException;
 import com.datastax.driver.core.exceptions.TransportException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
@@ -47,6 +48,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.bootstrap.Bootstrap;
@@ -85,6 +87,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
@@ -116,6 +119,12 @@ class Connection {
 
   private static final long ADV_SHARD_AWARENESS_BLOCK_ON_ERROR = 5 * 60 * 1000;
 
+  /**
+   * STARTUP option key under which the Cluster-scoped connection-grouping identifier is sent, on
+   * every connection (see {@link Factory#sessionId}).
+   */
+  static final String SESSION_ID_KEY = "SESSION_ID";
+
   enum State {
     OPEN,
     TRASHED,
@@ -127,7 +136,7 @@ class Connection {
 
   volatile long maxIdleTime;
 
-  EndPoint endPoint;
+  final EndPoint endPoint;
   private final String name;
   private volatile Integer shardId = null;
 
@@ -154,6 +163,13 @@ class Connection {
       new AtomicReference<ConnectionCloseFuture>();
 
   private final AtomicReference<Owner> ownerRef = new AtomicReference<Owner>();
+  private final ApplicationInfo applicationInfo;
+  private ProtocolFeatureStore protocolFeatureStore;
+
+  // Whether this connection reports the DRIVER_CONFIG blob in its STARTUP options. Set only for the
+  // control connection, so the (potentially large) config blob is sent once per Cluster rather than
+  // on every connection. SESSION_ID is still sent on every connection.
+  private final boolean reportConfig;
 
   /**
    * Create a new connection to a Cassandra node and associate it with the given pool.
@@ -165,6 +181,11 @@ class Connection {
    *     connection can also be associated to an owner later with {@link #setOwner(Owner)}.
    */
   protected Connection(String name, EndPoint endPoint, Factory factory, Owner owner) {
+    this(name, endPoint, factory, owner, false);
+  }
+
+  private Connection(
+      String name, EndPoint endPoint, Factory factory, Owner owner, boolean reportConfig) {
     this.endPoint = endPoint;
     this.factory = factory;
     this.dispatcher = new Dispatcher();
@@ -173,6 +194,8 @@ class Connection {
     ListenableFuture<Connection> thisFuture = Futures.immediateFuture(this);
     this.defaultKeyspaceAttempt = new SetKeyspaceAttempt(null, thisFuture);
     this.targetKeyspace = new AtomicReference<SetKeyspaceAttempt>(defaultKeyspaceAttempt);
+    this.applicationInfo = factory.configuration.getApplicationInfo();
+    this.reportConfig = reportConfig;
   }
 
   /** Create a new connection to a Cassandra node. */
@@ -345,17 +368,18 @@ class Connection {
         factory.manager.configuration.getPoolingOptions().getInitializationExecutor();
 
     ListenableFuture<Void> queryOptionsFuture =
-        GuavaCompatibility.INSTANCE.transformAsync(
+        Futures.transformAsync(
             channelReadyFuture, onChannelReady(protocolVersion, initExecutor), initExecutor);
 
     ListenableFuture<Void> initializeTransportFuture =
-        GuavaCompatibility.INSTANCE.transformAsync(
+        Futures.transformAsync(
             queryOptionsFuture, onOptionsReady(protocolVersion, initExecutor), initExecutor);
 
     // Fallback on initializeTransportFuture so we can properly propagate specific exceptions.
     ListenableFuture<Void> initFuture =
-        GuavaCompatibility.INSTANCE.withFallback(
+        Futures.catchingAsync(
             initializeTransportFuture,
+            Throwable.class,
             new AsyncFunction<Throwable, Void>() {
               @Override
               public ListenableFuture<Void> apply(Throwable t) throws Exception {
@@ -387,7 +411,7 @@ class Connection {
             initExecutor);
 
     // Ensure the connection gets closed if the caller cancels the returned future.
-    GuavaCompatibility.INSTANCE.addCallback(
+    Futures.addCallback(
         initFuture,
         new MoreFutures.FailureCallback<Void>() {
           @Override
@@ -428,7 +452,8 @@ class Connection {
   public ListenableFuture<String> optionsQuery() {
     Future startupOptionsFuture = write(new Requests.Options());
 
-    return GuavaCompatibility.INSTANCE.transformAsync(startupOptionsFuture, onSupportedResponse());
+    return Futures.transformAsync(
+        startupOptionsFuture, onSupportedResponse(), MoreExecutors.directExecutor());
   }
 
   private AsyncFunction<Void, Void> onChannelReady(
@@ -437,7 +462,7 @@ class Connection {
       @Override
       public ListenableFuture<Void> apply(Void input) throws Exception {
         Future startupOptionsFuture = write(new Requests.Options());
-        return GuavaCompatibility.INSTANCE.transformAsync(
+        return Futures.transformAsync(
             startupOptionsFuture, onOptionsResponse(protocolVersion, initExecutor), initExecutor);
       }
     };
@@ -447,35 +472,31 @@ class Connection {
       final ProtocolVersion protocolVersion, final Executor initExecutor) {
     return new AsyncFunction<Message.Response, Void>() {
       @Override
-      public ListenableFuture<Void> apply(Message.Response response) throws Exception {
+      public ListenableFuture<Void> apply(Message.Response response) {
         switch (response.type) {
           case SUPPORTED:
-            Responses.Supported msg = (Supported) response;
-            ShardingInfo.ConnectionShardingInfo sharding =
-                ShardingInfo.parseShardingInfo(msg.supported);
-            if (sharding != null) {
-              getHost().setShardingInfo(sharding.shardingInfo);
-              Connection.this.shardId = sharding.shardId;
+            Supported supported = (Supported) response;
+            protocolFeatureStore = ProtocolFeatureStore.parseSupportedOptions(supported.supported);
+            protocolFeatureStore.storeInChannel(channel);
+            getHost().setProtocolFeatureStore(protocolFeatureStore);
+
+            ShardingInfo.ConnectionShardingInfo shardingInfo =
+                protocolFeatureStore.getConnectionShardingInfo();
+            if (protocolFeatureStore.getConnectionShardingInfo() != null) {
+              Connection.this.shardId = shardingInfo.shardId;
               if (Connection.this.requestedShardId != -1
-                  && Connection.this.requestedShardId != sharding.shardId) {
+                  && Connection.this.requestedShardId != shardingInfo.shardId) {
                 logger.warn(
                     "Advanced shard awareness: requested connection to shard {}, but connected to {}. Is there a NAT between client and server?",
                     Connection.this.requestedShardId,
-                    sharding.shardId);
+                    shardingInfo.shardId);
                 // Owner is a HostConnectionPool if we are using adv. shard awareness
                 ((HostConnectionPool) Connection.this.ownerRef.get())
                     .tempBlockAdvShardAwareness(ADV_SHARD_AWARENESS_BLOCK_ON_NAT);
               }
             } else {
-              getHost().setShardingInfo(null);
               Connection.this.shardId = 0;
             }
-            LwtInfo lwt = LwtInfo.parseLwtInfo(msg.supported);
-            if (lwt != null) {
-              getHost().setLwtInfo(lwt);
-            }
-            TabletInfo tabletInfo = TabletInfo.parseTabletInfo(msg.supported);
-            getHost().setTabletInfo(tabletInfo);
             return MoreFutures.VOID_SUCCESS;
           case ERROR:
             Responses.Error error = (Responses.Error) response;
@@ -504,23 +525,36 @@ class Connection {
       @Override
       public ListenableFuture<Void> apply(Void input) throws Exception {
         ProtocolOptions protocolOptions = factory.configuration.getProtocolOptions();
-        Map<String, String> extraOptions = new HashMap<String, String>();
-        LwtInfo lwtInfo = getHost().getLwtInfo();
-        if (lwtInfo != null) {
-          lwtInfo.addOption(extraOptions);
+        Map<String, String> extraOptions = new HashMap<>();
+        if (applicationInfo != null) {
+          applicationInfo.addOption(extraOptions);
         }
-        TabletInfo tabletInfo = getHost().getTabletInfo();
-        if (tabletInfo != null
-            && tabletInfo.isEnabled()
-            && ProtocolFeature.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)) {
-          logger.debug("Enabling tablet support in OPTIONS message");
-          TabletInfo.addOption(extraOptions);
+
+        // Sent on every connection, unconditionally (like DRIVER_NAME / DRIVER_VERSION), so the
+        // server can group all the connections opened from this Cluster.
+        extraOptions.put(SESSION_ID_KEY, factory.sessionId.toString());
+
+        // Built here, on the control connection only, and rebuilt for every one of them: the report
+        // must describe the objects in force at this handshake, not the ones that existed when the
+        // Cluster was constructed. A load balancing policy is initialized after the first control
+        // connection's STARTUP, so a datacenter or rack it infers can only reach the server on a
+        // later one.
+        if (reportConfig) {
+          String driverConfig = factory.buildDriverConfigReport();
+          if (driverConfig != null) {
+            extraOptions.put(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, driverConfig);
+          }
         }
+
+        if (protocolFeatureStore != null) {
+          protocolFeatureStore.populateStartupOptions(protocolVersion, extraOptions);
+        }
+
         Future startupResponseFuture =
             write(
                 new Requests.Startup(
                     protocolOptions.getCompression(), protocolOptions.isNoCompact(), extraOptions));
-        return GuavaCompatibility.INSTANCE.transformAsync(
+        return Futures.transformAsync(
             startupResponseFuture, onStartupResponse(protocolVersion, initExecutor), initExecutor);
       }
     };
@@ -628,7 +662,7 @@ class Connection {
             new Requests.Query("select cluster_name from system.local where key = 'local'"));
     try {
       write(clusterNameFuture);
-      return GuavaCompatibility.INSTANCE.transformAsync(
+      return Futures.transformAsync(
           clusterNameFuture,
           new AsyncFunction<ResultSet, Void>() {
             @Override
@@ -667,7 +701,7 @@ class Connection {
         new Requests.Credentials(((ProtocolV1Authenticator) authenticator).getCredentials());
     try {
       Future authResponseFuture = write(creds);
-      return GuavaCompatibility.INSTANCE.transformAsync(
+      return Futures.transformAsync(
           authResponseFuture,
           new AsyncFunction<Message.Response, Void>() {
             @Override
@@ -703,7 +737,7 @@ class Connection {
 
     try {
       Future authResponseFuture = write(new Requests.AuthResponse(initialResponse));
-      return GuavaCompatibility.INSTANCE.transformAsync(
+      return Futures.transformAsync(
           authResponseFuture, onV2AuthResponse(authenticator, protocolVersion, executor), executor);
     } catch (Exception e) {
       return Futures.immediateFailedFuture(e);
@@ -734,7 +768,7 @@ class Connection {
               // Otherwise, send the challenge response back to the server
               logger.trace("{} Sending Auth response to challenge", this);
               Future nextResponseFuture = write(new Requests.AuthResponse(responseToServer));
-              return GuavaCompatibility.INSTANCE.transformAsync(
+              return Futures.transformAsync(
                   nextResponseFuture,
                   onV2AuthResponse(authenticator, protocolVersion, executor),
                   executor);
@@ -789,6 +823,11 @@ class Connection {
 
   boolean isDefunct() {
     return isDefunct.get();
+  }
+
+  @VisibleForTesting
+  void markDefunctForTest() {
+    isDefunct.set(true);
   }
 
   int maxAvailableStreams() {
@@ -846,17 +885,15 @@ class Connection {
 
     try {
       Uninterruptibles.getUninterruptibly(setKeyspaceAsync(keyspace));
-    } catch (ConnectionException e) {
-      throw defunct(e);
-    } catch (BusyConnectionException e) {
-      logger.warn(
-          "Tried to set the keyspace on busy {}. "
-              + "This should not happen but is not critical (it will be retried)",
-          this);
-      throw new ConnectionException(endPoint, "Tried to set the keyspace on busy connection");
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof OperationTimedOutException) {
+      if (cause instanceof BusyConnectionException) {
+        throw keyspaceBusyException();
+      } else if (cause instanceof QueryValidationException) {
+        throw (QueryValidationException) cause;
+      } else if (cause instanceof ConnectionException) {
+        throw defunct((ConnectionException) cause);
+      } else if (cause instanceof OperationTimedOutException) {
         // Rethrow so that the caller doesn't try to use the connection, but do not defunct as we
         // don't want to mark down
         logger.warn(
@@ -870,8 +907,15 @@ class Connection {
     }
   }
 
-  ListenableFuture<Connection> setKeyspaceAsync(final String keyspace)
-      throws ConnectionException, BusyConnectionException {
+  private ConnectionException keyspaceBusyException() {
+    logger.warn(
+        "Tried to set the keyspace on busy {}. "
+            + "This should not happen but is not critical (it will be retried)",
+        this);
+    return new ConnectionException(endPoint, "Tried to set the keyspace on busy connection");
+  }
+
+  ListenableFuture<Connection> setKeyspaceAsync(final String keyspace) {
     SetKeyspaceAttempt existingAttempt = targetKeyspace.get();
     if (MoreObjects.equal(existingAttempt.keyspace, keyspace)) return existingAttempt.future;
 
@@ -901,8 +945,19 @@ class Connection {
         logger.debug("{} Setting keyspace {}", this, keyspace);
         // Note: we quote the keyspace below, because the name is the one coming from Cassandra, so
         // it's in the right case already
-        Future future = write(new Requests.Query("USE \"" + keyspace + '"'));
-        GuavaCompatibility.INSTANCE.addCallback(
+        Future future;
+        try {
+          future = write(new Requests.Query("USE \"" + keyspace + '"'));
+        } catch (ConnectionException | BusyConnectionException e) {
+          targetKeyspace.compareAndSet(attempt, defaultKeyspaceAttempt);
+          ksFuture.setException(e);
+          return ksFuture;
+        } catch (RuntimeException e) {
+          targetKeyspace.compareAndSet(attempt, defaultKeyspaceAttempt);
+          ksFuture.setException(e);
+          return ksFuture;
+        }
+        Futures.addCallback(
             future,
             new FutureCallback<Message.Response>() {
 
@@ -916,7 +971,12 @@ class Connection {
                   targetKeyspace.compareAndSet(attempt, defaultKeyspaceAttempt);
                   if (response.type == ERROR) {
                     Responses.Error error = (Responses.Error) response;
-                    ksFuture.setException(defunct(error.asException(endPoint)));
+                    DriverException exception = error.asException(endPoint);
+                    if (exception instanceof QueryValidationException) {
+                      ksFuture.setException(exception);
+                    } else {
+                      ksFuture.setException(defunct(exception));
+                    }
                   } else {
                     ksFuture.setException(
                         defunct(
@@ -1057,6 +1117,10 @@ class Connection {
 
   public int shardId() {
     return shardId == null ? 0 : shardId;
+  }
+
+  public ProtocolFeatureStore getProtocolFeatureStore() {
+    return protocolFeatureStore;
   }
 
   /**
@@ -1253,11 +1317,26 @@ class Connection {
     volatile ProtocolVersion protocolVersion;
     private final NettyOptions nettyOptions;
 
+    // Dedicated, driver-generated identifier sent as SESSION_ID on every connection, so the server
+    // can group them. Not derived from the (user-settable) CLIENT_ID, so that it is guaranteed
+    // unique as the grouping key requires. There is one Factory per Cluster, so this is stable and
+    // shared by every Session obtained from that Cluster (the control connection has no Session
+    // affiliation, so Cluster-wide is the finest granularity available here).
+    final UUID sessionId = UUID.randomUUID();
+
+    // Whether this factory reports DRIVER_CONFIG at all: false when reporting is disabled, or when
+    // the reporter cannot be loaded on this classpath (see canBuildDriverConfigReport). The report
+    // itself is not cached — it is rebuilt for every control connection.
+    final boolean driverConfigReportable;
+
     Factory(Cluster.Manager manager, Configuration configuration) {
       this.defaultHandler = manager;
       this.manager = manager;
       this.reaper = manager.reaper;
       this.configuration = configuration;
+      this.driverConfigReportable =
+          configuration.isDriverConfigReportingEnabled()
+              && canBuildDriverConfigReport(configuration);
       this.authProvider = configuration.getProtocolOptions().getAuthProvider();
       this.protocolVersion = configuration.getProtocolOptions().initialProtocolVersion;
       this.nettyOptions = configuration.getNettyOptions();
@@ -1276,6 +1355,63 @@ class Connection {
                   .createThreadFactory(manager.clusterName, "timeouter"));
     }
 
+    /**
+     * The {@code DRIVER_CONFIG} report to send in this handshake's {@code STARTUP} options, or
+     * {@code null} when there is none to send.
+     *
+     * <p>Called once per control connection, from the {@code STARTUP} frame assembly, rather than
+     * cached: the report describes the objects that are in force, and one of them changes after the
+     * first handshake. {@code Cluster.Manager.init()} builds this factory before it initializes the
+     * load balancing policy, so a datacenter or rack the policy infers from the node it reaches is
+     * unknown while the first control connection is being opened and known on every later one.
+     * Rebuilding costs a few hundred microseconds on a connection that opens once per Cluster and
+     * then only on reconnect.
+     */
+    String buildDriverConfigReport() {
+      return driverConfigReportable
+          ? new DefaultDriverConfigReporter(configuration).buildReport()
+          : null;
+    }
+
+    /**
+     * Whether {@link DefaultDriverConfigReporter} can be loaded and run at all on this classpath.
+     * Also serves to load it here, on the {@link Cluster} initialization thread, rather than
+     * leaving a Netty event loop to be the first to touch Jackson; the report it builds is
+     * deliberately discarded, since every control connection builds its own.
+     *
+     * <p>Guarded because {@link DefaultDriverConfigReporter} serializes the report with Jackson,
+     * and holds an {@code ObjectMapper} in a static field: without Jackson, merely
+     * <em>initializing</em> that class raises {@link NoClassDefFoundError}. That is an {@code
+     * Error} raised while initializing the class rather than from any method it declares, so the
+     * reporter's own fail-safe cannot contain it and neither can anything it calls — and this runs
+     * on the {@link Cluster} initialization path, so it would take a classpath that merely lacks an
+     * optional serializer from "the report is skipped" to "no connection can be established at
+     * all". Choosing whether to touch the class is therefore the only place the check can live.
+     *
+     * <p>{@link LinkageError} rather than {@code NoClassDefFoundError} alone, so that a partially
+     * present or version-mismatched Jackson — which surfaces as {@code ExceptionInInitializerError}
+     * out of the static initializer — is covered too; probing for one class name would pass and
+     * then still fail here. This is the same fallback {@code SnappyCompressor} applies for its own
+     * optional library, and it does not contradict {@link
+     * DefaultDriverConfigReporter#buildReport()} deliberately not catching bare {@code Error}: that
+     * is about report building never masking a real JVM-level failure, while this is a call site
+     * tolerating a missing optional dependency.
+     */
+    static boolean canBuildDriverConfigReport(Configuration configuration) {
+      try {
+        new DefaultDriverConfigReporter(configuration).buildReport();
+        return true;
+      } catch (LinkageError e) {
+        // Logged unconditionally, and at WARN: reporting ships enabled, so nobody opted into it and
+        // nobody would think to look for a message saying it is off.
+        logger.warn(
+            "Cannot build the driver configuration report, so no DRIVER_CONFIG will be reported; "
+                + "this is expected if Jackson was excluded from the classpath ({})",
+            e.toString());
+        return false;
+      }
+    }
+
     int getPort() {
       return configuration.getProtocolOptions().getPort();
     }
@@ -1289,12 +1425,24 @@ class Connection {
     Connection open(Host host)
         throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
+      return open(host, false);
+    }
+
+    /**
+     * Same as {@link #open(Host)}, but when {@code reportConfig} is true, marks the connection as
+     * the control connection, which builds and reports a {@code DRIVER_CONFIG} blob of its own in
+     * its {@code STARTUP} options (a no-op when driver config reporting is disabled).
+     */
+    Connection open(Host host, boolean reportConfig)
+        throws ConnectionException, InterruptedException, UnsupportedProtocolVersionException,
+            ClusterNameMismatchException {
       EndPoint endPoint = host.getEndPoint();
 
       if (isShutdown) throw new ConnectionException(endPoint, "Connection factory is shut down");
 
       host.convictionPolicy.signalConnectionsOpening(1);
-      Connection connection = new Connection(buildConnectionName(host), endPoint, this);
+      Connection connection =
+          new Connection(buildConnectionName(host), endPoint, this, null, reportConfig);
       // This method opens the connection synchronously, so wait until it's initialized
       try {
         connection.initAsync().get();
@@ -1586,7 +1734,13 @@ class Connection {
             "{} was inactive for {} seconds, sending heartbeat",
             Connection.this,
             factory.configuration.getPoolingOptions().getHeartbeatIntervalSeconds());
-        write(HEARTBEAT_CALLBACK);
+        try {
+          write(HEARTBEAT_CALLBACK);
+        } catch (ConnectionException e) {
+          if (!e.getMessage().contains("Connection has been closed")) {
+            throw e;
+          }
+        }
       }
     }
 
@@ -1878,7 +2032,7 @@ class Connection {
     final int streamId;
     final ResponseCallback callback;
     final int retryCount;
-    private final long readTimeoutMillis;
+    final long readTimeoutMillis;
 
     private final long startTime;
     private volatile Timeout timeout;
@@ -1943,21 +2097,6 @@ class Connection {
   }
 
   private static class Initializer extends ChannelInitializer<SocketChannel> {
-    // Stateless handlers
-    private static final Message.ProtocolDecoder messageDecoder = new Message.ProtocolDecoder();
-    private static final Message.ProtocolEncoder messageEncoderV1 =
-        new Message.ProtocolEncoder(ProtocolVersion.V1);
-    private static final Message.ProtocolEncoder messageEncoderV2 =
-        new Message.ProtocolEncoder(ProtocolVersion.V2);
-    private static final Message.ProtocolEncoder messageEncoderV3 =
-        new Message.ProtocolEncoder(ProtocolVersion.V3);
-    private static final Message.ProtocolEncoder messageEncoderV4 =
-        new Message.ProtocolEncoder(ProtocolVersion.V4);
-    private static final Message.ProtocolEncoder messageEncoderV5 =
-        new Message.ProtocolEncoder(ProtocolVersion.V5);
-    private static final Message.ProtocolEncoder messageEncoderV6 =
-        new Message.ProtocolEncoder(ProtocolVersion.V6);
-    private static final Frame.Encoder frameEncoder = new Frame.Encoder();
 
     private final ProtocolVersion protocolVersion;
     private final Connection connection;
@@ -2021,7 +2160,7 @@ class Connection {
       }
 
       pipeline.addLast("frameDecoder", new Frame.Decoder());
-      pipeline.addLast("frameEncoder", frameEncoder);
+      pipeline.addLast("frameEncoder", new Frame.Encoder());
 
       pipeline.addLast("framingFormatHandler", new FramingFormatHandler(connection.factory));
 
@@ -2034,7 +2173,7 @@ class Connection {
         pipeline.addLast("frameCompressor", new Frame.Compressor(compressor));
       }
 
-      pipeline.addLast("messageDecoder", messageDecoder);
+      pipeline.addLast("messageDecoder", new Message.ProtocolDecoder(null));
       pipeline.addLast("messageEncoder", messageEncoderFor(protocolVersion));
 
       pipeline.addLast("idleStateHandler", idleStateHandler);
@@ -2044,23 +2183,11 @@ class Connection {
       nettyOptions.afterChannelInitialized(channel);
     }
 
-    private Message.ProtocolEncoder messageEncoderFor(ProtocolVersion version) {
-      switch (version) {
-        case V1:
-          return messageEncoderV1;
-        case V2:
-          return messageEncoderV2;
-        case V3:
-          return messageEncoderV3;
-        case V4:
-          return messageEncoderV4;
-        case V5:
-          return messageEncoderV5;
-        case V6:
-          return messageEncoderV6;
-        default:
-          throw new DriverInternalError("Unsupported protocol version " + protocolVersion);
+    private static Message.ProtocolEncoder messageEncoderFor(ProtocolVersion version) {
+      if (version.toInt() > ProtocolVersion.V6.toInt()) {
+        throw new DriverInternalError("Unsupported protocol version " + version);
       }
+      return new Message.ProtocolEncoder(version, null);
     }
   }
 

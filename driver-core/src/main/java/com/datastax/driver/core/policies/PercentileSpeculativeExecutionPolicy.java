@@ -22,6 +22,7 @@ import com.datastax.driver.core.Host;
 import com.datastax.driver.core.LatencyTracker;
 import com.datastax.driver.core.PercentileTracker;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -56,6 +57,28 @@ public class PercentileSpeculativeExecutionPolicy implements SpeculativeExecutio
     this.percentileTracker = percentileTracker;
     this.percentile = percentile;
     this.maxSpeculativeExecutions = maxSpeculativeExecutions;
+  }
+
+  /**
+   * The maximum number of speculative executions this policy triggers for a request, as specified
+   * at instantiation. This does not include the initial, normal request.
+   *
+   * @return the maximum number of speculative executions, always strictly positive.
+   */
+  @Beta
+  public int getMaxSpeculativeExecutions() {
+    return maxSpeculativeExecutions;
+  }
+
+  /**
+   * The latency percentile a request must fall into to be considered slow, as specified at
+   * instantiation.
+   *
+   * @return the percentile, in the range 0 (inclusive) to 100 (exclusive).
+   */
+  @Beta
+  public double getPercentile() {
+    return percentile;
   }
 
   @Override

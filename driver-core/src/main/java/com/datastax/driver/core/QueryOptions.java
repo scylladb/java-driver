@@ -18,6 +18,9 @@ package com.datastax.driver.core;
 import com.datastax.driver.core.exceptions.UnsupportedFeatureException;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.datastax.driver.core.utils.MoreObjects;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /** Options related to defaults for individual queries. */
 public class QueryOptions {
@@ -48,6 +51,9 @@ public class QueryOptions {
 
   public static final int DEFAULT_REFRESH_SCHEMA_INTERVAL_MILLIS = 1000;
 
+  public static final RequestRoutingMethod DEFAULT_LOAD_BALANCING_LWT_REQUEST_ROUTING_METHOD =
+      RequestRoutingMethod.PRESERVE_REPLICA_ORDER;
+
   private volatile ConsistencyLevel consistency = DEFAULT_CONSISTENCY_LEVEL;
   private volatile ConsistencyLevel serialConsistency = DEFAULT_SERIAL_CONSISTENCY_LEVEL;
   private volatile int fetchSize = DEFAULT_FETCH_SIZE;
@@ -77,6 +83,9 @@ public class QueryOptions {
   private volatile boolean addOriginalContactsToReconnectionPlan = false;
   private volatile boolean considerZeroTokenNodesValidPeers = false;
 
+  private volatile RequestRoutingMethod loadBalancingLwtRequestRoutingMethod =
+      DEFAULT_LOAD_BALANCING_LWT_REQUEST_ROUTING_METHOD;
+
   /**
    * Creates a new {@link QueryOptions} instance using the {@link #DEFAULT_CONSISTENCY_LEVEL},
    * {@link #DEFAULT_SERIAL_CONSISTENCY_LEVEL} and {@link #DEFAULT_FETCH_SIZE}.
@@ -93,10 +102,14 @@ public class QueryOptions {
    * <p>The consistency level set through this method will be use for queries that don't explicitly
    * have a consistency level, i.e. when {@link Statement#getConsistencyLevel} returns {@code null}.
    *
-   * @param consistencyLevel the new consistency level to set as default.
+   * @param consistencyLevel the new consistency level to set as default. It must not be {@code
+   *     null}: every query needs a consistency level, so a null default would fail any statement
+   *     that does not set one of its own.
    * @return this {@code QueryOptions} instance.
+   * @throws NullPointerException if {@code consistencyLevel} is {@code null}.
    */
   public QueryOptions setConsistencyLevel(ConsistencyLevel consistencyLevel) {
+    Preconditions.checkNotNull(consistencyLevel, "consistencyLevel cannot be null");
     this.consistencySet = true;
     this.consistency = consistencyLevel;
     return this;
@@ -219,7 +232,7 @@ public class QueryOptions {
   /**
    * Skip metadata resolve method .
    *
-   * <p>It defaults to {@link #skipCQL4MetadataResolveMethod.SMART}.
+   * <p>It defaults to {@link CQL4SkipMetadataResolveMethod#SMART}.
    *
    * @return the default idempotence for queries.
    */
@@ -335,7 +348,7 @@ public class QueryOptions {
       // 1. call submitNodeListRefresh() first to
       // be able to compute the token map for the first time,
       // which will be incomplete due to the lack of keyspace metadata
-      GuavaCompatibility.INSTANCE.addCallback(
+      Futures.addCallback(
           manager.submitNodeListRefresh(),
           new MoreFutures.SuccessCallback<Void>() {
             @Override
@@ -345,7 +358,8 @@ public class QueryOptions {
               // this time with information about keyspaces
               manager.submitSchemaRefresh(null, null, null, null);
             }
-          });
+          },
+          MoreExecutors.directExecutor());
     }
     return this;
   }
@@ -571,6 +585,28 @@ public class QueryOptions {
     return this.considerZeroTokenNodesValidPeers;
   }
 
+  /**
+   * Sets the default request routing method to use for LWT queries. Default is {@link
+   * RequestRoutingMethod#PRESERVE_REPLICA_ORDER}.
+   *
+   * @param loadBalancingLwtRequestRoutingMethod the new request routing method.
+   * @return this {@code QueryOptions} instance.
+   */
+  public QueryOptions setLoadBalancingLwtRequestRoutingMethod(
+      RequestRoutingMethod loadBalancingLwtRequestRoutingMethod) {
+    this.loadBalancingLwtRequestRoutingMethod = loadBalancingLwtRequestRoutingMethod;
+    return this;
+  }
+
+  /**
+   * The default request routing method used by LWT queries.
+   *
+   * @return the default request routing method used by LWT queries.
+   */
+  public RequestRoutingMethod getLoadBalancingLwtRequestRoutingMethod() {
+    return loadBalancingLwtRequestRoutingMethod;
+  }
+
   @Override
   public boolean equals(Object that) {
     if (that == null || !(that instanceof QueryOptions)) {
@@ -591,7 +627,9 @@ public class QueryOptions {
             && this.refreshNodeIntervalMillis == other.refreshNodeIntervalMillis
             && this.refreshSchemaIntervalMillis == other.refreshSchemaIntervalMillis
             && this.reprepareOnUp == other.reprepareOnUp
-            && this.prepareOnAllHosts == other.prepareOnAllHosts)
+            && this.prepareOnAllHosts == other.prepareOnAllHosts
+            && this.loadBalancingLwtRequestRoutingMethod
+                == other.loadBalancingLwtRequestRoutingMethod)
         && this.schemaQueriesPaged == other.schemaQueriesPaged;
   }
 
@@ -611,6 +649,7 @@ public class QueryOptions {
         refreshSchemaIntervalMillis,
         reprepareOnUp,
         prepareOnAllHosts,
+        loadBalancingLwtRequestRoutingMethod,
         schemaQueriesPaged);
   }
 
@@ -622,5 +661,11 @@ public class QueryOptions {
     ENABLED,
     DISABLED,
     SMART
+  }
+
+  /** The request routing method for queries. */
+  public enum RequestRoutingMethod {
+    REGULAR,
+    PRESERVE_REPLICA_ORDER
   }
 }

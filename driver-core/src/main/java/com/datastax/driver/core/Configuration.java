@@ -16,6 +16,7 @@
 package com.datastax.driver.core;
 
 import com.datastax.driver.core.policies.Policies;
+import com.google.common.annotations.Beta;
 import com.google.common.base.Joiner;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,8 +33,8 @@ import java.util.List;
  *   <li>Netty layer customization options.
  * </ul>
  *
- * This is also where you get the configured policies, though those cannot be changed (they are set
- * during the built of the Cluster object).
+ * <p>This is also where you get the configured policies, though those cannot be changed (they are
+ * set during the built of the Cluster object).
  */
 public class Configuration {
 
@@ -59,6 +60,8 @@ public class Configuration {
   private final NettyOptions nettyOptions;
   private final CodecRegistry codecRegistry;
   private final String defaultKeyspace;
+  private final ApplicationInfo applicationInfo;
+  private final boolean driverConfigReportingEnabled;
 
   private Configuration(
       Policies policies,
@@ -70,7 +73,9 @@ public class Configuration {
       ThreadingOptions threadingOptions,
       NettyOptions nettyOptions,
       CodecRegistry codecRegistry,
-      String defaultKeyspace) {
+      String defaultKeyspace,
+      ApplicationInfo applicationInfo,
+      boolean driverConfigReportingEnabled) {
     this.policies = policies;
     this.protocolOptions = protocolOptions;
     this.poolingOptions = poolingOptions;
@@ -81,6 +86,8 @@ public class Configuration {
     this.nettyOptions = nettyOptions;
     this.codecRegistry = codecRegistry;
     this.defaultKeyspace = defaultKeyspace;
+    this.applicationInfo = applicationInfo;
+    this.driverConfigReportingEnabled = driverConfigReportingEnabled;
   }
 
   /**
@@ -99,7 +106,9 @@ public class Configuration {
         toCopy.getThreadingOptions(),
         toCopy.getNettyOptions(),
         toCopy.getCodecRegistry(),
-        toCopy.getDefaultKeyspace());
+        toCopy.getDefaultKeyspace(),
+        toCopy.getApplicationInfo(),
+        toCopy.isDriverConfigReportingEnabled());
   }
 
   void register(Cluster.Manager manager) {
@@ -213,6 +222,26 @@ public class Configuration {
   public String getDefaultKeyspace() {
     return defaultKeyspace;
   }
+
+  public ApplicationInfo getApplicationInfo() {
+    return applicationInfo;
+  }
+
+  /**
+   * Whether driver configuration reporting is enabled, i.e. whether the control connection sends a
+   * {@code DRIVER_CONFIG} JSON blob describing the effective driver configuration in its startup
+   * options. Enabled by default.
+   *
+   * <p>This does not govern the {@code SESSION_ID} startup option, which every connection always
+   * sends regardless of this setting.
+   *
+   * @return {@code true} if driver configuration reporting is enabled.
+   */
+  @Beta
+  public boolean isDriverConfigReportingEnabled() {
+    return driverConfigReportingEnabled;
+  }
+
   /**
    * Returns the {@link CodecRegistry} instance for this configuration.
    *
@@ -237,8 +266,35 @@ public class Configuration {
     private QueryOptions queryOptions;
     private ThreadingOptions threadingOptions;
     private NettyOptions nettyOptions;
+    private ApplicationInfo applicationInfo;
+    private boolean driverConfigReportingEnabled = true;
     private CodecRegistry codecRegistry;
     private String defaultKeyspace;
+
+    /**
+     * Sets application information provider.
+     *
+     * @param applicationInfo application information provider.
+     * @return this builder.
+     */
+    public Builder withApplicationInfo(ApplicationInfo applicationInfo) {
+      this.applicationInfo = applicationInfo;
+      return this;
+    }
+
+    /**
+     * Enables or disables driver configuration reporting (the {@code DRIVER_CONFIG} startup option
+     * sent by the control connection). Enabled by default; see {@link
+     * Configuration#isDriverConfigReportingEnabled()}.
+     *
+     * @param driverConfigReportingEnabled whether driver configuration reporting is enabled.
+     * @return this builder.
+     */
+    @Beta
+    public Builder withDriverConfigReporting(boolean driverConfigReportingEnabled) {
+      this.driverConfigReportingEnabled = driverConfigReportingEnabled;
+      return this;
+    }
 
     /**
      * Sets the policies for this cluster.
@@ -370,7 +426,9 @@ public class Configuration {
           threadingOptions != null ? threadingOptions : new ThreadingOptions(),
           nettyOptions != null ? nettyOptions : NettyOptions.DEFAULT_INSTANCE,
           codecRegistry != null ? codecRegistry : CodecRegistry.DEFAULT_INSTANCE,
-          defaultKeyspace);
+          defaultKeyspace,
+          applicationInfo,
+          driverConfigReportingEnabled);
     }
   }
 }
