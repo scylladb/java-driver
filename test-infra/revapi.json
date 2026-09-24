@@ -18,6 +18,66 @@
     },
     "ignore": [
       {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method <T> org.assertj.core.api.Condition<T> org.assertj.core.api.Assertions::allOf(org.assertj.core.api.Condition<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "new": "method <T> org.assertj.core.api.Condition<T> org.assertj.core.api.Assertions::allOf(org.assertj.core.api.Condition<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method <T> org.assertj.core.api.ThrowingConsumer<T> org.assertj.core.api.Assertions::allOf(org.assertj.core.api.ThrowingConsumer<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "new": "method <T> org.assertj.core.api.ThrowingConsumer<T> org.assertj.core.api.Assertions::allOf(org.assertj.core.api.ThrowingConsumer<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method <T> org.assertj.core.api.Condition<T> org.assertj.core.api.Assertions::anyOf(org.assertj.core.api.Condition<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "new": "method <T> org.assertj.core.api.Condition<T> org.assertj.core.api.Assertions::anyOf(org.assertj.core.api.Condition<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method <T> org.assertj.core.api.ThrowingConsumer<T> org.assertj.core.api.Assertions::anyOf(org.assertj.core.api.ThrowingConsumer<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "new": "method <T> org.assertj.core.api.ThrowingConsumer<T> org.assertj.core.api.Assertions::anyOf(org.assertj.core.api.ThrowingConsumer<? super T>[]) @ com.datastax.oss.driver.assertions.Assertions",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfies(java.util.function.Consumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "new": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfies(java.util.function.Consumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfies(org.assertj.core.api.ThrowingConsumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "new": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfies(org.assertj.core.api.ThrowingConsumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfiesAnyOf(java.util.function.Consumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "new": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfiesAnyOf(java.util.function.Consumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfiesAnyOf(org.assertj.core.api.ThrowingConsumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "new": "method SELF org.assertj.core.api.AbstractAssert<SELF extends org.assertj.core.api.AbstractAssert<SELF, ACTUAL>, ACTUAL>::satisfiesAnyOf(org.assertj.core.api.ThrowingConsumer<? super ACTUAL>[]) @ com.datastax.oss.driver.assertions.NodeMetadataAssert",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method void org.apache.tinkerpop.gremlin.process.traversal.step.util.Tree<T>::<init>(T[])",
+        "new": "method void org.apache.tinkerpop.gremlin.process.traversal.step.util.Tree<T>::<init>(T[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method void org.apache.tinkerpop.gremlin.process.traversal.step.util.Tree<T>::<init>(java.util.Map.Entry<T, org.apache.tinkerpop.gremlin.process.traversal.step.util.Tree<T>>[])",
+        "new": "method void org.apache.tinkerpop.gremlin.process.traversal.step.util.Tree<T>::<init>(java.util.Map.Entry<T, org.apache.tinkerpop.gremlin.process.traversal.step.util.Tree<T>>[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
         "code": "java.method.returnTypeTypeParametersChanged",
         "old": "method java.util.Set<java.net.InetSocketAddress> com.datastax.oss.driver.api.testinfra.CassandraResourceRule::getContactPoints()",
         "new": "method java.util.Set<com.datastax.oss.driver.api.core.metadata.EndPoint> com.datastax.oss.driver.api.testinfra.CassandraResourceRule::getContactPoints()",

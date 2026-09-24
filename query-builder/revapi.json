@@ -17,6 +17,102 @@
     },
     "ignore": [
       {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumnEnd com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumn::dropColumns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumnEnd com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumn::dropColumns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumnEnd com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumn::dropColumns(java.lang.String[])",
+        "new": "method com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumnEnd com.datastax.dse.driver.api.querybuilder.schema.AlterDseTableDropColumn::dropColumns(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereColumns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereColumns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereColumns(java.lang.String[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereColumns(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereToken(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereToken(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereToken(java.lang.String[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<SelfT> com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT extends com.datastax.oss.driver.api.querybuilder.relation.OngoingWhereClause<SelfT>>::whereToken(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::columns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::columns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::columns(java.lang.String[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.MultiColumnRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::columns(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::token(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::token(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::token(java.lang.String[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.relation.TokenRelationBuilder<com.datastax.oss.driver.api.querybuilder.relation.Relation> com.datastax.oss.driver.api.querybuilder.relation.Relation::token(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumnEnd com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumn::dropColumns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumnEnd com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumn::dropColumns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumnEnd com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumn::dropColumns(java.lang.String[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumnEnd com.datastax.oss.driver.api.querybuilder.schema.AlterTableDropColumn::dropColumns(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelectionWithColumns com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelection::columns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelectionWithColumns com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelection::columns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelectionWithColumns com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelection::columns(java.lang.String[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelectionWithColumns com.datastax.oss.driver.api.querybuilder.schema.CreateMaterializedViewSelection::columns(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.select.Select com.datastax.oss.driver.api.querybuilder.select.OngoingSelection::columns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.select.Select com.datastax.oss.driver.api.querybuilder.select.OngoingSelection::columns(com.datastax.oss.driver.api.core.CqlIdentifier[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
+        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
+        "old": "method com.datastax.oss.driver.api.querybuilder.select.Select com.datastax.oss.driver.api.querybuilder.select.OngoingSelection::columns(java.lang.String[])",
+        "new": "method com.datastax.oss.driver.api.querybuilder.select.Select com.datastax.oss.driver.api.querybuilder.select.OngoingSelection::columns(java.lang.String[])",
+        "justification": "Legacy ambiguity retained for compatibility; new vararg overloads are still checked."
+      },
+      {
         "code": "java.method.addedToInterface",
         "new": "method <T> com.datastax.oss.driver.api.querybuilder.insert.JsonInsert com.datastax.oss.driver.api.querybuilder.insert.InsertInto::json(T, com.datastax.oss.driver.api.core.type.codec.TypeCodec<T>)",
         "justification": "JAVA-2182: Add insertInto().json() variant that takes an object in QueryBuilder"
@@ -2780,10 +2876,6 @@
         "code": "java.method.addedToInterface",
         "new": "method com.datastax.oss.driver.api.querybuilder.select.Select com.datastax.oss.driver.api.querybuilder.select.Select::orderByAnnOf(com.datastax.oss.driver.api.core.CqlIdentifier, com.datastax.oss.driver.api.core.data.CqlVector<?>)",
         "justification": "JAVA-3118: Add support for vector data type in Schema Builder, QueryBuilder"
-      },
-      {
-        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
-        "justification": "CASSJAVA-102: Suppress newly-supported varargs check"
       }
     ]
   }
