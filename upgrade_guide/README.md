@@ -70,7 +70,7 @@ Key points:
 - **Requires ScyllaDB Enterprise ≥ 2026.1** (scylladb/scylladb#27323). The feature is not
   available on ScyllaDB OSS or Apache Cassandra.
 
-See [Address resolution — Client Routes](../manual/core/address_resolution/) for full details.
+See [Client routes](../manual/core/connectivity/client_routes/) for full details.
 
 ### 4.18.1
 
