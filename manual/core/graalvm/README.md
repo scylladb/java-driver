@@ -28,9 +28,7 @@ under the License.
   * When using [Jackson](../integration#Jackson);
   * When using LZ4 [compression](../compression/);
   * Depending on the [logging backend](../logging) in use.
-* DSE-specific features:
-  * Geospatial types are supported.
-  * DSE Graph is not officially supported, although it may work.
+* DSE geospatial types require additional configuration.
 * The [shaded jar](../shaded_jar) is not officially supported, although it may work.
 
 -----
@@ -277,56 +275,6 @@ images, as stated above – replace the above entry with the below one:
 
 2. When invoking the native image builder, add a `-H:ReflectionConfigurationFiles=reflection.json`
    flag and point it to the file created above.
-
-#### DSE Graph
-
-**[DSE Graph](../dse/graph) is not officially supported on GraalVM native images.**
-
-The following configuration can be used as a starting point for users wishing to build a native
-image for a DSE Graph application. DataStax does not guarantee however that the below configuration
-will work in all cases. If the native image build fails, a good option is to use GraalVM's
-[Tracing Agent](https://www.graalvm.org/reference-manual/native-image/Agent/) to understand why.
-
-1. Create the following reflection.json file, or add these entries to an existing file:
-
-```json
-[
-  { "name": "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0" },
-  { "name": "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal" },
-  { "name": "org.apache.tinkerpop.gremlin.structure.Graph",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  },
-  { "name": "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  },
-  { "name": " org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  },
-  { "name": "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  }
-]
-```
-
-2. When invoking the native image builder, add the following flags:
-
-```
--H:ReflectionConfigurationFiles=reflection.json
---initialize-at-build-time=org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0
---initialize-at-build-time=org.apache.tinkerpop.shaded.jackson.databind.deser.std.StdDeserializer
-```
 
 ### Using the shaded jar
 

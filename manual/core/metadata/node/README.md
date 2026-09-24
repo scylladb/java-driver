@@ -69,14 +69,8 @@ nodes. The exact definition of `LOCAL` and `REMOTE` is left to the interpretatio
 but in general it represents the proximity to the client, and `LOCAL` nodes will be prioritized as
 coordinators. They also influence pooling options.
 
-[Node#getExtras()] contains additional free-form properties. This is intended for future evolution
-or custom driver extensions. In particular, if the driver is connected to DataStax Enterprise, the
-map will contain additional information under the keys defined in [DseNodeProperties]:
-
-```java
-Object rawDseVersion = node.getExtras().get(DseNodeProperties.DSE_VERSION);
-Version dseVersion = (rawDseVersion == null) ? null : (Version) rawDseVersion;
-```
+[Node#getExtras()] contains additional free-form properties intended for future evolution or custom
+driver extensions.
 
 ### Notifications
 
@@ -161,4 +155,3 @@ the source code.
 [NodeStateListener]:         https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/metadata/NodeStateListener.html
 [NodeStateListenerBase]:     https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/metadata/NodeStateListenerBase.html
 [SessionBuilder.addNodeStateListener]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/SessionBuilder.html#addNodeStateListener-com.datastax.oss.driver.api.core.metadata.NodeStateListener-
-[DseNodeProperties]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/metadata/DseNodeProperties.html

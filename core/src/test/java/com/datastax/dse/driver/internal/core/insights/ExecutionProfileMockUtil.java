@@ -17,7 +17,6 @@
  */
 package com.datastax.dse.driver.internal.core.insights;
 
-import static com.datastax.dse.driver.api.core.config.DseDriverOption.GRAPH_TRAVERSAL_SOURCE;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.AUTH_PROVIDER_CLASS;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE;
 import static com.datastax.oss.driver.api.core.config.DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE;
@@ -70,7 +69,6 @@ class ExecutionProfileMockUtil {
     when(profile.getDuration(RECONNECTION_BASE_DELAY)).thenReturn(Duration.ofMillis(100));
     when(profile.isDefined(SSL_ENGINE_FACTORY_CLASS)).thenReturn(true);
     when(profile.getString(eq(AUTH_PROVIDER_CLASS), any())).thenReturn("AuthProviderImpl");
-    when(profile.getString(GRAPH_TRAVERSAL_SOURCE, null)).thenReturn("src-graph");
     return profile;
   }
 
@@ -108,12 +106,6 @@ class ExecutionProfileMockUtil {
   static DriverExecutionProfile mockNonDefaultSerialConsistency() {
     DriverExecutionProfile profile = mockDefaultExecutionProfile();
     when(profile.getString(REQUEST_SERIAL_CONSISTENCY)).thenReturn("ONE");
-    return profile;
-  }
-
-  static DriverExecutionProfile mockNonDefaultGraphOptions() {
-    DriverExecutionProfile profile = mockDefaultExecutionProfile();
-    when(profile.getString(GRAPH_TRAVERSAL_SOURCE, null)).thenReturn("non-default-graph");
     return profile;
   }
 }

@@ -17,9 +17,7 @@
  */
 package com.datastax.oss.driver.api.testinfra.session;
 
-import com.datastax.dse.driver.api.core.graph.ScriptGraphStatement;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
-import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
@@ -28,12 +26,8 @@ import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
 import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
-import com.datastax.oss.driver.api.testinfra.ccm.BaseCcmRule;
-import com.datastax.oss.driver.api.testinfra.ccm.CcmBridge;
 import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
-import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 import com.datastax.oss.driver.api.testinfra.simulacron.SimulacronRule;
-import java.util.Objects;
 import org.junit.rules.ExternalResource;
 
 /**
@@ -63,16 +57,12 @@ import org.junit.rules.ExternalResource;
  */
 public class SessionRule<SessionT extends Session> extends ExternalResource {
 
-  private static final Version V6_8_0 = Objects.requireNonNull(Version.parse("6.8.0"));
-
   // the CCM or Simulacron rule to depend on
   private final CassandraResourceRule cassandraResource;
   private final NodeStateListener nodeStateListener;
   private final SchemaChangeListener schemaChangeListener;
   private final CqlIdentifier keyspace;
   private final DriverConfigLoader configLoader;
-  private final String graphName;
-  private final boolean isCoreGraph;
 
   // the session that is auto created for this rule and is tied to the given keyspace.
   private SessionT session;
@@ -94,9 +84,7 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
       boolean createKeyspace,
       NodeStateListener nodeStateListener,
       SchemaChangeListener schemaChangeListener,
-      DriverConfigLoader configLoader,
-      String graphName,
-      boolean isCoreGraph) {
+      DriverConfigLoader configLoader) {
     this.cassandraResource = cassandraResource;
     this.nodeStateListener = nodeStateListener;
     this.schemaChangeListener = schemaChangeListener;
@@ -105,41 +93,6 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
             ? null
             : SessionUtils.uniqueKeyspaceId();
     this.configLoader = configLoader;
-    this.graphName = graphName;
-    this.isCoreGraph = isCoreGraph;
-  }
-
-  public SessionRule(
-      CassandraResourceRule cassandraResource,
-      boolean createKeyspace,
-      NodeStateListener nodeStateListener,
-      SchemaChangeListener schemaChangeListener,
-      DriverConfigLoader configLoader,
-      String graphName) {
-    this(
-        cassandraResource,
-        createKeyspace,
-        nodeStateListener,
-        schemaChangeListener,
-        configLoader,
-        graphName,
-        false);
-  }
-
-  public SessionRule(
-      CassandraResourceRule cassandraResource,
-      boolean createKeyspace,
-      NodeStateListener nodeStateListener,
-      SchemaChangeListener schemaChangeListener,
-      DriverConfigLoader configLoader) {
-    this(
-        cassandraResource,
-        createKeyspace,
-        nodeStateListener,
-        schemaChangeListener,
-        configLoader,
-        null,
-        false);
   }
 
   @Override
@@ -154,46 +107,10 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
           SimpleStatement.newInstance(String.format("USE %s", keyspace.asCql(false))),
           Statement.SYNC);
     }
-    if (graphName != null) {
-      BaseCcmRule rule =
-          (cassandraResource instanceof BaseCcmRule) ? ((BaseCcmRule) cassandraResource) : null;
-      if (rule == null || !CcmBridge.isDistributionOf(BackendType.DSE)) {
-        throw new IllegalArgumentException("DseSessionRule should work with DSE.");
-      }
-      if (rule.getDistributionVersion().compareTo(V6_8_0) >= 0) {
-        session()
-            .execute(
-                ScriptGraphStatement.newInstance(
-                        String.format(
-                            "system.graph('%s').ifNotExists()%s.create()",
-                            this.graphName, isCoreGraph ? ".coreEngine()" : ".classicEngine()"))
-                    .setSystemQuery(true),
-                ScriptGraphStatement.SYNC);
-      } else {
-        if (isCoreGraph) {
-          throw new IllegalArgumentException(
-              "Core graph is not supported for DSE version < " + V6_8_0);
-        }
-        session()
-            .execute(
-                ScriptGraphStatement.newInstance(
-                        String.format("system.graph('%s').ifNotExists().create()", this.graphName))
-                    .setSystemQuery(true),
-                ScriptGraphStatement.SYNC);
-      }
-    }
   }
 
   @Override
   protected void after() {
-    if (graphName != null) {
-      session()
-          .execute(
-              ScriptGraphStatement.newInstance(
-                      String.format("system.graph('%s').drop()", this.graphName))
-                  .setSystemQuery(true),
-              ScriptGraphStatement.SYNC);
-    }
     if (keyspace != null) {
       SchemaChangeSynchronizer.withLock(
           () -> {
@@ -215,10 +132,6 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
    */
   public CqlIdentifier keyspace() {
     return keyspace;
-  }
-
-  public String getGraphName() {
-    return graphName;
   }
 
   /** @return a config profile where the request timeout is 30 seconds. * */
