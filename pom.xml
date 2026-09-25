@@ -100,7 +100,7 @@
     <skipUnitTests>${skipTests}</skipUnitTests>
     <release.autopublish>false</release.autopublish>
     <pushChanges>false</pushChanges>
-    <mockitoopens.argline />
+    <mockitoopens.argline/>
   </properties>
   <dependencyManagement>
     <dependencies>

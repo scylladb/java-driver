@@ -556,7 +556,7 @@ config.getDefaultProfile().getInt(MyCustomOption.AWESOMENESS_FACTOR);
 [HOCON]: https://github.com/typesafehub/config/blob/master/HOCON.md
 [API conventions]: ../../api_conventions
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :hidden:
    :glob:
