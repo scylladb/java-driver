@@ -86,7 +86,7 @@ ClientRoutesConfig config = ClientRoutesConfig.builder()
     .build();
 
 CqlSession session = CqlSession.builder()
-    .addContactPoint(new InetSocketAddress("my-cluster.region.provider.scylladb.com", 9042))
+    .addContactPoint(InetSocketAddress.createUnresolved("my-cluster.region.provider.scylladb.com", 9042))
     .withClientRoutesConfig(config)
     .withLocalDatacenter("datacenter1")
     .build();
@@ -96,6 +96,9 @@ Or via HOCON configuration file:
 
 ```
 datastax-java-driver {
+  basic.contact-points = [ "my-cluster.region.provider.scylladb.com:9042" ]
+  basic.load-balancing-policy.local-datacenter = "datacenter1"
+
   advanced.client-routes {
     endpoints = [
       { connection-id = "<connection-id>",
@@ -112,7 +115,7 @@ Key points:
 - **Requires ScyllaDB Enterprise ≥ 2026.1** (scylladb/scylladb#27323). The feature is not
   available on ScyllaDB OSS or Apache Cassandra.
 
-See [Address resolution — Client Routes](../manual/core/address_resolution/) for full details.
+See [Client routes](../manual/core/connectivity/client_routes/) for full details.
 
 ### 4.18.1
 

@@ -351,7 +351,7 @@ for (ColumnDefinitions.Definition definition : row.getColumnDefinitions()) {
 
 [CASSANDRA-10145]: https://issues.apache.org/jira/browse/CASSANDRA-10145
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :hidden:
    :glob:
@@ -361,6 +361,7 @@ for (ColumnDefinitions.Definition definition : row.getColumnDefinitions()) {
    authentication/*
    bom/*
    compression/*
+   connectivity/*
    configuration/*
    control_connection/*
    custom_codecs/*
