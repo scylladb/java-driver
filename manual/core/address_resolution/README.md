@@ -25,8 +25,12 @@ The driver uses `system.peers.rpc-address` to connect to newly discovered nodes.
 topologies, an address translation component can be plugged in.
 
 * `advanced.address-translator` in the configuration.
-* none by default. Also available: EC2-specific (for deployments that span multiple regions), or
-  write your own.
+* none by default. Also available: a fixed proxy hostname, EC2-specific (for deployments that span
+  multiple regions), or write your own.
+* behind a cloud private endpoint that publishes a per-node endpoint mapping (ScyllaDB Enterprise
+  2026.1 or later) no translator of your own is needed -- see
+  [client routes](../connectivity/client_routes/); a single hostname in front of every node needs
+  the fixed proxy hostname translator.
 
 -----
 
@@ -118,92 +122,33 @@ datastax-java-driver.advanced.address-translator.class = com.mycompany.MyAddress
 Note: the contact points provided while creating the `CqlSession` are not translated, only addresses
 retrieved from or sent by Cassandra nodes are.
 
-### Client Routes (cloud private endpoint deployments)
+### Client routes (cloud private endpoint deployments)
 
-For cloud deployments using private endpoint services (such as AWS PrivateLink, Azure Private Link,
-or GCP Private Service Connect) or similar technologies (e.g., ScyllaDB Cloud), nodes are accessed
-through private DNS endpoints rather than direct IP addresses. The driver
-provides a built-in client routes feature that handles address translation automatically.
+Deployments reached through a cloud private endpoint -- AWS PrivateLink, Azure Private Link, GCP
+Private Service Connect -- that publishes a per-node endpoint mapping (ScyllaDB Enterprise 2026.1 or
+later) do not need a translator of your own: the driver applies the mapping. See
+[client routes](../connectivity/client_routes/). One hostname for every node, a single-endpoint
+PrivateLink included, is covered by the next section.
 
-Client routes can be configured either **programmatically** or via **HOCON configuration files**.
-Note that `OptionsMap`-based configuration does not support client routes — use the programmatic
-API (`SessionBuilder.withClientRoutesConfig()`) instead, which can be combined with `OptionsMap`
-for all other driver options.
+### Fixed proxy hostname
 
-Client routes are **mutually exclusive** with:
-- A custom `AddressTranslator` (if both are provided, an `IllegalStateException` is thrown)
-- Cloud secure connect bundles (if both are provided, an `IllegalStateException` is thrown)
+If your client applications access Cassandra through some kind of proxy (eg. with AWS PrivateLink when all Cassandra
+nodes are exposed via one hostname pointing to AWS Endpoint), you can configure driver with
+`FixedHostNameAddressTranslator` to always translate all node addresses to that same proxy hostname, no matter what IP
+address a node has but still using its native transport port.
 
-#### Quick start (programmatic)
-
-```java
-import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.config.ClientRoutesConfig;
-import com.datastax.oss.driver.api.core.config.ClientRouteProxy;
-import java.net.InetSocketAddress;
-
-ClientRoutesConfig config = ClientRoutesConfig.builder()
-    .addEndpoint(new ClientRouteProxy(
-        "12345678-1234-1234-1234-123456789012",
-        "my-cluster-endpoint.example.com"))
-    .build();
-
-CqlSession session = CqlSession.builder()
-    .addContactPoint(new InetSocketAddress("my-cluster-endpoint.example.com", 9042))
-    .withClientRoutesConfig(config)
-    .withLocalDatacenter("datacenter1")
-    .build();
-```
-
-#### Quick start (HOCON configuration file)
+To use it, specify the following in the [configuration](../configuration):
 
 ```
-datastax-java-driver {
-  advanced.client-routes {
-    endpoints = [
-      { connection-id = "12345678-1234-1234-1234-123456789012",
-        connection-addr = "my-cluster-endpoint.example.com" }
-    ]
-  }
+datastax-java-driver.advanced.address-translator {
+  class = FixedHostNameAddressTranslator
+  advertised-hostname = proxyhostname
 }
 ```
 
-#### How it works
-
-1. **Startup** — after the control connection is established, the driver queries
-   `system.client_routes` (filtered to the configured `connection_id` values) and builds an
-   in-memory map of `host_id → (hostname, port, tls_port)`.
-2. **Translation** — every time the driver opens a connection to a peer node, it looks up the
-   node's `host_id` in the route map and resolves the associated DNS hostname. Contact points bypass
-   translation so the initial seed addresses are used as-is.
-3. **Event-driven updates** — the driver registers for `CLIENT_ROUTES_CHANGE` server events. When
-   one arrives, it re-queries the table and atomically swaps the route map.
-4. **Reconnect** — if the control connection is recreated the driver performs a full re-read of the
-   route table before refreshing node metadata.
-
-#### DNS resolution
-
-DNS is resolved at connection time (not at route discovery time). The driver delegates to
-`InetAddress.getByName()`, which is a blocking call that uses the JVM's built-in DNS cache
-(30 s default TTL in Java 8+). Because this runs on Netty I/O threads, slow or unresponsive
-DNS can block connection establishment and impact driver throughput. To mitigate this, configure
-the JVM DNS cache TTL via the `networkaddress.cache.ttl` security property (e.g. in
-`$JAVA_HOME/conf/security/java.security` or programmatically with
-`java.security.Security.setProperty("networkaddress.cache.ttl", "60")`).
-
-- **Route-map refresh** — the driver re-queries `system.client_routes` and atomically swaps the
-  in-memory route map in two situations:
-  - a `CLIENT_ROUTES_CHANGE` server event is received, or
-  - the control connection reconnects after a failure.
-
-  A route-map refresh does **not** flush the DNS cache. New hostnames are resolved on first use.
-
-#### Limitations
-
-- Requires ScyllaDB Enterprise ≥ 2026.1 with `system.client_routes` support
-  (scylladb/scylladb#27323). Not yet available on ScyllaDB OSS.
-- Not supported on Apache Cassandra.
-- Mutually exclusive with custom `AddressTranslator` and with cloud secure connect bundles.
+Every node keeps its own port, which on ScyllaDB is the same for every node, so unless the proxy
+gives each node its own port, the proxy rather than the driver picks the node and token-aware and
+shard-aware routing stop working.
 
 ### EC2 multi-region
 

@@ -37,7 +37,7 @@ from lowest to highest level:
 
 If you're reading this on GitHub, the `.nav` file in each directory contains a suggested order.
 
-```{eval-rst}
+```eval_rst
 .. toctree::
    :hidden:
    :glob:
