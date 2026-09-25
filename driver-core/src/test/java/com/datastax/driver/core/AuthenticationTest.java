@@ -61,7 +61,7 @@ public class AuthenticationTest extends CCMTestsSupport {
   @Test(groups = "short")
   public void should_connect_with_credentials() {
     PlainTextAuthProvider authProvider = spy(new PlainTextAuthProvider("cassandra", "cassandra"));
-    Cluster cluster = createClusterBuilder().withAuthProvider(authProvider).build();
+    Cluster cluster = register(createClusterBuilder().withAuthProvider(authProvider).build());
     cluster.connect();
     verify(authProvider, atLeastOnce())
         .newAuthenticator(
@@ -116,10 +116,11 @@ public class AuthenticationTest extends CCMTestsSupport {
   @CCMConfig(dirtiesContext = true)
   public void should_connect_with_slow_server() {
     Cluster cluster =
-        createClusterBuilder()
-            .withAuthProvider(new SlowAuthProvider())
-            .withPoolingOptions(new PoolingOptions().setHeartbeatIntervalSeconds(1))
-            .build();
+        register(
+            createClusterBuilder()
+                .withAuthProvider(new SlowAuthProvider())
+                .withPoolingOptions(new PoolingOptions().setHeartbeatIntervalSeconds(1))
+                .build());
     cluster.connect();
   }
 

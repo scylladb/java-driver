@@ -18,6 +18,7 @@ package com.datastax.driver.core;
 import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.util.List;
 
 /**
@@ -68,7 +69,7 @@ public abstract class CloseFuture extends AbstractFuture<Void> {
     Forwarding(List<CloseFuture> futures) {
       this.futures = futures;
 
-      GuavaCompatibility.INSTANCE.addCallback(
+      Futures.addCallback(
           Futures.allAsList(futures),
           new FutureCallback<List<Void>>() {
             @Override
@@ -80,7 +81,8 @@ public abstract class CloseFuture extends AbstractFuture<Void> {
             public void onSuccess(List<Void> v) {
               Forwarding.this.onFuturesDone();
             }
-          });
+          },
+          MoreExecutors.directExecutor());
     }
 
     @Override

@@ -24,7 +24,6 @@ import static org.testng.Assert.assertTrue;
 
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.CCMTestsSupport;
-import com.datastax.driver.core.GuavaCompatibility;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
@@ -42,7 +41,9 @@ import com.datastax.driver.mapping.annotations.QueryParameters;
 import com.datastax.driver.mapping.annotations.Table;
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -521,7 +522,7 @@ public class MapperTest extends CCMTestsSupport {
   private void executeFunctionAndTestForException(
       User u, Mapper<User> mapper, Function<Void, Thread> f2) {
     ListenableFuture<Void> f = mapper.saveAsync(u);
-    ListenableFuture<Thread> toTest = GuavaCompatibility.INSTANCE.transform(f, f2);
+    ListenableFuture<Thread> toTest = Futures.transform(f, f2, MoreExecutors.directExecutor());
     try {
       Thread executedThread = toTest.get();
       if (executedThread == Thread.currentThread()) {

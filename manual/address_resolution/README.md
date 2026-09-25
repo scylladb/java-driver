@@ -73,6 +73,13 @@ Cluster cluster = Cluster.builder()
 Note: the contact points provided while creating the `Cluster` are not translated, only
 addresses retrieved from or sent by Cassandra nodes are.
 
+### Client routes (PrivateLink / Private Service Connect)
+
+Deployments reached through a cloud private endpoint that publishes a per-node endpoint mapping --
+behind AWS PrivateLink (PL), Azure Private Link or GCP Private Service Connect (PSC) -- need *client
+routes* (`client_routes`), which Java Driver 3.x does not support, and an address translator is not
+a substitute. See [client routes](../connectivity/client_routes/).
+
 ### EC2 multi-region
 
 If you deploy both Cassandra and client applications on Amazon EC2, and your cluster spans multiple regions, you'll have

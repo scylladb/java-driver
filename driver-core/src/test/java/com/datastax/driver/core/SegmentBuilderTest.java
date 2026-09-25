@@ -35,7 +35,7 @@ import org.testng.annotations.Test;
 public class SegmentBuilderTest {
 
   private static final Message.ProtocolEncoder REQUEST_ENCODER =
-      new Message.ProtocolEncoder(ProtocolVersion.V5);
+      new Message.ProtocolEncoder(ProtocolVersion.V5, ProtocolFeatureStore.EMPTY);
 
   // The constant names denote the total encoded size, including the frame header
   private static final Message.Request _38B_REQUEST = new Requests.Query("SELECT * FROM table");
@@ -71,6 +71,8 @@ public class SegmentBuilderTest {
                 return MOCK_CHANNEL.newPromise();
               }
             });
+
+    when(CONTEXT.channel()).thenReturn(MOCK_CHANNEL);
   }
 
   @Test(groups = "unit")

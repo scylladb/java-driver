@@ -21,6 +21,7 @@ import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -77,6 +78,7 @@ public class DCAwareRoundRobinPolicy implements LoadBalancingPolicy {
 
   private final int usedHostsPerRemoteDc;
   private final boolean dontHopForLocalCL;
+  private final boolean localDcExplicit;
 
   private volatile Configuration configuration;
 
@@ -90,6 +92,43 @@ public class DCAwareRoundRobinPolicy implements LoadBalancingPolicy {
     this.localDc = localDc == null ? UNSET : localDc;
     this.usedHostsPerRemoteDc = usedHostsPerRemoteDc;
     this.dontHopForLocalCL = !allowRemoteDCsForLocalConsistencyLevel;
+    this.localDcExplicit = !Strings.isNullOrEmpty(localDc);
+  }
+
+  /**
+   * The datacenter this policy considers local, or {@code null} if it has neither been configured
+   * explicitly nor inferred yet. When {@link #isLocalDcExplicit()} is {@code false}, this is the
+   * datacenter inferred from the first contacted node, which is only available once the policy has
+   * been initialized.
+   *
+   * @return the local datacenter name, or {@code null}.
+   */
+  @Beta
+  public String getLocalDc() {
+    String dc = localDc;
+    return Strings.isNullOrEmpty(dc) ? null : dc;
+  }
+
+  /**
+   * Whether the local datacenter was configured explicitly (as opposed to being inferred from the
+   * first contacted node).
+   *
+   * @return {@code true} if the local datacenter was set explicitly.
+   */
+  @Beta
+  public boolean isLocalDcExplicit() {
+    return localDcExplicit;
+  }
+
+  /**
+   * The number of hosts per remote datacenter that this policy considers for failover (0 means no
+   * remote failover).
+   *
+   * @return the number of used hosts per remote datacenter.
+   */
+  @Beta
+  public int getUsedHostsPerRemoteDc() {
+    return usedHostsPerRemoteDc;
   }
 
   @Override

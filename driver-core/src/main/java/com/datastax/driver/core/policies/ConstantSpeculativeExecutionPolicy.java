@@ -18,6 +18,7 @@ package com.datastax.driver.core.policies;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.Statement;
+import com.google.common.annotations.Beta;
 import com.google.common.base.Preconditions;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -50,6 +51,28 @@ public class ConstantSpeculativeExecutionPolicy implements SpeculativeExecutionP
         maxSpeculativeExecutions);
     this.constantDelayMillis = constantDelayMillis;
     this.maxSpeculativeExecutions = maxSpeculativeExecutions;
+  }
+
+  /**
+   * The number of speculative executions this policy schedules for a request, as specified at
+   * instantiation. This does not include the initial, normal request.
+   *
+   * @return the number of speculative executions, always strictly positive.
+   */
+  @Beta
+  public int getMaxSpeculativeExecutions() {
+    return maxSpeculativeExecutions;
+  }
+
+  /**
+   * The delay between each speculative execution, as specified at instantiation. Zero means all
+   * executions are sent immediately, along with the original request.
+   *
+   * @return the delay in milliseconds, never negative.
+   */
+  @Beta
+  public long getConstantDelayMillis() {
+    return constantDelayMillis;
   }
 
   @Override

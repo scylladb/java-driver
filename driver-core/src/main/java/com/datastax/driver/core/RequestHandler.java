@@ -24,13 +24,13 @@ package com.datastax.driver.core;
 import com.codahale.metrics.Timer;
 import com.datastax.driver.core.exceptions.BootstrappingException;
 import com.datastax.driver.core.exceptions.BusyConnectionException;
-import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.OperationTimedOutException;
 import com.datastax.driver.core.exceptions.OverloadedException;
+import com.datastax.driver.core.exceptions.QueryValidationException;
 import com.datastax.driver.core.exceptions.ReadFailureException;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
 import com.datastax.driver.core.exceptions.ServerError;
@@ -44,7 +44,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
 import java.nio.ByteBuffer;
@@ -95,42 +97,6 @@ class RequestHandler {
   private final AtomicBoolean isDone = new AtomicBoolean();
   private final AtomicInteger executionIndex = new AtomicInteger();
 
-  private Iterator<Host> getReplicas(
-      String loggedKeyspace, Statement statement, Iterator<Host> fallback) {
-    ProtocolVersion protocolVersion = manager.cluster.manager.protocolVersion();
-    CodecRegistry codecRegistry = manager.cluster.manager.configuration.getCodecRegistry();
-    ByteBuffer partitionKey = statement.getRoutingKey(protocolVersion, codecRegistry);
-    String keyspace = statement.getKeyspace();
-    if (keyspace == null) {
-      keyspace = loggedKeyspace;
-    }
-
-    if (partitionKey == null || keyspace == null) {
-      return fallback;
-    }
-
-    Token.Factory partitioner = statement.getPartitioner();
-    String tableName = null;
-    ColumnDefinitions defs = null;
-    if (statement instanceof BoundStatement) {
-      defs = ((BoundStatement) statement).preparedStatement().getVariables();
-    } else if (statement instanceof PreparedStatement) {
-      defs = ((PreparedStatement) statement).getVariables();
-    }
-    if (defs != null && defs.size() > 0) {
-      tableName = defs.getTable(0);
-    }
-
-    final List<Host> replicas =
-        manager
-            .cluster
-            .getMetadata()
-            .getReplicasList(Metadata.quote(keyspace), tableName, partitioner, partitionKey);
-
-    // replicas are stored in the right order starting with the primary replica
-    return replicas.iterator();
-  }
-
   public RequestHandler(SessionManager manager, Callback callback, Statement statement) {
     this.id = Long.toString(System.identityHashCode(this));
     if (logger.isTraceEnabled()) logger.trace("[{}] {}", id, statement);
@@ -143,15 +109,6 @@ class RequestHandler {
     // If host is explicitly set on statement, bypass load balancing policy.
     if (statement.getHost() != null) {
       this.queryPlan = new QueryPlan(Iterators.singletonIterator(statement.getHost()));
-    } else if (statement.isLWT()) {
-      this.queryPlan =
-          new QueryPlan(
-              getReplicas(
-                  manager.poolsState.keyspace,
-                  statement,
-                  manager
-                      .loadBalancingPolicy()
-                      .newQueryPlan(manager.poolsState.keyspace, statement)));
     } else {
       this.queryPlan =
           new QueryPlan(
@@ -470,7 +427,7 @@ class RequestHandler {
               routingKey,
               statementKeyspace,
               statementTable);
-      GuavaCompatibility.INSTANCE.addCallback(
+      Futures.addCallback(
           connectionFuture,
           new FutureCallback<Connection>() {
             @Override
@@ -511,18 +468,15 @@ class RequestHandler {
 
             @Override
             public void onFailure(Throwable t) {
-              if (t instanceof BusyPoolException) {
-                logError(host.getEndPoint(), t);
-              } else {
-                logger.warn(
-                    "Unexpected error while querying {} - [{}]. Find next host to query.",
-                    host.getEndPoint(),
-                    t.toString());
-                logError(host.getEndPoint(), t);
+              if (t instanceof QueryValidationException) {
+                setFinalException(null, (QueryValidationException) t);
+                return;
               }
+              logError(host.getEndPoint(), t);
               findNextHostAndQuery();
             }
-          });
+          },
+          MoreExecutors.directExecutor());
       return true;
     }
 
@@ -858,7 +812,21 @@ class RequestHandler {
                     toPrepare.getQueryKeyspace(),
                     connection.endPoint);
 
-                write(connection, prepareAndRetry(toPrepare.getQueryString()));
+                try {
+                  write(connection, prepareAndRetry(toPrepare.getQueryString()));
+                } catch (ConnectionException e) {
+                  if (metricsEnabled()) metrics().getErrorMetrics().getConnectionErrors().inc();
+                  connection.release();
+                  logError(connection.endPoint, e);
+                  retry(false, null);
+                } catch (BusyConnectionException e) {
+                  connection.release(true);
+                  logError(connection.endPoint, e);
+                  retry(false, null);
+                } catch (RuntimeException e) {
+                  connection.release();
+                  throw e;
+                }
                 // we're done for now, the prepareAndRetry callback will handle the rest
                 return;
               case READ_FAILURE:
@@ -1049,9 +1017,24 @@ class RequestHandler {
 
       Host queriedHost = current;
 
+      HostConnectionPool pool = queriedHost == null ? null : manager.pools.get(queriedHost);
+      long configuredTimeoutMs =
+          connectionHandler != null
+              ? connectionHandler.readTimeoutMillis
+              : OperationTimedOutException.UNAVAILABLE;
+      int connInFlight = connection.inFlight.get();
+      int poolPendingBorrows =
+          pool != null ? pool.pendingBorrowCount.get() : OperationTimedOutException.UNAVAILABLE;
+      int poolTotalInFlight =
+          pool != null ? pool.totalInFlight.get() : OperationTimedOutException.UNAVAILABLE;
+
       OperationTimedOutException timeoutException =
           new OperationTimedOutException(
-              connection.endPoint, "Timed out waiting for server response");
+              connection.endPoint,
+              configuredTimeoutMs,
+              connInFlight,
+              poolPendingBorrows,
+              poolTotalInFlight);
 
       try {
         connection.release();

@@ -16,7 +16,9 @@
 package com.datastax.driver.core;
 
 import com.google.common.base.Function;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.util.concurrent.EventExecutor;
 import java.nio.ByteBuffer;
@@ -114,7 +116,7 @@ public abstract class AbstractSession implements Session {
     final CodecRegistry codecRegistry = getCluster().getConfiguration().getCodecRegistry();
     ListenableFuture<PreparedStatement> prepared =
         prepareAsync(statement.getQueryString(codecRegistry), statement.getOutgoingPayload());
-    return GuavaCompatibility.INSTANCE.transform(
+    return Futures.transform(
         prepared,
         new Function<PreparedStatement, PreparedStatement>() {
           @Override
@@ -134,7 +136,8 @@ public abstract class AbstractSession implements Session {
 
             return prepared;
           }
-        });
+        },
+        MoreExecutors.directExecutor());
   }
 
   /**

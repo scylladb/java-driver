@@ -31,7 +31,9 @@ import com.datastax.driver.core.utils.CassandraVersion;
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.nio.ByteBuffer;
 import java.util.Collection;
@@ -62,7 +64,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
       String keyspace = (String) objects[0];
       execute(
           String.format(
-              "create keyspace %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}",
+              "create keyspace %s WITH replication = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1}",
               keyspace),
           String.format("create table %s.foo(k int, v int, primary key (k, v))", keyspace));
       for (int v = 1; v <= 100; v++)
@@ -118,7 +120,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
   public void should_chain_query_on_async_session_init_with_same_executor(String keyspace)
       throws Exception {
     ListenableFuture<Integer> resultFuture =
-        connectAndQuery(keyspace, GuavaCompatibility.INSTANCE.sameThreadExecutor());
+        connectAndQuery(keyspace, MoreExecutors.directExecutor());
 
     Integer result = Uninterruptibles.getUninterruptibly(resultFuture);
     assertThat(result).isEqualTo(1);
@@ -140,7 +142,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
   @Test(groups = "short")
   public void should_propagate_error_to_chained_query_if_session_init_fails() throws Exception {
     ListenableFuture<Integer> resultFuture =
-        connectAndQuery("wrong_keyspace", GuavaCompatibility.INSTANCE.sameThreadExecutor());
+        connectAndQuery("wrong_keyspace", MoreExecutors.directExecutor());
 
     try {
       Uninterruptibles.getUninterruptibly(resultFuture);
@@ -157,7 +159,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
       ResultSetFuture f =
           session().executeAsync("select release_version from system.local where key='local'");
       ListenableFuture<Thread> f2 =
-          GuavaCompatibility.INSTANCE.transform(
+          Futures.transform(
               f,
               new Function<ResultSet, Thread>() {
                 @Override
@@ -165,7 +167,8 @@ public class AsyncQueryTest extends CCMTestsSupport {
                   session().execute("select release_version from system.local where key='local'");
                   return Thread.currentThread();
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
       if (isFailed(
           f2, IllegalStateException.class, "Detected a synchronous call on an I/O thread")) {
         return;
@@ -182,7 +185,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
       ResultSetFuture f =
           session.executeAsync("select release_version from system.local where key='local'");
       ListenableFuture<Thread> f2 =
-          GuavaCompatibility.INSTANCE.transform(
+          Futures.transform(
               f,
               new Function<ResultSet, Thread>() {
                 @Override
@@ -190,7 +193,8 @@ public class AsyncQueryTest extends CCMTestsSupport {
                   session.execute("select release_version from system.local where key='local'");
                   return Thread.currentThread();
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
       if (isFailed(
           f2, IllegalStateException.class, "Detected a synchronous call on an I/O thread")) {
         return;
@@ -208,7 +212,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
       statement.setFetchSize(10);
       ResultSetFuture f = session().executeAsync(statement);
       ListenableFuture<Thread> f2 =
-          GuavaCompatibility.INSTANCE.transform(
+          Futures.transform(
               f,
               new Function<ResultSet, Thread>() {
                 @Override
@@ -216,7 +220,8 @@ public class AsyncQueryTest extends CCMTestsSupport {
                   rs.all(); // Consume the whole result set
                   return Thread.currentThread();
                 }
-              });
+              },
+              MoreExecutors.directExecutor());
       if (isFailed(
           f2, IllegalStateException.class, "Detected a synchronous call on an I/O thread")) {
         return;
@@ -249,7 +254,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
   private ListenableFuture<Integer> connectAndQuery(String keyspace, Executor executor) {
     ListenableFuture<Session> sessionFuture = cluster().connectAsync(keyspace);
     ListenableFuture<ResultSet> queryFuture =
-        GuavaCompatibility.INSTANCE.transformAsync(
+        Futures.transformAsync(
             sessionFuture,
             new AsyncFunction<Session, ResultSet>() {
               @Override
@@ -258,7 +263,7 @@ public class AsyncQueryTest extends CCMTestsSupport {
               }
             },
             executor);
-    return GuavaCompatibility.INSTANCE.transform(
+    return Futures.transform(
         queryFuture,
         new Function<ResultSet, Integer>() {
           @Override

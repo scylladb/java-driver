@@ -25,7 +25,7 @@
 
     <groupId>com.scylladb</groupId>
     <artifactId>scylla-driver-parent</artifactId>
-    <version>3.11.5.7</version>
+    <version>3.11.5.19-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Java Driver for Scylla and Apache Cassandra</name>
     <description>
@@ -51,26 +51,26 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <cassandra.version>3.11.2</cassandra.version>
         <scylla.version />
-        <java.version>1.8</java.version>
+        <java.version>8</java.version>
         <log4j.version>1.2.17</log4j.version>
-        <slf4j.version>1.7.25</slf4j.version>
-        <slf4j-log4j12.version>1.7.25</slf4j-log4j12.version>
-        <guava.version>19.0</guava.version>
-        <netty.version>4.1.119.Final</netty.version>
+        <slf4j.version>1.7.36</slf4j.version>
+        <slf4j-log4j12.version>1.7.36</slf4j-log4j12.version>
+        <guava.version>33.3.1-jre</guava.version>
+        <netty.version>4.1.136.Final</netty.version>
         <netty-tcnative.artifact>netty-tcnative-boringssl-static</netty-tcnative.artifact>
         <netty-tcnative.version>2.0.70.Final</netty-tcnative.version>
-        <metrics.version>3.2.2</metrics.version>
-        <snappy.version>1.1.10.5</snappy.version>
-        <lz4.version>1.4.1</lz4.version>
-        <hdr.version>2.1.10</hdr.version>
-        <jackson.version>2.15.2</jackson.version>
-        <joda.version>2.9.9</joda.version>
+        <metrics.version>3.2.6</metrics.version>
+        <snappy.version>1.1.10.7</snappy.version>
+        <lz4.version>1.11.1</lz4.version>
+        <hdr.version>2.2.2</hdr.version>
+        <jackson.version>2.18.9</jackson.version>
+        <joda.version>2.12.7</joda.version>
         <jsr353-api.version>1.0</jsr353-api.version>
         <jsr353-ri.version>1.0.4</jsr353-ri.version>
         <!-- Note:  When upgrading either jnr-ffi or jnr-posix, ensure that the versions are compatible.
              JNR has broken compatibility between minor versions in the past. -->
         <jnr-ffi.version>2.2.16</jnr-ffi.version>
-        <jnr-posix.version>3.1.15</jnr-posix.version>
+        <jnr-posix.version>3.1.19</jnr-posix.version>
         <groovy.version>2.4.21</groovy.version>
         <jax-rs.version>2.0.1</jax-rs.version>
         <jersey.version>2.23.1</jersey.version>
@@ -79,16 +79,20 @@
         <!-- more recent versions of pax-exam require JDK7+ -->
         <pax-exam.version>3.6.0</pax-exam.version>
         <url.version>2.4.0</url.version>
-        <testng.version>6.8.8</testng.version>
-        <assertj.version>1.7.0</assertj.version>
-        <mockito.version>1.10.8</mockito.version>
-        <wiremock.version>2.25.0</wiremock.version>
+        <testng.version>6.14.3</testng.version>
+        <assertj.version>1.7.1</assertj.version>
+        <mockito.version>1.10.19</mockito.version>
+        <wiremock.version>2.27.2</wiremock.version>
         <commons-exec.version>1.3</commons-exec.version>
         <scassandra.version>1.1.2</scassandra.version>
         <logback.version>1.2.13</logback.version>
         <byteman.version>3.0.8</byteman.version>
-        <burningwave.tools.version>0.26.2</burningwave.tools.version>
-        <surefire.version>3.0.0-M6</surefire.version>
+        <burningwave.tools.version>0.27.2</burningwave.tools.version>
+        <!-- 1.5.x is the last minor line targeting Java 8. DefaultDriverConfigReporterTest asserts
+             on this validator's exact ValidationMessage wording, so a bump may need those strings
+             updated. -->
+        <json-schema-validator.version>1.5.9</json-schema-validator.version>
+        <surefire.version>3.5.4</surefire.version>
         <ipprefix>127.0.1.</ipprefix>
         <!-- defaults below are overridden by profiles and/or submodules -->
         <test.groups>unit</test.groups>
@@ -102,11 +106,20 @@
              regular netty-tcnative.
         <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
         -->
+        <release.autopublish>false</release.autopublish>
     </properties>
 
     <dependencyManagement>
 
         <dependencies>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
 
             <dependency>
                 <groupId>com.scylladb</groupId>
@@ -183,7 +196,7 @@
             </dependency>
 
             <dependency>
-                <groupId>org.lz4</groupId>
+                <groupId>at.yawk.lz4</groupId>
                 <artifactId>lz4-java</artifactId>
                 <version>${lz4.version}</version>
             </dependency>
@@ -198,30 +211,6 @@
                 <groupId>org.hdrhistogram</groupId>
                 <artifactId>HdrHistogram</artifactId>
                 <version>${hdr.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-core</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-databind</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.fasterxml.jackson.core</groupId>
-                <artifactId>jackson-annotations</artifactId>
-                <version>${jackson.version}</version>
-            </dependency>
-
-            <dependency>
-                <groupId>com.fasterxml.jackson.dataformat</groupId>
-                <artifactId>jackson-dataformat-yaml</artifactId>
-                <version>${jackson.version}</version>
             </dependency>
 
             <dependency>
@@ -396,7 +385,7 @@
             <dependency>
                 <groupId>org.ow2.asm</groupId>
                 <artifactId>asm</artifactId>
-                <version>5.0.3</version>
+                <version>9.7.1</version>
             </dependency>
 
             <dependency>
@@ -411,6 +400,18 @@
                 <version>${burningwave.tools.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>org.awaitility</groupId>
+                <artifactId>awaitility</artifactId>
+                <version>4.3.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.networknt</groupId>
+                <artifactId>json-schema-validator</artifactId>
+                <version>${json-schema-validator.version}</version>
+            </dependency>
+
         </dependencies>
 
     </dependencyManagement>
@@ -422,7 +423,7 @@
             <extension>
                 <groupId>kr.motd.maven</groupId>
                 <artifactId>os-maven-plugin</artifactId>
-                <version>1.4.1.Final</version>
+                <version>1.7.1</version>
             </extension>
 
         </extensions>
@@ -437,38 +438,36 @@
 
                 <plugin>
                     <artifactId>maven-clean-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.5.0</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-resources-plugin</artifactId>
-                    <version>3.0.2</version>
+                    <version>3.3.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-site-plugin</artifactId>
-                    <version>3.6</version>
+                    <version>3.21.0</version>
                 </plugin>
 
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>build-helper-maven-plugin</artifactId>
-                    <!-- last version compatible with Java 6 -->
-                    <version>1.9.1</version>
+                    <!-- last version compatible with Java 8 -->
+                    <version>3.6.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>1.4.1</version>
+                    <version>3.6.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.6.1</version>
+                    <version>3.14.0</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
-                        <optimize>true</optimize>
+                        <release>${java.version}</release>
                         <showDeprecation>true</showDeprecation>
                         <showWarnings>true</showWarnings>
                         <!--
@@ -514,7 +513,7 @@
 
                 <plugin>
                     <artifactId>maven-source-plugin</artifactId>
-                    <version>3.0.1</version>
+                    <version>3.3.1</version>
                     <executions>
                         <execution>
                             <id>attach-sources</id>
@@ -528,20 +527,22 @@
 
                 <plugin>
                     <artifactId>maven-javadoc-plugin</artifactId>
-                    <version>2.10.4</version>
+                    <version>3.11.3</version>
                     <inherited>true</inherited>
                     <configuration>
                         <quiet>true</quiet>
                         <verbose>false</verbose>
-                        <additionalparam>${javadoc.opts}</additionalparam>
+                        <additionalJOptions>
+                            <additionalJOption>${javadoc.opts}</additionalJOption>
+                        </additionalJOptions>
+                        <detectJavaApiLink>true</detectJavaApiLink>
                         <links>
-                            <link>https://docs.oracle.com/javase/8/docs/api/</link>
-                            <link>https://google.github.io/guava/releases/19.0/api/docs/</link>
+                            <link>https://google.github.io/guava/releases/33.3.1-jre/api/docs/</link>
                             <link>http://netty.io/4.0/api/</link>
                             <link>http://www.joda.org/joda-time/apidocs/</link>
                             <link>http://fasterxml.github.io/jackson-core/javadoc/2.8/</link>
                             <link>http://fasterxml.github.io/jackson-databind/javadoc/2.7/</link>
-                            <link>https://javaee.github.io/javaee-spec/javadocs/</link>
+                            <link>https://jakarta.ee/specifications/platform/8/apidocs/</link>
                         </links>
                         <!-- optional dependencies from other modules (must be explicitly declared here in order to be correctly resolved) -->
                         <additionalDependencies>
@@ -551,7 +552,7 @@
                                 <version>${snappy.version}</version>
                             </additionalDependency>
                             <additionalDependency>
-                                <groupId>org.lz4</groupId>
+                                <groupId>at.yawk.lz4</groupId>
                                 <artifactId>lz4-java</artifactId>
                                 <version>${lz4.version}</version>
                             </additionalDependency>
@@ -599,15 +600,15 @@
 
                 <plugin>
                     <artifactId>maven-jar-plugin</artifactId>
-                    <version>3.0.2</version>
+                    <version>3.4.2</version>
                 </plugin>
 
                 <plugin>
                     <groupId>org.apache.felix</groupId>
                     <artifactId>maven-bundle-plugin</artifactId>
                     <extensions>true</extensions>
-                    <!-- last version compatible with Java 6 -->
-                    <version>2.5.4</version>
+                    <!-- last version compatible with Java 8 -->
+                    <version>5.1.9</version>
                     <configuration>
                         <instructions>
                             <Bundle-Version>${project.version}</Bundle-Version>
@@ -623,46 +624,44 @@
 
                 <plugin>
                     <artifactId>maven-shade-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.6.0</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-release-plugin</artifactId>
-                    <version>2.5.3</version>
+                    <version>3.1.1</version>
                     <configuration>
                         <tagNameFormat>@{project.version}</tagNameFormat>
                         <autoVersionSubmodules>true</autoVersionSubmodules>
-                        <!-- useReleaseProfile>false</useReleaseProfile>
                         <releaseProfiles>release</releaseProfiles>
-                        <goals>deploy</goals-->
+                        <useReleaseProfile>false</useReleaseProfile>
                         <localCheckout>true</localCheckout>
-                        <deployAtEnd>true</deployAtEnd>
                         <pushChanges>${pushChanges}</pushChanges>
                         <mavenExecutorId>forked-path</mavenExecutorId>
-                        <arguments>-Dgpg.passphrase=${gpg.passphrase}</arguments>
+                        <arguments>-Drelease.autopublish=${release.autopublish}</arguments>
                     </configuration>
                     <dependencies>
                         <dependency>
                             <groupId>org.apache.maven.scm</groupId>
                             <artifactId>maven-scm-provider-gitexe</artifactId>
-                            <version>1.9.5</version>
+                            <version>2.1.0</version>
                         </dependency>
                     </dependencies>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-assembly-plugin</artifactId>
-                    <version>3.0.0</version>
+                    <version>3.7.1</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-install-plugin</artifactId>
-                    <version>2.5.2</version>
+                    <version>3.1.4</version>
                 </plugin>
 
                 <plugin>
                     <artifactId>maven-deploy-plugin</artifactId>
-                    <version>2.8.2</version>
+                    <version>3.1.4</version>
                     <executions>
                         <execution>
                             <id>default-deploy</id>
@@ -717,7 +716,7 @@
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>animal-sniffer-maven-plugin</artifactId>
-                    <version>1.18</version>
+                    <version>1.24</version>
                     <executions>
                         <execution>
                             <id>check-jdk8</id>
@@ -775,8 +774,7 @@
 
                 <plugin>
                     <artifactId>maven-failsafe-plugin</artifactId>
-                    <!-- do not upgrade until https://issues.apache.org/jira/browse/SUREFIRE-1302 is fixed -->
-                    <version>2.18</version>
+                    <version>3.5.4</version>
                     <configuration>
                         <groups>${test.groups}</groups>
                         <useFile>false</useFile>
@@ -810,39 +808,6 @@
                             </goals>
                         </execution>
                     </executions>
-                </plugin>
-
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-gpg-plugin</artifactId>
-                    <version>1.5</version>
-                    <executions>
-                        <execution>
-                            <id>sign-artifacts</id>
-                            <phase>verify</phase>
-                            <goals>
-                                <goal>sign</goal>
-                            </goals>
-                            <configuration>
-                                <gpgArguments>
-                                    <arg>--pinentry-mode</arg>
-                                    <arg>loopback</arg>
-                                </gpgArguments>
-                            </configuration>
-                        </execution>
-                    </executions>
-                </plugin>
-
-                <plugin>
-                    <groupId>org.sonatype.plugins</groupId>
-                    <artifactId>nexus-staging-maven-plugin</artifactId>
-                    <version>1.6.8</version>
-                    <extensions>true</extensions>
-                    <configuration>
-                        <serverId>ossrh</serverId>
-                        <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                        <autoReleaseAfterClose>true</autoReleaseAfterClose>
-                    </configuration>
                 </plugin>
 
                 <plugin>
@@ -897,39 +862,28 @@
                     </execution>
                 </executions>
             </plugin>
-
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.8.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <excludeArtifacts>scylla-driver-tests-parent,scylla-driver-tests-osgi,scylla-driver-tests-osgi-common,scylla-driver-tests-osgi-shaded,scylla-driver-tests-shading,scylla-driver-tests-shading-shaded,scylla-driver-tests-shading-unshaded,scylla-driver-tests-osgi-unshaded,scylla-driver-tests-stress,scylla-driver-dist,scylla-driver-examples</excludeArtifacts>
+                    <autoPublish>${release.autopublish}</autoPublish>
+                    <waitUntil>validated</waitUntil>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>3.2.8</version>
+            </plugin>
         </plugins>
 
     </build>
 
     <profiles>
-
-        <profile>
-            <id>release-sign-artifacts</id>
-            <activation>
-                <property>
-                    <name>performRelease</name>
-                    <value>true</value>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-gpg-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>sign-artifacts</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sign</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
 
         <profile>
             <id>short</id>
@@ -1048,17 +1002,6 @@
                             </execution>
                         </executions>
                     </plugin>
-                    <plugin>
-                        <groupId>org.sonatype.plugins</groupId>
-                        <artifactId>nexus-staging-maven-plugin</artifactId>
-                        <extensions>true</extensions>
-                        <configuration>
-                            <serverId>ossrh</serverId>
-                            <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                            <autoReleaseAfterClose>true</autoReleaseAfterClose>
-                            <!-- skipLocalStaging>true</skipLocalStaging -->
-                        </configuration>
-                    </plugin>
                 </plugins>
             </build>
         </profile>
@@ -1124,12 +1067,12 @@
 
     <distributionManagement>
         <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>central</id>
+            <url>https://central.sonatype.com/repository/maven-snapshots</url>
         </snapshotRepository>
         <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+            <id>central</id>
+            <url>https://central.sonatype.com/repository/maven-releases</url>
         </repository>
     </distributionManagement>
 
@@ -1146,7 +1089,7 @@
         <connection>scm:git:https://github.com/scylladb/java-driver</connection>
         <developerConnection>scm:git:https://github.com/scylladb/java-driver</developerConnection>
         <url>https://github.com/scylladb/java-driver</url>
-        <tag>3.11.5.7</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <developers>

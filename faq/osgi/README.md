@@ -11,22 +11,20 @@ environment; please refer to our [OSGi examples repository].
 
 ### How to override Guava's version?
 
-The driver is compatible and tested with all versions of Guava in the range
-`[16.0.1,26.0-jre)`.
+The driver is built and tested with the Guava version declared in the root `pom.xml`
+(`33.3.1-jre` at the time of writing). Overriding that dependency to an older Guava
+release is not supported.
 
-If using Maven, you can force a more specific version by re-declaring
-the Guava dependency in your project, e.g.:
+If you need to align with a newer release in your application, re-declare the same
+major line and update your manifest accordingly, for example:
 
     <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>19.0</version>
+        <version>33.3.1-jre</version>
     </dependency>
 
-Make sure that your project's manifest is importing the right version
-of Guava's packages, e.g. for 19.0:
-
-    Import-Package: com.google.common.base;version="[19.0,20)"
+    Import-Package: com.google.common.base;version="[33.0,34)"
 
 
 ### How to enable compression?

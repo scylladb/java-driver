@@ -138,6 +138,13 @@ local datacenter and rack. In general, providing the datacenter and rack name ex
 Hosts belonging to the local datacenter are at distance `LOCAL`, and appear first in query plans (in a round-robin
 fashion) with hosts in the local rack having precedence over nodes in remote racks in the local datacenter.
 
+**LWT (Lightweight Transaction) Behavior:** For LWT queries (`Statement.isLWT()` returns true), the policy does not 
+prioritize the local rack. Instead, it round-robins evenly across all hosts in the local datacenter first, then falls 
+back to remote datacenters (if enabled). This design avoids creating rack-level hotspots during Paxos consensus phases. 
+LWT queries involve multiple rounds of coordination between replicas, and concentrating these operations on a single 
+rack can create contention that degrades performance. By distributing LWT load across the entire local datacenter, 
+the driver achieves better throughput while maintaining low latency through datacenter locality.
+
 For example, if there are any UP hosts in the local rack the policy will query those nodes in round-robin fashion:
 * query 1: host1 *(local DC, local rack)*, host2 *(local DC, local rack)*, host3 *(local DC, local rack)*
 * query 2: host2 *(local DC, local rack)*, host3 *(local DC, local rack)*, host1 *(local DC, local rack)*

@@ -15,10 +15,10 @@
  */
 package com.datastax.driver.core.utils;
 
-import com.datastax.driver.core.GuavaCompatibility;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 
 /** Helpers to work with Guava's {@link ListenableFuture}. */
@@ -51,7 +51,7 @@ public class MoreFutures {
    */
   public static <T> void propagateFuture(
       final SettableFuture<T> settable, ListenableFuture<T> future) {
-    GuavaCompatibility.INSTANCE.addCallback(
+    Futures.addCallback(
         future,
         new FutureCallback<T>() {
           @Override
@@ -63,6 +63,7 @@ public class MoreFutures {
           public void onFailure(Throwable t) {
             settable.setException(t);
           }
-        });
+        },
+        MoreExecutors.directExecutor());
   }
 }

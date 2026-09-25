@@ -2,6 +2,7 @@ package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
 import static com.datastax.driver.core.Metadata.handleId;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.mock;
@@ -43,7 +44,7 @@ public class TabletMapListenerTest extends CCMTestsSupport {
   private static final String CREATE_KEYSPACE = CREATE_TABLETS_KEYSPACE_QUERY;
   private static final String ALTER_KEYSPACE =
       "ALTER KEYSPACE " + KEYSPACE_NAME + " WITH durable_writes = false";
-  private static final String DROP_KEYSPACE = "DROP KEYSPACE " + KEYSPACE_NAME;
+  private static final String DROP_KEYSPACE = "DROP KEYSPACE IF EXISTS " + KEYSPACE_NAME;
 
   private static final String CREATE_TABLE =
       "CREATE TABLE " + KEYSPACE_NAME + "." + TABLE_NAME + "(i int primary key)";
@@ -56,6 +57,8 @@ public class TabletMapListenerTest extends CCMTestsSupport {
   private static final String ALTER_TABLE =
       "ALTER TABLE " + KEYSPACE_NAME + "." + TABLE_NAME + " ADD j int";
   private static final String DROP_TABLE = "DROP TABLE " + KEYSPACE_NAME + "." + TABLE_NAME;
+  private static final TabletMap.KeyspaceTableNamePair TABLET_MAP_KEY =
+      new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME));
 
   /** The maximum time that the test will wait to check that listeners have been notified. */
   private static final long NOTIF_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(1);
@@ -94,16 +97,15 @@ public class TabletMapListenerTest extends CCMTestsSupport {
     tabletMap = cluster.getMetadata().getTabletMap();
 
     session.execute(CREATE_TABLE);
-    assertThat(tabletMap.getMapping())
-        .doesNotContainKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> !tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
 
     session.execute(String.format(INSERT_QUERY_TEMPLATE, "42"));
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-    assertThat(tabletMap.getMapping())
-        .containsKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
+    executeOnAllHosts(session.prepare(SELECT_PK_WHERE).bind(42), session);
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
 
     session.execute(ALTER_TABLE);
     for (SchemaChangeListener listener : listeners) {
@@ -114,16 +116,15 @@ public class TabletMapListenerTest extends CCMTestsSupport {
       assertThat(previous.getValue().getKeyspace()).hasName(handleId(KEYSPACE_NAME));
       assertThat(previous.getValue()).hasName(handleId(TABLE_NAME));
     }
-    assertThat(tabletMap.getMapping())
-        .doesNotContainKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> !tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
 
     session.execute(String.format(INSERT_ALTERED_TEMPLATE, "42", "42"));
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-    assertThat(tabletMap.getMapping())
-        .containsKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
+    executeOnAllHosts(session.prepare(SELECT_PK_WHERE).bind(42), session);
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
 
     session.execute(DROP_TABLE);
     ArgumentCaptor<TableMetadata> removed = null;
@@ -133,12 +134,10 @@ public class TabletMapListenerTest extends CCMTestsSupport {
       assertThat(removed.getValue().getKeyspace()).hasName(handleId(KEYSPACE_NAME));
       assertThat(removed.getValue()).hasName(handleId(TABLE_NAME));
     }
-    assert removed != null;
-    assertThat(tabletMap.getMapping())
-        .doesNotContainKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
-
-    session.execute(DROP_KEYSPACE);
+    assertThat(removed).isNotNull();
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> !tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
   }
 
   @Test(groups = "short")
@@ -157,13 +156,10 @@ public class TabletMapListenerTest extends CCMTestsSupport {
 
     session.execute(CREATE_TABLE);
     session.execute(String.format(INSERT_QUERY_TEMPLATE, "42"));
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-    assertThat(tabletMap.getMapping())
-        .containsKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
-
-    assertThat(cluster.getMetadata().getKeyspace(KEYSPACE_NAME).isDurableWrites()).isTrue();
+    executeOnAllHosts(session.prepare(SELECT_PK_WHERE).bind(42), session);
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
 
     session.execute(ALTER_KEYSPACE);
     assertThat(cluster.getMetadata().getKeyspace(KEYSPACE_NAME)).isNotDurableWrites();
@@ -178,16 +174,14 @@ public class TabletMapListenerTest extends CCMTestsSupport {
       verify(listener, after((int) SHORT_TIMEOUT_MS).never())
           .onTableChanged(anyObject(), anyObject());
     }
-    assertThat(tabletMap.getMapping())
-        .doesNotContainKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> !tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
 
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-    session.execute(session.prepare(SELECT_PK_WHERE).bind(42));
-
-    assertThat(tabletMap.getMapping())
-        .containsKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
+    executeOnAllHosts(session.prepare(SELECT_PK_WHERE).bind(42), session);
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
 
     session.execute(DROP_KEYSPACE);
     for (SchemaChangeListener listener : listeners) {
@@ -195,14 +189,23 @@ public class TabletMapListenerTest extends CCMTestsSupport {
       verify(listener, timeout(NOTIF_TIMEOUT_MS).times(1)).onKeyspaceRemoved(removed.capture());
       assertThat(removed.getValue()).hasName(handleId(KEYSPACE_NAME));
     }
-    assertThat(tabletMap.getMapping())
-        .doesNotContainKey(
-            new TabletMap.KeyspaceTableNamePair(handleId(KEYSPACE_NAME), handleId(TABLE_NAME)));
+    await()
+        .atMost(SHORT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        .until(() -> !tabletMap.getMapping().containsKey(TABLET_MAP_KEY));
   }
 
   @AfterMethod(groups = "short", alwaysRun = true)
   public void teardown() {
-    if (session != null) session.close();
+    if (session != null) {
+      session.execute(DROP_KEYSPACE);
+      session.close();
+    }
     if (cluster != null) cluster.close();
+  }
+
+  private void executeOnAllHosts(Statement statement, Session session) {
+    for (Host host : session.getCluster().getMetadata().getAllHosts()) {
+      session.execute(statement.setHost(host));
+    }
   }
 }

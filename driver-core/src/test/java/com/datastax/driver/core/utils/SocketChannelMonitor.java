@@ -26,6 +26,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Collection;
@@ -186,6 +187,31 @@ public class SocketChannelMonitor implements Runnable, Closeable {
                     return input.isOpen()
                         && input.remoteAddress() != null
                         && addresses.contains(input.remoteAddress());
+                  }
+                }));
+    Collections.sort(channels, BY_REMOTE_ADDRESS);
+    return channels;
+  }
+
+  public Collection<SocketChannel> openChannelsPortAgnostic(InetAddress... addresses) {
+    return openChannelsPortAgnostic(Arrays.asList(addresses));
+  }
+
+  /**
+   * @param addresses The InetAddresses to include. The port is ignored in this case.
+   * @return Open channels matching the given InetAddresses.
+   */
+  public Collection<SocketChannel> openChannelsPortAgnostic(
+      final Collection<InetAddress> addresses) {
+    List<SocketChannel> channels =
+        Lists.newArrayList(
+            matchingChannels(
+                new Predicate<SocketChannel>() {
+                  @Override
+                  public boolean apply(SocketChannel input) {
+                    return input.isOpen()
+                        && input.remoteAddress() != null
+                        && addresses.contains(input.remoteAddress().getAddress());
                   }
                 }));
     Collections.sort(channels, BY_REMOTE_ADDRESS);
