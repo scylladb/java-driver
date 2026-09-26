@@ -67,7 +67,7 @@ See the [upgrade guide](upgrade_guide/) for details.
 * [Changelog]
 * [FAQ]
 
-[API docs]: https://java-driver.docs.scylladb.com/scylla-4.17.0.x/api/overview-summary.html
+[API docs]: https://java-driver.docs.scylladb.com/stable/api/index.html
 [Scylla University]: https://university.scylladb.com
 [Changelog]: changelog/
 [FAQ]: faq/
