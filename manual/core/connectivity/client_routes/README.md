@@ -36,6 +36,7 @@ endpoints rather than direct IP addresses, and the driver's built-in client rout
 the address translation automatically. It works regardless of which provider service fronts the
 private endpoint — AWS PrivateLink (PL), Azure Private Link, or GCP Private Service Connect (PSC),
 collectively a private service connection — and equally for ScyllaDB Cloud and similar technologies.
+The feature is also written as `client_routes` or `clientroutes`.
 
 Client routes can be configured either **programmatically** or via **HOCON configuration files**.
 Note that `OptionsMap`-based configuration does not support client routes — use the programmatic
