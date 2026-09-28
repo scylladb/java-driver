@@ -135,9 +135,9 @@ the [upgrade guide](/upgrade_guide/).
 
 ## Migrating to Java Driver 4.x
 
-The [4.x migration guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/) covers the
-API changes in detail. The first thing to change is the dependency: the artifacts are renamed, while
-the `com.scylladb` group id stays the same.
+The [4.x migration guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/)
+covers the API changes in detail. The first thing to change is the dependency: the artifacts are
+renamed, while the `com.scylladb` group id stays the same.
 
 | Driver 3.x | Driver 4.x |
 |---|---|
