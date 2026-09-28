@@ -194,7 +194,8 @@ def setup(app):
     current_slug = os.getenv("SPHINX_MULTIVERSION_NAME", "stable")
     replacements = {
         r'docs.datastax.com/en/drivers/java\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/api/",
-        r'java-driver.docs.scylladb.com\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/",
+        # Pin only version-slug links; /stable/ and unversioned links are deliberate
+        r'java-driver\.docs\.scylladb\.com/scylla-[\w.-]+/': "java-driver.docs.scylladb.com/" + current_slug + "/",
         r'github.com\/apache\/cassandra-java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
         r'github.com\/apache\/cassandra-java-driver\/tree\/4.x\/': "github.com/scylladb/java-driver/tree/scylla-4.x/",
         r'github.com\/datastax\/java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
