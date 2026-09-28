@@ -80,10 +80,8 @@ notfound_urls_prefix = ''
 # -- Options for markdown extension
 scylladb_markdown_enable = True
 scylladb_markdown_recommonmark_versions = [
-    'scylla-3.11.5.x',
     'scylla-4.18.1.x',
-    'scylla-4.19.0.x',
-    'scylla-4.19.2.x'
+    'scylla-4.19.0.x'
 ]
 suppress_warnings = ["ref.any", "myst.header","myst.xref_missing","autosectionlabel"]
 
@@ -156,6 +154,34 @@ def replace_relative_links(app, docname, source):
         result = re.sub(key, app.config.replacements[key], result)
     source[0] = result
 
+# MyST resolves links against the staged tree, where every README.md is
+# index.md, and turns `../x/` into a dead `#../x/` fragment (#1132). Point
+# directory and README.md links at index.md; the sources stay GitHub-correct.
+MYST_INLINE_LINK = re.compile(r'(\]\()([^\s)#]+)(#[^\s)]*)?(?=[\s)])')
+MYST_LINK_DEFINITION = re.compile(r'^([ \t]*\[[^\]]+\]:[ \t]*)([^\s#]+)(#\S*)?', re.MULTILINE)
+
+def myst_link_target(target, docdir):
+    if re.match(r'[a-zA-Z][\w+.-]*:|/', target):
+        return target
+    if target.endswith('README.md'):
+        return target[:-len('README.md')] + 'index.md'
+    last = target.rsplit('/', 1)[-1]
+    if last and last not in ('.', '..') and '.' in last:
+        return target
+    directory = target.rstrip('/')
+    index = 'index.rst' if os.path.exists(os.path.join(docdir, directory, 'index.rst')) else 'index.md'
+    return directory + '/' + index
+
+def rewrite_links_for_myst(app, docname, source):
+    if os.getenv("SPHINX_MULTIVERSION_NAME", "stable") in scylladb_markdown_recommonmark_versions:
+        return
+    path = str(app.env.doc2path(docname))
+    if not path.endswith('.md'):
+        return
+    docdir = os.path.dirname(path)
+    link = lambda m: m.group(1) + myst_link_target(m.group(2), docdir) + (m.group(3) or '')
+    source[0] = MYST_LINK_DEFINITION.sub(link, MYST_INLINE_LINK.sub(link, source[0]))
+
 def redirect_api_page_to_javadoc(app, exception):
     version_name = os.getenv("SPHINX_MULTIVERSION_NAME", "")
     version_name = "/" + version_name if version_name else ""
@@ -176,4 +202,5 @@ def setup(app):
     }
     app.add_config_value('replacements', replacements, True)
     app.connect('source-read', replace_relative_links)
+    app.connect('source-read', rewrite_links_for_myst)
     app.connect('build-finished', redirect_api_page_to_javadoc)
