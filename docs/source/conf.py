@@ -80,10 +80,8 @@ notfound_urls_prefix = ''
 # -- Options for markdown extension
 scylladb_markdown_enable = True
 scylladb_markdown_recommonmark_versions = [
-    'scylla-3.11.5.x',
     'scylla-4.18.1.x',
-    'scylla-4.19.0.x',
-    'scylla-4.19.2.x'
+    'scylla-4.19.0.x'
 ]
 suppress_warnings = ["ref.any", "myst.header","myst.xref_missing","autosectionlabel"]
 
