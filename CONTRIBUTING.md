@@ -71,6 +71,10 @@ If you want to contribute but don't have a specific issue in mind, it's best to 
 
 ## Editor configuration
 
+For IntelliJ IDEA users, a suite of run configurations is bundled with the project (`.run` directory).
+The run configurations should appear automatically in Run > Run... after loading the project in IntelliJ. They provide
+a convenient way to build and test the project.
+
 We use IntelliJ IDEA with the default formatting options, with one exception: check
 "Enable formatter markers in comments" in Preferences > Editor > Code Style.
 
