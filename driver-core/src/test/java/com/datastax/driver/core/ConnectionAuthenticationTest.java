@@ -22,6 +22,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.fail;
 
 import com.datastax.driver.core.exceptions.AuthenticationException;
@@ -33,6 +34,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
 import java.lang.reflect.Field;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -114,6 +116,32 @@ public class ConnectionAuthenticationTest {
     }
 
     verify(factory, times(2)).open(any(Host.class), eq(true));
+  }
+
+  @Test(groups = "unit")
+  public void should_ignore_authentication_overload_when_repreparing_on_recovered_host()
+      throws Exception {
+    Cluster cluster =
+        Cluster.builder()
+            .addContactPoint("127.0.0.1")
+            .withoutMetrics()
+            .withDriverConfigReporting(false)
+            .build();
+    Cluster.Manager manager = cluster.manager;
+    manager.preparedQueries = new ConcurrentHashMap<MD5Digest, PreparedStatement>();
+    PreparedStatement statement = mock(PreparedStatement.class);
+    when(statement.getQueryString()).thenReturn("SELECT * FROM system.local");
+    manager.preparedQueries.put(MD5Digest.wrap(new byte[] {1}), statement);
+
+    Host host = mock(Host.class);
+    Connection.Factory factory = mock(Connection.Factory.class);
+    manager.connectionFactory = factory;
+    doThrow(new OverloadedException(null, "Too many authentication requests"))
+        .when(factory)
+        .open(host);
+
+    assertThat(manager.prepareAllQueries(host, null)).isNull();
+    verify(factory).open(host);
   }
 
   private static TestConnection newConnection(EndPoint endPoint) throws Exception {
