@@ -30,6 +30,7 @@ import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.BusyConnectionException;
 import com.datastax.driver.core.exceptions.BusyPoolException;
 import com.datastax.driver.core.exceptions.ConnectionException;
+import com.datastax.driver.core.exceptions.OverloadedException;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
 import com.google.common.annotations.VisibleForTesting;
@@ -865,7 +866,7 @@ class HostConnectionPool implements Connection.Owner {
       // Skip the open but ignore otherwise
       open[shardId].decrementAndGet();
       return ConnectionResult.FAILED;
-    } catch (ConnectionException e) {
+    } catch (ConnectionException | OverloadedException e) {
       open[shardId].decrementAndGet();
       logger.debug("Connection error to {} while creating additional connection", host);
       return ConnectionResult.FAILED;

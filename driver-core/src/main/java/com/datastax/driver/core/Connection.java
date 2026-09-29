@@ -702,30 +702,37 @@ class Connection {
     try {
       Future authResponseFuture = write(creds);
       return Futures.transformAsync(
-          authResponseFuture,
-          new AsyncFunction<Message.Response, Void>() {
-            @Override
-            public ListenableFuture<Void> apply(Message.Response authResponse) throws Exception {
-              switch (authResponse.type) {
-                case READY:
-                  return checkClusterName(protocolVersion, executor);
-                case ERROR:
-                  incrementAuthErrorMetric();
-                  throw new AuthenticationException(
-                      endPoint, ((Responses.Error) authResponse).message);
-                default:
-                  throw new TransportException(
-                      endPoint,
-                      String.format(
-                          "Unexpected %s response message from server to a CREDENTIALS message",
-                          authResponse.type));
-              }
-            }
-          },
-          executor);
+          authResponseFuture, onV1AuthResponse(protocolVersion, executor), executor);
     } catch (Exception e) {
       return Futures.immediateFailedFuture(e);
     }
+  }
+
+  @VisibleForTesting
+  AsyncFunction<Message.Response, Void> onV1AuthResponse(
+      final ProtocolVersion protocolVersion, final Executor executor) {
+    return new AsyncFunction<Message.Response, Void>() {
+      @Override
+      public ListenableFuture<Void> apply(Message.Response authResponse) throws Exception {
+        switch (authResponse.type) {
+          case READY:
+            return checkClusterName(protocolVersion, executor);
+          case ERROR:
+            Responses.Error error = (Responses.Error) authResponse;
+            if (error.code == ExceptionCode.OVERLOADED) {
+              throw error.asException(endPoint);
+            }
+            incrementAuthErrorMetric();
+            throw new AuthenticationException(endPoint, error.message);
+          default:
+            throw new TransportException(
+                endPoint,
+                String.format(
+                    "Unexpected %s response message from server to a CREDENTIALS message",
+                    authResponse.type));
+        }
+      }
+    };
   }
 
   private ListenableFuture<Void> authenticateV2(
@@ -744,7 +751,8 @@ class Connection {
     }
   }
 
-  private AsyncFunction<Message.Response, Void> onV2AuthResponse(
+  @VisibleForTesting
+  AsyncFunction<Message.Response, Void> onV2AuthResponse(
       final Authenticator authenticator,
       final ProtocolVersion protocolVersion,
       final Executor executor) {
@@ -774,11 +782,15 @@ class Connection {
                   executor);
             }
           case ERROR:
+            Responses.Error error = (Responses.Error) authResponse;
+            if (error.code == ExceptionCode.OVERLOADED) {
+              throw error.asException(endPoint);
+            }
             // This is not very nice, but we're trying to identify if we
             // attempted v2 auth against a server which only supports v1
             // The AIOOBE indicates that the server didn't recognise the
             // initial AuthResponse message
-            String message = ((Responses.Error) authResponse).message;
+            String message = error.message;
             if (message.startsWith("java.lang.ArrayIndexOutOfBoundsException: 15"))
               message =
                   String.format(

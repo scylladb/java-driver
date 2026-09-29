@@ -29,6 +29,7 @@ import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.exceptions.OverloadedException;
 import com.datastax.driver.core.exceptions.ServerError;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.utils.MoreFutures;
@@ -262,7 +263,7 @@ class ControlConnection implements Connection.Owner {
         if (!host.convictionPolicy.canReconnectNow()) continue;
         try {
           return tryConnect(host, isInitialConnection);
-        } catch (ConnectionException e) {
+        } catch (ConnectionException | OverloadedException e) {
           errors = logError(host, e, errors, iter);
           if (isInitialConnection) {
             // Mark the host down right away so that we don't try it again during the initialization

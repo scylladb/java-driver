@@ -6,6 +6,7 @@
 -->
 
 ### 3.11.5
+- [bug] DRIVER-1121: Preserve OVERLOADED errors during authentication
 - [improvement] JAVA-3114: Shade io.dropwizard.metrics:metrics-core in shaded driver
 - [improvement] JAVA-3115: SchemaChangeListener#onKeyspaceChanged can fire when keyspace has not changed if using SimpleStrategy replication
 
