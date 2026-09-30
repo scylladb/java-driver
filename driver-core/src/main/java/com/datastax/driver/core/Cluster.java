@@ -28,6 +28,7 @@ import com.datastax.driver.core.exceptions.BusyConnectionException;
 import com.datastax.driver.core.exceptions.ConnectionException;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
+import com.datastax.driver.core.exceptions.OverloadedException;
 import com.datastax.driver.core.exceptions.SyntaxError;
 import com.datastax.driver.core.exceptions.UnsupportedProtocolVersionException;
 import com.datastax.driver.core.policies.AddressTranslator;
@@ -2551,7 +2552,8 @@ public class Cluster implements Closeable {
      * @return a connection that the rest of the initialization process can use (it will be made
      *     part of a connection pool). Can be reusedConnection, or one that was open in the method.
      */
-    private Connection prepareAllQueries(Host host, Connection reusedConnection)
+    @VisibleForTesting
+    Connection prepareAllQueries(Host host, Connection reusedConnection)
         throws InterruptedException, UnsupportedProtocolVersionException,
             ClusterNameMismatchException {
       if (preparedQueries.isEmpty()) return reusedConnection;
@@ -2611,7 +2613,7 @@ public class Cluster implements Closeable {
         }
 
         return connection;
-      } catch (ConnectionException e) {
+      } catch (ConnectionException | OverloadedException e) {
         // Ignore, not a big deal
         if (connection != null) connection.closeAsync();
         return null;

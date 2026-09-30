@@ -55,6 +55,7 @@ import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.InvalidQueryException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.OperationTimedOutException;
+import com.datastax.driver.core.exceptions.OverloadedException;
 import com.datastax.driver.core.exceptions.ReadTimeoutException;
 import com.datastax.driver.core.exceptions.ServerError;
 import com.datastax.driver.core.policies.ConstantReconnectionPolicy;
@@ -146,7 +147,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
     assertBorrowedConnections(requests, Collections.singletonList(expectedConnection));
   }
 
-  private static Responses.Error errorResponse(ExceptionCode code, String message) {
+  static Responses.Error errorResponse(ExceptionCode code, String message) {
     ByteBuf body = Unpooled.buffer();
     try {
       body.writeInt(code.value);
@@ -1252,6 +1253,46 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
       }
     } finally {
       MockRequest.completeAll(allRequests);
+      cluster.close();
+    }
+  }
+
+  /**
+   * Ensures that an overload while creating an additional connection does not leave the creation
+   * task registered forever, which would prevent later attempts from growing the pool.
+   *
+   * @jira_ticket DRIVER-1121
+   * @test_category connection:connection_pool
+   */
+  @Test(groups = "short")
+  public void should_retry_additional_connection_after_authentication_overload() throws Exception {
+    Cluster cluster = createClusterBuilder().build();
+    List<MockRequest> requests = newArrayList();
+    try {
+      HostConnectionPool pool = createPool(cluster, 1, 2);
+      Connection.Factory factory = spy(cluster.manager.connectionFactory);
+      cluster.manager.connectionFactory = factory;
+      TestExecutorService blockingExecutor =
+          new TestExecutorService(cluster.manager.blockingExecutor);
+      cluster.manager.blockingExecutor = blockingExecutor;
+
+      doThrow(new OverloadedException(pool.host.getEndPoint(), "Too many authentication requests"))
+          .when(factory)
+          .open(any(HostConnectionPool.class), anyInt(), anyInt());
+
+      requests.addAll(MockRequest.sendMany(NEW_CONNECTION_THRESHOLD, pool));
+      requests.add(MockRequest.send(pool));
+      blockingExecutor.blockUntilNextTaskCompleted();
+      verify(factory, times(1)).open(any(HostConnectionPool.class), anyInt(), anyInt());
+      assertThat(size(pool)).isEqualTo(1);
+
+      reset(factory);
+      requests.add(MockRequest.send(pool));
+      verify(factory, timeout(2000).times(1))
+          .open(any(HostConnectionPool.class), anyInt(), anyInt());
+      assertPoolSize(pool, 2);
+    } finally {
+      MockRequest.completeAll(requests);
       cluster.close();
     }
   }
