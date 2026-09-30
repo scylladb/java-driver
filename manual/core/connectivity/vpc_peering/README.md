@@ -74,8 +74,21 @@ rather than just one.
 
 ### Connecting
 
-There is nothing connectivity-specific to configure. Give the session the contact points from your
-cluster's connect page, name the local datacenter, and add credentials:
+There is nothing connectivity-specific to configure. The example below connects to 9142, the TLS
+port, so it also configures TLS; on VPC peering or Transit Gateway, 9042 accepts unencrypted
+connections unless the cluster enforces encryption. The cluster certificate is signed by a
+per-cluster CA, not a public one, so first download it from the cluster's details page ("Download CA
+public key") and import it into a truststore:
+
+```
+keytool -import -v -trustcacerts -alias CARoot -file scylladb_cluster_ca.pem \
+    -keystore client.truststore -storepass 'password123'
+```
+
+Choose your own store password; the driver needs the same one to open the truststore. Keep it in
+single quotes on the command line, and in double quotes in `application.conf`, where an unquoted `#`
+starts a comment. Then give the session the contact points from your cluster's connect page, the
+truststore, the local datacenter and your credentials:
 
 ```java
 CqlSession session = CqlSession.builder()
@@ -85,36 +98,37 @@ CqlSession session = CqlSession.builder()
         "node-1.aws-eu-west-1.example.clusters.scylla.cloud", 9142))
     .addContactPoint(InetSocketAddress.createUnresolved(
         "node-2.aws-eu-west-1.example.clusters.scylla.cloud", 9142))
+    .withConfigLoader(DriverConfigLoader.programmaticBuilder()
+        .withString(DefaultDriverOption.SSL_ENGINE_FACTORY_CLASS, "DefaultSslEngineFactory")
+        .withString(DefaultDriverOption.SSL_TRUSTSTORE_PATH, "/path/to/client.truststore")
+        .withString(DefaultDriverOption.SSL_TRUSTSTORE_PASSWORD, "password123")
+        .build())
     .withLocalDatacenter("AWS_EU_WEST_1")
     .withAuthCredentials("scylla", "...")
     .build();
 ```
 
-`createUnresolved` defers that lookup until the session connects;
-`new InetSocketAddress(host, port)` does it on construction, so the contact point is fixed to
-whatever that one lookup returned. Either way the name matters only at startup: the driver soon
-reaches each node at the address the cluster reports for it, so a DNS change after startup is not
-followed. Contact points given in the configuration are resolved once, when the session is built,
-and every address a name returns becomes a contact point, unless `advanced.resolve-contact-points`
-is `false` -- see the [reference configuration](../../configuration/reference/).
+`createUnresolved` is what keeps the contact point a name: the driver looks it up again every time
+it connects to that node, so a hostname that later points somewhere else is followed.
+`new InetSocketAddress(host, port)` resolves on construction, so the contact point is fixed to
+whatever that one lookup returned. Contact points given in the configuration are resolved once,
+when the session is built, and every address a name returns becomes a contact point, unless
+`advanced.resolve-contact-points` is `false`, which keeps them names -- see the
+[reference configuration](../../configuration/reference/).
 
-Port 9142 is the TLS port; 9042 stays open for unencrypted traffic unless the cluster enforces
-encryption. The cluster certificate is signed by a per-cluster CA, not a public one: download it
-from the cluster's details page ("Download CA public key") and import it into a truststore:
-
-```
-keytool -import -v -trustcacerts -alias CARoot -file scylladb_cluster_ca.pem -keystore client.truststore
-```
-
-Then point the engine factory at that truststore:
+The same TLS settings can live in `application.conf` instead of code:
 
 ```
 datastax-java-driver.advanced.ssl-engine-factory {
   class = DefaultSslEngineFactory
   truststore-path = /path/to/client.truststore
-  truststore-password = password123
+  truststore-password = "password123"
 }
 ```
+
+In 4.18.1, a session with a truststore but no keystore logs an `Error while closing` warning for
+its `JdkSslHandlerFactory`, with a `NullPointerException`, when it closes. The warning is harmless,
+and driver 4.19.0 no longer logs it.
 
 [SSL](../../ssl/) covers truststores, hostname validation and client certificates.
 
