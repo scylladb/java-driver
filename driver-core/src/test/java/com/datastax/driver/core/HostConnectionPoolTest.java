@@ -147,7 +147,7 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
     assertBorrowedConnections(requests, Collections.singletonList(expectedConnection));
   }
 
-  private static Responses.Error errorResponse(ExceptionCode code, String message) {
+  static Responses.Error errorResponse(ExceptionCode code, String message) {
     ByteBuf body = Unpooled.buffer();
     try {
       body.writeInt(code.value);

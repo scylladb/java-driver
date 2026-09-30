@@ -15,6 +15,7 @@
  */
 package com.datastax.driver.core;
 
+import static com.datastax.driver.core.HostConnectionPoolTest.errorResponse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -29,9 +30,6 @@ import com.datastax.driver.core.exceptions.AuthenticationException;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.datastax.driver.core.exceptions.OverloadedException;
 import com.google.common.util.concurrent.MoreExecutors;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.util.CharsetUtil;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -175,20 +173,6 @@ public class ConnectionAuthenticationTest {
       connection
           .onV2AuthResponse(mock(Authenticator.class), version, MoreExecutors.directExecutor())
           .apply(response);
-    }
-  }
-
-  private static Responses.Error errorResponse(ExceptionCode code, String message) {
-    ByteBuf body = Unpooled.buffer();
-    try {
-      body.writeInt(code.value);
-      byte[] messageBytes = message.getBytes(CharsetUtil.UTF_8);
-      body.writeShort(messageBytes.length);
-      body.writeBytes(messageBytes);
-      return Responses.Error.decoder.decode(
-          body, ProtocolVersion.V4, CodecRegistry.DEFAULT_INSTANCE, ProtocolFeatureStore.EMPTY);
-    } finally {
-      body.release();
     }
   }
 
