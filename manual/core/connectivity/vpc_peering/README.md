@@ -74,8 +74,19 @@ of the addresses it resolves to -- see
 
 ### Connecting
 
-There is nothing connectivity-specific to configure. Give the session the contact points from your
-cluster's connect page, name the local datacenter, and add credentials:
+There is nothing connectivity-specific to configure, but the session must use TLS: port 9142 is the
+TLS port, and 9042 stays open for unencrypted traffic unless the cluster enforces encryption. The
+cluster certificate is signed by a per-cluster CA, not a public one, so first download it from the
+cluster's details page ("Download CA public key") and import it into a truststore:
+
+```
+keytool -import -v -trustcacerts -alias CARoot -file scylladb_cluster_ca.pem \
+    -keystore client.truststore -storepass password123
+```
+
+Choose your own store password; the driver needs the same one to open the truststore. Then give the
+session the contact points from your cluster's connect page, the truststore, the local datacenter
+and your credentials:
 
 ```java
 CqlSession session = CqlSession.builder()
@@ -85,25 +96,17 @@ CqlSession session = CqlSession.builder()
         "node-1.aws-eu-west-1.example.clusters.scylla.cloud", 9142))
     .addContactPoint(InetSocketAddress.createUnresolved(
         "node-2.aws-eu-west-1.example.clusters.scylla.cloud", 9142))
+    .withConfigLoader(DriverConfigLoader.programmaticBuilder()
+        .withString(DefaultDriverOption.SSL_ENGINE_FACTORY_CLASS, "DefaultSslEngineFactory")
+        .withString(DefaultDriverOption.SSL_TRUSTSTORE_PATH, "/path/to/client.truststore")
+        .withString(DefaultDriverOption.SSL_TRUSTSTORE_PASSWORD, "password123")
+        .build())
     .withLocalDatacenter("AWS_EU_WEST_1")
     .withAuthCredentials("scylla", "...")
     .build();
 ```
 
-`createUnresolved` is what keeps the contact point a name. `new InetSocketAddress(host, port)`
-resolves on construction, so the session is frozen to the one address that lookup returned, and a
-hostname that later points somewhere else is never followed -- see
-[contact points given as hostnames](../../address_resolution/#contact-points-given-as-hostnames).
-
-Port 9142 is the TLS port; 9042 stays open for unencrypted traffic unless the cluster enforces
-encryption. The cluster certificate is signed by a per-cluster CA, not a public one: download it
-from the cluster's details page ("Download CA public key") and import it into a truststore:
-
-```
-keytool -import -v -trustcacerts -alias CARoot -file scylladb_cluster_ca.pem -keystore client.truststore
-```
-
-Then point the engine factory at that truststore:
+The same TLS settings can live in `application.conf` instead of code:
 
 ```
 datastax-java-driver.advanced.ssl-engine-factory {
@@ -112,6 +115,11 @@ datastax-java-driver.advanced.ssl-engine-factory {
   truststore-password = password123
 }
 ```
+
+`createUnresolved` is what keeps the contact point a name. `new InetSocketAddress(host, port)`
+resolves on construction, so the session is frozen to the one address that lookup returned, and a
+hostname that later points somewhere else is never followed -- see
+[contact points given as hostnames](../../address_resolution/#contact-points-given-as-hostnames).
 
 [SSL](../../ssl/) covers truststores, hostname validation and client certificates.
 
