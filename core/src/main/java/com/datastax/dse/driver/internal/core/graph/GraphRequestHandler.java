@@ -19,6 +19,7 @@ package com.datastax.dse.driver.internal.core.graph;
 
 import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
 
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.dse.driver.api.core.graph.AsyncGraphResultSet;
 import com.datastax.dse.driver.api.core.graph.GraphNode;
 import com.datastax.dse.driver.api.core.graph.GraphStatement;
@@ -131,8 +132,10 @@ public class GraphRequestHandler implements Throttled {
   private final RequestThrottler throttler;
   private final RequestTracker requestTracker;
   private final SessionMetricUpdater sessionMetricUpdater;
+  private final DriverExecutionProfile initialExecutionProfile;
   private final GraphBinaryModule graphBinaryModule;
   private final GraphSupportChecker graphSupportChecker;
+  private volatile boolean admitted;
 
   // The errors on the nodes that were already tried (lazily initialized on the first error).
   // We don't use a map because nodes can appear multiple times.
@@ -176,7 +179,12 @@ public class GraphRequestHandler implements Throttled {
     this.requestTracker = context.getRequestTracker();
     this.sessionMetricUpdater = session.getMetricUpdater();
 
-    Duration timeout = GraphConversions.resolveGraphRequestTimeout(statement, context);
+    this.initialExecutionProfile = Conversions.resolveExecutionProfile(statement, context);
+    Duration statementTimeout = statement.getTimeout();
+    Duration timeout =
+        statementTimeout != null
+            ? statementTimeout
+            : initialExecutionProfile.getDuration(DseDriverOption.GRAPH_TIMEOUT);
     this.scheduledTimeout = scheduleTimeout(timeout);
 
     this.throttler = context.getRequestThrottler();
@@ -185,25 +193,31 @@ public class GraphRequestHandler implements Throttled {
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(initialStatement, context);
-    if (wasDelayed
-        // avoid call to nanoTime() if metric is disabled:
-        && sessionMetricUpdater.isEnabled(
-            DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
-      sessionMetricUpdater.updateTimer(
-          DefaultSessionMetric.THROTTLING_DELAY,
-          executionProfile.getName(),
-          System.nanoTime() - startTimeNanos,
-          TimeUnit.NANOSECONDS);
+    admitted = true;
+    try {
+      if (wasDelayed
+          // avoid call to nanoTime() if metric is disabled:
+          && sessionMetricUpdater.isEnabled(
+              DefaultSessionMetric.THROTTLING_DELAY, initialExecutionProfile.getName())) {
+        sessionMetricUpdater.updateTimer(
+            DefaultSessionMetric.THROTTLING_DELAY,
+            initialExecutionProfile.getName(),
+            System.nanoTime() - startTimeNanos,
+            TimeUnit.NANOSECONDS);
+      }
+      Queue<Node> queryPlan =
+          initialStatement.getNode() != null
+              ? new SimpleQueryPlan(initialStatement.getNode())
+              : context
+                  .getLoadBalancingPolicyWrapper()
+                  .newQueryPlan(initialStatement, initialExecutionProfile.getName(), session);
+      sendRequest(initialStatement, null, queryPlan, 0, 0, true);
+    } catch (Throwable t) {
+      // Concurrency-limiting throttlers contain exceptions from ready callbacks so that a failed
+      // request can't interrupt queue draining. Complete through the normal terminal path to
+      // release this request's permit before returning to the throttler.
+      setFinalError(initialStatement, t, null, NO_SUCCESSFUL_EXECUTION);
     }
-    Queue<Node> queryPlan =
-        initialStatement.getNode() != null
-            ? new SimpleQueryPlan(initialStatement.getNode())
-            : context
-                .getLoadBalancingPolicyWrapper()
-                .newQueryPlan(initialStatement, executionProfile.getName(), session);
-    sendRequest(initialStatement, null, queryPlan, 0, 0, true);
   }
 
   public CompletionStage<AsyncGraphResultSet> handle() {
@@ -483,7 +497,9 @@ public class GraphRequestHandler implements Throttled {
   private void setFinalError(
       GraphStatement<?> statement, Throwable error, Node node, int execution) {
     DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(statement, context);
+        statement == initialStatement
+            ? initialExecutionProfile
+            : Conversions.resolveExecutionProfile(statement, context);
     if (error instanceof DriverException) {
       ((DriverException) error)
           .setExecutionInfo(
@@ -510,7 +526,8 @@ public class GraphRequestHandler implements Throttled {
         throttler.signalTimeout(this);
         sessionMetricUpdater.incrementCounter(
             DseSessionMetric.GRAPH_CLIENT_TIMEOUTS, executionProfile.getName());
-      } else if (!(error instanceof RequestThrottlingException)) {
+      } else if (!(error instanceof CancellationException)
+          && (admitted || !(error instanceof RequestThrottlingException))) {
         throttler.signalError(this, error);
       }
     }
