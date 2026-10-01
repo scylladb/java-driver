@@ -17,6 +17,8 @@
  */
 package com.datastax.oss.driver.internal.core.context;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+import io.netty.channel.Channel;
 import java.util.Map;
 
 /**
@@ -43,8 +45,13 @@ public interface DriverConfigReporter {
    * failure to build the report must be swallowed (and logged) rather than propagated, otherwise it
    * would prevent the session from establishing or reconnecting.
    *
-   * <p>The report describes the driver's own configuration only, so nothing here depends on which
-   * backend answered: it can be built before the connection learns anything about its peer.
+   * <p>The report describes the driver's own configuration and the effective SSL state of the
+   * control connection. It does not depend on which backend answered, but the SSL handler must
+   * already be installed on {@code channel}.
+   *
+   * @param startupOptions startup options to add the report to
+   * @param channel control connection whose effective SSL state is reported
    */
-  void populateControlConnectionOptions(Map<String, String> startupOptions);
+  void populateControlConnectionOptions(
+      @NonNull Map<String, String> startupOptions, @NonNull Channel channel);
 }

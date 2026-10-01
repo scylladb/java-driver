@@ -18,7 +18,12 @@
 package com.datastax.oss.driver.internal.core.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.datastax.dse.driver.internal.core.loadbalancing.DseDcInferringLoadBalancingPolicy;
@@ -33,6 +38,7 @@ import com.datastax.oss.driver.api.core.config.TypedDriverOption;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.session.Request;
@@ -45,6 +51,8 @@ import com.datastax.oss.driver.internal.core.connection.ExponentialReconnectionP
 import com.datastax.oss.driver.internal.core.loadbalancing.BasicLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.loadbalancing.DcInferringLoadBalancingPolicy;
 import com.datastax.oss.driver.internal.core.loadbalancing.DefaultLoadBalancingPolicy;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.SniEndPoint;
 import com.datastax.oss.driver.internal.core.retry.ConsistencyDowngradingRetryPolicy;
 import com.datastax.oss.driver.internal.core.retry.DefaultRetryPolicy;
 import com.datastax.oss.driver.internal.core.specex.ConstantSpeculativeExecutionPolicy;
@@ -65,8 +73,13 @@ import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.netty.channel.Channel;
+import io.netty.channel.embedded.EmbeddedChannel;
+import io.netty.handler.ssl.SslHandler;
 import java.io.InputStream;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -75,6 +88,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -107,6 +123,7 @@ public class DefaultDriverConfigReporterTest {
   private InternalDriverContext mockContext;
   private DriverExecutionProfile mockProfile;
   private DefaultDriverConfigReporter reporter;
+  private EmbeddedChannel reportingChannel;
 
   @Before
   public void setup() {
@@ -116,6 +133,12 @@ public class DefaultDriverConfigReporterTest {
     when(mockContext.getConfig()).thenReturn(config);
     when(config.getDefaultProfile()).thenReturn(mockProfile);
     reporter = new DefaultDriverConfigReporter(mockContext);
+    reportingChannel = new EmbeddedChannel();
+  }
+
+  @After
+  public void cleanup() {
+    reportingChannel.finishAndReleaseAll();
   }
 
   private void enableReporting(boolean enabled) {
@@ -127,7 +150,7 @@ public class DefaultDriverConfigReporterTest {
   private DefaultDriverConfigReporter reporterReporting(Supplier<String> json) {
     return new DefaultDriverConfigReporter(mockContext) {
       @Override
-      String buildJson() {
+      String buildJson(Channel channel) {
         return json.get();
       }
     };
@@ -142,7 +165,8 @@ public class DefaultDriverConfigReporterTest {
   public void should_add_driver_config_when_enabled() {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
-    reporterReporting(() -> "{\"version\":1}").populateControlConnectionOptions(options);
+    reporterReporting(() -> "{\"version\":1}")
+        .populateControlConnectionOptions(options, reportingChannel);
     assertThat(options)
         .hasSize(1)
         .containsEntry(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, "{\"version\":1}");
@@ -152,7 +176,7 @@ public class DefaultDriverConfigReporterTest {
   public void should_add_nothing_when_disabled() {
     enableReporting(false);
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options);
+    reporter.populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -163,7 +187,7 @@ public class DefaultDriverConfigReporterTest {
     // getBoolean(), ignoring the fallback that is under test here.
     Map<String, String> options = new HashMap<>();
     defaultsReporter(map -> map.remove(TypedDriverOption.DRIVER_CONFIG_REPORTING_ENABLED))
-        .populateControlConnectionOptions(options);
+        .populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).containsKey(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY);
   }
 
@@ -176,7 +200,7 @@ public class DefaultDriverConfigReporterTest {
     // in-process; what is checked here is that the substitute contributes nothing and, in
     // particular, does not need a context to say so.
     Map<String, String> options = new HashMap<>();
-    new NoopDriverConfigReporter().populateControlConnectionOptions(options);
+    new NoopDriverConfigReporter().populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -187,7 +211,7 @@ public class DefaultDriverConfigReporterTest {
     when(mockProfile.getBoolean(DefaultDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, true))
         .thenThrow(new IllegalStateException("config blew up"));
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options); // must not throw
+    reporter.populateControlConnectionOptions(options, reportingChannel); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -199,7 +223,7 @@ public class DefaultDriverConfigReporterTest {
             () -> {
               throw new IllegalStateException("introspection blew up");
             })
-        .populateControlConnectionOptions(options); // must not throw
+        .populateControlConnectionOptions(options, reportingChannel); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -208,7 +232,7 @@ public class DefaultDriverConfigReporterTest {
     // buildJson() returns null when Jackson fails to serialize the node tree.
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
-    reporterReporting(() -> null).populateControlConnectionOptions(options);
+    reporterReporting(() -> null).populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -285,7 +309,7 @@ public class DefaultDriverConfigReporterTest {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
     reporterReporting(() -> oversizedReport())
-        .populateControlConnectionOptions(options); // must not throw
+        .populateControlConnectionOptions(options, reportingChannel); // must not throw
     assertThat(options).isEmpty();
   }
 
@@ -294,7 +318,7 @@ public class DefaultDriverConfigReporterTest {
     enableReporting(true);
     Map<String, String> options = new HashMap<>();
     String atLimit = padTo(DefaultDriverConfigReporter.MAX_DRIVER_CONFIG_LENGTH);
-    reporterReporting(() -> atLimit).populateControlConnectionOptions(options);
+    reporterReporting(() -> atLimit).populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).containsEntry(DefaultDriverConfigReporter.DRIVER_CONFIG_KEY, atLimit);
   }
 
@@ -314,13 +338,13 @@ public class DefaultDriverConfigReporterTest {
     // Built, well-formed and over the limit: it is dropped for its size, not because building it
     // failed. Reporting is left at the shipped default here, since defaultsReporter() reads a real
     // profile rather than the bare mock the tests above use.
-    String json = reporter.buildJson();
+    String json = reporter.buildJson(reportingChannel);
     assertConformsToSchema(MAPPER.readTree(json));
     assertThat(json.getBytes(StandardCharsets.UTF_8).length)
         .isGreaterThan(DefaultDriverConfigReporter.MAX_DRIVER_CONFIG_LENGTH);
 
     Map<String, String> options = new HashMap<>();
-    reporter.populateControlConnectionOptions(options);
+    reporter.populateControlConnectionOptions(options, reportingChannel);
     assertThat(options).isEmpty();
   }
 
@@ -1431,8 +1455,10 @@ public class DefaultDriverConfigReporterTest {
   }
 
   @Test
-  public void should_report_tls_enabled_with_hostname_verification() throws Exception {
-    // hostname-verification comes from the factory's own state, not the config option.
+  public void should_treat_a_programmatic_ssl_context_with_an_algorithm_as_unknown()
+      throws Exception {
+    // A custom trust manager can ignore the engine's endpoint-identification algorithm, so its
+    // presence does not prove that the handshake verifies the host name.
     SslEngineFactory factory =
         new ProgrammaticSslEngineFactory(
             SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
@@ -1448,16 +1474,16 @@ public class DefaultDriverConfigReporterTest {
     JsonNode connection = report(r).get("connection");
     // Presence of the group is what reports TLS as on: the schema dropped the "enabled" boolean.
     assertThat(connection.has("tls")).isTrue();
-    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isTrue();
+    assertThat(connection.get("tls").has("hostname-verification")).isFalse();
   }
 
   @Test
-  public void should_report_hostname_verification_from_factory_not_config_option()
+  public void should_treat_a_programmatic_ssl_context_without_an_algorithm_as_unknown()
       throws Exception {
-    // Regression for the false-report bug: a ProgrammaticSslEngineFactory (as built by
-    // SessionBuilder.withSslContext(...)) does NO hostname validation by default and ignores the
-    // SSL_HOSTNAME_VALIDATION config option. The report must reflect the factory's real state
-    // (false), not the config option (true here) — otherwise it falsely claims validation is on.
+    // ProgrammaticSslEngineFactory (as built by SessionBuilder.withSslContext(...)) ignores the
+    // SSL_HOSTNAME_VALIDATION config option, and the arbitrary SSLContext it wraps may contain a
+    // custom trust manager that validates host names without using an endpoint-identification
+    // algorithm. Neither true nor false can be inferred safely, so the optional field is omitted.
     SslEngineFactory programmatic = new ProgrammaticSslEngineFactory(SSLContext.getDefault());
     DefaultDriverConfigReporter r =
         reporterWith(
@@ -1471,7 +1497,7 @@ public class DefaultDriverConfigReporterTest {
     JsonNode connection = report(r).get("connection");
     // Presence of the group is what reports TLS as on: the schema dropped the "enabled" boolean.
     assertThat(connection.has("tls")).isTrue();
-    assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isFalse();
+    assertThat(connection.get("tls").has("hostname-verification")).isFalse();
   }
 
   @Test
@@ -1511,6 +1537,7 @@ public class DefaultDriverConfigReporterTest {
     // name handling is unknown. Guessing false here would report a session as not checking host
     // names when its factory may well be doing exactly that.
     SslEngineFactory unrecognized = mock(SslEngineFactory.class);
+    when(unrecognized.newSslEngine(any())).thenReturn(clientSslEngine());
     DefaultDriverConfigReporter r =
         reporterWith(
             defaults(map -> {}),
@@ -1528,24 +1555,35 @@ public class DefaultDriverConfigReporterTest {
   }
 
   @Test
-  public void should_report_every_built_in_engine_factory() throws Exception {
-    // None of the built-ins is ever reported as unknown. Real instances rather than mocks, so that
-    // the branches are pinned to the classes the driver actually instantiates — and, for the
-    // configured one, to the whole option-to-field-to-report chain.
-    assertThat(hostnameVerificationOf(new DefaultSslEngineFactory(policyConstructionContext())))
-        .isTrue();
-    assertThat(hostnameVerificationOf(new SniSslEngineFactory(SSLContext.getDefault()))).isTrue();
-    assertThat(hostnameVerificationOf(new ProgrammaticSslEngineFactory(SSLContext.getDefault())))
-        .isFalse();
-    assertThat(
-            hostnameVerificationOf(
-                new ProgrammaticSslEngineFactory(
-                    SSLContext.getDefault(), null, /* requireHostnameValidation= */ true)))
-        .isTrue();
+  public void should_treat_a_custom_engine_factory_with_an_algorithm_as_unknown() throws Exception {
+    // The factory configures an algorithm, but its arbitrary SSLContext may use an extended trust
+    // manager that ignores the engine parameters.
+    SslEngineFactory factory =
+        new ProgrammaticSslEngineFactory(SSLContext.getDefault()) {
+          @Override
+          public SSLEngine newSslEngine(EndPoint remoteEndpoint) {
+            SSLEngine engine = super.newSslEngine(remoteEndpoint);
+            SSLParameters parameters = engine.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            engine.setSSLParameters(parameters);
+            return engine;
+          }
+        };
+
+    assertThat(hostnameVerificationNode(factory)).isNull();
   }
 
-  /** The {@code connection.tls.hostname-verification} a report built over this factory carries. */
-  private Boolean hostnameVerificationOf(SslEngineFactory factory) throws Exception {
+  @Test
+  public void should_treat_an_engine_factory_subclass_without_an_algorithm_as_unknown()
+      throws Exception {
+    SslEngineFactory factory =
+        new ProgrammaticSslEngineFactory(SSLContext.getDefault()) {
+          @Override
+          public SSLEngine newSslEngine(EndPoint remoteEndpoint) {
+            return super.newSslEngine(remoteEndpoint);
+          }
+        };
+
     DefaultDriverConfigReporter r =
         reporterWith(
             defaults(map -> {}),
@@ -1555,9 +1593,148 @@ public class DefaultDriverConfigReporterTest {
             loadBalancing(DefaultLoadBalancingPolicy.class),
             clientSideGenerator(),
             Optional.of(factory));
-    JsonNode verification = report(r).get("connection").get("tls").get("hostname-verification");
+    assertThat(report(r).get("connection").get("tls").has("hostname-verification")).isFalse();
+  }
+
+  @Test
+  public void should_keep_hostname_verification_state_on_the_control_channel() throws Exception {
+    SslEngineFactory engineFactory = knownSniFactory();
+    JdkSslHandlerFactory handlerFactory =
+        (JdkSslHandlerFactory) activeJdkSslHandler(engineFactory, reportingChannel);
+    EmbeddedChannel pooledChannel = new EmbeddedChannel();
+    try {
+      SslHandler pooledHandler =
+          handlerFactory.newSslHandler(
+              pooledChannel,
+              new SniEndPoint(
+                  new InetSocketAddress("127.0.0.2", 9042), "another-node.example.com"));
+      pooledChannel.pipeline().addLast(pooledHandler);
+      SSLParameters pooledParameters = pooledHandler.engine().getSSLParameters();
+      pooledParameters.setEndpointIdentificationAlgorithm(null);
+      pooledHandler.engine().setSSLParameters(pooledParameters);
+      DefaultDriverConfigReporter r =
+          reporterWith(
+              defaults(map -> {}),
+              exponentialReconnection(),
+              mock(DefaultRetryPolicy.class),
+              mock(NoSpeculativeExecutionPolicy.class),
+              loadBalancing(DefaultLoadBalancingPolicy.class),
+              clientSideGenerator(),
+              Optional.of(engineFactory),
+              Optional.of(handlerFactory),
+              /* programmaticLocalDc= */ null);
+
+      assertThat(report(r).get("connection").get("tls").get("hostname-verification").asBoolean())
+          .isTrue();
+    } finally {
+      pooledChannel.finishAndReleaseAll();
+    }
+  }
+
+  @Test
+  public void should_ignore_an_unrelated_ssl_handler_ahead_of_the_driver_handler()
+      throws Exception {
+    SslEngineFactory engineFactory = knownSniFactory();
+    SslHandlerFactory handlerFactory = activeJdkSslHandler(engineFactory, reportingChannel);
+    reportingChannel.pipeline().addFirst("unrelatedSsl", clientSslHandler());
+    DefaultDriverConfigReporter r =
+        reporterWith(
+            defaults(map -> {}),
+            exponentialReconnection(),
+            mock(DefaultRetryPolicy.class),
+            mock(NoSpeculativeExecutionPolicy.class),
+            loadBalancing(DefaultLoadBalancingPolicy.class),
+            clientSideGenerator(),
+            Optional.of(engineFactory),
+            Optional.of(handlerFactory),
+            /* programmaticLocalDc= */ null);
+
+    assertThat(report(r).get("connection").get("tls").get("hostname-verification").asBoolean())
+        .isTrue();
+  }
+
+  @Test
+  public void should_not_break_the_connection_when_engine_introspection_fails() throws Exception {
+    SSLEngine engine = spy(SSLContext.getDefault().createSSLEngine("node.example.com", 9042));
+    SSLParameters parameters = engine.getSSLParameters();
+    doReturn(parameters)
+        .doThrow(new IllegalStateException("engine introspection blew up"))
+        .when(engine)
+        .getSSLParameters();
+    SSLContext sslContext = spy(SSLContext.getDefault());
+    doReturn(engine).when(sslContext).createSSLEngine(anyString(), anyInt());
+    SslEngineFactory engineFactory = SniSslEngineFactory.forCloudBundle(sslContext);
+    JdkSslHandlerFactory handlerFactory = new JdkSslHandlerFactory(engineFactory);
+
+    // Handler creation is mandatory connection work and must not perform diagnostic inspection.
+    reportingChannel
+        .pipeline()
+        .addLast(
+            handlerFactory.newSslHandler(
+                reportingChannel,
+                new SniEndPoint(new InetSocketAddress("127.0.0.1", 9042), "node.example.com")));
+
+    DefaultDriverConfigReporter r =
+        reporterWith(
+            defaults(map -> {}),
+            exponentialReconnection(),
+            mock(DefaultRetryPolicy.class),
+            mock(NoSpeculativeExecutionPolicy.class),
+            loadBalancing(DefaultLoadBalancingPolicy.class),
+            clientSideGenerator(),
+            Optional.of(engineFactory),
+            Optional.of(handlerFactory),
+            /* programmaticLocalDc= */ null);
+    Map<String, String> options = new HashMap<>();
+    r.populateControlConnectionOptions(options, reportingChannel); // must not throw
+    assertThat(options).isEmpty();
+  }
+
+  @Test
+  public void should_report_only_built_in_factories_with_known_validators() throws Exception {
+    assertThat(hostnameVerificationOf(configuredDefaultSslEngineFactory(true))).isTrue();
+    assertThat(hostnameVerificationOf(configuredDefaultSslEngineFactory(false))).isFalse();
+    assertThat(hostnameVerificationOf(knownSniFactory())).isTrue();
+
+    // These factories all accept a process-wide or caller-supplied SSLContext, whose custom trust
+    // manager may enforce or ignore host names independently of the engine parameters.
+    assertThat(hostnameVerificationNode(new DefaultSslEngineFactory(policyConstructionContext())))
+        .isNull();
+    assertThat(hostnameVerificationNode(new SniSslEngineFactory(SSLContext.getDefault()))).isNull();
+    assertThat(
+            hostnameVerificationNode(
+                new ProgrammaticSslEngineFactory(
+                    SSLContext.getDefault(), null, /* requireHostnameValidation= */ true)))
+        .isNull();
+  }
+
+  /** The {@code connection.tls.hostname-verification} a report built over this factory carries. */
+  private Boolean hostnameVerificationOf(SslEngineFactory factory) throws Exception {
+    JsonNode verification = hostnameVerificationNode(factory);
     assertThat(verification).isNotNull();
     return verification.asBoolean();
+  }
+
+  @Nullable
+  private JsonNode hostnameVerificationNode(SslEngineFactory factory) throws Exception {
+    EmbeddedChannel channel = new EmbeddedChannel();
+    try {
+      SslHandlerFactory handlerFactory = activeJdkSslHandler(factory, channel);
+      DefaultDriverConfigReporter r =
+          reporterWith(
+              defaults(map -> {}),
+              exponentialReconnection(),
+              mock(DefaultRetryPolicy.class),
+              mock(NoSpeculativeExecutionPolicy.class),
+              loadBalancing(DefaultLoadBalancingPolicy.class),
+              clientSideGenerator(),
+              Optional.of(factory),
+              Optional.of(handlerFactory),
+              /* programmaticLocalDc= */ null);
+      return report(r, channel).get("connection").get("tls").get("hostname-verification");
+    } finally {
+      channel.finishAndReleaseAll();
+    }
   }
 
   @Test
@@ -1567,9 +1744,7 @@ public class DefaultDriverConfigReporterTest {
     // a context that overrides buildSslHandlerFactory() may pass an engine factory of its own while
     // advanced.ssl-engine-factory.class still names another. The report has to describe the engine
     // that actually builds the connection's SSLEngine, so the wrapped one wins.
-    SslEngineFactory wrapped =
-        new ProgrammaticSslEngineFactory(
-            SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
+    SslEngineFactory wrapped = knownSniFactory();
     SslEngineFactory configuredButUnused =
         new ProgrammaticSslEngineFactory(SSLContext.getDefault());
     DefaultDriverConfigReporter r =
@@ -1581,7 +1756,7 @@ public class DefaultDriverConfigReporterTest {
             loadBalancing(DefaultLoadBalancingPolicy.class),
             clientSideGenerator(),
             Optional.of(configuredButUnused),
-            Optional.of(new JdkSslHandlerFactory(wrapped)),
+            Optional.of(activeJdkSslHandler(wrapped, reportingChannel)),
             /* programmaticLocalDc= */ null);
     JsonNode connection = report(r).get("connection");
     assertThat(connection.get("tls").get("hostname-verification").asBoolean()).isTrue();
@@ -1597,10 +1772,8 @@ public class DefaultDriverConfigReporterTest {
     // Mockito cannot have a when(...) open while another begins.
     ReconnectionPolicy reconnection = exponentialReconnection();
     TimestampGenerator timestamps = clientSideGenerator();
-    SslEngineFactory wrapped =
-        new ProgrammaticSslEngineFactory(
-            SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
-    SslHandlerFactory handlerFactory = new JdkSslHandlerFactory(wrapped);
+    SslEngineFactory wrapped = knownSniFactory();
+    SslHandlerFactory handlerFactory = activeJdkSslHandler(wrapped, reportingChannel);
     // Built before the stubbing chain below: the helper stubs the policy itself, and Mockito
     // rejects a nested when() inside an unfinished one.
     LoadBalancingPolicy policy = loadBalancing(DefaultLoadBalancingPolicy.class);
@@ -1620,7 +1793,8 @@ public class DefaultDriverConfigReporterTest {
     when(ctx.getSslEngineFactory())
         .thenThrow(new AssertionError("the configured engine factory must not be resolved"));
 
-    JsonNode report = MAPPER.readTree(new DefaultDriverConfigReporter(ctx).buildJson());
+    JsonNode report =
+        MAPPER.readTree(new DefaultDriverConfigReporter(ctx).buildJson(reportingChannel));
     // The group is built from the wrapped engine factory alone; getSslEngineFactory() throwing
     // proves it was never consulted.
     assertThat(report.get("connection").get("tls").get("hostname-verification").asBoolean())
@@ -2398,9 +2572,7 @@ public class DefaultDriverConfigReporterTest {
   @Test
   public void should_conform_to_schema_for_tls_enabled_with_hostname_verification()
       throws Exception {
-    SslEngineFactory factory =
-        new ProgrammaticSslEngineFactory(
-            SSLContext.getDefault(), null, /* requireHostnameValidation= */ true);
+    SslEngineFactory factory = knownSniFactory();
     assertConformsToSchema(
         report(
             reporterWith(
@@ -2595,7 +2767,11 @@ public class DefaultDriverConfigReporterTest {
   }
 
   private JsonNode report(DefaultDriverConfigReporter reporter) throws Exception {
-    return MAPPER.readTree(reporter.buildJson());
+    return report(reporter, reportingChannel);
+  }
+
+  private JsonNode report(DefaultDriverConfigReporter reporter, Channel channel) throws Exception {
+    return MAPPER.readTree(reporter.buildJson(channel));
   }
 
   /** A real default execution profile with the given customizations applied. */
@@ -2649,8 +2825,20 @@ public class DefaultDriverConfigReporterTest {
         loadBalancing,
         timestamps,
         ssl,
-        ssl.map(JdkSslHandlerFactory::new),
+        ssl.map(engineFactory -> activeJdkSslHandler(engineFactory, reportingChannel)),
         programmaticLocalDc);
+  }
+
+  /** Mirrors ChannelFactory installing the JDK handler before STARTUP builds the report. */
+  private SslHandlerFactory activeJdkSslHandler(SslEngineFactory engineFactory, Channel channel) {
+    JdkSslHandlerFactory handlerFactory = new JdkSslHandlerFactory(engineFactory);
+    EndPoint endPoint =
+        engineFactory instanceof SniSslEngineFactory
+            ? new SniEndPoint(new InetSocketAddress("127.0.0.1", 9042), "node.example.com")
+            : new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042));
+    channel.pipeline().addLast(handlerFactory.newSslHandler(channel, endPoint));
+    assertThat(channel.pipeline().get(SslHandler.class)).isNotNull();
+    return handlerFactory;
   }
 
   /**
@@ -2711,11 +2899,46 @@ public class DefaultDriverConfigReporterTest {
     return ctx;
   }
 
+  private SslEngineFactory knownSniFactory() throws Exception {
+    return SniSslEngineFactory.forCloudBundle(SSLContext.getDefault());
+  }
+
+  private SSLEngine clientSslEngine() throws Exception {
+    SSLEngine engine = SSLContext.getDefault().createSSLEngine();
+    engine.setUseClientMode(true);
+    return engine;
+  }
+
+  private SslHandler clientSslHandler() throws Exception {
+    return new SslHandler(clientSslEngine());
+  }
+
+  private DefaultSslEngineFactory configuredDefaultSslEngineFactory(
+      boolean requireHostnameValidation) throws Exception {
+    String truststorePath =
+        Paths.get(
+                DefaultDriverConfigReporterTest.class
+                    .getResource("/config/cloud/trustStore.jks")
+                    .toURI())
+            .toString();
+    return new DefaultSslEngineFactory(
+        policyConstructionContext(
+            map -> {
+              map.put(TypedDriverOption.SSL_TRUSTSTORE_PATH, truststorePath);
+              map.put(TypedDriverOption.SSL_TRUSTSTORE_PASSWORD, "fakePasswordForTests2");
+              map.put(TypedDriverOption.SSL_HOSTNAME_VALIDATION, requireHostnameValidation);
+            }));
+  }
+
   /** A minimal {@link DriverContext} good enough to construct a real built-in policy instance. */
   private DriverContext policyConstructionContext() {
+    return policyConstructionContext(map -> {});
+  }
+
+  private DriverContext policyConstructionContext(Consumer<OptionsMap> customize) {
     DriverContext ctx = mock(DriverContext.class);
     DriverConfig config = mock(DriverConfig.class);
-    DriverExecutionProfile profile = defaults(map -> {});
+    DriverExecutionProfile profile = defaults(customize);
     when(ctx.getConfig()).thenReturn(config);
     when(config.getDefaultProfile()).thenReturn(profile);
     when(config.getProfile(DriverExecutionProfile.DEFAULT_NAME)).thenReturn(profile);

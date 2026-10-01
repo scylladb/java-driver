@@ -197,7 +197,9 @@ class ProtocolInitHandler extends ConnectInitHandler {
           // SESSION_ID that every connection already carries from context.getStartupOptions().
           // No-op when driver config reporting is disabled.
           if (options.reportConfig) {
-            context.getDriverConfigReporter().populateControlConnectionOptions(startupOptions);
+            context
+                .getDriverConfigReporter()
+                .populateControlConnectionOptions(startupOptions, ctx.channel());
           }
           return request = new Startup(startupOptions);
         case GET_CLUSTER_NAME:
