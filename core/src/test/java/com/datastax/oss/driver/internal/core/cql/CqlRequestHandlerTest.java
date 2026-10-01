@@ -119,6 +119,55 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
     }
   }
 
+  // scylladb/java-driver#846: post-shutdown branch (closeFuture already completed).
+  @Test
+  public void should_fail_with_session_closed_when_query_plan_empty_and_session_is_closed() {
+    // no withResponse/withEmptyPool calls => empty query plan
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getSession().isClosed()).thenReturn(true);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(
+              error -> {
+                assertThat(error).isInstanceOf(IllegalStateException.class);
+                assertThat(error).hasMessage("Session is closed");
+              });
+    }
+  }
+
+  // scylladb/java-driver#846: shutdown-in-progress branch (closeAsync called, closeFuture not yet
+  // done).
+  @Test
+  public void should_fail_with_session_closed_when_query_plan_empty_and_session_is_closing() {
+    // no withResponse/withEmptyPool calls => empty query plan
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getSession().isClosing()).thenReturn(true);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(
+              error -> {
+                assertThat(error).isInstanceOf(IllegalStateException.class);
+                assertThat(error).hasMessage("Session is closed");
+              });
+    }
+  }
+
   @Test
   public void should_fail_if_nodes_unavailable() {
     RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
