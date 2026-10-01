@@ -32,7 +32,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.dse.driver.internal.core.insights.configuration.InsightsConfiguration;
 import com.datastax.dse.driver.internal.core.insights.schema.AuthProviderType;
 import com.datastax.dse.driver.internal.core.insights.schema.Insight;
@@ -95,6 +94,7 @@ import org.mockito.Mockito;
 
 @RunWith(DataProviderRunner.class)
 public class InsightsClientTest {
+  private static final String DSE_VERSION = "DSE_VERSION";
   private static final StackTraceElement[] EMPTY_STACK_TRACE = {};
   private static final Map<String, Object> EMPTY_OBJECT_MAP = Collections.emptyMap();
   private static final Supplier<Long> MOCK_TIME_SUPPLIER = Suppliers.ofInstance(1L);
@@ -190,10 +190,9 @@ public class InsightsClientTest {
                         ImmutableMap.of("maxSpeculativeExecutions", 100, "delay", 20),
                         DEFAULT_SPECULATIVE_EXECUTION_PACKAGE),
                     "LOCAL_ONE",
-                    "SERIAL",
-                    ImmutableMap.of("source", "src-graph")),
+                    "SERIAL"),
                 "non-default",
-                new SpecificExecutionProfile(50, null, null, null, null, null)));
+                new SpecificExecutionProfile(50, null, null, null, null)));
     assertThat(insightData.getPoolSizeByHostDistance())
         .isEqualTo(new PoolSizeByHostDistance(2, 1, 0));
     assertThat(insightData.getHeartbeatInterval()).isEqualTo(100);
@@ -466,9 +465,7 @@ public class InsightsClientTest {
     when(manager.getMetadata()).thenReturn(metadata);
     Node node = mock(Node.class);
     when(node.getExtras())
-        .thenReturn(
-            ImmutableMap.of(
-                DseNodeProperties.DSE_VERSION, Objects.requireNonNull(Version.parse("6.0.5"))));
+        .thenReturn(ImmutableMap.of(DSE_VERSION, Objects.requireNonNull(Version.parse("6.0.5"))));
     when(metadata.getNodes()).thenReturn(ImmutableMap.of(UUID.randomUUID(), node));
     DriverExecutionProfile defaultExecutionProfile = mockDefaultExecutionProfile();
     DriverExecutionProfile nonDefaultExecutionProfile =

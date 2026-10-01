@@ -17,12 +17,12 @@
  */
 package com.datastax.dse.driver.internal.core.insights;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import java.util.Collection;
 
 class InsightsSupportVerifier {
+  private static final String DSE_VERSION = "DSE_VERSION";
   private static final Version minDse6Version = Version.parse("6.0.5");
   private static final Version minDse51Version = Version.parse("5.1.13");
   private static final Version dse600Version = Version.parse("6.0.0");
@@ -34,7 +34,7 @@ class InsightsSupportVerifier {
     if (nodes.isEmpty()) return false;
 
     for (Node node : nodes) {
-      Object version = node.getExtras().get(DseNodeProperties.DSE_VERSION);
+      Object version = node.getExtras().get(DSE_VERSION);
       if (version == null) {
         return false;
       }
