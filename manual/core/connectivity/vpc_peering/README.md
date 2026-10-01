@@ -73,19 +73,21 @@ tried, so give the session every hostname from the connect page rather than just
 
 ### Connecting
 
-There is nothing connectivity-specific to configure, but the session must use TLS: port 9142 is the
-TLS port, and 9042 stays open for unencrypted traffic unless the cluster enforces encryption. The
-cluster certificate is signed by a per-cluster CA, not a public one, so first download it from the
-cluster's details page ("Download CA public key") and import it into a truststore:
+There is nothing connectivity-specific to configure. The example below connects to 9142, the TLS
+port, so it also configures TLS; on VPC peering or Transit Gateway, 9042 accepts unencrypted
+connections unless the cluster enforces encryption. The cluster certificate is signed by a
+per-cluster CA, not a public one, so first download it from the cluster's details page ("Download CA
+public key") and import it into a truststore:
 
 ```
 keytool -import -v -trustcacerts -alias CARoot -file scylladb_cluster_ca.pem \
-    -keystore client.truststore -storepass password123
+    -keystore client.truststore -storepass 'password123'
 ```
 
-Choose your own store password; the driver needs the same one to open the truststore. Then give the
-session the contact points from your cluster's connect page, the truststore, the local datacenter
-and your credentials:
+Choose your own store password; the driver needs the same one to open the truststore. Keep it in
+single quotes on the command line, and in double quotes in `application.conf`, where an unquoted `#`
+starts a comment. Then give the session the contact points from your cluster's connect page, the
+truststore, the local datacenter and your credentials:
 
 ```java
 CqlSession session = CqlSession.builder()
@@ -105,21 +107,21 @@ CqlSession session = CqlSession.builder()
     .build();
 ```
 
+`createUnresolved` defers the hostname lookup until the session connects;
+`new InetSocketAddress(host, port)` does it on construction, so the contact point is fixed to
+whatever that one lookup returned. Either way the name matters only at startup: the driver soon
+reaches each node at the address the cluster reports for it, so a DNS change after startup is not
+followed.
+
 The same TLS settings can live in `application.conf` instead of code:
 
 ```
 datastax-java-driver.advanced.ssl-engine-factory {
   class = DefaultSslEngineFactory
   truststore-path = /path/to/client.truststore
-  truststore-password = password123
+  truststore-password = "password123"
 }
 ```
-
-`createUnresolved` defers the hostname lookup until the session connects;
-`new InetSocketAddress(host, port)` does it on construction, so the contact point is fixed to
-whatever that one lookup returned. Either way the name matters only at startup: the driver soon
-reaches each node at the address the cluster reports for it, so a DNS change after startup is not
-followed.
 
 [SSL](../../ssl/) covers truststores, hostname validation and client certificates.
 
