@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.oss.driver.api.core.auth.PlainTextAuthProviderBase.Credentials;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
+import java.nio.ByteBuffer;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -32,7 +33,23 @@ public class ProgrammaticPlainTextAuthProviderTest {
   @Mock private EndPoint endpoint;
 
   @Test
-  public void should_return_correct_credentials_without_authorization_id() {
+  public void should_encode_standard_sasl_plain_response() {
+    ProgrammaticPlainTextAuthProvider provider =
+        new ProgrammaticPlainTextAuthProvider("user", "pass");
+
+    ByteBuffer response =
+        provider
+            .newAuthenticator(endpoint, "org.apache.cassandra.auth.PasswordAuthenticator")
+            .initialResponse()
+            .toCompletableFuture()
+            .join();
+
+    assertThat(response)
+        .isEqualTo(ByteBuffer.wrap(new byte[] {0, 'u', 's', 'e', 'r', 0, 'p', 'a', 's', 's'}));
+  }
+
+  @Test
+  public void should_return_correct_credentials() {
     // given
     ProgrammaticPlainTextAuthProvider provider =
         new ProgrammaticPlainTextAuthProvider("user", "pass");
@@ -41,20 +58,6 @@ public class ProgrammaticPlainTextAuthProviderTest {
     // then
     assertThat(credentials.getUsername()).isEqualTo("user".toCharArray());
     assertThat(credentials.getPassword()).isEqualTo("pass".toCharArray());
-    assertThat(credentials.getAuthorizationId()).isEqualTo(new char[0]);
-  }
-
-  @Test
-  public void should_return_correct_credentials_with_authorization_id() {
-    // given
-    ProgrammaticPlainTextAuthProvider provider =
-        new ProgrammaticPlainTextAuthProvider("user", "pass", "proxy");
-    // when
-    Credentials credentials = provider.getCredentials(endpoint, "irrelevant");
-    // then
-    assertThat(credentials.getUsername()).isEqualTo("user".toCharArray());
-    assertThat(credentials.getPassword()).isEqualTo("pass".toCharArray());
-    assertThat(credentials.getAuthorizationId()).isEqualTo("proxy".toCharArray());
   }
 
   @Test
@@ -68,7 +71,6 @@ public class ProgrammaticPlainTextAuthProviderTest {
     // then
     assertThat(credentials.getUsername()).isEqualTo("user2".toCharArray());
     assertThat(credentials.getPassword()).isEqualTo("pass".toCharArray());
-    assertThat(credentials.getAuthorizationId()).isEqualTo(new char[0]);
   }
 
   @Test
@@ -82,20 +84,5 @@ public class ProgrammaticPlainTextAuthProviderTest {
     // then
     assertThat(credentials.getUsername()).isEqualTo("user".toCharArray());
     assertThat(credentials.getPassword()).isEqualTo("pass2".toCharArray());
-    assertThat(credentials.getAuthorizationId()).isEqualTo(new char[0]);
-  }
-
-  @Test
-  public void should_change_authorization_id() {
-    // given
-    ProgrammaticPlainTextAuthProvider provider =
-        new ProgrammaticPlainTextAuthProvider("user", "pass", "proxy");
-    // when
-    provider.setAuthorizationId("proxy2");
-    Credentials credentials = provider.getCredentials(endpoint, "irrelevant");
-    // then
-    assertThat(credentials.getUsername()).isEqualTo("user".toCharArray());
-    assertThat(credentials.getPassword()).isEqualTo("pass".toCharArray());
-    assertThat(credentials.getAuthorizationId()).isEqualTo("proxy2".toCharArray());
   }
 }
