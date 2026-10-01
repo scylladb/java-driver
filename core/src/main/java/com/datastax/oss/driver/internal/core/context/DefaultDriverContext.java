@@ -22,9 +22,6 @@ import static com.datastax.oss.driver.internal.core.util.Dependency.JACKSON;
 import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.dse.driver.internal.core.InsightsClientLifecycleListener;
 import com.datastax.dse.driver.internal.core.type.codec.DseTypeCodecsRegistrar;
-import com.datastax.dse.protocol.internal.DseProtocolV1ClientCodecs;
-import com.datastax.dse.protocol.internal.DseProtocolV2ClientCodecs;
-import com.datastax.dse.protocol.internal.ProtocolV4ClientCodecsForDse;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
@@ -105,6 +102,7 @@ import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.FrameCodec;
 import com.datastax.oss.protocol.internal.PrimitiveCodec;
 import com.datastax.oss.protocol.internal.ProtocolV3ClientCodecs;
+import com.datastax.oss.protocol.internal.ProtocolV4ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV5ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
 import com.datastax.oss.protocol.internal.SegmentCodec;
@@ -630,11 +628,9 @@ public class DefaultDriverContext implements InternalDriverContext {
         getPrimitiveCodec(),
         getCompressor(),
         new ProtocolV3ClientCodecs(),
-        new ProtocolV4ClientCodecsForDse(),
+        new ProtocolV4ClientCodecs(),
         new ProtocolV5ClientCodecs(),
-        new ProtocolV6ClientCodecs(),
-        new DseProtocolV1ClientCodecs(),
-        new DseProtocolV2ClientCodecs());
+        new ProtocolV6ClientCodecs());
   }
 
   protected SegmentCodec<ByteBuf> buildSegmentCodec() {

@@ -21,7 +21,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
-import com.datastax.dse.protocol.internal.response.result.DseRowsMetadata;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -33,6 +32,7 @@ import com.datastax.oss.protocol.internal.response.result.ColumnSpec;
 import com.datastax.oss.protocol.internal.response.result.DefaultRows;
 import com.datastax.oss.protocol.internal.response.result.RawType;
 import com.datastax.oss.protocol.internal.response.result.Rows;
+import com.datastax.oss.protocol.internal.response.result.RowsMetadata;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
@@ -46,8 +46,8 @@ public class DseTestFixtures {
 
   // Returns a single row, with a single "message" column with the value "hello, world"
   public static Rows singleDseRow() {
-    DseRowsMetadata metadata =
-        new DseRowsMetadata(
+    RowsMetadata metadata =
+        new RowsMetadata(
             ImmutableList.of(
                 new ColumnSpec(
                     "ks",
@@ -57,9 +57,7 @@ public class DseTestFixtures {
                     RawType.PRIMITIVES.get(ProtocolConstants.DataType.VARCHAR))),
             null,
             new int[] {},
-            null,
-            1,
-            true);
+            null);
     Queue<List<ByteBuffer>> data = new ArrayDeque<>();
     data.add(ImmutableList.of(Bytes.fromHexString("0x68656C6C6F2C20776F726C64")));
     return new DefaultRows(metadata, data);
@@ -67,8 +65,8 @@ public class DseTestFixtures {
 
   // Returns 10 rows, each with a single "message" column with the value "hello, world"
   public static Rows tenDseRows(int page, boolean last) {
-    DseRowsMetadata metadata =
-        new DseRowsMetadata(
+    RowsMetadata metadata =
+        new RowsMetadata(
             ImmutableList.of(
                 new ColumnSpec(
                     "ks",
@@ -78,9 +76,7 @@ public class DseTestFixtures {
                     RawType.PRIMITIVES.get(ProtocolConstants.DataType.VARCHAR))),
             last ? null : ByteBuffer.wrap(new byte[] {(byte) page}),
             new int[] {},
-            null,
-            page,
-            last);
+            null);
     Queue<List<ByteBuffer>> data = new ArrayDeque<>();
     for (int i = 0; i < 10; i++) {
       data.add(ImmutableList.of(Bytes.fromHexString("0x68656C6C6F2C20776F726C64")));

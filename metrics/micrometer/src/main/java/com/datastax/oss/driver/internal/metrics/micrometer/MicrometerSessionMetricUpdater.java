@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.metrics.micrometer;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.api.core.metrics.DseSessionMetric;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
@@ -49,12 +47,9 @@ public class MicrometerSessionMetricUpdater extends MicrometerMetricUpdater<Sess
 
     initializeCounter(DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, profile);
     initializeCounter(DefaultSessionMetric.THROTTLING_ERRORS, profile);
-    initializeCounter(DseSessionMetric.GRAPH_CLIENT_TIMEOUTS, profile);
 
     initializeTimer(DefaultSessionMetric.CQL_REQUESTS, profile);
     initializeTimer(DefaultSessionMetric.THROTTLING_DELAY, profile);
-    initializeTimer(DseSessionMetric.CONTINUOUS_CQL_REQUESTS, profile);
-    initializeTimer(DseSessionMetric.GRAPH_REQUESTS, profile);
   }
 
   @Override
@@ -104,51 +99,6 @@ public class MicrometerSessionMetricUpdater extends MicrometerMetricUpdater<Sess
 
       configurePercentilesPublishIfDefined(
           builder, profile, DefaultDriverOption.METRICS_SESSION_THROTTLING_PUBLISH_PERCENTILES);
-    } else if (metric == DseSessionMetric.CONTINUOUS_CQL_REQUESTS) {
-      builder
-          .minimumExpectedValue(
-              profile.getDuration(
-                  DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST))
-          .maximumExpectedValue(
-              profile.getDuration(
-                  DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST))
-          .serviceLevelObjectives(
-              profile.isDefined(DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_SLO)
-                  ? profile
-                      .getDurationList(
-                          DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_SLO)
-                      .toArray(new Duration[0])
-                  : null)
-          .percentilePrecision(
-              profile.isDefined(
-                      DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS)
-                  ? profile.getInt(
-                      DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS)
-                  : null);
-
-      configurePercentilesPublishIfDefined(
-          builder,
-          profile,
-          DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES);
-    } else if (metric == DseSessionMetric.GRAPH_REQUESTS) {
-      builder
-          .minimumExpectedValue(
-              profile.getDuration(DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_LOWEST))
-          .maximumExpectedValue(
-              profile.getDuration(DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_HIGHEST))
-          .serviceLevelObjectives(
-              profile.isDefined(DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_SLO)
-                  ? profile
-                      .getDurationList(DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_SLO)
-                      .toArray(new Duration[0])
-                  : null)
-          .percentilePrecision(
-              profile.isDefined(DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS)
-                  ? profile.getInt(DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS)
-                  : null);
-
-      configurePercentilesPublishIfDefined(
-          builder, profile, DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES);
     }
     return builder;
   }

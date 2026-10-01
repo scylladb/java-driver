@@ -57,7 +57,6 @@ public class DseStartupOptionsBuilderTest {
     initMocks(this);
     when(configLoader.getInitialConfig()).thenReturn(driverConfig);
     when(driverConfig.getDefaultProfile()).thenReturn(defaultProfile);
-    when(defaultProfile.isDefined(DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE)).thenReturn(true);
   }
 
   private void buildContext(UUID clientId, String applicationName, String applicationVersion) {
