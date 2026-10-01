@@ -87,7 +87,10 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
 
   @Override
   public ProtocolVersion highestNonBeta() {
-    ProtocolVersion highest = allVersions.get(allVersions.size() - 1);
+    // DSE protocol versions remain available when forced, but are never useful when negotiating
+    // with ScyllaDB.
+    DefaultProtocolVersion[] ossVersions = DefaultProtocolVersion.values();
+    ProtocolVersion highest = ossVersions[ossVersions.length - 1];
     if (!highest.isBeta()) {
       return highest;
     } else {

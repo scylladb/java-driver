@@ -66,6 +66,11 @@ public class DefaultProtocolVersionRegistryTest {
   }
 
   @Test
+  public void should_pick_highest_non_beta_oss_version_for_negotiation() {
+    assertThat(registry.highestNonBeta()).isEqualTo(V5);
+  }
+
+  @Test
   public void should_downgrade_if_lower_version_available() {
     Optional<ProtocolVersion> downgraded = registry.downgrade(V4);
     downgraded.map(version -> assertThat(version).isEqualTo(V3)).orElseThrow(AssertionError::new);
