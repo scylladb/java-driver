@@ -134,3 +134,12 @@ jobs:
         run: |
           git status && git log -3
           git push origin --follow-tags -v
+
+  publish-docs:
+    name: Publish docs
+    needs: release
+    if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
+    # The release push uses the workflow token, which starts no workflow.
+    uses: ./.github/workflows/docs-pages.yml
+    permissions:
+      contents: write
