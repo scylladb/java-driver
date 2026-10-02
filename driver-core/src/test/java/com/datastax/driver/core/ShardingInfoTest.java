@@ -19,6 +19,7 @@ package com.datastax.driver.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -87,5 +88,143 @@ public class ShardingInfoTest {
                   '1', '0', '0', '0', '0', '0',
                 }));
     assertThat(sharding.shardingInfo.shardId(token5)).isEqualTo(2);
+  }
+
+  private static final List<String> REQUIRED_KEYS =
+      Arrays.asList(
+          "SCYLLA_SHARD",
+          "SCYLLA_NR_SHARDS",
+          "SCYLLA_PARTITIONER",
+          "SCYLLA_SHARDING_ALGORITHM",
+          "SCYLLA_SHARDING_IGNORE_MSB");
+
+  private static Map<String, List<String>> validParams() {
+    Map<String, List<String>> params = new HashMap<String, List<String>>();
+    params.put("SCYLLA_SHARD", Collections.singletonList("3"));
+    params.put("SCYLLA_NR_SHARDS", Collections.singletonList("12"));
+    params.put(
+        "SCYLLA_PARTITIONER",
+        Collections.singletonList("org.apache.cassandra.dht.Murmur3Partitioner"));
+    params.put("SCYLLA_SHARDING_ALGORITHM", Collections.singletonList("biased-token-round-robin"));
+    params.put("SCYLLA_SHARDING_IGNORE_MSB", Collections.singletonList("12"));
+    return params;
+  }
+
+  @Test(groups = "unit")
+  public void should_parse_valid_params_without_shard_aware_ports() {
+    ShardingInfo.ConnectionShardingInfo sharding = ShardingInfo.parseShardingInfo(validParams());
+
+    assertThat(sharding).isNotNull();
+    assertThat(sharding.shardId).isEqualTo(3);
+    assertThat(sharding.shardingInfo.getShardsCount()).isEqualTo(12);
+    assertThat(sharding.shardingInfo.getShardAwarePort(false)).isEqualTo(0);
+    assertThat(sharding.shardingInfo.getShardAwarePort(true)).isEqualTo(0);
+  }
+
+  @Test(groups = "unit")
+  public void should_parse_shard_aware_ports() {
+    Map<String, List<String>> params = validParams();
+    params.put("SCYLLA_SHARD_AWARE_PORT", Collections.singletonList("19042"));
+    params.put("SCYLLA_SHARD_AWARE_PORT_SSL", Collections.singletonList("19142"));
+
+    ShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(params).shardingInfo;
+
+    assertThat(shardingInfo.getShardAwarePort(false)).isEqualTo(19042);
+    assertThat(shardingInfo.getShardAwarePort(true)).isEqualTo(19142);
+  }
+
+  @Test(groups = "unit")
+  public void should_default_only_missing_plain_shard_aware_port() {
+    Map<String, List<String>> params = validParams();
+    params.put("SCYLLA_SHARD_AWARE_PORT_SSL", Collections.singletonList("19142"));
+
+    ShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(params).shardingInfo;
+
+    assertThat(shardingInfo.getShardAwarePort(false)).isEqualTo(0);
+    assertThat(shardingInfo.getShardAwarePort(true)).isEqualTo(19142);
+  }
+
+  @Test(groups = "unit")
+  public void should_default_only_missing_ssl_shard_aware_port() {
+    Map<String, List<String>> params = validParams();
+    params.put("SCYLLA_SHARD_AWARE_PORT", Collections.singletonList("19042"));
+
+    ShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(params).shardingInfo;
+
+    assertThat(shardingInfo.getShardAwarePort(false)).isEqualTo(19042);
+    assertThat(shardingInfo.getShardAwarePort(true)).isEqualTo(0);
+  }
+
+  @Test(groups = "unit")
+  public void should_default_shard_aware_port_when_not_a_number() {
+    Map<String, List<String>> params = validParams();
+    params.put("SCYLLA_SHARD_AWARE_PORT", Collections.singletonList("abc"));
+    params.put("SCYLLA_SHARD_AWARE_PORT_SSL", Collections.singletonList("19142a"));
+
+    ShardingInfo shardingInfo = ShardingInfo.parseShardingInfo(params).shardingInfo;
+
+    assertThat(shardingInfo.getShardAwarePort(false)).isEqualTo(0);
+    assertThat(shardingInfo.getShardAwarePort(true)).isEqualTo(0);
+  }
+
+  @Test(groups = "unit")
+  public void should_return_null_when_required_param_missing() {
+    for (String key : REQUIRED_KEYS) {
+      Map<String, List<String>> params = validParams();
+      params.remove(key);
+      assertThat(ShardingInfo.parseShardingInfo(params)).as(key).isNull();
+    }
+  }
+
+  @Test(groups = "unit")
+  public void should_return_null_when_required_param_not_single_valued() {
+    for (String key : REQUIRED_KEYS) {
+      Map<String, List<String>> params = validParams();
+      params.put(key, Collections.<String>emptyList());
+      assertThat(ShardingInfo.parseShardingInfo(params)).as(key + " empty").isNull();
+      String value = validParams().get(key).get(0);
+      params.put(key, Arrays.asList(value, value));
+      assertThat(ShardingInfo.parseShardingInfo(params)).as(key + " multi").isNull();
+    }
+  }
+
+  @Test(groups = "unit")
+  public void should_return_null_when_int_param_not_a_number() {
+    for (String key :
+        Arrays.asList("SCYLLA_SHARD", "SCYLLA_NR_SHARDS", "SCYLLA_SHARDING_IGNORE_MSB")) {
+      Map<String, List<String>> params = validParams();
+      params.put(key, Collections.singletonList("twelve"));
+      assertThat(ShardingInfo.parseShardingInfo(params)).as(key).isNull();
+    }
+  }
+
+  @Test(groups = "unit")
+  public void should_return_null_for_unsupported_partitioner() {
+    Map<String, List<String>> params = validParams();
+    params.put(
+        "SCYLLA_PARTITIONER",
+        Collections.singletonList("org.apache.cassandra.dht.RandomPartitioner"));
+
+    assertThat(ShardingInfo.parseShardingInfo(params)).isNull();
+  }
+
+  @Test(groups = "unit")
+  public void should_return_null_for_unsupported_sharding_algorithm() {
+    Map<String, List<String>> params = validParams();
+    params.put("SCYLLA_SHARDING_ALGORITHM", Collections.singletonList("token-round-robin"));
+
+    assertThat(ShardingInfo.parseShardingInfo(params)).isNull();
+  }
+
+  @Test(groups = "unit")
+  public void should_accept_out_of_range_shard_values() {
+    // Pins current behaviour (#1192): shard count and shard id are not range-checked
+    Map<String, List<String>> params = validParams();
+    params.put("SCYLLA_NR_SHARDS", Collections.singletonList("0"));
+    assertThat(ShardingInfo.parseShardingInfo(params).shardingInfo.getShardsCount()).isEqualTo(0);
+
+    params = validParams();
+    params.put("SCYLLA_SHARD", Collections.singletonList("12"));
+    assertThat(ShardingInfo.parseShardingInfo(params).shardId).isEqualTo(12);
   }
 }
