@@ -1,0 +1,36 @@
+# Codecov configuration for the upload in the "Coverage report" job of
+# .github/workflows/tests@v1.yml.
+# Reference: https://docs.codecov.com/docs/codecov-yaml
+#
+# There are no path fixes: each package/sourcefile pair in jacoco.xml names
+# exactly one file, e.g. com/datastax/oss/driver/api/core/CqlSession.java can
+# only be core/src/main/java/com/datastax/oss/driver/api/core/CqlSession.java.
+
+codecov:
+  # That job is the only uploader, so its report should neither be withheld
+  # because an unrelated check (Full verify, say) failed nor wait for it.
+  require_ci_to_pass: false
+  notify:
+    wait_for_ci: false
+  # Codecov discards a JaCoCo report whose oldest session is from before noon
+  # the previous day. "Re-run failed jobs" keeps the lanes that passed, so a
+  # re-run's report still carries their first-attempt sessions, and a re-run
+  # after a weekend would be discarded although it is built from this run's
+  # own lanes.
+  max_report_age: false
+
+coverage:
+  status:
+    # Informational: report the delta, never fail a pull request on it. The
+    # integration suites run against live Scylla and Cassandra clusters, so
+    # which lines they reach depends on cluster timing as well as on the diff.
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: true
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+        informational: true
