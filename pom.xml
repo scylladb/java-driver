@@ -27,7 +27,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.scylladb</groupId>
   <artifactId>java-driver-parent</artifactId>
-  <version>4.19.2.2-SNAPSHOT</version>
+  <version>4.19.2.2</version>
   <packaging>pom</packaging>
   <name>Java Driver for Scylla and Apache Cassandra</name>
   <description>A driver for Scylla and Apache Cassandra(R) 2.1+ that works exclusively with the Cassandra Query Language version 3 (CQL3) and Cassandra's native protocol versions 3 and above.</description>
@@ -63,7 +63,7 @@
         as the literal string "@{argLine}", which the forked JVM then
         rejects as an option.
     -->
-    <argLine/>
+    <argLine />
     <config.version>1.4.8</config.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <hdrhistogram.version>2.2.2</hdrhistogram.version>
@@ -110,7 +110,7 @@
     <skipUnitTests>${skipTests}</skipUnitTests>
     <release.autopublish>false</release.autopublish>
     <pushChanges>false</pushChanges>
-    <mockitoopens.argline/>
+    <mockitoopens.argline />
     <!--
         Declared empty for the same reason as argLine above: the JDK
         profiles below only set this from JDK 14 onwards, so on JDK 11 it
@@ -121,7 +121,7 @@
         JVM then rejects ("Could not find or load main class
         ${blockhound.argline}").
     -->
-    <blockhound.argline/>
+    <blockhound.argline />
     <api.plumber.skip>false</api.plumber.skip>
   </properties>
   <dependencyManagement>
@@ -1200,7 +1200,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <connection>scm:git:https://github.com/scylladb/java-driver</connection>
     <developerConnection>scm:git:https://github.com/scylladb/java-driver</developerConnection>
     <url>https://github.com/scylladb/java-driver</url>
-    <tag>HEAD</tag>
+    <tag>4.19.2.2</tag>
   </scm>
   <developers>
     <developer>
