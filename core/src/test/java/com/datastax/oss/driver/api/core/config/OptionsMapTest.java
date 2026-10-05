@@ -44,7 +44,7 @@ public class OptionsMapTest {
 
     // Then
     assertThat(deserialized.get(TypedDriverOption.REQUEST_TIMEOUT))
-        .isEqualTo(Duration.ofSeconds(2));
+        .isEqualTo(Duration.ofSeconds(11));
     assertThat(deserialized.get("slow", TypedDriverOption.REQUEST_TIMEOUT)).isEqualTo(slowTimeout);
     // Listeners are transient
     assertThat(deserialized.removeChangeListener(mockListener)).isFalse();

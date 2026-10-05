@@ -247,7 +247,7 @@ public class OptionsMap implements Serializable {
 
   protected static void fillWithDriverDefaults(OptionsMap map) {
     Duration initQueryTimeout = Duration.ofSeconds(5);
-    Duration requestTimeout = Duration.ofSeconds(2);
+    Duration requestTimeout = Duration.ofSeconds(11);
     int requestPageSize = 5000;
     int continuousMaxPages = 0;
     int continuousMaxPagesPerSecond = 0;
