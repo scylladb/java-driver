@@ -311,4 +311,15 @@ public class DefaultDriverConfigLoaderTest {
     // Any option not in the string should be pulled from reference.conf
     assertThat(config.getString(DefaultDriverOption.REQUEST_CONSISTENCY)).isEqualTo("LOCAL_ONE");
   }
+
+  @Test
+  public void should_load_default_request_timeout() {
+    DriverExecutionProfile config =
+        DriverConfigLoader.fromString("datastax-java-driver.basic.session-name = my-app")
+            .getInitialConfig()
+            .getDefaultProfile();
+
+    assertThat(config.getDuration(DefaultDriverOption.REQUEST_TIMEOUT))
+        .isEqualTo(Duration.ofSeconds(11));
+  }
 }
