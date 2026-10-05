@@ -79,9 +79,10 @@ as an artifact. That job is `continue-on-error`, so a flaky integration test cos
 data rather than adding a second failure to the pull request. Collecting from the existing lanes
 rather than a dedicated workflow keeps the Scylla suite from being run twice.
 
-When every test lane passed, the next job uploads that `jacoco.xml` to
-[Codecov](https://codecov.io/gh/scylladb/java-driver), which comments the coverage delta on the
-pull request. Its statuses are informational, so a drop never blocks a merge.
+When every test lane passed and handed over execution data, the next job uploads that `jacoco.xml`
+to [Codecov](https://codecov.io/gh/scylladb/java-driver), which comments the coverage delta on the
+pull request. Its statuses are informational, so a drop never blocks a merge. The upload runs only
+in scylladb/java-driver; a fork's push runs skip it.
 
 Only the lanes on `COVERAGE_JAVA_VERSION` (a workflow-level variable, JDK 17) are instrumented.
 javac 11 and javac 17 do not emit the same bytes for the same source even under `--release 11` --

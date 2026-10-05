@@ -494,9 +494,10 @@ jobs:
     continue-on-error: true
     timeout-minutes: 20
     # continue-on-error reports this job to the jobs that need it as a success
-    # even when it failed, so the Codecov upload reads this instead.
+    # even when it failed, so the Codecov upload reads this instead. The lanes
+    # check is continue-on-error of its own, so it is read separately.
     outputs:
-      built: ${{ steps.aggregate.outcome == 'success' && steps.upload-report.outcome == 'success' }}
+      built: ${{ steps.lanes.outcome == 'success' && steps.aggregate.outcome == 'success' && steps.upload-report.outcome == 'success' }}
 
     # Only needs to read the checkout; same-run artifacts are handled by the
     # Actions runtime token rather than GITHUB_TOKEN. Scoped on this job alone
@@ -580,6 +581,27 @@ jobs:
           done
           find . -name 'jacoco-*.exec' -printf '%p\t%s bytes\n'
 
+      # A lane can pass without its JaCoCo agent having recorded anything. The
+      # report still renders for diagnosis, but is not handed to Codecov.
+      - name: Check that every lane handed over execution data
+        id: lanes
+        continue-on-error: true
+        run: |
+          shopt -s nullglob
+          missing=()
+          for lane in coverage-exec/*/; do
+            found=0
+            for exec_file in "$lane"*.exec; do
+              [[ -s "$exec_file" ]] && found=1
+            done
+            lane_name="$(basename "$lane")"
+            [[ $found -eq 1 ]] || missing+=("${lane_name#coverage-exec-}")
+          done
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::No execution data from ${missing[*]}; this report is incomplete, so it is not uploaded to Codecov."
+            exit 1
+          fi
+
       - name: Aggregate coverage
         id: aggregate
         run: make coverage-report
@@ -600,12 +622,14 @@ jobs:
   # apart, so a failed JDK 11 leg, which records no coverage, holds the upload
   # back as well. Pull requests from forks get no secrets and upload without a
   # token; neither that nor a Dependabot run, which gets no CODECOV_TOKEN,
-  # fails on a refused upload.
+  # fails on a refused upload. A fork's own push runs have no token and no
+  # Codecov project, so they skip the job.
   codecov:
     name: Upload coverage to Codecov
     runs-on: ubuntu-latest
     needs: [unit-tests, cassandra-integration-tests, scylla-integration-tests, coverage-report]
     if: >-
+      github.repository == 'scylladb/java-driver' &&
       needs.unit-tests.result == 'success' &&
       needs.cassandra-integration-tests.result == 'success' &&
       needs.scylla-integration-tests.result == 'success' &&
@@ -633,4 +657,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage-report/jacoco.xml
           disable_search: true
+          # The CLI's gcov, Xcode and coverage.py plugins have nothing to find here.
+          plugins: noop
           fail_ci_if_error: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
