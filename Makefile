@@ -361,7 +361,7 @@ release-prepare: .require-release-prepare-env
 	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	$(MVNCMD) release:prepare -DpushChanges=false
+	$(MVNCMD) release:prepare -DpushChanges=false -DcheckModificationExcludeList=README.md
 
 release: .require-release-env
 	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
