@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      actions: write
       contents: write
       issues: read
 
@@ -135,10 +134,11 @@ jobs:
           git status && git log -3
           git push origin --follow-tags -v
 
-      # A tag pushed with the workflow token starts no other workflow; a dispatch
-      # does. The docs build from release tags, so publish them now.
-      - name: Publish docs
-        if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-4.x' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run docs-pages.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.event.repository.default_branch }}"
+  publish-docs:
+    name: Publish docs
+    needs: release
+    if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-4.x' }}
+    # The release push uses the workflow token, which starts no workflow.
+    uses: ./.github/workflows/docs-pages.yml
+    permissions:
+      contents: write
