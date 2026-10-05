@@ -1,5 +1,7 @@
 # Scylla Java Driver for Scylla and Apache Cassandra®
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.scylladb/scylla-driver-core?versionPrefix=3.11.5)](https://central.sonatype.com/artifact/com.scylladb/scylla-driver-core)
+
 > **Deprecation Notice:** Scylla Java Driver 3.x is now **deprecated** and has
 > entered **maintenance mode**. Only critical bug fixes will be accepted.
 > For new projects and active development, please migrate to
