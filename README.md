@@ -5,8 +5,8 @@
 
 *If you're reading this on github.com, please note that this is the readme for the development 
 version and that some features described here might not yet have been released. You can find the
-documentation for latest version through [Java Driver Docs](https://docs.scylladb.com/using-scylla/drivers/cql-drivers/scylla-java-driver/) or via the release tags, e.g. 
-[4.17.0.0](https://github.com/scylladb/java-driver/tree/4.17.0.0).*
+documentation for latest version through [Java Driver Docs](https://docs.scylladb.com/using-scylla/drivers/cql-drivers/scylla-java-driver/) or via the
+[release tags](https://github.com/scylladb/java-driver/releases).*
 
 A modern, feature-rich and highly tunable Java client library for Scylla and [Apache Cassandra®] \(2.1+),
 using exclusively Cassandra's binary protocol and Cassandra Query Language (CQL) v3.
@@ -45,7 +45,7 @@ dependency if you plan to use it.
 Refer to each module's manual for more details ([core](manual/core/), [query
 builder](manual/query_builder/), [mapper](manual/mapper)).
 
-[com.scylladb]: http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22com.scylladb%22
+[com.scylladb]: https://central.sonatype.com/namespace/com.scylladb
 
 ## Compatibility
 
