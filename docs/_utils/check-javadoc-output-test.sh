@@ -14,7 +14,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 STUB_CONF="$TMP/conf.py"
 cat > "$STUB_CONF" <<'PY'
-TAGS = []
+RELEASE_LINES = []
 BRANCHES = [
     'scylla-4.17.0.x',
     'scylla-4.18.1.x',
@@ -31,7 +31,7 @@ ALL="scylla-4.17.0.x scylla-4.18.1.x scylla-4.19.0.x stable"
 
 # What the real conf.py documents, written out rather than re-derived: deriving it
 # with a copy of the guard's own parser makes this case pass when that parser breaks.
-# TAGS order, then BRANCHES order, then the smv_rename_latest_version alias. Changing
+# RELEASE_LINES order, then BRANCHES order, then the smv_rename_latest_version alias. Changing
 # the published set is meant to land here too.
 REAL_ALL="scylla-4.19.2.x scylla-3.11.5.x scylla-4.18.1.x scylla-4.19.0.x stable"
 REAL_ALL="$(echo $REAL_ALL)"
@@ -164,7 +164,7 @@ run_case "non-version directories ignored" 0 "" "" "$extras"
 # shorter list: BRANCHES is what the whole guard is derived from. The annotation has
 # to name that cause, or the operator is sent after an empty version list instead.
 cat > "$TMP/unreadable-conf.py" <<'PY'
-TAGS = []
+RELEASE_LINES = []
 BRANCHES = [v for v in ('scylla-4.19.0.x',)]
 LATEST_VERSION = 'scylla-4.19.0.x'
 smv_rename_latest_version = 'stable'

@@ -2,7 +2,7 @@
 
 cd .. || exit 1
 
-# TAGS versions build from their line's newest release, through local alias tags.
+# RELEASE_LINES versions build from their line's newest release, through local alias tags.
 trap 'python3 ./docs/_utils/alias-tags.py delete' EXIT
 python3 ./docs/_utils/alias-tags.py create || exit 1
 

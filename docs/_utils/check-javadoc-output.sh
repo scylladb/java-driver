@@ -37,7 +37,7 @@ if not isinstance(values.get("BRANCHES"), list):
     sys.exit("BRANCHES is missing from %s, or is not a literal list" % sys.argv[1])
 
 alias = values.get("smv_rename_latest_version", "")
-for version in list(values.get("TAGS", [])) + list(values["BRANCHES"]):
+for version in list(values.get("RELEASE_LINES", [])) + list(values["BRANCHES"]):
     print("VERSION\t%s" % version)
 if alias:
     print("VERSION\t%s" % alias)

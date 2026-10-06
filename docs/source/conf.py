@@ -9,14 +9,15 @@ from redirects_cli import cli as redirects_cli
 
 # -- General configuration
 
-# Build documentation for the following tags and branches
-# TAGS lines follow their newest release tag (docs/_utils/alias-tags.py); BRANCHES lines
-# build from their branch. scylla-3.11.5.x moves to TAGS after 3.11.5.20.
-TAGS = [
-    'scylla-4.19.2.x'
+# Build documentation for the following release lines and branches.
+# RELEASE_LINES are line names: each builds from its newest X.Y.Z.N release through a
+# local alias tag of the same name (docs/_utils/alias-tags.py). BRANCHES build from their
+# branch.
+RELEASE_LINES = [
+    'scylla-4.19.2.x',
+    'scylla-3.11.5.x'
 ]
 BRANCHES = [
-    'scylla-3.11.5.x',
     'scylla-4.18.1.x',
     'scylla-4.19.0.x'
 ]
@@ -90,8 +91,8 @@ suppress_warnings = ["ref.any", "myst.header","myst.xref_missing","autosectionla
 
 # -- Options for multiversion extension
 
-# Whitelist pattern for tags
-smv_tag_whitelist = multiversion_regex_builder(TAGS)
+# Whitelist pattern for tags: the local aliases alias-tags.py creates for RELEASE_LINES
+smv_tag_whitelist = multiversion_regex_builder(RELEASE_LINES)
 # Whitelist pattern for branches
 smv_branch_whitelist = multiversion_regex_builder(BRANCHES)
 # Defines which version is considered to be the latest stable version.
@@ -151,12 +152,12 @@ htmlhelp_basename = 'ScyllaDocumentationdoc'
 html_baseurl = 'https://java-driver.docs.scylladb.com'
 
 # Dictionary of values to pass into the template engine’s context for all pages
-# version_order: the dropdown lists TAGS and BRANCHES as one list, newest first
+# version_order: the dropdown lists RELEASE_LINES and BRANCHES as one list, newest first
 # (_templates/versions.html).
 html_context = {
     'html_baseurl': html_baseurl,
     'version_order': sorted(
-        TAGS + BRANCHES,
+        RELEASE_LINES + BRANCHES,
         key=lambda name: [int(part) for part in re.findall(r'\d+', name)],
         reverse=True),
 }
