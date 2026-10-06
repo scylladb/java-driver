@@ -194,6 +194,11 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
       significantDigits = 3;
     }
     Duration refreshInterval = profile.getDuration(intervalOption);
-    return new HdrReservoir(highestLatency, significantDigits, refreshInterval, id.getName());
+    return new HdrReservoir(
+        highestLatency,
+        significantDigits,
+        refreshInterval,
+        id.getName(),
+        highestLatencyOption.getPath());
   }
 }

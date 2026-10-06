@@ -313,13 +313,18 @@ public class DefaultDriverConfigLoaderTest {
   }
 
   @Test
-  public void should_load_default_request_timeout() {
+  public void should_keep_default_metric_caps_above_request_timeout() {
     DriverExecutionProfile config =
         DriverConfigLoader.fromString("datastax-java-driver.basic.session-name = my-app")
             .getInitialConfig()
             .getDefaultProfile();
 
-    assertThat(config.getDuration(DefaultDriverOption.REQUEST_TIMEOUT))
-        .isEqualTo(Duration.ofSeconds(11));
+    Duration requestTimeout = config.getDuration(DefaultDriverOption.REQUEST_TIMEOUT);
+    assertThat(config.getDuration(DefaultDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST))
+        .isGreaterThan(requestTimeout);
+    assertThat(config.getDuration(DefaultDriverOption.METRICS_SESSION_THROTTLING_HIGHEST))
+        .isGreaterThan(requestTimeout);
+    assertThat(config.getDuration(DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_HIGHEST))
+        .isGreaterThan(requestTimeout);
   }
 }

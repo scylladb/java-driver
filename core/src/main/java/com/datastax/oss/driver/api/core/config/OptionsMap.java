@@ -317,11 +317,11 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES, Duration.ofSeconds(1));
     map.put(TypedDriverOption.MONITOR_REPORTING_ENABLED, true);
     map.put(TypedDriverOption.METRICS_SESSION_ENABLED, Collections.emptyList());
-    map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST, Duration.ofSeconds(3));
+    map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_INTERVAL, Duration.ofMinutes(5));
-    map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_HIGHEST, Duration.ofSeconds(3));
+    map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_INTERVAL, Duration.ofMinutes(5));
@@ -342,7 +342,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_INTERVAL, Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_NODE_ENABLED, Collections.emptyList());
-    map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_HIGHEST, Duration.ofSeconds(3));
+    map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_INTERVAL, Duration.ofMinutes(5));
