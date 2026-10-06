@@ -10,12 +10,15 @@ from redirects_cli import cli as redirects_cli
 # -- General configuration
 
 # Build documentation for the following tags and branches
-TAGS = []
+# TAGS lines follow their newest release tag (docs/_utils/alias-tags.py); BRANCHES lines
+# build from their branch. scylla-3.11.5.x moves to TAGS after 3.11.5.20.
+TAGS = [
+    'scylla-4.19.2.x'
+]
 BRANCHES = [
     'scylla-3.11.5.x',
     'scylla-4.18.1.x',
-    'scylla-4.19.0.x',
-    'scylla-4.19.2.x'
+    'scylla-4.19.0.x'
 ]
 # Set the latest version.
 LATEST_VERSION = 'scylla-4.19.2.x'
@@ -120,6 +123,7 @@ html_theme = 'sphinx_scylladb_theme'
 html_theme_options = {
     'conf_py_path': 'docs/source/',
     'branch_substring_removed': 'scylla-',
+    'tag_substring_removed': 'scylla-',
     'github_repository': 'scylladb/java-driver',
     'default_branch': 'scylla-4.x',
     'github_issues_repository': 'scylladb/java-driver',
@@ -147,7 +151,15 @@ htmlhelp_basename = 'ScyllaDocumentationdoc'
 html_baseurl = 'https://java-driver.docs.scylladb.com'
 
 # Dictionary of values to pass into the template engine’s context for all pages
-html_context = {'html_baseurl': html_baseurl}
+# version_order: the dropdown lists TAGS and BRANCHES as one list, newest first
+# (_templates/versions.html).
+html_context = {
+    'html_baseurl': html_baseurl,
+    'version_order': sorted(
+        TAGS + BRANCHES,
+        key=lambda name: [int(part) for part in re.findall(r'\d+', name)],
+        reverse=True),
+}
 def replace_relative_links(app, docname, source):
     result = source[0]
     for key in app.config.replacements:

@@ -8,9 +8,8 @@
    templates_path against the confdir, so this reaches the frozen scylla-3.*.x
    branches too -- none of which need to be touched.
 
-   The migration link targets /stable/upgrade_guide/from_3x/, which exists once
-   scylla-4.19.2.x (LATEST_VERSION) is fast-forwarded to a scylla-4.x commit that
-   has it; the top branches only move by fast-forward from scylla-4.x. #}
+   The migration link targets /stable/upgrade_guide/from_3x/, which LATEST_VERSION
+   has: it builds from the newest 4.19.2.N release tag (conf.py TAGS). #}
 {% if versions and current_version and latest_version and current_version.name in theme_versions_deprecated %}
     <div class="admonition caution">
         <p class="admonition-title">Caution</p>

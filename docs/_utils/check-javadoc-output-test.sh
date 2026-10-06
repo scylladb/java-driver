@@ -31,9 +31,9 @@ ALL="scylla-4.17.0.x scylla-4.18.1.x scylla-4.19.0.x stable"
 
 # What the real conf.py documents, written out rather than re-derived: deriving it
 # with a copy of the guard's own parser makes this case pass when that parser breaks.
-# BRANCHES order, then the smv_rename_latest_version alias. Changing the published set
-# is meant to land here too.
-REAL_ALL="scylla-3.11.5.x scylla-4.18.1.x scylla-4.19.0.x scylla-4.19.2.x stable"
+# TAGS order, then BRANCHES order, then the smv_rename_latest_version alias. Changing
+# the published set is meant to land here too.
+REAL_ALL="scylla-4.19.2.x scylla-3.11.5.x scylla-4.18.1.x scylla-4.19.0.x stable"
 REAL_ALL="$(echo $REAL_ALL)"
 
 failures=0
