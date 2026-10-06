@@ -780,6 +780,15 @@
               <goal>xml-check</goal>
             </goals>
           </execution>
+          <!-- Run by the release plugin: formats only the poms it rewrites and commits. -->
+          <execution>
+            <id>release-poms</id>
+            <configuration>
+              <includes>
+                <include>**/pom.xml</include>
+              </includes>
+            </configuration>
+          </execution>
         </executions>
         <configuration>
           <excludes>
@@ -959,7 +968,14 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <localCheckout>true</localCheckout>
           <pushChanges>${pushChanges}</pushChanges>
           <mavenExecutorId>forked-path</mavenExecutorId>
-          <arguments>-DskipITs -Drelease.autopublish=${release.autopublish} -Dxml-format.skip=true</arguments>
+          <!--
+              The release plugin puts a space before the closing slash of empty elements, which
+              fails xml-check; format the poms before each of its commits (release tag and next
+              SNAPSHOT).
+          -->
+          <preparationGoals>clean xml-format:xml-format@release-poms verify</preparationGoals>
+          <completionGoals>xml-format:xml-format@release-poms</completionGoals>
+          <arguments>-DskipITs -Drelease.autopublish=${release.autopublish} -Dxml-format.skip=false</arguments>
         </configuration>
         <dependencies>
           <dependency>
