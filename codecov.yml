@@ -1,5 +1,5 @@
-# Codecov configuration for the upload in the "Coverage report" job of
-# .github/workflows/tests@v1.yml.
+# Codecov configuration for the upload in the "Upload coverage to Codecov" job
+# of .github/workflows/tests@v1.yml.
 # Reference: https://docs.codecov.com/docs/codecov-yaml
 #
 # There are no path fixes: each package/sourcefile pair in jacoco.xml names
@@ -18,6 +18,14 @@ codecov:
   # after a weekend would be discarded although it is built from this run's
   # own lanes.
   max_report_age: false
+
+parsers:
+  jacoco:
+    # Counts a line with partly covered branches as covered, as JaCoCo's own
+    # line counter and the "Coverage report" job summary do. The cost: Codecov
+    # no longer marks such lines partial, so a half-tested condition counts
+    # fully toward patch coverage. The report artifact still shows it.
+    partials_as_hits: true
 
 coverage:
   status:
