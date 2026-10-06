@@ -49,6 +49,7 @@ public class HdrReservoir implements Reservoir {
   private static final Logger LOG = LoggerFactory.getLogger(HdrReservoir.class);
 
   private final String logPrefix;
+  private final String highestLatencyOptionPath;
   private final Recorder recorder;
   private final long refreshIntervalNanos;
 
@@ -70,8 +71,10 @@ public class HdrReservoir implements Reservoir {
       Duration highestTrackableLatency,
       int numberOfSignificantValueDigits,
       Duration refreshInterval,
-      String logPrefix) {
+      String logPrefix,
+      String highestLatencyOptionPath) {
     this.logPrefix = logPrefix;
+    this.highestLatencyOptionPath = highestLatencyOptionPath;
     // The Reservoir interface is supposed to be agnostic to the unit. However, the Metrics library
     // heavily leans towards nanoseconds (for example, Timer feeds nanoseconds to update(); JmxTimer
     // assumes that the snapshot results are in nanoseconds).
@@ -91,9 +94,10 @@ public class HdrReservoir implements Reservoir {
       recorder.recordValue(value / 1000);
     } catch (ArrayIndexOutOfBoundsException e) {
       LOG.warn(
-          "[{}] Recorded value ({}) is out of bounds, discarding. Set advanced.metrics.session.cql-requests.highest-latency to maximum possible request timeout to make it not happening.",
+          "[{}] Recorded value ({}) is out of bounds, discarding. Increase {}.",
           logPrefix,
-          value);
+          Duration.ofNanos(value),
+          highestLatencyOptionPath);
     }
   }
 
