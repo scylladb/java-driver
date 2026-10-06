@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Points a local tag named after each version in conf.py's TAGS at that line's newest
+"""Points a local tag named after each version in conf.py's RELEASE_LINES at that line's newest
 release, so scylla-4.19.2.x builds from the newest 4.19.2.N tag and a patch release
 needs no conf.py change. The aliases are scratch refs: never push them.
 
-  alias-tags.py create   (re)create one alias per TAGS entry
+  alias-tags.py create   (re)create one alias per RELEASE_LINES entry
   alias-tags.py delete   remove them again
 """
 
@@ -21,17 +21,17 @@ def fail(message):
     sys.exit(1)
 
 
-def read_tags(conf_py):
+def read_lines(conf_py):
     with open(conf_py) as conf:
         tree = ast.parse(conf.read())
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign) and any(
-                isinstance(target, ast.Name) and target.id == "TAGS" for target in node.targets):
-            tags = ast.literal_eval(node.value)
-            if not isinstance(tags, list):
-                fail("TAGS in %s is not a literal list" % conf_py)
-            return tags
-    fail("TAGS is missing from %s" % conf_py)
+                isinstance(target, ast.Name) and target.id == "RELEASE_LINES" for target in node.targets):
+            lines = ast.literal_eval(node.value)
+            if not isinstance(lines, list):
+                fail("RELEASE_LINES in %s is not a literal list" % conf_py)
+            return lines
+    fail("RELEASE_LINES is missing from %s" % conf_py)
 
 
 def git(*args):
@@ -51,7 +51,7 @@ def create(versions):
     for version in versions:
         match = ALIAS.fullmatch(version)
         if not match:
-            fail("TAGS entry '%s' is not of the form scylla-X.Y.Z.x" % version)
+            fail("RELEASE_LINES entry '%s' is not of the form scylla-X.Y.Z.x" % version)
         newest = newest_release(match.group(1))
         if not newest:
             fail("No release tag matches %s.N for %s" % (match.group(1), version))
@@ -73,7 +73,7 @@ def main():
     if len(sys.argv) != 2 or sys.argv[1] not in commands:
         print("usage: %s create|delete" % sys.argv[0], file=sys.stderr)
         sys.exit(2)
-    commands[sys.argv[1]](read_tags(os.environ.get("CONF_PY", "docs/source/conf.py")))
+    commands[sys.argv[1]](read_lines(os.environ.get("CONF_PY", "docs/source/conf.py")))
 
 
 if __name__ == "__main__":

@@ -17,17 +17,17 @@ To generate the reference documentation of the driver, run the command `make jav
 
 ## Multiversion build
 
-`make -C docs multiversion` builds the documentation site and javadoc for every version in `TAGS` and `BRANCHES` (`docs/source/conf.py`):
+`make -C docs multiversion` builds the documentation site and javadoc for every version in `RELEASE_LINES` and `BRANCHES` (`docs/source/conf.py`):
 
-- A `TAGS` version (`scylla-X.Y.Z.x`) builds from the newest `X.Y.Z.N` release tag. `docs/_utils/alias-tags.py` points a local, never-pushed tag of that name at it for the build. A patch release needs no change, and moving the `scylla-X.Y.Z.x` branch does not change the site.
+- A `RELEASE_LINES` version (`scylla-X.Y.Z.x`) builds from the newest `X.Y.Z.N` release tag. `docs/_utils/alias-tags.py` points a local, never-pushed tag of that name at it for the build. A patch release needs no change, and moving the `scylla-X.Y.Z.x` branch does not change the site.
 - A `BRANCHES` version builds from its branch. These are lines whose docs no longer follow releases.
 
 `docs/_utils/javadoc-multiversion.sh` selects the JDK per version: versions up to `scylla-4.19.0.x` need JDK 8, newer ones JDK 11.
 
 To add a new documented version:
 
-1. Release the line first: a `TAGS` version with no `X.Y.Z.N` tag fails the build.
-2. Add it to `TAGS` in `docs/source/conf.py`, and update `LATEST_VERSION` if it is the new latest. New versions build with JDK 11 by default.
+1. Release the line first: a `RELEASE_LINES` version with no `X.Y.Z.N` tag fails the build.
+2. Add it to `RELEASE_LINES` in `docs/source/conf.py`, and update `LATEST_VERSION` if it is the new latest. New versions build with JDK 11 by default.
 3. Only if the version needs a different JDK, map it in `docs/_utils/javadoc-multiversion.sh`.
 4. Only if that JDK is not installed by the workflow yet, add it to the `setup-java` step in `.github/workflows/docs-pages.yml`.
 
