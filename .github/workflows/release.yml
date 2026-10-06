@@ -77,6 +77,24 @@ jobs:
           git config user.name "ScyllaDB Promoter"
           git config user.email "github-promoter@scylladb.com"
 
+      # The release plugin rewrites only poms, so the README's version went stale between
+      # releases. Its commit takes the whole index, so a README staged here lands in the
+      # "prepare release" commit and the tag; release-prepare tolerates it via
+      # checkModificationExcludeList.
+      - name: Stamp the README with the release version
+        run: |
+          set -euo pipefail
+          version="$(mvn -B -q -ntp help:evaluate -Dexpression=project.version -DforceStdout)"
+          version="${version%-SNAPSHOT}"
+          line="${version%.*}"
+          sed -i -E "s/${line//./\\.}\.[0-9]+/${version}/g" README.md
+          if ! grep -qF "$version" README.md; then
+            echo "::error::README.md does not name $version after stamping; update this step"
+            exit 1
+          fi
+          git add README.md
+          git diff --cached --stat
+
       - name: Prepare release
         env:
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
