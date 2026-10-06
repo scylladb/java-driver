@@ -22,10 +22,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.data.UdtValue;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
 import com.datastax.oss.driver.api.testinfra.ccm.CcmRule;
+import com.datastax.oss.driver.api.testinfra.ccm.SchemaChangeSynchronizer;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.categories.ParallelizableTests;
 import java.util.Objects;
@@ -47,8 +49,18 @@ public class UdtCodecIT {
   @Test
   public void should_decoding_udt_be_backward_compatible() {
     CqlSession session = sessionRule.session();
-    session.execute("CREATE TYPE test_type_1 (a text, b int)");
-    session.execute("CREATE TABLE test_table_1 (e int primary key, f frozen<test_type_1>)");
+    SchemaChangeSynchronizer.withLock(
+        () -> {
+          session.execute(
+              SimpleStatement.builder("CREATE TYPE test_type_1 (a text, b int)")
+                  .setExecutionProfile(sessionRule.slowProfile())
+                  .build());
+          session.execute(
+              SimpleStatement.builder(
+                      "CREATE TABLE test_table_1 (e int primary key, f frozen<test_type_1>)")
+                  .setExecutionProfile(sessionRule.slowProfile())
+                  .build());
+        });
     // insert a row using version 1 of the UDT schema
     session.execute("INSERT INTO test_table_1(e, f) VALUES(1, {a: 'a', b: 1})");
     UserDefinedType udt =
@@ -59,7 +71,12 @@ public class UdtCodecIT {
             .orElseThrow(IllegalStateException::new);
     TypeCodec<?> oldCodec = session.getContext().getCodecRegistry().codecFor(udt);
     // update UDT schema
-    session.execute("ALTER TYPE test_type_1 add i text");
+    SchemaChangeSynchronizer.withLock(
+        () ->
+            session.execute(
+                SimpleStatement.builder("ALTER TYPE test_type_1 add i text")
+                    .setExecutionProfile(sessionRule.slowProfile())
+                    .build()));
     // insert a row using version 2 of the UDT schema
     session.execute("INSERT INTO test_table_1(e, f) VALUES(2, {a: 'b', b: 2, i: 'b'})");
     Row row =
