@@ -18,17 +18,23 @@ on:
         description: 'target-tag: tag or branch name to release. Use to re-release tagged releases'
         default: scylla-3.x
 
+      skip-integration-matrix:
+        type: boolean
+        description: 'skip-integration-matrix: do not run the driver matrix integration tests before releasing'
+        default: false
+
 jobs:
-  release:
-    name: Release
+  release-target:
+    name: Resolve release target
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write
+      contents: read
       issues: read
 
-    env:
-      MVNCMD: mvn -B -X -ntp
+    outputs:
+      ref: ${{ steps.target.outputs.ref }}
+      version: ${{ steps.target.outputs.version }}
 
     steps:
       - name: Check for open release blockers
@@ -52,6 +58,73 @@ jobs:
           fi
           echo "No open release blockers."
 
+      - name: Checkout Repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # The commit release:prepare starts from, and the version it will tag: HEAD, or one commit
+      # before target-tag for a re-release, as make checkout-one-commit-before does.
+      - name: Resolve release commit and version
+        id: target
+        env:
+          TARGET_TAG: ${{ inputs.target-tag }}
+        run: |
+          set -euo pipefail
+          ref="$GITHUB_SHA"
+          if [[ "$TARGET_TAG" == 3.* ]]; then
+            ref="$(git rev-parse "refs/tags/$TARGET_TAG~1")"
+          fi
+          version="$(git show "$ref:pom.xml" | python3 -c 'import sys, xml.etree.ElementTree as ET; print(ET.parse(sys.stdin).getroot().findtext("{http://maven.apache.org/POM/4.0.0}version"))')"
+          version="${version%-SNAPSHOT}"
+          if [[ ! "$version" =~ ^3\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unexpected release version '$version' at $ref"
+            exit 1
+          fi
+          if [[ "$TARGET_TAG" == 3.* && "$version" != "$TARGET_TAG" ]]; then
+            echo "::error::$TARGET_TAG~1 would release $version, not $TARGET_TAG"
+            exit 1
+          fi
+          echo "Releasing $version from $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Skip integration matrix
+        if: inputs.skip-integration-matrix == true
+        run: echo "::warning::Pre-release integration matrix skipped"
+
+  # The driver matrix patches and tests every release, and a release that breaks it used to
+  # surface only in the nightly Jenkins run, after it was public (4.19.2.2). This runs the full
+  # Scylla matrix from matrix master on the commit about to be released, selecting patches as
+  # if it were already tagged with the release version. If it fails, fix the matrix (for
+  # example, add versions/scylla/<version>), merge that, and re-dispatch.
+  pre-release-integration:
+    name: Pre-release integration matrix
+    needs: release-target
+    if: inputs.skip-integration-matrix == false
+    permissions:
+      contents: read
+    uses: scylladb/scylla-java-driver-matrix/.github/workflows/driver-integration-matrix.yml@master
+    with:
+      run_apache: false
+      driver_ref: ${{ needs.release-target.outputs.ref }}
+      driver_version: ${{ needs.release-target.outputs.version }}
+
+  release:
+    name: Release
+    needs: [release-target, pre-release-integration]
+    if: ${{ !cancelled() && needs.release-target.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.pre-release-integration.result) }}
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      issues: read
+
+    env:
+      MVNCMD: mvn -B -X -ntp
+
+    steps:
       - name: Checkout Repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
@@ -156,7 +229,8 @@ jobs:
   publish-docs:
     name: Publish docs
     needs: release
-    if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
+    # Without !cancelled(), a skipped pre-release-integration would skip this job too.
+    if: ${{ !cancelled() && needs.release.result == 'success' && inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
     # The release push uses the workflow token, which starts no workflow.
     uses: ./.github/workflows/docs-pages.yml
     permissions:
