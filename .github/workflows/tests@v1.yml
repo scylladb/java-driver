@@ -41,6 +41,12 @@ env:
   COVERAGE_JAVA_VERSION: "17"
 
 jobs:
+  pre-release-integration:
+    uses: scylladb/scylla-java-driver-matrix/.github/workflows/driver-integration-matrix.yml@master
+    with:
+      driver_ref: ${{ github.sha }}
+      driver_version: 4.19.2.3
+
   build:
     name: Build
     runs-on: ubuntu-latest
