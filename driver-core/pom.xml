@@ -168,6 +168,14 @@
                     <groupId>org.testng</groupId>
                     <artifactId>testng</artifactId>
                 </exclusion>
+                <!-- byteman's JDK 8 tools.jar path comes from a file-activated profile that Maven
+                     3.10 no longer applies, which breaks dependency resolution. tools.jar is only
+                     needed to attach the BMUnit agent, and the one BMUnit test (SessionErrorTest)
+                     is disabled. Re-enabling it on JDK 8 needs tools.jar on the test classpath. -->
+                <exclusion>
+                    <groupId>com.sun</groupId>
+                    <artifactId>tools</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <!-- Used by DefaultDriverConfigReporter to build the DRIVER_CONFIG JSON blob -->
