@@ -676,6 +676,11 @@ public class CCMTestsSupport {
    * @throws Exception
    */
   public void beforeTestMethod(Object testInstance, Method testMethod) throws Exception {
+    // Apply the method's version gates before creating its cluster. TestListener applies them too,
+    // but only after this @BeforeMethod has started CCM, and TestNG still runs the body.
+    // configfailurepolicy=continue limits a skip here to this one method.
+    TestListener.checkForSkipConditions(testMethod);
+
     if (isCcmEnabled(testMethod)) {
       if (closer == null) closer = Closer.create();
       if (testMode == PER_METHOD || erroredOut) {
