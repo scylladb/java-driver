@@ -26,6 +26,12 @@ import java.util.logging.Logger;
 import org.awaitility.Awaitility;
 import org.testng.annotations.Test;
 
+// Class-level so beforeTestClass skips before CCM starts: older servers reject the
+// session-ticket option in @CCMConfig and never come up.
+@ScyllaVersion(
+    minEnterprise = "2025.2.0",
+    maxOSS = "0.0.0",
+    description = "Requires certain options to be enabled server side. Since scylladb/pull/22928")
 @CreateCCM(PER_METHOD)
 @CCMConfig(
     auth = false,
@@ -57,10 +63,6 @@ public class SSLSessionTicketsTest extends SSLTestBase {
    * @expected_result Connection can be established.
    */
   @Test(groups = "isolated")
-  @ScyllaVersion(
-      minEnterprise = "2025.2.0",
-      maxOSS = "0.0.0",
-      description = "Requires certain options to be enabled server side. Since scylladb/pull/22928")
   public void should_receive_tickets_TLSv13_JDK() throws Exception {
     try {
       setupJavaSslLogTracking();
@@ -83,10 +85,6 @@ public class SSLSessionTicketsTest extends SSLTestBase {
   }
 
   @Test(groups = "isolated")
-  @ScyllaVersion(
-      minEnterprise = "2025.2.0",
-      maxOSS = "0.0.0",
-      description = "Requires certain options to be enabled server side. Since scylladb/pull/22928")
   public void all_reconnections_should_use_tickets_TLSv13_netty() throws Exception {
     TestableNettySSLOptions testableSSLOptions =
         (TestableNettySSLOptions)
@@ -147,10 +145,6 @@ public class SSLSessionTicketsTest extends SSLTestBase {
       groups = "isolated",
       expectedExceptions = AssertionError.class,
       expectedExceptionsMessageRegExp = ".*Every reconnection should be a resumption.*")
-  @ScyllaVersion(
-      minEnterprise = "2025.2.0",
-      maxOSS = "0.0.0",
-      description = "Requires certain options to be enabled server side. Since scylladb/pull/22928")
   public void all_reconnections_should_use_tickets_TLSv13_JDK() throws Exception {
     // Unfortunately the OpenJDK's cache in older versions cannot hold more than 1 ticket
     // making the reconnection scenario with all reconnections using tickets impossible.
