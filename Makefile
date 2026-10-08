@@ -362,15 +362,8 @@ release-prepare: .require-release-prepare-env
 	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	# maven-release-plugin rewrites pom.xml via its own XML serializer (MavenXpp3Writer)
-	# which does not conform to xml-format-maven-plugin rules (e.g. expands <foo/> to <foo />).
-	# The check is skipped during release:prepare to avoid build failure, but we immediately
-	# re-format all pom.xml files and amend the resulting SNAPSHOT commit so that downstream
-	# branches and PRs do not inherit the formatting corruption in their CI merge commits.
-	$(MVNCMD) release:prepare -DpushChanges=false -Dxml-format.skip=true
-	$(MVNCMD) xml-format:xml-format -Dxml-format.skip=false
-	git diff --name-only | grep 'pom\.xml' | xargs --no-run-if-empty git add
-	git diff --cached --quiet || git commit --amend --no-edit
+	# maven-release-plugin formats the poms via preparationGoals/completionGoals (pom.xml), so the tag passes xml-check.
+	$(MVNCMD) release:prepare -DpushChanges=false
 
 release: .require-release-env
 	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
