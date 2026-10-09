@@ -98,6 +98,7 @@ public class CqlPrepareHandler implements Throttled {
   private final RequestThrottler throttler;
   private final Boolean prepareOnAllNodes;
   private final DriverExecutionProfile executionProfile;
+  private volatile boolean admitted;
   private volatile InitialPrepareCallback initialCallback;
 
   // The errors on the nodes that were already tried (lazily initialized on the first error).
@@ -148,18 +149,24 @@ public class CqlPrepareHandler implements Throttled {
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(initialRequest, context);
-    if (wasDelayed) {
-      session
-          .getMetricUpdater()
-          .updateTimer(
-              DefaultSessionMetric.THROTTLING_DELAY,
-              executionProfile.getName(),
-              System.nanoTime() - startTimeNanos,
-              TimeUnit.NANOSECONDS);
+    admitted = true;
+    try {
+      if (wasDelayed) {
+        session
+            .getMetricUpdater()
+            .updateTimer(
+                DefaultSessionMetric.THROTTLING_DELAY,
+                executionProfile.getName(),
+                System.nanoTime() - startTimeNanos,
+                TimeUnit.NANOSECONDS);
+      }
+      sendRequest(initialRequest, null, 0);
+    } catch (Throwable t) {
+      // Concurrency-limiting throttlers contain exceptions from ready callbacks so that a failed
+      // request can't interrupt queue draining. Complete through the normal terminal path to
+      // release this request's permit before returning to the throttler.
+      setFinalError(t);
     }
-    sendRequest(initialRequest, null, 0);
   }
 
   public CompletableFuture<PreparedStatement> handle() {
@@ -370,7 +377,8 @@ public class CqlPrepareHandler implements Throttled {
       cancelTimeout();
       if (error instanceof DriverTimeoutException) {
         throttler.signalTimeout(this);
-      } else if (!(error instanceof RequestThrottlingException)) {
+      } else if (!(error instanceof CancellationException)
+          && (admitted || !(error instanceof RequestThrottlingException))) {
         throttler.signalError(this, error);
       }
     }

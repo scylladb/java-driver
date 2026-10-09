@@ -105,6 +105,7 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
   private final long startTimeNanos;
   private final RequestThrottler throttler;
   private final SessionMetricUpdater metricUpdater;
+  private volatile boolean admitted;
   private final AtomicBoolean holdsExternalReservation;
 
   protected ThrottledAdminRequestHandler(
@@ -140,9 +141,13 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
       throttler.register(this);
     } catch (Throwable t) {
       cancelExternalReservation();
-      // Registration can fail before the throttler admits this request, so complete the result
-      // without calling this class's override, which would signal a permit that was never acquired.
-      super.setFinalError(t);
+      if (admitted) {
+        setFinalError(t);
+        cancelSubmittedRequest();
+      } else {
+        // Registration failed before admission, so there is no throttler permit to release.
+        super.setFinalError(t);
+      }
       throw t;
     }
     return result;
@@ -150,6 +155,7 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
+    admitted = true;
     try {
       if (wasDelayed) {
         metricUpdater.updateTimer(
@@ -163,7 +169,7 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
     } catch (Throwable t) {
       cancelExternalReservation();
       setFinalError(t);
-      throw t;
+      cancelSubmittedRequest();
     }
   }
 
@@ -175,8 +181,6 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
   }
 
   private void cancelExternalReservation() {
-    // register() can invoke onThrottleReady() synchronously. If that callback throws, both
-    // onThrottleReady() and start() catch the same failure, so cancellation must be idempotent.
     if (holdsExternalReservation.compareAndSet(true, false)) {
       cancelCallerOwnedPreAcquireId();
     }
@@ -197,7 +201,7 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
     if (wasSet) {
       if (error instanceof DriverTimeoutException) {
         throttler.signalTimeout(this);
-      } else if (!(error instanceof RequestThrottlingException)) {
+      } else if (admitted) {
         throttler.signalError(this, error);
       }
     }

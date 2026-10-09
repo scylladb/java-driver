@@ -46,6 +46,7 @@ import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
+import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
@@ -110,7 +111,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,7 +145,7 @@ public class CqlRequestHandler implements Throttled {
    */
   private final AtomicInteger startedSpeculativeExecutionsCount;
 
-  final Timeout scheduledTimeout;
+  volatile Timeout scheduledTimeout;
   final List<Timeout> scheduledExecutions;
   private final List<NodeResponseCallback> inFlightCallbacks;
   private final RequestThrottler throttler;
@@ -150,6 +153,10 @@ public class CqlRequestHandler implements Throttled {
   private final Optional<RequestIdGenerator> requestIdGenerator;
   private final SessionMetricUpdater sessionMetricUpdater;
   private final DriverExecutionProfile executionProfile;
+  private volatile boolean admitted;
+  private final AtomicBoolean registrationComplete = new AtomicBoolean();
+  private final AtomicBoolean throttlerReleased = new AtomicBoolean();
+  private final AtomicReference<Throwable> terminalError = new AtomicReference<>();
 
   // The errors on the nodes that were already tried (lazily initialized on the first error).
   // We don't use a map because nodes can appear multiple times.
@@ -179,13 +186,15 @@ public class CqlRequestHandler implements Throttled {
     this.session = session;
     this.keyspace = session.getKeyspace().orElse(null);
     this.context = context;
+    this.throttler = context.getRequestThrottler();
     this.result = new CompletableFuture<>();
     this.result.exceptionally(
         t -> {
           try {
             if (t instanceof CancellationException) {
+              terminalError.compareAndSet(null, t);
               cancelScheduledTasks();
-              context.getRequestThrottler().signalCancel(this);
+              releaseThrottler(t);
             }
           } catch (Throwable t2) {
             Loggers.warnWithException(LOG, "[{}] Uncaught exception", handlerLogPrefix, t2);
@@ -205,34 +214,63 @@ public class CqlRequestHandler implements Throttled {
     this.executionProfile = Conversions.resolveExecutionProfile(initialStatement, context);
     Duration timeout = Conversions.resolveRequestTimeout(statement, executionProfile);
     this.scheduledTimeout = scheduleTimeout(timeout);
-
-    this.throttler = context.getRequestThrottler();
-    this.throttler.register(this);
+    if (!result.isDone()) {
+      try {
+        this.throttler.register(this);
+        registrationComplete.set(true);
+      } catch (Throwable t) {
+        if (admitted) {
+          setFinalError(initialStatement, t, null, -1);
+        } else {
+          // Registration failed before admission, so there is no throttler permit to release.
+          setFinalErrorWithoutThrottlerRelease(initialStatement, t, null, -1);
+        }
+        throw t;
+      }
+      // The timeout can fire while register() is still deciding whether to admit or enqueue the
+      // request. Once registration returns, finish any release that had to be deferred until the
+      // throttler was known to own the request.
+      if (result.isDone()) {
+        releaseThrottler(terminalError.get());
+      }
+    }
   }
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    if (wasDelayed
-        // avoid call to nanoTime() if metric is disabled:
-        && sessionMetricUpdater.isEnabled(
-            DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
-      sessionMetricUpdater.updateTimer(
-          DefaultSessionMetric.THROTTLING_DELAY,
-          executionProfile.getName(),
-          System.nanoTime() - startTimeNanos,
-          TimeUnit.NANOSECONDS);
+    admitted = true;
+    if (result.isDone()) {
+      releaseThrottler(terminalError.get());
+      return;
     }
-    Queue<Node> queryPlan;
-    if (this.initialStatement.getNode() != null) {
-      queryPlan = new SimpleQueryPlan(this.initialStatement.getNode());
-    } else {
-      queryPlan =
-          context
-              .getLoadBalancingPolicyWrapper()
-              .newQueryPlan(initialStatement, executionProfile.getName(), session);
-    }
+    try {
+      if (wasDelayed
+          // avoid call to nanoTime() if metric is disabled:
+          && sessionMetricUpdater.isEnabled(
+              DefaultSessionMetric.THROTTLING_DELAY, executionProfile.getName())) {
+        sessionMetricUpdater.updateTimer(
+            DefaultSessionMetric.THROTTLING_DELAY,
+            executionProfile.getName(),
+            System.nanoTime() - startTimeNanos,
+            TimeUnit.NANOSECONDS);
+      }
+      Queue<Node> queryPlan;
+      if (this.initialStatement.getNode() != null) {
+        queryPlan = new SimpleQueryPlan(this.initialStatement.getNode());
+      } else {
+        queryPlan =
+            context
+                .getLoadBalancingPolicyWrapper()
+                .newQueryPlan(initialStatement, executionProfile.getName(), session);
+      }
 
-    sendRequest(initialStatement, null, queryPlan, 0, 0, true);
+      sendRequest(initialStatement, null, queryPlan, 0, 0, true);
+    } catch (Throwable t) {
+      // Throttlers invoke this callback synchronously after admitting the request. Contain setup
+      // failures so the normal terminal path releases the permit and scheduled work, and so a
+      // delayed request can't throw through the completion path of the request that admitted it.
+      setFinalError(initialStatement, t, null, -1);
+    }
   }
 
   public CompletionStage<AsyncResultSet> handle() {
@@ -255,12 +293,15 @@ public class CqlRequestHandler implements Throttled {
             timeoutDuration.toNanos(),
             TimeUnit.NANOSECONDS);
       } catch (IllegalStateException e) {
-        // If we raced with session shutdown the timer might be closed already, rethrow with a more
-        // explicit message
-        result.completeExceptionally(
+        // Timeout installation precedes throttler registration. Complete the request without
+        // signaling a throttler that does not own it yet.
+        setFinalErrorWithoutThrottlerRelease(
+            initialStatement,
             "cannot be started once stopped".equals(e.getMessage())
                 ? new IllegalStateException("Session is closed")
-                : e);
+                : e,
+            null,
+            -1);
       }
     }
     return null;
@@ -380,27 +421,43 @@ public class CqlRequestHandler implements Throttled {
     }
     Node node = retriedNode;
     DriverChannel channel = null;
-    if (node == null
-        || (channel =
+    try {
+      Token routingToken = getRoutingToken(statement);
+      if (node != null) {
+        try {
+          channel =
+              session.getChannel(
+                  node,
+                  handlerLogPrefix,
+                  routingToken,
+                  getShardFromTabletMap(statement, node, routingToken));
+        } catch (Throwable t) {
+          recordError(node, t);
+        }
+      }
+      if (channel == null) {
+        while (!result.isDone() && (node = queryPlan.poll()) != null) {
+          try {
+            channel =
                 session.getChannel(
                     node,
                     handlerLogPrefix,
-                    getRoutingToken(statement),
-                    getShardFromTabletMap(statement, node, getRoutingToken(statement))))
-            == null) {
-      while (!result.isDone() && (node = queryPlan.poll()) != null) {
-        channel =
-            session.getChannel(
-                node,
-                handlerLogPrefix,
-                getRoutingToken(statement),
-                getShardFromTabletMap(statement, node, getRoutingToken(statement)));
-        if (channel != null) {
-          break;
-        } else {
-          recordError(node, new NodeUnavailableException(node));
+                    routingToken,
+                    getShardFromTabletMap(statement, node, routingToken));
+          } catch (Throwable t) {
+            recordError(node, t);
+            continue;
+          }
+          if (channel != null) {
+            break;
+          } else {
+            recordError(node, new NodeUnavailableException(node));
+          }
         }
       }
+    } catch (Throwable t) {
+      handleRequestSetupFailure(statement, t, currentExecutionIndex);
+      return;
     }
     if (channel == null) {
       // We've reached the end of the query plan without finding any node to write to
@@ -410,6 +467,7 @@ public class CqlRequestHandler implements Throttled {
       }
     } else {
       boolean writeSubmitted = false;
+      Throwable setupFailure = null;
       try {
         Statement finalStatement = statement;
         String nodeRequestId =
@@ -437,11 +495,46 @@ public class CqlRequestHandler implements Throttled {
                 message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback);
         writeSubmitted = true;
         writeFuture.addListener(nodeResponseCallback);
+      } catch (Throwable t) {
+        setupFailure = t;
       } finally {
         if (!writeSubmitted) {
-          channel.cancelPreAcquireId();
+          try {
+            channel.cancelPreAcquireId();
+          } catch (Throwable t) {
+            if (setupFailure == null) {
+              setupFailure = t;
+            } else if (setupFailure != t) {
+              setupFailure.addSuppressed(t);
+            }
+          }
         }
       }
+      if (setupFailure != null) {
+        handleRequestSetupFailure(statement, setupFailure, currentExecutionIndex);
+      }
+    }
+  }
+
+  private void handleRequestSetupFailure(Statement<?> statement, Throwable error, int execution) {
+    if (result.isDone()) {
+      Loggers.warnWithException(
+          LOG,
+          "[{}] Request setup failed after the request had completed",
+          handlerLogPrefix,
+          error);
+      return;
+    }
+    if (activeExecutionsCount.decrementAndGet() == 0) {
+      // Setup failed before channel.write() accepted a node request, so this is a session-level
+      // failure rather than a failed node attempt.
+      setFinalError(statement, error, null, execution);
+    } else {
+      Loggers.warnWithException(
+          LOG,
+          "[{}] Request setup failed, another execution is still active",
+          handlerLogPrefix,
+          error);
     }
   }
 
@@ -485,7 +578,9 @@ public class CqlRequestHandler implements Throttled {
           Conversions.toResultSet(resultMessage, executionInfo, session, context);
       if (result.complete(resultSet)) {
         cancelScheduledTasks();
-        throttler.signalSuccess(this);
+        if (throttlerReleased.compareAndSet(false, true)) {
+          throttler.signalSuccess(this);
+        }
 
         // Only call nanoTime() if we're actually going to use it
         long completionTimeNanos = NANOTIME_NOT_MEASURED_YET,
@@ -606,10 +701,23 @@ public class CqlRequestHandler implements Throttled {
   public void onThrottleFailure(@NonNull RequestThrottlingException error) {
     sessionMetricUpdater.incrementCounter(
         DefaultSessionMetric.THROTTLING_ERRORS, executionProfile.getName());
+    // The throttler rejected this request, so there is no admission to release.
+    throttlerReleased.set(true);
     setFinalError(initialStatement, error, null, -1);
   }
 
   private void setFinalError(Statement<?> statement, Throwable error, Node node, int execution) {
+    setFinalError(statement, error, node, execution, true);
+  }
+
+  private void setFinalErrorWithoutThrottlerRelease(
+      Statement<?> statement, Throwable error, Node node, int execution) {
+    setFinalError(statement, error, node, execution, false);
+  }
+
+  private void setFinalError(
+      Statement<?> statement, Throwable error, Node node, int execution, boolean releaseThrottler) {
+    terminalError.compareAndSet(null, error);
     if (error instanceof DriverException) {
       ((DriverException) error)
           .setExecutionInfo(
@@ -633,13 +741,36 @@ public class CqlRequestHandler implements Throttled {
         requestTracker.onError(
             statement, error, latencyNanos, executionProfile, node, handlerLogPrefix);
       }
+      if (releaseThrottler) {
+        releaseThrottler(error);
+      }
       if (error instanceof DriverTimeoutException) {
-        throttler.signalTimeout(this);
         sessionMetricUpdater.incrementCounter(
             DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, executionProfile.getName());
-      } else if (!(error instanceof RequestThrottlingException)) {
-        throttler.signalError(this, error);
       }
+    }
+  }
+
+  private void releaseThrottler(@Nullable Throwable error) {
+    if (!admitted && !registrationComplete.get()) {
+      // A timeout can race with register(), but signaling before registration has completed can
+      // corrupt throttler accounting if the request has not been enqueued yet. onThrottleReady()
+      // releases immediately once admission proves ownership; otherwise the constructor retries
+      // after register() returns.
+      return;
+    }
+    if (!throttlerReleased.compareAndSet(false, true)) {
+      return;
+    }
+    if (error instanceof DriverTimeoutException) {
+      throttler.signalTimeout(this);
+    } else if (error instanceof CancellationException || !admitted) {
+      // Before admission this removes a queued request. If admission raced with this call, the
+      // throttler treats it as completion of the transferred permit.
+      throttler.signalCancel(this);
+    } else {
+      throttler.signalError(
+          this, error == null ? new IllegalStateException("Request failed") : error);
     }
   }
 
@@ -946,6 +1077,9 @@ public class CqlRequestHandler implements Throttled {
       } else {
         RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(context, executionProfile);
         RetryVerdict verdict;
+        DefaultNodeMetric errorMetric;
+        DefaultNodeMetric retriesOnErrorMetric;
+        DefaultNodeMetric ignoresOnErrorMetric;
         if (error instanceof ReadTimeoutException) {
           ReadTimeoutException readTimeout = (ReadTimeoutException) error;
           verdict =
@@ -956,12 +1090,9 @@ public class CqlRequestHandler implements Throttled {
                   readTimeout.getReceived(),
                   readTimeout.wasDataPresent(),
                   retryCount);
-          updateErrorMetrics(
-              metricUpdater,
-              verdict,
-              DefaultNodeMetric.READ_TIMEOUTS,
-              DefaultNodeMetric.RETRIES_ON_READ_TIMEOUT,
-              DefaultNodeMetric.IGNORES_ON_READ_TIMEOUT);
+          errorMetric = DefaultNodeMetric.READ_TIMEOUTS;
+          retriesOnErrorMetric = DefaultNodeMetric.RETRIES_ON_READ_TIMEOUT;
+          ignoresOnErrorMetric = DefaultNodeMetric.IGNORES_ON_READ_TIMEOUT;
         } else if (error instanceof WriteTimeoutException) {
           WriteTimeoutException writeTimeout = (WriteTimeoutException) error;
           verdict =
@@ -974,12 +1105,9 @@ public class CqlRequestHandler implements Throttled {
                       writeTimeout.getReceived(),
                       retryCount)
                   : RetryVerdict.RETHROW;
-          updateErrorMetrics(
-              metricUpdater,
-              verdict,
-              DefaultNodeMetric.WRITE_TIMEOUTS,
-              DefaultNodeMetric.RETRIES_ON_WRITE_TIMEOUT,
-              DefaultNodeMetric.IGNORES_ON_WRITE_TIMEOUT);
+          errorMetric = DefaultNodeMetric.WRITE_TIMEOUTS;
+          retriesOnErrorMetric = DefaultNodeMetric.RETRIES_ON_WRITE_TIMEOUT;
+          ignoresOnErrorMetric = DefaultNodeMetric.IGNORES_ON_WRITE_TIMEOUT;
         } else if (error instanceof UnavailableException) {
           UnavailableException unavailable = (UnavailableException) error;
           verdict =
@@ -989,52 +1117,70 @@ public class CqlRequestHandler implements Throttled {
                   unavailable.getRequired(),
                   unavailable.getAlive(),
                   retryCount);
-          updateErrorMetrics(
-              metricUpdater,
-              verdict,
-              DefaultNodeMetric.UNAVAILABLES,
-              DefaultNodeMetric.RETRIES_ON_UNAVAILABLE,
-              DefaultNodeMetric.IGNORES_ON_UNAVAILABLE);
+          errorMetric = DefaultNodeMetric.UNAVAILABLES;
+          retriesOnErrorMetric = DefaultNodeMetric.RETRIES_ON_UNAVAILABLE;
+          ignoresOnErrorMetric = DefaultNodeMetric.IGNORES_ON_UNAVAILABLE;
         } else {
           verdict =
               Conversions.resolveIdempotence(statement, executionProfile)
                   ? retryPolicy.onErrorResponseVerdict(statement, error, retryCount)
                   : RetryVerdict.RETHROW;
-          updateErrorMetrics(
-              metricUpdater,
-              verdict,
-              DefaultNodeMetric.OTHER_ERRORS,
-              DefaultNodeMetric.RETRIES_ON_OTHER_ERROR,
-              DefaultNodeMetric.IGNORES_ON_OTHER_ERROR);
+          errorMetric = DefaultNodeMetric.OTHER_ERRORS;
+          retriesOnErrorMetric = DefaultNodeMetric.RETRIES_ON_OTHER_ERROR;
+          ignoresOnErrorMetric = DefaultNodeMetric.IGNORES_ON_OTHER_ERROR;
         }
-        processRetryVerdict(verdict, error);
+        RetryDecision decision = getRetryDecisionOrHandleFailure(verdict, error);
+        if (decision != null) {
+          updateErrorMetrics(
+              metricUpdater, decision, errorMetric, retriesOnErrorMetric, ignoresOnErrorMetric);
+          processRetryVerdict(verdict, decision, error);
+        }
       }
     }
 
-    private void processRetryVerdict(RetryVerdict verdict, Throwable error) {
-      LOG.trace("[{}] Processing retry decision {}", logPrefix, verdict);
-      switch (verdict.getRetryDecision()) {
+    @Nullable
+    private RetryDecision getRetryDecisionOrHandleFailure(
+        RetryVerdict verdict, Throwable requestError) {
+      try {
+        RetryDecision decision = verdict.getRetryDecision();
+        if (decision == null) {
+          throw new NullPointerException("Retry verdict returned a null decision");
+        }
+        return decision;
+      } catch (Throwable setupFailure) {
+        handleRetrySetupFailure(requestError, setupFailure);
+        return null;
+      }
+    }
+
+    private void handleRetrySetupFailure(Throwable requestError, Throwable setupFailure) {
+      recordError(node, requestError);
+      trackNodeError(node, requestError, NANOTIME_NOT_MEASURED_YET);
+      handleRequestSetupFailure(statement, setupFailure, execution);
+    }
+
+    private void processRetryVerdict(
+        RetryVerdict verdict, RetryDecision decision, Throwable error) {
+      LOG.trace("[{}] Processing retry decision {}", logPrefix, decision);
+      Statement<?> retryStatement = null;
+      if (decision == RetryDecision.RETRY_SAME || decision == RetryDecision.RETRY_NEXT) {
+        try {
+          retryStatement = verdict.getRetryRequest(statement);
+        } catch (Throwable t) {
+          handleRetrySetupFailure(error, t);
+          return;
+        }
+      }
+      switch (decision) {
         case RETRY_SAME:
           recordError(node, error);
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
-          sendRequest(
-              verdict.getRetryRequest(statement),
-              node,
-              queryPlan,
-              execution,
-              retryCount + 1,
-              false);
+          sendRequest(retryStatement, node, queryPlan, execution, retryCount + 1, false);
           break;
         case RETRY_NEXT:
           recordError(node, error);
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
-          sendRequest(
-              verdict.getRetryRequest(statement),
-              null,
-              queryPlan,
-              execution,
-              retryCount + 1,
-              false);
+          sendRequest(retryStatement, null, queryPlan, execution, retryCount + 1, false);
           break;
         case RETHROW:
           trackNodeError(node, error, NANOTIME_NOT_MEASURED_YET);
@@ -1048,12 +1194,12 @@ public class CqlRequestHandler implements Throttled {
 
     private void updateErrorMetrics(
         NodeMetricUpdater metricUpdater,
-        RetryVerdict verdict,
+        RetryDecision decision,
         DefaultNodeMetric error,
         DefaultNodeMetric retriesOnError,
         DefaultNodeMetric ignoresOnError) {
       metricUpdater.incrementCounter(error, executionProfile.getName());
-      switch (verdict.getRetryDecision()) {
+      switch (decision) {
         case RETRY_SAME:
         case RETRY_NEXT:
           metricUpdater.incrementCounter(DefaultNodeMetric.RETRIES, executionProfile.getName());
@@ -1076,26 +1222,30 @@ public class CqlRequestHandler implements Throttled {
       }
       LOG.trace("[{}] Request failure, processing: {}", logPrefix, error);
       RetryVerdict verdict;
-      if (!Conversions.resolveIdempotence(statement, executionProfile)
-          || error instanceof FrameTooLongException) {
-        verdict = RetryVerdict.RETHROW;
-      } else {
-        try {
+      try {
+        if (!Conversions.resolveIdempotence(statement, executionProfile)
+            || error instanceof FrameTooLongException) {
+          verdict = RetryVerdict.RETHROW;
+        } else {
           RetryPolicy retryPolicy = Conversions.resolveRetryPolicy(context, executionProfile);
           verdict = retryPolicy.onRequestAbortedVerdict(statement, error, retryCount);
-        } catch (Throwable cause) {
-          setFinalError(
-              statement,
-              new IllegalStateException("Unexpected error while invoking the retry policy", cause),
-              null,
-              execution);
-          return;
         }
+      } catch (Throwable cause) {
+        setFinalError(
+            statement,
+            new IllegalStateException("Unexpected error while invoking the retry policy", cause),
+            null,
+            execution);
+        return;
       }
-      processRetryVerdict(verdict, error);
+      RetryDecision decision = getRetryDecisionOrHandleFailure(verdict, error);
+      if (decision == null) {
+        return;
+      }
+      processRetryVerdict(verdict, decision, error);
       updateErrorMetrics(
           ((DefaultNode) node).getMetricUpdater(),
-          verdict,
+          decision,
           DefaultNodeMetric.ABORTED_REQUESTS,
           DefaultNodeMetric.RETRIES_ON_ABORTED,
           DefaultNodeMetric.IGNORES_ON_ABORTED);
