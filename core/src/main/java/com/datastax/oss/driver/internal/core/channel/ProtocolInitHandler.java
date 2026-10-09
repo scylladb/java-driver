@@ -98,8 +98,7 @@ class ProtocolInitHandler extends ConnectInitHandler {
 
   /**
    * @param querySupportedOptions whether to send OPTIONS as the first message, to request which
-   *     protocol options the channel supports. If this is true, the options will be stored as a
-   *     channel attribute, and exposed via {@link DriverChannel#getOptions()}.
+   *     protocol options the channel supports and negotiate Scylla-specific protocol features.
    */
   ProtocolInitHandler(
       InternalDriverContext context,
@@ -229,7 +228,6 @@ class ProtocolInitHandler extends ConnectInitHandler {
       try {
         if (step == Step.OPTIONS && response instanceof Supported) {
           Supported supported = (Supported) response;
-          channel.attr(DriverChannel.OPTIONS_KEY).set(supported.options);
           featureStore = ProtocolFeatureStore.parseSupportedOptions(supported.options);
           featureStore.storeInChannel(channel);
           step = Step.STARTUP;

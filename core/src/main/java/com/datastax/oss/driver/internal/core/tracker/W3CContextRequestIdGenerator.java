@@ -35,10 +35,6 @@ public class W3CContextRequestIdGenerator implements RequestIdGenerator {
     payloadKey = RequestIdGenerator.super.getCustomPayloadKey();
   }
 
-  public W3CContextRequestIdGenerator(String payloadKey) {
-    this.payloadKey = payloadKey;
-  }
-
   /** Random 16 bytes, e.g. "4bf92f3577b34da6a3ce929d0e0e4736" */
   @Override
   public String getSessionRequestId() {

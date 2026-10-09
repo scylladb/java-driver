@@ -27,7 +27,7 @@ through the address the node broadcasts.
 
 * `advanced.client-routes` in the configuration, or `SessionBuilder.withClientRoutesConfig()`.
 * disabled by default. Requires ScyllaDB Enterprise 2026.1 or later.
-* mutually exclusive with `advanced.address-translator` and with cloud secure connect bundles.
+* mutually exclusive with `advanced.address-translator`.
 
 -----
 
@@ -122,8 +122,8 @@ Refreshing the route map does **not** flush the DNS cache; new hostnames are res
 - Requires ScyllaDB Enterprise ≥ 2026.1 with `system.client_routes` support
   (scylladb/scylladb#27323). Not yet available on ScyllaDB OSS.
 - Not supported on Apache Cassandra.
-- Mutually exclusive with a custom `AddressTranslator` and with cloud secure connect bundles:
-  configuring either one alongside client routes throws an `IllegalStateException`.
+- Configuring a custom `AddressTranslator` alongside client routes throws an
+  `IllegalStateException`.
 
 A deployment that is *not* fronted by a per-node endpoint mapping -- one proxy hostname for the
 whole cluster, one proxy per subnet, or EC2 multi-region -- needs an address translator instead, and

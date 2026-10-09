@@ -62,7 +62,6 @@ import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
-import com.datastax.oss.driver.internal.core.metadata.CloudTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.LoadBalancingPolicyWrapper;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
@@ -114,7 +113,6 @@ import com.typesafe.config.ConfigObject;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.buffer.ByteBuf;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -254,7 +252,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final Map<String, Predicate<Node>> nodeFiltersFromBuilder;
   private final Map<String, NodeDistanceEvaluator> nodeDistanceEvaluatorsFromBuilder;
   private final ClassLoader classLoader;
-  private final InetSocketAddress cloudProxyAddress;
   private final ClientRoutesConfig clientRoutesConfigFromBuilder;
   private final LazyReference<RequestLogFormatter> requestLogFormatterRef =
       new LazyReference<>("requestLogFormatter", this::buildRequestLogFormatter, cycleDetector);
@@ -315,7 +312,6 @@ public class DefaultDriverContext implements InternalDriverContext {
     this.nodeFiltersFromBuilder = nodeFilters;
     this.nodeDistanceEvaluatorsFromBuilder = programmaticArguments.getNodeDistanceEvaluators();
     this.classLoader = programmaticArguments.getClassLoader();
-    this.cloudProxyAddress = programmaticArguments.getCloudProxyAddress();
     this.clientRoutesConfigFromBuilder = programmaticArguments.getClientRoutesConfig();
     this.startupClientId = programmaticArguments.getStartupClientId();
     this.startupApplicationName = programmaticArguments.getStartupApplicationName();
@@ -677,9 +673,6 @@ public class DefaultDriverContext implements InternalDriverContext {
     ClientRoutesConfig clientRoutesConfig = resolveClientRoutesConfig();
     validateClientRoutesConfiguration(clientRoutesConfig);
 
-    if (cloudProxyAddress != null) {
-      return new CloudTopologyMonitor(this, cloudProxyAddress);
-    }
     if (clientRoutesConfig != null) {
       return new ClientRoutesTopologyMonitor(this, clientRoutesConfig);
     }
@@ -689,12 +682,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   private void validateClientRoutesConfiguration(ClientRoutesConfig clientRoutesConfig) {
     if (clientRoutesConfig == null) {
       return;
-    }
-    if (cloudProxyAddress != null) {
-      throw new IllegalStateException(
-          "Both a secure connect bundle and client routes configuration were provided. "
-              + "They are mutually exclusive. Please use either a secure connect bundle OR "
-              + "client routes configuration, but not both.");
     }
     DriverExecutionProfile defaultProfile = getConfig().getDefaultProfile();
     if (defaultProfile.isDefined(DefaultDriverOption.ADDRESS_TRANSLATOR_CLASS)) {
