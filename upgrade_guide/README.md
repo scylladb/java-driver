@@ -19,6 +19,39 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.3
+
+#### DataStax Astra secure-connect-bundle support was removed
+
+This release intentionally removes the DataStax Astra secure-connect-bundle integration and its
+public API. The following members are no longer available:
+
+- `SessionBuilder.withCloudSecureConnectBundle(Path)`
+- `SessionBuilder.withCloudSecureConnectBundle(URL)`
+- `SessionBuilder.withCloudSecureConnectBundle(InputStream)`
+- `SessionBuilder.withCloudProxyAddress(InetSocketAddress)`
+- `SessionBuilder.cloudConfigInputStream` (protected)
+- `ProgrammaticArguments.getCloudProxyAddress()`
+- `ProgrammaticArguments.Builder.withCloudProxyAddress(InetSocketAddress)`
+- `SessionBuilder.ASTRA_PAYLOAD_KEY`
+- `DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
+- `TypedDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
+
+The old `datastax-java-driver.basic.cloud.secure-connect-bundle` configuration key is now an
+unknown option and no longer supplies connection information. If that was the only connection
+setting, the resulting configuration contains no contact points, so the driver falls back to its
+default contact point, `127.0.0.1:9042`.
+
+This is an intentional binary- and source-compatibility break. This driver no longer has built-in
+support for connecting to DataStax Astra. Plain contact points cannot replace an Astra secure
+connect bundle because the bundle also provides TLS identity and trust material, metadata, and SNI
+proxy routing. Applications that need Astra must use 4.19.2.2 or an earlier release that supports
+secure connect bundles, or migrate to an Astra-compatible driver.
+
+For ScyllaDB deployments, configure explicit `basic.contact-points` or programmatic contact points.
+For supported ScyllaDB private-endpoint deployments, use
+[client routes](../manual/core/connectivity/client_routes/) together with an explicit contact point.
+
 ### 4.19.2.2
 
 #### The local-DC check no longer inspects contact points
