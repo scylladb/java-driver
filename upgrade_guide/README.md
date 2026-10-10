@@ -52,6 +52,14 @@ For ScyllaDB deployments, configure explicit `basic.contact-points` or programma
 For supported ScyllaDB private-endpoint deployments, use
 [client routes](../manual/core/connectivity/client_routes/) together with an explicit contact point.
 
+#### DataStax Insights monitoring has been removed
+
+The driver no longer sends DataStax Insights startup or status events. The
+`advanced.monitor-reporting.enabled` option has no effect and is no longer in the reference
+configuration. Its public constants remain deprecated for source and binary compatibility. The
+option now defaults to `false`. If it is set to `true` in an application configuration, the driver
+logs a warning whenever a session is created; remove that setting.
+
 ### 4.19.2.2
 
 #### The local-DC check no longer inspects contact points
