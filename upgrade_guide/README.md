@@ -21,6 +21,38 @@ under the License.
 
 ### 4.19.2.3
 
+#### DSE authentication and proxy execution were removed
+
+The driver no longer supports DSE GSSAPI, DSE plaintext negotiation, or proxy authentication and
+execution. Configuring `advanced.auth-provider.class` as `DsePlainTextAuthProvider` or
+`DseGssApiAuthProvider` now causes session `build()` to fail because those classes are gone. For
+ordinary username and password authentication, use `PlainTextAuthProvider` instead of
+`DsePlainTextAuthProvider`.
+
+The following APIs were removed:
+
+- `SessionBuilder.withAuthCredentials(username, password, authorizationId)` and the deprecated
+  `SessionBuilder.withCredentials(username, password, authorizationId)` alias
+- `ProgrammaticPlainTextAuthProvider(username, password, authorizationId)` and
+  `setAuthorizationId(authorizationId)`
+- `PlainTextAuthProviderBase.Credentials(username, password, authorizationId)` and
+  `getAuthorizationId()`
+- `DseDriverOption.AUTH_PROVIDER_*` and the DSE `TypedDriverOption.AUTH_PROVIDER_*` options
+- `ProxyAuthentication`, `BaseDseAuthenticator`, `DseGssApiAuthProviderBase`,
+  `ProgrammaticDseGssApiAuthProvider`, and `DsePlainTextAuthProviderBase`
+
+`PlainTextAuthProviderBase.PlainTextAuthenticator` now implements `SyncAuthenticator` directly
+instead of extending `BaseDseAuthenticator`. Its three-argument constructor
+`(Credentials, EndPoint, String)` was removed; custom subclasses should use
+`(Credentials, EndPoint)`. The deprecated `(Credentials)` constructor remains for ordinary plaintext
+subclasses, but DSE negotiation methods such as `getMechanism()` and `getInitialServerChallenge()`
+are no longer available.
+
+The DSE-only `authorization-id`, `service`, `login-configuration`, and `sasl-properties`
+authentication settings are no longer read. Remove them from application configuration. Custom
+providers that extended `DsePlainTextAuthProviderBase` can extend `PlainTextAuthProviderBase` for
+standard SASL PLAIN authentication; DSE proxy authorization and GSSAPI have no replacement here.
+
 #### DataStax Astra secure-connect-bundle support was removed
 
 This release intentionally removes the DataStax Astra secure-connect-bundle integration and its
@@ -742,10 +774,6 @@ changes right away; but you will get deprecation warnings:
   methods in this class now redirect to `DriverConfigLoader`. On that note, `dse-reference.conf`
   does not exist anymore, all the driver defaults are now in
   [reference.conf](../manual/core/configuration/reference/).
-* plain-text authentication: there is now a single implementation that works with both Cassandra and
-  DSE. If you used `DseProgrammaticPlainTextAuthProvider`, replace it by
-  `PlainTextProgrammaticAuthProvider`. Similarly, if you wrote a custom implementation by
-  subclassing `DsePlainTextAuthProviderBase`, extend `PlainTextAuthProviderBase` instead.
 * `DseLoadBalancingPolicy`: DSE-specific features (the slow replica avoidance mechanism) have been
   merged into `DefaultLoadBalancingPolicy`. `DseLoadBalancingPolicy` still exists for backward
   compatibility, but it is now identical to the default policy.
