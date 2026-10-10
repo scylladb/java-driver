@@ -980,8 +980,7 @@ public class DefaultDriverContext implements InternalDriverContext {
             this,
             DefaultDriverOption.AUTH_PROVIDER_CLASS,
             AuthProvider.class,
-            "com.datastax.oss.driver.internal.core.auth",
-            "com.datastax.dse.driver.internal.core.auth");
+            "com.datastax.oss.driver.internal.core.auth");
   }
 
   // Keep the hook and its lazy reference for subclasses that add their own lifecycle listeners.

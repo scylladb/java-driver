@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.dse.driver.internal.core.auth;
+package com.datastax.oss.driver.internal.core.auth;
 
 import com.datastax.oss.driver.api.core.auth.AuthenticationException;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
