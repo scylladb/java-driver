@@ -17,6 +17,9 @@
  */
 package com.datastax.oss.driver.internal.core.context;
 
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atLeast;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -331,6 +334,77 @@ public class DefaultDriverContextTest {
           .contains("basic.graph.traversal-source");
     } finally {
       loader.close();
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_warn_when_removed_insights_monitoring_is_enabled() {
+    DriverExecutionProfile defaultProfile = mock(DriverExecutionProfile.class);
+    when(defaultProfile.isDefined(DefaultDriverOption.SESSION_NAME)).thenReturn(true);
+    when(defaultProfile.getString(DefaultDriverOption.SESSION_NAME)).thenReturn("test");
+    when(defaultProfile.getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED, false))
+        .thenReturn(true);
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      MockedDriverContextFactory.defaultDriverContext(Optional.of(defaultProfile));
+
+      verify(logger.appender, atLeastOnce()).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getAllValues())
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .contains(
+              "[test] Configuration option advanced.monitor-reporting.enabled is deprecated and "
+                  + "ignored; DataStax Insights monitoring is no longer supported");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_not_warn_when_removed_insights_monitoring_is_disabled() {
+    DriverExecutionProfile defaultProfile = mock(DriverExecutionProfile.class);
+    when(defaultProfile.isDefined(DefaultDriverOption.SESSION_NAME)).thenReturn(true);
+    when(defaultProfile.getString(DefaultDriverOption.SESSION_NAME)).thenReturn("test");
+    when(defaultProfile.getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED, false))
+        .thenReturn(false);
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      MockedDriverContextFactory.defaultDriverContext(Optional.of(defaultProfile));
+
+      verify(logger.appender, atLeast(0)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getAllValues())
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .noneMatch(message -> message.contains("advanced.monitor-reporting.enabled"));
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_ignore_invalid_removed_insights_monitoring_option() {
+    DriverExecutionProfile defaultProfile = mock(DriverExecutionProfile.class);
+    when(defaultProfile.isDefined(DefaultDriverOption.SESSION_NAME)).thenReturn(true);
+    when(defaultProfile.getString(DefaultDriverOption.SESSION_NAME)).thenReturn("test");
+    when(defaultProfile.getBoolean(DseDriverOption.MONITOR_REPORTING_ENABLED, false))
+        .thenThrow(new IllegalArgumentException("wrong type"));
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      MockedDriverContextFactory.defaultDriverContext(Optional.of(defaultProfile));
+
+      verify(logger.appender, atLeastOnce()).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getAllValues())
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .contains(
+              "[test] Could not read deprecated configuration option "
+                  + "advanced.monitor-reporting.enabled; it will be ignored "
+                  + "(IllegalArgumentException: wrong type)");
+    } finally {
       logger.close();
     }
   }

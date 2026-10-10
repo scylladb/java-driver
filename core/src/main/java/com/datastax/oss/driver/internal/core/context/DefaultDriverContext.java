@@ -278,6 +278,27 @@ public class DefaultDriverContext implements InternalDriverContext {
       this.sessionName = "s" + SESSION_NAME_COUNTER.getAndIncrement();
     }
     warnIfDeprecatedGraphOptionsChanged();
+    @SuppressWarnings("deprecation")
+    DseDriverOption legacyMonitorReporting = DseDriverOption.MONITOR_REPORTING_ENABLED;
+    boolean insightsMonitoringRequested;
+    try {
+      insightsMonitoringRequested = defaultProfile.getBoolean(legacyMonitorReporting, false);
+    } catch (RuntimeException e) {
+      Loggers.warnWithException(
+          LOG,
+          "[{}] Could not read deprecated configuration option {}; it will be ignored",
+          sessionName,
+          legacyMonitorReporting.getPath(),
+          e);
+      insightsMonitoringRequested = false;
+    }
+    if (insightsMonitoringRequested) {
+      LOG.warn(
+          "[{}] Configuration option {} is deprecated and ignored; "
+              + "DataStax Insights monitoring is no longer supported",
+          sessionName,
+          legacyMonitorReporting.getPath());
+    }
     this.localDatacentersFromBuilder = programmaticArguments.getLocalDatacenters();
     this.codecRegistry = buildCodecRegistry(programmaticArguments);
     this.nodeStateListenerFromBuilder = programmaticArguments.getNodeStateListener();

@@ -67,8 +67,9 @@ public class OptionsMap implements Serializable {
    * Creates a new instance that contains the driver's default configuration.
    *
    * <p>This will produce a configuration that is equivalent to the {@code reference.conf} file
-   * bundled with the driver (however, this method does not load any file, and doesn't require
-   * Typesafe config in the classpath).
+   * bundled with the driver, except that it retains the deprecated DataStax Insights monitoring
+   * option with a {@code false} default for programmatic compatibility. This method does not load
+   * any file and doesn't require Typesafe config in the classpath.
    */
   @NonNull
   public static OptionsMap driverDefaults() {
@@ -336,7 +337,9 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, continuousMaxEnqueuedPages);
     map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE, Duration.ofSeconds(2));
     map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES, Duration.ofSeconds(1));
-    map.put(TypedDriverOption.MONITOR_REPORTING_ENABLED, true);
+    @SuppressWarnings("deprecation")
+    TypedDriverOption<Boolean> legacyMonitorReporting = TypedDriverOption.MONITOR_REPORTING_ENABLED;
+    map.put(legacyMonitorReporting, false);
     map.put(TypedDriverOption.METRICS_SESSION_ENABLED, Collections.emptyList());
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_LOWEST, Duration.ofMillis(1));

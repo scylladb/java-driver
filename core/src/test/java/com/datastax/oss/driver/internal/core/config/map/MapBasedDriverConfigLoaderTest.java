@@ -71,12 +71,18 @@ public class MapBasedDriverConfigLoaderTest {
             .getInitialConfig()
             .getDefaultProfile();
 
-    // Make sure we're not missing any options. -1 is for CONFIG_RELOAD_INTERVAL, which is not
-    // defined by OptionsMap because it is irrelevant for the map-based config.
-    assertThat(mapBasedConfig.entrySet()).hasSize(fileBasedConfig.entrySet().size() - 1);
+    // CONFIG_RELOAD_INTERVAL exists only in the file; the deprecated monitoring default exists
+    // only in OptionsMap so programmatic configurations retain their previous option shape.
+    assertThat(mapBasedConfig.entrySet()).hasSize(fileBasedConfig.entrySet().size());
+
+    @SuppressWarnings("deprecation")
+    TypedDriverOption<Boolean> legacyMonitorReporting = TypedDriverOption.MONITOR_REPORTING_ENABLED;
+    assertThat(fileBasedConfig.isDefined(legacyMonitorReporting.getRawOption())).isFalse();
+    assertThat(mapBasedConfig.getBoolean(legacyMonitorReporting.getRawOption())).isFalse();
 
     for (TypedDriverOption<?> option : TypedDriverOption.builtInValues()) {
-      if (option.getRawOption() == DefaultDriverOption.CONFIG_RELOAD_INTERVAL) {
+      if (option.getRawOption() == DefaultDriverOption.CONFIG_RELOAD_INTERVAL
+          || option == legacyMonitorReporting) {
         continue;
       }
       Optional<Object> fileBasedValue = get(fileBasedConfig, option);
