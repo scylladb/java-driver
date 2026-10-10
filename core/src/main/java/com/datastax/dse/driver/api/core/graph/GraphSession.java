@@ -17,10 +17,10 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.session.Session;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 
 /**
@@ -31,7 +31,11 @@ import java.util.concurrent.CompletionStage;
  * integrated usage of DataStax Enterprise's multi-model database via a single entry point. However,
  * it is still possible to cast a {@code CqlSession} to a {@code GraphSession} to only expose the
  * DSE Graph execution methods.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface GraphSession extends Session {
 
   /**
@@ -60,9 +64,7 @@ public interface GraphSession extends Session {
    */
   @NonNull
   default GraphResultSet execute(@NonNull GraphStatement<?> graphStatement) {
-    return Objects.requireNonNull(
-        execute(graphStatement, GraphStatement.SYNC),
-        "The graph processor should never return a null result");
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -80,8 +82,6 @@ public interface GraphSession extends Session {
   @NonNull
   default CompletionStage<AsyncGraphResultSet> executeAsync(
       @NonNull GraphStatement<?> graphStatement) {
-    return Objects.requireNonNull(
-        execute(graphStatement, GraphStatement.ASYNC),
-        "The graph processor should never return a null result");
+    throw GraphSupportRemoved.exception();
   }
 }

@@ -19,6 +19,7 @@ package com.datastax.dse.driver.internal.core.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
@@ -36,6 +37,7 @@ import com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder;
 import com.datastax.oss.protocol.internal.request.Startup;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
+import java.util.Collections;
 import java.util.UUID;
 import org.junit.Before;
 import org.junit.Test;
@@ -57,6 +59,9 @@ public class DseStartupOptionsBuilderTest {
     initMocks(this);
     when(configLoader.getInitialConfig()).thenReturn(driverConfig);
     when(driverConfig.getDefaultProfile()).thenReturn(defaultProfile);
+    doReturn(Collections.singletonMap(DriverExecutionProfile.DEFAULT_NAME, defaultProfile))
+        .when(driverConfig)
+        .getProfiles();
     when(defaultProfile.isDefined(DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE)).thenReturn(true);
   }
 

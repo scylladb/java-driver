@@ -17,11 +17,13 @@
  */
 package com.datastax.dse.driver.api.core.graph.predicates;
 
-import com.datastax.dse.driver.internal.core.graph.EditDistance;
-import com.datastax.dse.driver.internal.core.graph.SearchPredicate;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import org.apache.tinkerpop.gremlin.process.traversal.P;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 
+/** @deprecated DSE Graph is not supported starting with driver 4.19.2.2. */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface Search {
 
   /**
@@ -30,7 +32,7 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> token(String value) {
-    return new P<>(SearchPredicate.token, value);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -40,7 +42,7 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> tokenPrefix(String value) {
-    return new P<>(SearchPredicate.tokenPrefix, value);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -50,7 +52,7 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> tokenRegex(String value) {
-    return new P<>(SearchPredicate.tokenRegex, value);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -59,7 +61,7 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> prefix(String value) {
-    return new P<>(SearchPredicate.prefix, value);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -68,7 +70,7 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> regex(String value) {
-    return new P<>(SearchPredicate.regex, value);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -89,7 +91,7 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> phrase(String query, int distance) {
-    return new P<>(SearchPredicate.phrase, new EditDistance(query, distance));
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -110,7 +112,7 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> fuzzy(String query, int distance) {
-    return new P<>(SearchPredicate.fuzzy, new EditDistance(query, distance));
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -131,6 +133,6 @@ public interface Search {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> tokenFuzzy(String query, int distance) {
-    return new P<>(SearchPredicate.tokenFuzzy, new EditDistance(query, distance));
+    throw GraphSupportRemoved.exception();
   }
 }

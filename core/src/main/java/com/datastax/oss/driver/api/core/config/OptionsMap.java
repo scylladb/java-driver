@@ -18,6 +18,8 @@
 package com.datastax.oss.driver.api.core.config;
 
 import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
+import com.datastax.oss.driver.internal.core.config.DeprecatedGraphConfig;
+import com.datastax.oss.driver.internal.core.config.map.OptionsMapView;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -30,6 +32,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -75,15 +78,23 @@ public class OptionsMap implements Serializable {
   }
 
   private final ConcurrentHashMap<String, Map<DriverOption, Object>> map;
+  private final ConcurrentHashMap<String, Set<DriverOption>> explicitOptions;
+  // Older streams cannot distinguish defaults from writes made before deserialization.
+  private final boolean legacyUnknown;
 
   private final List<Consumer<OptionsMap>> changeListeners = new CopyOnWriteArrayList<>();
 
   public OptionsMap() {
-    this(new ConcurrentHashMap<>());
+    this(new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), false);
   }
 
-  private OptionsMap(ConcurrentHashMap<String, Map<DriverOption, Object>> map) {
+  private OptionsMap(
+      ConcurrentHashMap<String, Map<DriverOption, Object>> map,
+      ConcurrentHashMap<String, Set<DriverOption>> explicitOptions,
+      boolean legacyUnknown) {
     this.map = map;
+    this.explicitOptions = explicitOptions;
+    this.legacyUnknown = legacyUnknown;
   }
 
   /**
@@ -98,7 +109,12 @@ public class OptionsMap implements Serializable {
     Objects.requireNonNull(option, "option");
     Objects.requireNonNull(value, "value");
     Object previous = getProfileMap(profile).put(option.getRawOption(), value);
-    if (!value.equals(previous)) {
+    boolean newlyExplicit =
+        DeprecatedGraphConfig.isDeprecatedGraphOption(option.getRawOption())
+            && explicitOptions
+                .computeIfAbsent(profile, p -> ConcurrentHashMap.newKeySet())
+                .add(option.getRawOption());
+    if (!value.equals(previous) || newlyExplicit) {
       for (Consumer<OptionsMap> listener : changeListeners) {
         listener.accept(this);
       }
@@ -148,6 +164,10 @@ public class OptionsMap implements Serializable {
       @NonNull String profile, @NonNull TypedDriverOption<ValueT> option) {
     Objects.requireNonNull(option, "option");
     Object previous = getProfileMap(profile).remove(option.getRawOption());
+    Set<DriverOption> options = explicitOptions.get(profile);
+    if (options != null) {
+      options.remove(option.getRawOption());
+    }
     if (previous != null) {
       for (Consumer<OptionsMap> listener : changeListeners) {
         listener.accept(this);
@@ -212,7 +232,7 @@ public class OptionsMap implements Serializable {
    */
   @NonNull
   protected Map<String, Map<DriverOption, Object>> asRawMap() {
-    return map;
+    return new OptionsMapView(map, explicitOptions, legacyUnknown);
   }
 
   @NonNull
@@ -236,7 +256,7 @@ public class OptionsMap implements Serializable {
    *     store options internally (listeners are transient).
    */
   private Object writeReplace() {
-    return new SerializationProxy(this.map);
+    return new SerializationProxy(this.map, this.explicitOptions, this.legacyUnknown);
   }
 
   // Should never be called since we serialize a proxy
@@ -245,6 +265,7 @@ public class OptionsMap implements Serializable {
     throw new InvalidObjectException("Proxy required");
   }
 
+  @SuppressWarnings("deprecation")
   protected static void fillWithDriverDefaults(OptionsMap map) {
     Duration initQueryTimeout = Duration.ofSeconds(5);
     Duration requestTimeout = Duration.ofSeconds(11);
@@ -402,6 +423,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, 9042);
     map.put(TypedDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, false);
     map.put(TypedDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, true);
+    map.explicitOptions.clear();
   }
 
   @Immutable
@@ -410,13 +432,23 @@ public class OptionsMap implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final ConcurrentHashMap<String, Map<DriverOption, Object>> map;
+    @Nullable private final ConcurrentHashMap<String, Set<DriverOption>> explicitOptions;
+    private final boolean legacyUnknown;
 
-    private SerializationProxy(ConcurrentHashMap<String, Map<DriverOption, Object>> map) {
+    private SerializationProxy(
+        ConcurrentHashMap<String, Map<DriverOption, Object>> map,
+        ConcurrentHashMap<String, Set<DriverOption>> explicitOptions,
+        boolean legacyUnknown) {
       this.map = map;
+      this.explicitOptions = explicitOptions;
+      this.legacyUnknown = legacyUnknown;
     }
 
     private Object readResolve() {
-      return new OptionsMap(map);
+      return new OptionsMap(
+          map,
+          explicitOptions == null ? new ConcurrentHashMap<>() : explicitOptions,
+          explicitOptions == null || legacyUnknown);
     }
   }
 }

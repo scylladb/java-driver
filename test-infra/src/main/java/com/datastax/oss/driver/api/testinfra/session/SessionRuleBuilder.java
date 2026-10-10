@@ -33,9 +33,12 @@ public abstract class SessionRuleBuilder<
   protected NodeStateListener nodeStateListener;
   protected SchemaChangeListener schemaChangeListener;
   protected DriverConfigLoader loader;
-  protected boolean createGraph;
-  protected boolean isCoreGraph;
-  protected String graphProtocol;
+  /** @deprecated DSE Graph is no longer supported. */
+  @Deprecated protected boolean createGraph;
+  /** @deprecated DSE Graph is no longer supported. */
+  @Deprecated protected boolean isCoreGraph;
+  /** @deprecated DSE Graph is no longer supported. */
+  @Deprecated protected String graphProtocol;
 
   @SuppressWarnings("unchecked")
   protected final SelfT self = (SelfT) this;
@@ -80,25 +83,26 @@ public abstract class SessionRuleBuilder<
   }
 
   /**
-   * Configures the rule to create a new graph instance.
+   * Requests Graph creation when the rule is built. Graph creation is unsupported and will fail
+   * with migration guidance.
    *
-   * <p>This assumes that the associated {@link CassandraResourceRule} is a DSE instance with the
-   * graph workload enabled.
-   *
-   * <p>The name of the graph will be injected in the session's configuration, so that all graph
-   * statements are automatically routed to it. It's also exposed via {@link
-   * SessionRule#getGraphName()}.
+   * @deprecated DSE Graph is no longer supported.
    */
+  @Deprecated
   public SelfT withCreateGraph() {
     this.createGraph = true;
     return self;
   }
 
+  /** @deprecated DSE Graph is no longer supported; this setting is ignored. */
+  @Deprecated
   public SelfT withCoreEngine() {
     this.isCoreGraph = true;
     return self;
   }
 
+  /** @deprecated DSE Graph is no longer supported; this setting is ignored. */
+  @Deprecated
   public SelfT withGraphProtocol(String graphProtocol) {
     this.graphProtocol = graphProtocol;
     return self;

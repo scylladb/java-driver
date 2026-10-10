@@ -20,15 +20,53 @@ package com.datastax.oss.driver.internal.core.config.typesafe;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.internal.core.config.MockOptions;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.Test;
 
 public class TypesafeDriverConfigTest {
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_not_treat_dependency_reference_conf_as_driver_defaults() throws Exception {
+    Path directory = Files.createTempDirectory("dependency-config-");
+    Path reference = directory.resolve("reference.conf");
+    try {
+      Files.writeString(reference, "basic.graph.name = legacy-graph\n");
+      TypesafeDriverConfig config =
+          new TypesafeDriverConfig(ConfigFactory.parseFile(reference.toFile()));
+
+      assertThat(
+              TypesafeDriverConfig.isDefault(
+                  config.getDefaultProfile(), DseDriverOption.GRAPH_NAME))
+          .isFalse();
+    } finally {
+      Files.deleteIfExists(reference);
+      Files.deleteIfExists(directory);
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_recognize_resource_defaults_without_a_class_url() {
+    Config reference = ConfigFactory.parseResources("reference.conf");
+
+    assertThat(
+            TypesafeDriverConfig.isDriverDefaultOrigin(
+                reference
+                    .getValue(
+                        "datastax-java-driver." + DseDriverOption.GRAPH_TRAVERSAL_SOURCE.getPath())
+                    .origin(),
+                null))
+        .isTrue();
+  }
 
   @Test
   public void should_load_minimal_config_with_no_profiles() {

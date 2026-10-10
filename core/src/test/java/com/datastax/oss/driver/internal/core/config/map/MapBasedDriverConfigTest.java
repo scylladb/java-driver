@@ -19,10 +19,12 @@ package com.datastax.oss.driver.internal.core.config.map;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.OptionsMap;
+import com.datastax.oss.driver.api.core.config.TypedDriverOption;
 import com.datastax.oss.driver.internal.core.config.MockOptions;
 import com.datastax.oss.driver.internal.core.config.MockTypedOptions;
 import org.junit.Test;
@@ -49,6 +51,24 @@ public class MapBasedDriverConfigTest {
     assertThat(config)
         .hasIntOption(MockOptions.INT1, 42)
         .hasIntOption("profile1", MockOptions.INT1, 42);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_inherit_explicit_write_provenance_in_profile() {
+    OptionsMap source = OptionsMap.driverDefaults();
+    source.put(TypedDriverOption.GRAPH_TRAVERSAL_SOURCE, "g");
+    source.put("profile1", TypedDriverOption.GRAPH_NAME, "legacy-graph");
+    DriverConfig config = DriverConfigLoader.fromMap(source).getInitialConfig();
+
+    MapBasedDriverExecutionProfile profile =
+        (MapBasedDriverExecutionProfile) config.getProfile("profile1");
+    assertThat(profile.wasExplicitlySet(DseDriverOption.GRAPH_TRAVERSAL_SOURCE)).isTrue();
+    assertThat(profile.wasExplicitlySet(DseDriverOption.GRAPH_NAME)).isTrue();
+
+    source.put("profile1", TypedDriverOption.GRAPH_TRAVERSAL_SOURCE, "other");
+    source.remove("profile1", TypedDriverOption.GRAPH_TRAVERSAL_SOURCE);
+    assertThat(profile.wasExplicitlySet(DseDriverOption.GRAPH_TRAVERSAL_SOURCE)).isTrue();
   }
 
   @Test

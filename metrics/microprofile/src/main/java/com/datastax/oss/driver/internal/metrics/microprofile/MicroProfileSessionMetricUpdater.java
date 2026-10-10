@@ -45,12 +45,10 @@ public class MicroProfileSessionMetricUpdater extends MicroProfileMetricUpdater<
 
     initializeCounter(DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, profile);
     initializeCounter(DefaultSessionMetric.THROTTLING_ERRORS, profile);
-    initializeCounter(DseSessionMetric.GRAPH_CLIENT_TIMEOUTS, profile);
 
     initializeTimer(DefaultSessionMetric.CQL_REQUESTS, profile);
     initializeTimer(DefaultSessionMetric.THROTTLING_DELAY, profile);
     initializeTimer(DseSessionMetric.CONTINUOUS_CQL_REQUESTS, profile);
-    initializeTimer(DseSessionMetric.GRAPH_REQUESTS, profile);
   }
 
   @Override

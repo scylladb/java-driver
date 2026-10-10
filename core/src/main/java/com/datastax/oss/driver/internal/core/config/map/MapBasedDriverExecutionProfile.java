@@ -23,6 +23,7 @@ import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSortedSet;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.Collections;
@@ -34,6 +35,7 @@ import java.util.SortedSet;
 public class MapBasedDriverExecutionProfile implements DriverExecutionProfile {
 
   private final String profileName;
+  @Nullable private final OptionsMapView provenance;
   // The backing map for the current profile
   private final Map<DriverOption, Object> profile;
   // The backing map for the default profile (if the current one is not the default)
@@ -46,7 +48,8 @@ public class MapBasedDriverExecutionProfile implements DriverExecutionProfile {
         optionsMap.get(profileName),
         profileName.equals(DriverExecutionProfile.DEFAULT_NAME)
             ? Collections.emptyMap()
-            : optionsMap.get(DriverExecutionProfile.DEFAULT_NAME));
+            : optionsMap.get(DriverExecutionProfile.DEFAULT_NAME),
+        optionsMap instanceof OptionsMapView ? (OptionsMapView) optionsMap : null);
     Preconditions.checkArgument(
         optionsMap.containsKey(profileName),
         "Unknown profile '%s'. Check your configuration.",
@@ -57,9 +60,32 @@ public class MapBasedDriverExecutionProfile implements DriverExecutionProfile {
       String profileName,
       Map<DriverOption, Object> profile,
       Map<DriverOption, Object> defaultProfile) {
+    this(profileName, profile, defaultProfile, null);
+  }
+
+  private MapBasedDriverExecutionProfile(
+      String profileName,
+      Map<DriverOption, Object> profile,
+      Map<DriverOption, Object> defaultProfile,
+      @Nullable OptionsMapView provenance) {
     this.profileName = profileName;
     this.profile = profile;
     this.defaultProfile = defaultProfile;
+    this.provenance = provenance;
+  }
+
+  /** Returns null when explicit-write provenance is unavailable. */
+  @Nullable
+  public Boolean wasExplicitlySet(@NonNull DriverOption option) {
+    if (provenance == null) {
+      return null;
+    }
+    Boolean explicit = provenance.wasExplicitlySet(profileName, option);
+    if (DriverExecutionProfile.DEFAULT_NAME.equals(profileName) || profile.containsKey(option)) {
+      return explicit;
+    }
+    Boolean inDefault = provenance.wasExplicitlySet(DriverExecutionProfile.DEFAULT_NAME, option);
+    return inDefault;
   }
 
   @NonNull

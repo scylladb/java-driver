@@ -18,15 +18,18 @@
 package com.datastax.dse.driver.api.core.graph.reactive;
 
 import com.datastax.dse.driver.api.core.graph.GraphStatement;
-import com.datastax.dse.driver.internal.core.graph.reactive.ReactiveGraphRequestProcessor;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.session.Session;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import java.util.Objects;
 
 /**
  * A {@link Session} that offers utility methods to issue graph queries using reactive-style
  * programming.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface ReactiveGraphSession extends Session {
 
   /**
@@ -43,7 +46,6 @@ public interface ReactiveGraphSession extends Session {
    */
   @NonNull
   default ReactiveGraphResultSet executeReactive(@NonNull GraphStatement<?> statement) {
-    return Objects.requireNonNull(
-        execute(statement, ReactiveGraphRequestProcessor.REACTIVE_GRAPH_RESULT_SET));
+    throw GraphSupportRemoved.exception();
   }
 }

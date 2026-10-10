@@ -22,7 +22,12 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
-/** See {@code reference.conf} for a description of each metric. */
+/**
+ * Legacy DSE node metrics retained for compatibility.
+ *
+ * @deprecated DSE Graph is no longer supported; these metrics are ignored.
+ */
+@Deprecated
 public enum DseNodeMetric implements NodeMetric {
   GRAPH_MESSAGES("graph-messages");
 

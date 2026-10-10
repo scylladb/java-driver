@@ -99,14 +99,10 @@
       <artifactId>esri-geometry-api</artifactId>
       <optional>true</optional>
     </dependency>
+    <!-- Required only by deprecated Graph API signatures; no Graph implementation remains. -->
     <dependency>
       <groupId>org.apache.tinkerpop</groupId>
       <artifactId>gremlin-core</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>tinkergraph-gremlin</artifactId>
       <optional>true</optional>
     </dependency>
     <dependency>
@@ -317,19 +313,14 @@
                   <version>${lz4.version}</version>
                 </additionalDependency>
                 <additionalDependency>
-                  <groupId>org.apache.tinkerpop</groupId>
-                  <artifactId>gremlin-core</artifactId>
-                  <version>${tinkerpop.version}</version>
-                </additionalDependency>
-                <additionalDependency>
-                  <groupId>org.apache.tinkerpop</groupId>
-                  <artifactId>tinkergraph-gremlin</artifactId>
-                  <version>${tinkerpop.version}</version>
-                </additionalDependency>
-                <additionalDependency>
                   <groupId>com.esri.geometry</groupId>
                   <artifactId>esri-geometry-api</artifactId>
                   <version>${esri.version}</version>
+                </additionalDependency>
+                <additionalDependency>
+                  <groupId>org.apache.tinkerpop</groupId>
+                  <artifactId>gremlin-core</artifactId>
+                  <version>${tinkerpop.version}</version>
                 </additionalDependency>
               </additionalDependencies>
             </configuration>
@@ -375,7 +366,7 @@
                   Note: dependencies marked as optional are by default included with optional
                   resolution in the manifest; we only need to manually set the resolution to
                   optional for dependencies declared as non-optional in the pom files.
-                  -->jnr.*;resolution:=optional, com.esri.core.geometry.*;resolution:=optional,org.reactivestreams.*;resolution:=optional, org.apache.tinkerpop.*;resolution:=optional, org.javatuples.*;resolution:=optional, reactor.blockhound.*;resolution:=optional,
+                  -->jnr.*;resolution:=optional, com.esri.core.geometry.*;resolution:=optional,org.reactivestreams.*;resolution:=optional, org.apache.tinkerpop.*;resolution:=optional, reactor.blockhound.*;resolution:=optional,
                   <!--
                   5) Don't import packages imported by shaded classes, if they are not used by the
                   driver bundle.
