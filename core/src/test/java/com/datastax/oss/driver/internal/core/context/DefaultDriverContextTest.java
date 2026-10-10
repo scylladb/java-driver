@@ -19,12 +19,22 @@ package com.datastax.oss.driver.internal.core.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.config.OptionsMap;
+import com.datastax.oss.driver.api.core.config.TypedDriverOption;
+import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.internal.core.protocol.Lz4Compressor;
 import com.datastax.oss.driver.internal.core.protocol.SnappyCompressor;
+import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.NoopCompressor;
 import com.tngtech.java.junit.dataprovider.DataProvider;
@@ -78,5 +88,250 @@ public class DefaultDriverContextTest {
   public void should_create_noop_compressor_if_defined_as_none(String name) {
 
     doCreateCompressorTest(Optional.of(name), NoopCompressor.class);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_warn_and_ignore_deprecated_graph_configuration() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      DriverConfigLoader loader =
+          DriverConfigLoader.fromString(
+              "datastax-java-driver {\n"
+                  + " basic.graph.name = \"legacy-graph\"\n"
+                  + " advanced.graph.paging-enabled = ENABLED\n"
+                  + " advanced.metrics.session.enabled = [graph-requests, graph-client-timeouts]\n"
+                  + " advanced.metrics.node.enabled = [graph-messages]\n"
+                  + "}\n");
+
+      DefaultDriverContext context =
+          new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+
+      assertThat(context.getConfig().getDefaultProfile().getString(DseDriverOption.GRAPH_NAME))
+          .isEqualTo("legacy-graph");
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("DSE Graph configuration is deprecated and ignored")
+          .contains("basic.graph.name")
+          .contains("graph-requests")
+          .contains("graph-client-timeouts")
+          .contains("graph-messages");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  public void should_not_warn_for_deprecated_graph_defaults() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      DriverConfigLoader loader = DriverConfigLoader.fromString("datastax-java-driver {}\n");
+
+      new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, never()).doAppend(logger.loggingEventCaptor.capture());
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  @DataProvider({"basic.request.page-size", "advanced.continuous-paging.page-size"})
+  public void should_not_warn_for_non_graph_page_size_overrides(String option) {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      DriverConfigLoader loader =
+          DriverConfigLoader.fromString("datastax-java-driver." + option + " = 6000\n");
+
+      new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, never()).doAppend(logger.loggingEventCaptor.capture());
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  public void should_warn_for_explicit_graph_page_size_equal_to_continuous_page_size() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      DriverConfigLoader loader =
+          DriverConfigLoader.fromString(
+              "datastax-java-driver {\n"
+                  + " basic.request.page-size = 6000\n"
+                  + " advanced.graph.paging-options.page-size = 6000\n"
+                  + "}\n");
+
+      new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("advanced.graph.paging-options.page-size");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  public void should_warn_for_graph_page_size_set_on_same_line_as_fallback() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      DriverConfigLoader loader =
+          DriverConfigLoader.fromString(
+              "datastax-java-driver { basic.request.page-size = 6000, "
+                  + "advanced.graph.paging-options.page-size = 6000 }");
+
+      new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("advanced.graph.paging-options.page-size");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  public void should_ignore_malformed_metrics_in_named_profile_when_checking_graph_options() {
+    DriverConfigLoader loader =
+        DriverConfigLoader.fromString(
+            "datastax-java-driver.profiles.analytics.advanced.metrics.session.enabled = 1\n");
+
+    new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+  }
+
+  @Test
+  public void should_warn_for_graph_option_despite_malformed_named_profile_metrics() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      DriverConfigLoader loader =
+          DriverConfigLoader.fromString(
+              "datastax-java-driver {\n"
+                  + " basic.graph.name = legacy-graph\n"
+                  + " profiles.analytics.advanced.metrics.session.enabled = 1\n"
+                  + "}\n");
+
+      new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("basic.graph.name");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  public void should_warn_for_deprecated_graph_metrics_in_named_profiles() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      DriverConfigLoader loader =
+          DriverConfigLoader.fromString(
+              "datastax-java-driver.profiles.analytics {\n"
+                  + " advanced.metrics.session.enabled = [graph-requests, graph-client-timeouts]\n"
+                  + " advanced.metrics.node.enabled = [graph-messages]\n"
+                  + "}\n");
+
+      new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("DSE Graph configuration is deprecated and ignored")
+          .contains("graph-requests")
+          .contains("graph-client-timeouts")
+          .contains("graph-messages");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_warn_when_deprecated_graph_configuration_is_added_at_runtime() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    OptionsMap options = OptionsMap.driverDefaults();
+    DriverConfigLoader loader = DriverConfigLoader.fromMap(options);
+    try {
+      DefaultDriverContext context =
+          new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+      loader.onDriverInit(context);
+
+      options.put(TypedDriverOption.GRAPH_NAME, "legacy-graph");
+
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("DSE Graph configuration is deprecated and ignored")
+          .contains("basic.graph.name");
+    } finally {
+      loader.close();
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_warn_for_explicit_graph_option_equal_to_default() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      OptionsMap options = OptionsMap.driverDefaults();
+      options.put(TypedDriverOption.GRAPH_TRAVERSAL_SOURCE, "g");
+
+      new DefaultDriverContext(
+          DriverConfigLoader.fromMap(options), ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("basic.graph.traversal-source");
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_not_warn_for_untouched_graph_defaults_in_options_map() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    try {
+      new DefaultDriverContext(
+          DriverConfigLoader.fromMap(OptionsMap.driverDefaults()),
+          ProgrammaticArguments.builder().build());
+
+      verify(logger.appender, never()).doAppend(logger.loggingEventCaptor.capture());
+    } finally {
+      logger.close();
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_warn_when_default_graph_value_is_explicitly_set_at_runtime() {
+    LoggerTest.LoggerSetup logger =
+        LoggerTest.setupTestLogger(InternalDriverContext.class, Level.WARN);
+    OptionsMap options = OptionsMap.driverDefaults();
+    DriverConfigLoader loader = DriverConfigLoader.fromMap(options);
+    try {
+      DefaultDriverContext context =
+          new DefaultDriverContext(loader, ProgrammaticArguments.builder().build());
+      loader.onDriverInit(context);
+
+      options.put(TypedDriverOption.GRAPH_TRAVERSAL_SOURCE, "g");
+
+      verify(logger.appender, times(1)).doAppend(logger.loggingEventCaptor.capture());
+      assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+          .contains("basic.graph.traversal-source");
+    } finally {
+      loader.close();
+      logger.close();
+    }
   }
 }

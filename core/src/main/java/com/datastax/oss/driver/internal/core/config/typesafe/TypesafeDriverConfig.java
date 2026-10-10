@@ -21,13 +21,17 @@ import static com.typesafe.config.ConfigValueType.OBJECT;
 
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.config.DriverOption;
 import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigObject;
+import com.typesafe.config.ConfigOrigin;
 import com.typesafe.config.ConfigValue;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Map;
 import java.util.Optional;
 import net.jcip.annotations.ThreadSafe;
@@ -38,6 +42,7 @@ import org.slf4j.LoggerFactory;
 public class TypesafeDriverConfig implements DriverConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(TypesafeDriverConfig.class);
+  @Nullable private static final URL DRIVER_REFERENCE_CONF_URL = driverReferenceConfigUrl();
   private final ImmutableMap<String, TypesafeDriverExecutionProfile.Base> profiles;
   // Only used to detect if reload saw any change
   private volatile Config lastLoadedConfig;
@@ -170,5 +175,44 @@ public class TypesafeDriverConfig implements DriverConfig {
       return ((TypesafeDriverExecutionProfile) profile).getEffectiveOptions();
     }
     return null;
+  }
+
+  /** Returns whether an option's effective value comes from the driver's reference.conf. */
+  public static boolean isDefault(
+      @NonNull DriverExecutionProfile profile, @NonNull DriverOption option) {
+    Config config = getRawConfig(profile);
+    if (config == null || !config.hasPath(option.getPath())) {
+      return false;
+    }
+    ConfigOrigin origin = config.getValue(option.getPath()).origin();
+    return isDriverDefaultOrigin(origin, DRIVER_REFERENCE_CONF_URL);
+  }
+
+  static boolean isDriverDefaultOrigin(ConfigOrigin origin, @Nullable URL driverReferenceUrl) {
+    URL url = origin.url();
+    if (url != null && driverReferenceUrl != null) {
+      return url.sameFile(driverReferenceUrl);
+    }
+    // In native images, class resources may not have URLs. Typesafe Config still records the
+    // resource name for values loaded from the driver's reference.conf.
+    return "reference.conf".equals(origin.resource());
+  }
+
+  @Nullable
+  private static URL driverReferenceConfigUrl() {
+    String classPath = TypesafeDriverConfig.class.getName().replace('.', '/') + ".class";
+    URL classUrl = TypesafeDriverConfig.class.getResource("TypesafeDriverConfig.class");
+    if (classUrl == null) {
+      return null;
+    }
+    String url = classUrl.toExternalForm();
+    if (!url.endsWith(classPath)) {
+      return null;
+    }
+    try {
+      return new URL(url.substring(0, url.length() - classPath.length()) + "reference.conf");
+    } catch (MalformedURLException ignored) {
+      return null;
+    }
   }
 }
