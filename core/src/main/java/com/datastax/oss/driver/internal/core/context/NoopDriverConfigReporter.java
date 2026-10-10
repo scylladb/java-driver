@@ -27,8 +27,7 @@ import net.jcip.annotations.ThreadSafe;
  * <p>Today that means Jackson is absent from the classpath: the driver declares it as a required
  * dependency but documents that it can be excluded (see {@code manual/core/integration}), and
  * {@link DefaultDriverConfigReporter} serializes the report with it. Substituting this
- * implementation keeps that exclusion working, the same way {@code
- * DefaultDriverContext#buildLifecycleListeners()} skips Insights monitoring.
+ * implementation keeps that exclusion working.
  *
  * <p>Deliberately free of any reference to Jackson, including in the signatures it inherits — a
  * single one would make loading <em>this</em> class fail for exactly the deployments it exists to

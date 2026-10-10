@@ -115,7 +115,7 @@ public class StartupOptionsBuilder {
     builder.put(DRIVER_NAME_KEY, getDriverName()).put(DRIVER_VERSION_KEY, getDriverVersion());
 
     // Identifier of this session, sent on every connection so the server can group them. Not
-    // derived from the (user-settable, Insights-oriented) CLIENT_ID below, so that it is guaranteed
+    // derived from the user-settable CLIENT_ID below, so that it is guaranteed
     // unique per session as the grouping key requires. Generated lazily here rather than eagerly in
     // a field initializer, mirroring clientId; DefaultDriverContext builds the startup options
     // exactly once per session (LazyReference), which is what makes the value stable across all of
@@ -125,7 +125,7 @@ public class StartupOptionsBuilder {
     }
     builder.put(SESSION_ID_KEY, sessionId.toString());
 
-    // Add Insights entries, falling back to generation / config if no programmatic values provided:
+    // Add client and application metadata, falling back to configuration when needed:
     if (clientId == null) {
       clientId = Uuids.random();
     }
