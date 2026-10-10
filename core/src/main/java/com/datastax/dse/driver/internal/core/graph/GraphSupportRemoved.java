@@ -15,20 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.dse.driver.internal.core.graph.binary;
+package com.datastax.dse.driver.internal.core.graph;
 
-import com.datastax.dse.driver.api.core.data.geometry.Point;
-import java.nio.ByteBuffer;
+public final class GraphSupportRemoved {
 
-public class PointSerializer extends GeometrySerializer<Point> {
+  public static final String MESSAGE =
+      "DSE Graph is not supported starting with Java driver 4.19.2.2; "
+          + "use 4.19.2.1 or migrate the Graph workload before upgrading";
 
-  @Override
-  public String getTypeName() {
-    return GraphBinaryModule.GRAPH_BINARY_POINT_TYPE_NAME;
+  public static UnsupportedOperationException exception() {
+    return new UnsupportedOperationException(MESSAGE);
   }
 
-  @Override
-  public Point fromWellKnownBinary(ByteBuffer buffer) {
-    return Point.fromWellKnownBinary(buffer);
-  }
+  private GraphSupportRemoved() {}
 }

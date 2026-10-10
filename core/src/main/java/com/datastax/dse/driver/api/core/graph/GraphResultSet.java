@@ -17,7 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.GraphExecutionInfoConverter;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -40,7 +40,10 @@ import java.util.List;
  *
  * @see GraphNode
  * @see GraphSession#execute(GraphStatement)
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface GraphResultSet extends Iterable<GraphNode> {
 
   /**
@@ -83,7 +86,7 @@ public interface GraphResultSet extends Iterable<GraphNode> {
    */
   @NonNull
   default ExecutionInfo getRequestExecutionInfo() {
-    return GraphExecutionInfoConverter.convert(getExecutionInfo());
+    throw GraphSupportRemoved.exception();
   }
 
   /** @deprecated Use {@link #getRequestExecutionInfo()} instead. */

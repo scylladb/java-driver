@@ -20,30 +20,37 @@ package com.datastax.dse.driver.api.core.graph.predicates;
 import com.datastax.dse.driver.api.core.data.geometry.LineString;
 import com.datastax.dse.driver.api.core.data.geometry.Point;
 import com.datastax.dse.driver.api.core.data.geometry.Polygon;
-import com.datastax.dse.driver.internal.core.data.geometry.Distance;
-import com.datastax.dse.driver.internal.core.graph.GeoPredicate;
-import com.datastax.dse.driver.internal.core.graph.GeoUtils;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import org.apache.tinkerpop.gremlin.process.traversal.P;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 
+/** @deprecated DSE Graph is not supported starting with driver 4.19.2.2. */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public interface Geo {
 
   enum Unit {
-    MILES(GeoUtils.MILES_TO_KM * GeoUtils.KM_TO_DEG),
-    KILOMETERS(GeoUtils.KM_TO_DEG),
-    METERS(GeoUtils.KM_TO_DEG / 1000.0),
-    DEGREES(1);
+    MILES,
+    KILOMETERS,
+    METERS,
+    DEGREES;
 
-    private final double multiplier;
-
-    Unit(double multiplier) {
-      this.multiplier = multiplier;
-    }
+    private static final double KILOMETERS_TO_DEGREES = 1 / (Math.PI / 180 * 6371.0087714);
+    private static final double MILES_TO_KILOMETERS = 1 / 0.621371192;
 
     /** Convert distance to degrees (used internally only). */
     public double toDegrees(double distance) {
-      return distance * multiplier;
+      switch (this) {
+        case MILES:
+          return distance * MILES_TO_KILOMETERS * KILOMETERS_TO_DEGREES;
+        case KILOMETERS:
+          return distance * KILOMETERS_TO_DEGREES;
+        case METERS:
+          return distance * KILOMETERS_TO_DEGREES / 1000;
+        default:
+          return distance;
+      }
     }
   }
 
@@ -53,7 +60,7 @@ public interface Geo {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> inside(Point center, double radius, Unit units) {
-    return new P<>(GeoPredicate.inside, new Distance(center, units.toDegrees(radius)));
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -62,7 +69,7 @@ public interface Geo {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> inside(Point center, double radius) {
-    return new P<>(GeoPredicate.insideCartesian, new Distance(center, radius));
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -71,7 +78,7 @@ public interface Geo {
    * @return a predicate to apply in a {@link GraphTraversal}.
    */
   static P<Object> inside(Polygon polygon) {
-    return new P<>(GeoPredicate.insideCartesian, polygon);
+    throw GraphSupportRemoved.exception();
   }
 
   /**

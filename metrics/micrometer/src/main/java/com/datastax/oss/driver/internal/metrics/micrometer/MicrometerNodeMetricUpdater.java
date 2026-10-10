@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.metrics.micrometer;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -77,7 +75,6 @@ public class MicrometerNodeMetricUpdater extends MicrometerMetricUpdater<NodeMet
     initializeCounter(DefaultNodeMetric.AUTHENTICATION_ERRORS, profile);
 
     initializeTimer(DefaultNodeMetric.CQL_MESSAGES, profile);
-    initializeTimer(DseNodeMetric.GRAPH_MESSAGES, profile);
   }
 
   @Override
@@ -116,22 +113,6 @@ public class MicrometerNodeMetricUpdater extends MicrometerMetricUpdater<NodeMet
 
       configurePercentilesPublishIfDefined(
           builder, profile, DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_PUBLISH_PERCENTILES);
-    } else if (metric == DseNodeMetric.GRAPH_MESSAGES) {
-      builder
-          .minimumExpectedValue(
-              profile.getDuration(DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_LOWEST))
-          .maximumExpectedValue(
-              profile.getDuration(DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST))
-          .serviceLevelObjectives(
-              profile.isDefined(DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_SLO)
-                  ? profile
-                      .getDurationList(DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_SLO)
-                      .toArray(new Duration[0])
-                  : null)
-          .percentilePrecision(profile.getInt(DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS));
-
-      configurePercentilesPublishIfDefined(
-          builder, profile, DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES);
     }
     return builder;
   }

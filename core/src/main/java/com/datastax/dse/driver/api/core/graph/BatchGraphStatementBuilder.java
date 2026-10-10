@@ -17,8 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.DefaultBatchGraphStatement;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import net.jcip.annotations.NotThreadSafe;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
@@ -27,30 +26,28 @@ import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
  * A builder to create a batch graph statement.
  *
  * <p>This class is mutable and not thread-safe.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
 @NotThreadSafe
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public class BatchGraphStatementBuilder
     extends GraphStatementBuilderBase<BatchGraphStatementBuilder, BatchGraphStatement> {
 
-  private ImmutableList.Builder<GraphTraversal> traversalsBuilder = ImmutableList.builder();
-  private int traversalsCount;
-
   public BatchGraphStatementBuilder() {
-    // nothing to do
+    throw GraphSupportRemoved.exception();
   }
 
   public BatchGraphStatementBuilder(BatchGraphStatement template) {
     super(template);
-    traversalsBuilder.addAll(template);
-    traversalsCount = template.size();
+    throw GraphSupportRemoved.exception();
   }
 
   /** Add a traversal to this builder to include in the generated {@link BatchGraphStatement}. */
   @NonNull
   public BatchGraphStatementBuilder addTraversal(@NonNull GraphTraversal traversal) {
-    traversalsBuilder.add(traversal);
-    traversalsCount += 1;
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -58,11 +55,7 @@ public class BatchGraphStatementBuilder
    */
   @NonNull
   public BatchGraphStatementBuilder addTraversals(@NonNull Iterable<GraphTraversal> traversals) {
-    for (GraphTraversal traversal : traversals) {
-      traversalsBuilder.add(traversal);
-      traversalsCount += 1;
-    }
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -70,43 +63,23 @@ public class BatchGraphStatementBuilder
    */
   @NonNull
   public BatchGraphStatementBuilder addTraversals(@NonNull GraphTraversal... traversals) {
-    for (GraphTraversal traversal : traversals) {
-      traversalsBuilder.add(traversal);
-      traversalsCount += 1;
-    }
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /** Clears all the traversals previously added to this builder. */
   @NonNull
   public BatchGraphStatementBuilder clearTraversals() {
-    traversalsBuilder = ImmutableList.builder();
-    traversalsCount = 0;
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /** Returns the number of traversals added to this statement so far. */
   public int getTraversalsCount() {
-    return traversalsCount;
+    throw GraphSupportRemoved.exception();
   }
 
   @NonNull
   @Override
   public BatchGraphStatement build() {
-    return new DefaultBatchGraphStatement(
-        traversalsBuilder.build(),
-        isIdempotent,
-        timeout,
-        node,
-        timestamp,
-        executionProfile,
-        executionProfileName,
-        buildCustomPayload(),
-        graphName,
-        traversalSource,
-        subProtocol,
-        consistencyLevel,
-        readConsistencyLevel,
-        writeConsistencyLevel);
+    throw GraphSupportRemoved.exception();
   }
 }

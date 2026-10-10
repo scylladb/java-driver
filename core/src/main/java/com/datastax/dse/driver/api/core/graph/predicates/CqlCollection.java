@@ -17,17 +17,20 @@
  */
 package com.datastax.dse.driver.api.core.graph.predicates;
 
-import com.datastax.dse.driver.internal.core.graph.CqlCollectionPredicate;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import java.util.Collection;
 import java.util.Map;
 import org.apache.tinkerpop.gremlin.process.traversal.P;
-import org.javatuples.Pair;
 
 /**
  * Predicates that can be used on CQL collections (lists, sets and maps).
  *
  * <p>Note: CQL collection predicates are only available when using the binary subprotocol.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public class CqlCollection {
 
   /**
@@ -37,9 +40,8 @@ public class CqlCollection {
    * @return a predicate to apply in a {@link
    *     org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal}.
    */
-  @SuppressWarnings("unchecked")
   public static <C extends Collection<V>, V> P<C> contains(V value) {
-    return new P(CqlCollectionPredicate.contains, value);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -49,9 +51,8 @@ public class CqlCollection {
    * @return a predicate to apply in a {@link
    *     org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal}.
    */
-  @SuppressWarnings("unchecked")
   public static <M extends Map<K, ?>, K> P<M> containsKey(K key) {
-    return new P(CqlCollectionPredicate.containsKey, key);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -61,9 +62,8 @@ public class CqlCollection {
    * @return a predicate to apply in a {@link
    *     org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal}.
    */
-  @SuppressWarnings("unchecked")
   public static <M extends Map<?, V>, V> P<M> containsValue(V value) {
-    return new P(CqlCollectionPredicate.containsValue, value);
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -74,8 +74,7 @@ public class CqlCollection {
    * @return a predicate to apply in a {@link
    *     org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal}.
    */
-  @SuppressWarnings("unchecked")
   public static <M extends Map<K, V>, K, V> P<M> entryEq(K key, V value) {
-    return new P(CqlCollectionPredicate.entryEq, new Pair<>(key, value));
+    throw GraphSupportRemoved.exception();
   }
 }

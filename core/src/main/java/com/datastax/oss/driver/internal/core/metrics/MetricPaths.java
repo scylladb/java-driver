@@ -17,12 +17,12 @@
  */
 package com.datastax.oss.driver.internal.core.metrics;
 
-import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
 import com.datastax.dse.driver.api.core.metrics.DseSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.metrics.NodeMetric;
 import com.datastax.oss.driver.api.core.metrics.SessionMetric;
+import com.datastax.oss.driver.internal.core.config.DeprecatedGraphConfig;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +37,9 @@ public class MetricPaths {
   public static Set<SessionMetric> parseSessionMetricPaths(List<String> paths, String logPrefix) {
     Set<SessionMetric> result = new HashSet<>();
     for (String path : paths) {
+      if (DeprecatedGraphConfig.isDeprecatedSessionMetric(path)) {
+        continue;
+      }
       try {
         result.add(DefaultSessionMetric.fromPath(path));
       } catch (IllegalArgumentException e) {
@@ -53,14 +56,13 @@ public class MetricPaths {
   public static Set<NodeMetric> parseNodeMetricPaths(List<String> paths, String logPrefix) {
     Set<NodeMetric> result = new HashSet<>();
     for (String path : paths) {
+      if (DeprecatedGraphConfig.isDeprecatedNodeMetric(path)) {
+        continue;
+      }
       try {
         result.add(DefaultNodeMetric.fromPath(path));
       } catch (IllegalArgumentException e) {
-        try {
-          result.add(DseNodeMetric.fromPath(path));
-        } catch (IllegalArgumentException e1) {
-          LOG.warn("[{}] Unknown node metric {}, skipping", logPrefix, path);
-        }
+        LOG.warn("[{}] Unknown node metric {}, skipping", logPrefix, path);
       }
     }
     return Collections.unmodifiableSet(result);

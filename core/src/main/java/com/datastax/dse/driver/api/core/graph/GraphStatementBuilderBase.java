@@ -17,6 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.Statement;
@@ -29,7 +30,10 @@ import java.time.Duration;
 import java.util.Map;
 import net.jcip.annotations.NotThreadSafe;
 
+/** @deprecated DSE Graph is not supported starting with driver 4.19.2.2. */
 @NotThreadSafe
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public abstract class GraphStatementBuilderBase<
     SelfT extends GraphStatementBuilderBase<SelfT, StatementT>,
     StatementT extends GraphStatement<StatementT>> {
@@ -52,27 +56,11 @@ public abstract class GraphStatementBuilderBase<
   protected ConsistencyLevel writeConsistencyLevel;
 
   protected GraphStatementBuilderBase() {
-    // nothing to do
+    throw GraphSupportRemoved.exception();
   }
 
   protected GraphStatementBuilderBase(StatementT template) {
-    this.isIdempotent = template.isIdempotent();
-    this.timeout = template.getTimeout();
-    this.node = template.getNode();
-    this.timestamp = template.getTimestamp();
-    this.executionProfile = template.getExecutionProfile();
-    this.executionProfileName = template.getExecutionProfileName();
-    if (!template.getCustomPayload().isEmpty()) {
-      this.customPayloadBuilder =
-          NullAllowingImmutableMap.<String, ByteBuffer>builder()
-              .putAll(template.getCustomPayload());
-    }
-    this.graphName = template.getGraphName();
-    this.traversalSource = template.getTraversalSource();
-    this.subProtocol = template.getSubProtocol();
-    this.consistencyLevel = template.getConsistencyLevel();
-    this.readConsistencyLevel = template.getReadConsistencyLevel();
-    this.writeConsistencyLevel = template.getWriteConsistencyLevel();
+    throw GraphSupportRemoved.exception();
   }
 
   /** @see GraphStatement#setIdempotent(Boolean) */

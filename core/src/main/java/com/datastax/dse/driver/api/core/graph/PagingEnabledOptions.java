@@ -17,6 +17,9 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
+/** @deprecated DSE Graph is not supported starting with driver 4.19.2.2. */
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public enum PagingEnabledOptions {
   ENABLED,
   DISABLED,

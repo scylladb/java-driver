@@ -17,9 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.graph;
 
-import com.datastax.dse.driver.internal.core.graph.DefaultScriptGraphStatement;
-import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
-import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Map;
@@ -29,42 +27,37 @@ import net.jcip.annotations.NotThreadSafe;
  * A builder to create a script graph statement.
  *
  * <p>This class is mutable and not thread-safe.
+ *
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
 @NotThreadSafe
+@SuppressWarnings("DoNotCallSuggester")
+@Deprecated
 public class ScriptGraphStatementBuilder
     extends GraphStatementBuilderBase<ScriptGraphStatementBuilder, ScriptGraphStatement> {
 
-  private String script;
-  private Boolean isSystemQuery;
-  private final Map<String, Object> queryParams;
-
   public ScriptGraphStatementBuilder() {
-    this.queryParams = Maps.newHashMap();
+    throw GraphSupportRemoved.exception();
   }
 
   public ScriptGraphStatementBuilder(String script) {
-    this.script = script;
-    this.queryParams = Maps.newHashMap();
+    throw GraphSupportRemoved.exception();
   }
 
   public ScriptGraphStatementBuilder(ScriptGraphStatement template) {
     super(template);
-    this.script = template.getScript();
-    this.queryParams = Maps.newHashMap(template.getQueryParams());
-    this.isSystemQuery = template.isSystemQuery();
+    throw GraphSupportRemoved.exception();
   }
 
   @NonNull
   public ScriptGraphStatementBuilder setScript(@NonNull String script) {
-    this.script = script;
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /** @see ScriptGraphStatement#isSystemQuery() */
   @NonNull
   public ScriptGraphStatementBuilder setSystemQuery(@Nullable Boolean isSystemQuery) {
-    this.isSystemQuery = isSystemQuery;
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -74,8 +67,7 @@ public class ScriptGraphStatementBuilder
    */
   @NonNull
   public ScriptGraphStatementBuilder setQueryParam(@NonNull String name, @Nullable Object value) {
-    this.queryParams.put(name, value);
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -85,8 +77,7 @@ public class ScriptGraphStatementBuilder
    */
   @NonNull
   public ScriptGraphStatementBuilder setQueryParams(@NonNull Map<String, Object> params) {
-    this.queryParams.putAll(params);
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /**
@@ -101,36 +92,17 @@ public class ScriptGraphStatementBuilder
    */
   @NonNull
   public ScriptGraphStatementBuilder removeQueryParam(@NonNull String name) {
-    this.queryParams.remove(name);
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   /** Clears all the parameters previously added to this builder. */
   public ScriptGraphStatementBuilder clearQueryParams() {
-    this.queryParams.clear();
-    return this;
+    throw GraphSupportRemoved.exception();
   }
 
   @NonNull
   @Override
   public ScriptGraphStatement build() {
-    Preconditions.checkNotNull(this.script, "Script hasn't been defined in this builder.");
-    return new DefaultScriptGraphStatement(
-        this.script,
-        this.queryParams,
-        this.isSystemQuery,
-        isIdempotent,
-        timeout,
-        node,
-        timestamp,
-        executionProfile,
-        executionProfileName,
-        buildCustomPayload(),
-        graphName,
-        traversalSource,
-        subProtocol,
-        consistencyLevel,
-        readConsistencyLevel,
-        writeConsistencyLevel);
+    throw GraphSupportRemoved.exception();
   }
 }

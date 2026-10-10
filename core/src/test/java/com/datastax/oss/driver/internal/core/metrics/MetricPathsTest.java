@@ -15,12 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.dse.driver;
+package com.datastax.oss.driver.internal.core.metrics;
 
-import org.apache.tinkerpop.gremlin.structure.io.Buffer;
+import static org.assertj.core.api.Assertions.assertThat;
 
-public class Assertions extends org.assertj.core.api.Assertions {
-  public static TinkerpopBufferAssert assertThat(Buffer actual) {
-    return new TinkerpopBufferAssert(actual);
+import java.util.Arrays;
+import java.util.Collections;
+import org.junit.Test;
+
+public class MetricPathsTest {
+
+  @Test
+  public void should_ignore_deprecated_graph_metrics() {
+    assertThat(
+            MetricPaths.parseSessionMetricPaths(
+                Arrays.asList("graph-requests", "graph-client-timeouts"), "test"))
+        .isEmpty();
+    assertThat(
+            MetricPaths.parseNodeMetricPaths(Collections.singletonList("graph-messages"), "test"))
+        .isEmpty();
   }
 }

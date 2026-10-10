@@ -27,10 +27,9 @@ import java.util.Map;
 /**
  * Information about the execution of a graph statement.
  *
- * @deprecated This interface is not used by any driver component anymore; the driver now exposes
- *     instances of {@link com.datastax.oss.driver.api.core.cql.ExecutionInfo} for all Graph
- *     queries.
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
  */
+@SuppressWarnings("DoNotCallSuggester")
 @Deprecated
 public interface GraphExecutionInfo {
 
