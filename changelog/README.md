@@ -21,9 +21,13 @@ under the License.
 
 <!-- Note: contrary to 3.x, insert new entries *first* in their section -->
 
+### 4.19.2.3
+
+- [breaking] Remove public DSE metadata and query-builder APIs, plus related schema support
+  (#1031)
+
 ### 4.19.2.2
 
-- [improvement] Remove unused DSE metadata and query-builder extensions (#1031)
 - [breaking] Remove DSE Graph execution support and TinkerPop integration; deprecated Graph API
   shells and legacy configuration remain temporarily for migration (#1028)
 
