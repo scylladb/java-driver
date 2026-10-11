@@ -66,7 +66,6 @@ import org.slf4j.LoggerFactory;
 @Category(ParallelizableTests.class)
 @ScyllaSkip(description = "scylladb/java-driver#566 - needs to be adopted to scylla")
 @BackendRequirement(type = BackendType.CASSANDRA)
-@BackendRequirement(type = BackendType.DSE)
 public class DescribeIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(DescribeIT.class);
@@ -95,7 +94,6 @@ public class DescribeIT {
   private static final Map<BackendType, String> scriptFileForBackend =
       ImmutableMap.<BackendType, String>builder()
           .put(BackendType.CASSANDRA, "DescribeIT/oss")
-          .put(BackendType.DSE, "DescribeIT/dse")
           .put(BackendType.HCD, "DescribeIT/hcd")
           .build();
 
@@ -136,9 +134,8 @@ public class DescribeIT {
         .isEqualTo(scriptContents);
   }
 
-  private boolean atLeastVersion(Version dseVersion, Version ossVersion) {
-    Version comparison = CCM_RULE.isDistributionOf(BackendType.DSE) ? dseVersion : ossVersion;
-    return serverVersion.compareTo(comparison) >= 0;
+  private boolean atLeastVersion(Version ossVersion) {
+    return serverVersion.compareTo(ossVersion) >= 0;
   }
 
   @Test
@@ -155,10 +152,10 @@ public class DescribeIT {
     /* Validate that the keyspace metadata is fully populated */
     assertThat(ks.getUserDefinedTypes()).isNotEmpty();
     assertThat(ks.getTables()).isNotEmpty();
-    if (atLeastVersion(Version.V5_0_0, Version.V3_0_0)) {
+    if (atLeastVersion(Version.V3_0_0)) {
       assertThat(ks.getViews()).isNotEmpty();
     }
-    if (atLeastVersion(Version.V5_0_0, Version.V2_2_0)) {
+    if (atLeastVersion(Version.V2_2_0)) {
       assertThat(ks.getFunctions()).isNotEmpty();
       assertThat(ks.getAggregates()).isNotEmpty();
     }
