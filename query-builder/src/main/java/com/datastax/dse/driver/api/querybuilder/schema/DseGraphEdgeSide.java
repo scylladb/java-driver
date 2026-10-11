@@ -25,13 +25,21 @@ import java.util.List;
 @SuppressWarnings("DoNotCallSuggester")
 public interface DseGraphEdgeSide {
 
-  /** Starts the definition of a graph edge side by designating the from/to table. */
+  /**
+   * Starts the definition of a graph edge side by designating the from/to table.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   static DseGraphEdgeSide table(@NonNull CqlIdentifier tableId) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
   }
 
-  /** Shortcut for {@link #table(CqlIdentifier) table(CqlIdentifier.fromCql(tableName))}. */
+  /**
+   * Shortcut for {@link #table(CqlIdentifier) table(CqlIdentifier.fromCql(tableName))}.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   static DseGraphEdgeSide table(@NonNull String tableName) {
     return table(CqlIdentifier.fromCql(tableName));

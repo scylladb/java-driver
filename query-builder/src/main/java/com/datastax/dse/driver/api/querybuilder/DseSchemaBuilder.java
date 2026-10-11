@@ -44,13 +44,19 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts a CREATE AGGREGATE query with the given aggregate name. This assumes the keyspace name
    * is already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(@NonNull CqlIdentifier aggregateId) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
   }
 
-  /** Starts a CREATE AGGREGATE query with the given aggregate name for the given keyspace name. */
+  /**
+   * Starts a CREATE AGGREGATE query with the given aggregate name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(
       @Nullable CqlIdentifier keyspaceId, @NonNull CqlIdentifier aggregateId) {
@@ -60,6 +66,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #createDseAggregate(CqlIdentifier)
    * createDseAggregate(CqlIdentifier.fromCql(aggregateName))}.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(@NonNull String aggregateName) {
@@ -69,6 +77,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #createAggregate(CqlIdentifier, CqlIdentifier)
    * createDseAggregate(CqlIdentifier.fromCql(keyspaceName), CqlIdentifier.fromCql(aggregateName))}.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(
@@ -132,13 +142,19 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts a CREATE FUNCTION query with the given function name. This assumes the keyspace name is
    * already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(@NonNull CqlIdentifier functionId) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
   }
 
-  /** Starts a CREATE FUNCTION query with the given function name for the given keyspace name. */
+  /**
+   * Starts a CREATE FUNCTION query with the given function name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(
       @Nullable CqlIdentifier keyspaceId, @NonNull CqlIdentifier functionId) {
@@ -148,6 +164,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #createFunction(CqlIdentifier)
    * createFunction(CqlIdentifier.fromCql(functionName)}
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(@NonNull String functionName) {
@@ -157,6 +175,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #createFunction(CqlIdentifier, CqlIdentifier)
    * createFunction(CqlIdentifier.fromCql(keyspaceName), CqlIdentifier.fromCql(functionName)}
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(
@@ -217,7 +237,11 @@ public class DseSchemaBuilder extends SchemaBuilder {
     return SchemaBuilder.createFunction(keyspace, functionName);
   }
 
-  /** Starts a CREATE KEYSPACE query. */
+  /**
+   * Starts a CREATE KEYSPACE query.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   public static CreateDseKeyspaceStart createDseKeyspace(@NonNull CqlIdentifier keyspaceName) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
@@ -226,13 +250,19 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #createDseKeyspace(CqlIdentifier)
    * createKeyspace(CqlIdentifier.fromCql(keyspaceName))}
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseKeyspaceStart createDseKeyspace(@NonNull String keyspaceName) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
   }
 
-  /** Starts an ALTER KEYSPACE query. */
+  /**
+   * Starts an ALTER KEYSPACE query.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   public static AlterDseKeyspaceStart alterDseKeyspace(@NonNull CqlIdentifier keyspaceName) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
@@ -241,6 +271,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #alterDseKeyspace(CqlIdentifier)
    * alterKeyspace(CqlIdentifier.fromCql(keyspaceName)}.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static AlterDseKeyspaceStart alterDseKeyspace(@NonNull String keyspaceName) {
@@ -250,13 +282,19 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts a CREATE TABLE query with the given table name. This assumes the keyspace name is
    * already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseTableStart createDseTable(@NonNull CqlIdentifier tableName) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
   }
 
-  /** Starts a CREATE TABLE query with the given table name for the given keyspace name. */
+  /**
+   * Starts a CREATE TABLE query with the given table name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   public static CreateDseTableStart createDseTable(
       @Nullable CqlIdentifier keyspace, @NonNull CqlIdentifier tableName) {
@@ -266,6 +304,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #createDseTable(CqlIdentifier)
    * createDseTable(CqlIdentifier.fromCql(tableName)}
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseTableStart createDseTable(@NonNull String tableName) {
@@ -275,6 +315,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #createDseTable(CqlIdentifier,CqlIdentifier)
    * createDseTable(CqlIdentifier.fromCql(keyspaceName),CqlIdentifier.fromCql(tableName)}
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static CreateDseTableStart createDseTable(
@@ -285,13 +327,19 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts an ALTER TABLE query with the given table name. This assumes the keyspace name is
    * already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static AlterDseTableStart alterDseTable(@NonNull CqlIdentifier tableName) {
     throw new UnsupportedOperationException("DSE schema query building is no longer supported");
   }
 
-  /** Starts an ALTER TABLE query with the given table name for the given keyspace name. */
+  /**
+   * Starts an ALTER TABLE query with the given table name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
+   */
   @NonNull
   public static AlterDseTableStart alterDseTable(
       @Nullable CqlIdentifier keyspace, @NonNull CqlIdentifier tableName) {
@@ -301,6 +349,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #alterDseTable(CqlIdentifier)
    * alterDseTable(CqlIdentifier.fromCql(tableName)}
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static AlterDseTableStart alterDseTable(@NonNull String tableName) {
@@ -310,6 +360,8 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Shortcut for {@link #alterDseTable(CqlIdentifier,CqlIdentifier)
    * alterDseTable(CqlIdentifier.fromCql(keyspaceName),CqlIdentifier.fromCql(tableName)}
+   *
+   * @throws UnsupportedOperationException always; DSE schema query building is unsupported.
    */
   @NonNull
   public static AlterDseTableStart alterDseTable(
