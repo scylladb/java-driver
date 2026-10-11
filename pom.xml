@@ -631,9 +631,6 @@
             <versionFormat>\d+(?:\.\d+)+</versionFormat>
             <failOnUnresolvedArtifacts>true</failOnUnresolvedArtifacts>
             <failOnUnresolvedDependencies>true</failOnUnresolvedDependencies>
-            <oldArtifacts>
-              <artifact>${project.groupId}:${project.artifactId}:RELEASE</artifact>
-            </oldArtifacts>
             <analysisConfiguration>
               <revapi.ignore>
                 <item>
