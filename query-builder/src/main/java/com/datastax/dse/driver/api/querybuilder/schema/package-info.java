@@ -16,8 +16,11 @@
  * limitations under the License.
  */
 /**
- * This package effectively mirrors the Cassandra OSS Schema interfaces to allow extended schema and
- * query building for the DSE driver. NOTE: Changes made to the OSS driver will need to be mirrored
- * here if the OSS driver changes affect an extended schema build strategy for the DSE driver.
+ * Legacy DSE schema query interfaces retained for binary compatibility.
+ *
+ * <p>DSE-specific schema query building is no longer supported. The legacy factory methods in
+ * {@link com.datastax.dse.driver.api.querybuilder.DseSchemaBuilder} and {@link DseGraphEdgeSide}
+ * throw {@link UnsupportedOperationException}. Use {@link
+ * com.datastax.oss.driver.api.querybuilder.SchemaBuilder} for supported CQL schema queries.
  */
 package com.datastax.dse.driver.api.querybuilder.schema;
