@@ -79,9 +79,10 @@ public class OptionsMap implements Serializable {
   }
 
   private final ConcurrentHashMap<String, Map<DriverOption, Object>> map;
-  private final ConcurrentHashMap<String, Set<DriverOption>> explicitOptions;
+  // Serialized through SerializationProxy; these fields are not part of the direct form.
+  private final transient ConcurrentHashMap<String, Set<DriverOption>> explicitOptions;
   // Older streams cannot distinguish defaults from writes made before deserialization.
-  private final boolean legacyUnknown;
+  private final transient boolean legacyUnknown;
 
   private final List<Consumer<OptionsMap>> changeListeners = new CopyOnWriteArrayList<>();
 

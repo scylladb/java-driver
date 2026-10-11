@@ -56,7 +56,10 @@ import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -64,6 +67,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
 import javax.net.ssl.SSLContext;
@@ -82,6 +86,9 @@ import org.slf4j.LoggerFactory;
 @NotThreadSafe
 public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
 
+  /** @deprecated DataStax Astra connections are no longer supported. */
+  @Deprecated public static final String ASTRA_PAYLOAD_KEY = "traceparent";
+
   private static final Logger LOG = LoggerFactory.getLogger(SessionBuilder.class);
 
   @SuppressWarnings("unchecked")
@@ -90,6 +97,10 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   protected DriverConfigLoader configLoader;
   protected Set<EndPoint> programmaticContactPoints = new HashSet<>();
   protected CqlIdentifier keyspace;
+
+  /** @deprecated DataStax Astra connections are no longer supported. */
+  @Deprecated protected Callable<InputStream> cloudConfigInputStream;
+
   protected ProgrammaticArguments.Builder programmaticArgumentsBuilder =
       ProgrammaticArguments.builder();
 
@@ -355,6 +366,15 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     return withAuthProvider(new ProgrammaticPlainTextAuthProvider(username, password));
   }
 
+  /** @deprecated DSE proxy authentication is no longer supported. */
+  @Deprecated
+  @NonNull
+  public SelfT withAuthCredentials(
+      @NonNull String username, @NonNull String password, @NonNull String authorizationId) {
+    return withAuthProvider(
+        new ProgrammaticPlainTextAuthProvider(username, password, authorizationId));
+  }
+
   /**
    * @deprecated this method only exists to ease the transition from driver 3, it is an alias for
    *     {@link #withAuthCredentials(String, String)}.
@@ -363,6 +383,14 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   @NonNull
   public SelfT withCredentials(@NonNull String username, @NonNull String password) {
     return withAuthCredentials(username, password);
+  }
+
+  /** @deprecated DSE proxy authentication is no longer supported. */
+  @Deprecated
+  @NonNull
+  public SelfT withCredentials(
+      @NonNull String username, @NonNull String password, @NonNull String authorizationId) {
+    return withAuthCredentials(username, password, authorizationId);
   }
 
   /**
@@ -603,6 +631,34 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   public SelfT withCodecRegistry(@Nullable MutableCodecRegistry codecRegistry) {
     this.programmaticArgumentsBuilder.withCodecRegistry(codecRegistry);
     return self;
+  }
+
+  /** @deprecated DataStax Astra connections are no longer supported. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudSecureConnectBundle(@NonNull Path path) {
+    throw new UnsupportedOperationException("DataStax Astra connections are no longer supported");
+  }
+
+  /** @deprecated DataStax Astra connections are no longer supported. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudSecureConnectBundle(@NonNull URL url) {
+    throw new UnsupportedOperationException("DataStax Astra connections are no longer supported");
+  }
+
+  /** @deprecated DataStax Astra connections are no longer supported. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudSecureConnectBundle(@NonNull InputStream inputStream) {
+    throw new UnsupportedOperationException("DataStax Astra connections are no longer supported");
+  }
+
+  /** @deprecated DataStax Astra connections are no longer supported. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudProxyAddress(@Nullable InetSocketAddress address) {
+    throw new UnsupportedOperationException("DataStax Astra connections are no longer supported");
   }
 
   /**

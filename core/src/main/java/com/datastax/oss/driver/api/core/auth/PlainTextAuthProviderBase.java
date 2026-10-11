@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.api.core.auth;
 
+import com.datastax.dse.driver.api.core.auth.BaseDseAuthenticator;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
@@ -26,6 +27,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
 import net.jcip.annotations.ThreadSafe;
@@ -72,7 +74,8 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
   public Authenticator newAuthenticator(
       @NonNull EndPoint endPoint, @NonNull String serverAuthenticator)
       throws AuthenticationException {
-    return new PlainTextAuthenticator(getCredentials(endPoint, serverAuthenticator), endPoint);
+    return new PlainTextAuthenticator(
+        getCredentials(endPoint, serverAuthenticator), endPoint, serverAuthenticator);
   }
 
   @Override
@@ -93,11 +96,25 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
 
     private final char[] username;
     private final char[] password;
+    private final char[] authorizationId;
 
-    /** Builds an instance for username/password authentication. */
-    public Credentials(@NonNull char[] username, @NonNull char[] password) {
+    /**
+     * Builds an instance for username/password authentication, and proxy authentication with the
+     * given authorizationId.
+     *
+     * <p>This feature is only available with DataStax Enterprise. If the target server is Apache
+     * Cassandra, the authorizationId will be ignored.
+     */
+    public Credentials(
+        @NonNull char[] username, @NonNull char[] password, @NonNull char[] authorizationId) {
       this.username = Objects.requireNonNull(username);
       this.password = Objects.requireNonNull(password);
+      this.authorizationId = Objects.requireNonNull(authorizationId);
+    }
+
+    /** Builds an instance for simple username/password authentication. */
+    public Credentials(@NonNull char[] username, @NonNull char[] password) {
+      this(username, password, new char[0]);
     }
 
     @NonNull
@@ -120,6 +137,11 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       return password;
     }
 
+    @NonNull
+    public char[] getAuthorizationId() {
+      return authorizationId;
+    }
+
     /** Clears the credentials from memory when they're no longer needed. */
     protected void clear() {
       // Note: this is a bit irrelevant with the built-in provider, because the config already
@@ -127,10 +149,19 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       // retrieves the credentials from a different source.
       Arrays.fill(getUsername(), (char) 0);
       Arrays.fill(getPassword(), (char) 0);
+      Arrays.fill(getAuthorizationId(), (char) 0);
     }
   }
 
-  protected static class PlainTextAuthenticator implements SyncAuthenticator {
+  // Implementation note: BaseDseAuthenticator is backward compatible with Cassandra authenticators.
+  // This will work with both Cassandra (as long as no authorizationId is set) and DSE.
+  protected static class PlainTextAuthenticator extends BaseDseAuthenticator {
+
+    private static final ByteBuffer MECHANISM =
+        ByteBuffer.wrap("PLAIN".getBytes(StandardCharsets.UTF_8)).asReadOnlyBuffer();
+
+    private static final ByteBuffer SERVER_INITIAL_CHALLENGE =
+        ByteBuffer.wrap("PLAIN-START".getBytes(StandardCharsets.UTF_8)).asReadOnlyBuffer();
 
     private static final EndPoint DUMMY_END_POINT =
         new EndPoint() {
@@ -143,28 +174,37 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
           @NonNull
           @Override
           public String asMetricPrefix() {
-            return "";
+            return ""; // will never be used
           }
         };
 
     private final ByteBuffer encodedCredentials;
     private final EndPoint endPoint;
 
-    protected PlainTextAuthenticator(@NonNull Credentials credentials, @NonNull EndPoint endPoint) {
+    protected PlainTextAuthenticator(
+        @NonNull Credentials credentials,
+        @NonNull EndPoint endPoint,
+        @NonNull String serverAuthenticator) {
+      super(serverAuthenticator);
+
       Objects.requireNonNull(credentials);
       Objects.requireNonNull(endPoint);
 
+      ByteBuffer authorizationId = toUtf8Bytes(credentials.getAuthorizationId());
       ByteBuffer username = toUtf8Bytes(credentials.getUsername());
       ByteBuffer password = toUtf8Bytes(credentials.getPassword());
 
       this.encodedCredentials =
-          ByteBuffer.allocate(username.remaining() + password.remaining() + 2);
+          ByteBuffer.allocate(
+              authorizationId.remaining() + username.remaining() + password.remaining() + 2);
+      encodedCredentials.put(authorizationId);
       encodedCredentials.put((byte) 0);
       encodedCredentials.put(username);
       encodedCredentials.put((byte) 0);
       encodedCredentials.put(password);
       encodedCredentials.flip();
 
+      clear(authorizationId);
       clear(username);
       clear(password);
 
@@ -172,12 +212,20 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
     }
 
     /**
-     * @deprecated Preserved for existing plaintext subclasses. Use {@link
-     *     #PlainTextAuthenticator(Credentials, EndPoint)} instead.
+     * @deprecated Preserved for backward compatibility, implementors should use the 3-arg
+     *     constructor {@code PlainTextAuthenticator(Credentials, EndPoint, String)} instead.
      */
     @Deprecated
     protected PlainTextAuthenticator(@NonNull Credentials credentials) {
-      this(credentials, DUMMY_END_POINT);
+      this(
+          credentials,
+          // It's unlikely that this class was ever extended by third parties, but if it was, assume
+          // that it was not written for DSE:
+          // - dummy end point because we should never need to build an auth exception
+          DUMMY_END_POINT,
+          // - default OSS authenticator name (the only thing that matters is how this string
+          //   compares to "DseAuthenticator")
+          "org.apache.cassandra.auth.PasswordAuthenticator");
     }
 
     private static ByteBuffer toUtf8Bytes(char[] charArray) {
@@ -192,6 +240,18 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       }
     }
 
+    @NonNull
+    @Override
+    public ByteBuffer getMechanism() {
+      return MECHANISM;
+    }
+
+    @NonNull
+    @Override
+    public ByteBuffer getInitialServerChallenge() {
+      return SERVER_INITIAL_CHALLENGE;
+    }
+
     @Nullable
     @Override
     public ByteBuffer initialResponseSync() {
@@ -203,8 +263,5 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
     public ByteBuffer evaluateChallengeSync(@Nullable ByteBuffer challenge) {
       throw new AuthenticationException(endPoint, "Incorrect challenge from server");
     }
-
-    @Override
-    public void onAuthenticationSuccessSync(@Nullable ByteBuffer token) {}
   }
 }
