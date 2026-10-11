@@ -23,8 +23,8 @@ under the License.
 
 ### 4.19.2.3
 
-- [breaking] Remove public DSE metadata and query-builder APIs, plus related schema support
-  (#1031)
+- [breaking] Remove public DSE metadata and query-builder APIs, plus related schema support;
+  DSE connections are unsupported (#1031)
 
 ### 4.19.2.2
 
