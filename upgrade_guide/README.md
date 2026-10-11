@@ -21,6 +21,30 @@ under the License.
 
 ### 4.19.2.3
 
+#### Remaining DSE compatibility APIs were removed
+
+The DSE protocol versions, continuous paging, Graph API shells, geometry and DateRange types,
+DSE metadata extensions, and DSE query builder extensions are no longer available. Remove usages
+of `DseSession`, `DseDriverOption`, and the Graph and continuous paging APIs before upgrading.
+The generic reactive CQL and mapper APIs remain available under their existing
+`com.datastax.dse` package names.
+
+Replace `DseDriverOption.APPLICATION_NAME` and `DseDriverOption.APPLICATION_VERSION` with
+`DefaultDriverOption.APPLICATION_NAME` and `DefaultDriverOption.APPLICATION_VERSION`. The
+`basic.application.name` and `basic.application.version` configuration paths are unchanged.
+If `basic.load-balancing-policy.class` names `DseLoadBalancingPolicy` or
+`DseDcInferringLoadBalancingPolicy`, replace it with `DefaultLoadBalancingPolicy` or
+`DcInferringLoadBalancingPolicy`, respectively. The DSE policy classes have been removed.
+
+Serialized `OptionsMap` instances from 4.19.2.1 or 4.19.2.2 that contain `DseDriverOption` entries
+cannot be deserialized with this release because that enum has been removed. In particular,
+`OptionsMap.driverDefaults()` in 4.19.2.2 includes Graph defaults backed by `DseDriverOption`.
+Rebuild those maps with the remaining options before upgrading; the serialization compatibility
+noted under 4.19.2.2 below does not extend to these maps.
+
+For four-part versions, replace `Version.getDSEPatch()` with `Version.getRevision()`; it returns
+the fourth component, or `-1` when that component is absent.
+
 #### DSE authentication and proxy execution were removed
 
 The driver no longer supports DSE GSSAPI, DSE plaintext negotiation, or proxy authentication and
@@ -40,6 +64,10 @@ The following APIs were removed:
 - `DseDriverOption.AUTH_PROVIDER_*` and the DSE `TypedDriverOption.AUTH_PROVIDER_*` options
 - `ProxyAuthentication`, `BaseDseAuthenticator`, `DseGssApiAuthProviderBase`,
   `ProgrammaticDseGssApiAuthProvider`, and `DsePlainTextAuthProviderBase`
+
+Removing these public signatures in 4.19.2.3 is an intentional exception to the
+[public API compatibility convention](../manual/api_conventions/). Applications compiled against
+them must migrate and be recompiled before upgrading.
 
 `PlainTextAuthProviderBase.PlainTextAuthenticator` now implements `SyncAuthenticator` directly
 instead of extending `BaseDseAuthenticator`. Its three-argument constructor
@@ -173,7 +201,8 @@ Legacy configuration remains compatible during the transition:
 * `basic.graph`, `advanced.graph`, and Graph metric settings are accepted and ignored. The driver
   logs a deprecation warning when an application explicitly configures them.
 * Legacy Graph defaults remain readable from `reference.conf` and `OptionsMap.driverDefaults()`.
-* Serialized `OptionsMap` instances created by older driver versions remain deserializable.
+* Serialized `OptionsMap` instances created by older driver versions remain deserializable in
+  4.19.2.2. See the 4.19.2.3 note above for maps containing removed `DseDriverOption` entries.
 * Graph helpers in `java-driver-test-infra` remain as deprecated signatures. Requests to create a
   Graph fail fast; Graph engine and protocol settings are ignored.
 * `DseNodeMetric.GRAPH_MESSAGES`, `DseSessionMetric.GRAPH_REQUESTS`, and
@@ -679,37 +708,6 @@ token map for these keyspaces, you now must modify the following configuration o
 [Metadata.getKeyspaces()]: https://docs.datastax.com/en/drivers/java/4.11/com/datastax/oss/driver/api/core/metadata/Metadata.html#getKeyspaces--
 [TokenMap]: https://docs.datastax.com/en/drivers/java/4.11/com/datastax/oss/driver/api/core/metadata/TokenMap.html
 
-#### DSE Graph dependencies are now optional
-
-Until driver 4.9.0, the driver declared a mandatory dependency to Apache TinkerPop, a library
-required only when connecting to DSE Graph. The vast majority of Apache Cassandra users did not need
-that library, but were paying the price of having that heavy-weight library in their application's
-classpath.
-
-_Starting with driver 4.10.0, TinkerPop is now considered an optional dependency._
-
-Regular users of Apache Cassandra that do not use DSE Graph will not notice any disruption.
-
-DSE Graph users, however, will now have to explicitly declare a dependency to Apache TinkerPop. This
-can be achieved with Maven by adding the following dependencies to the `<dependencies>` section of
-your POM file:
-
-```xml
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>gremlin-core</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-<dependency>
-  <groupId>org.apache.tinkerpop</groupId>
-  <artifactId>tinkergraph-gremlin</artifactId>
-  <version>${tinkerpop.version}</version>
-</dependency>
-```
-
-This requirement applies through driver 4.19.2.1. DSE Graph execution is removed starting with
-4.19.2.2, as described above.
-
 ### 4.5.x - 4.6.0
 
 These versions are subject to [JAVA-2676](https://datastax-oss.atlassian.net/browse/JAVA-2676), a
@@ -726,13 +724,9 @@ separate DSE driver.
 The great news is that [reactive execution](../manual/core/reactive/) is now available for everyone.
 See the `CqlSession.executeReactive` methods.
 
-Apart from that, the only visible change is that DSE-specific features are now exposed in the API:
-
-* new execution methods: `CqlSession.executeGraph`, `CqlSession.executeContinuously*`. They all
-  have default implementations so this doesn't break binary compatibility. You can just ignore them.
-* new driver dependencies: TinkerPop, ESRI, Reactive Streams. If you want to keep your classpath
-  lean, you can exclude some dependencies when you don't use the corresponding DSE features; see the
-  [Integration>Driver dependencies](../manual/core/integration/#driver-dependencies) section.
+The main visible change is the Reactive Streams dependency. If you want to keep your classpath
+lean, you can exclude it when you don't use reactive execution; see the
+[Integration>Driver dependencies](../manual/core/integration/#driver-dependencies) section.
 
 #### For DataStax Enterprise users
 

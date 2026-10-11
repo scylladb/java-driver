@@ -116,6 +116,10 @@ clear text in memory; this means they are vulnerable to an attacker who is able 
 dumps. If this is not acceptable for you, consider writing your own [AuthProvider] implementation;
 [PlainTextAuthProviderBase] is a good starting point.
 
+This base class supports standard SASL PLAIN authentication only. DSE proxy authentication and
+GSSAPI, including `BaseDseAuthenticator`, were removed; see the
+[4.19.2.3 upgrade notes](../../../upgrade_guide/#dse-authentication-and-proxy-execution-were-removed).
+
 [SASL]: https://en.wikipedia.org/wiki/Simple_Authentication_and_Security_Layer
 
 [AuthProvider]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/auth/AuthProvider.html
