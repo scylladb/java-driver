@@ -39,7 +39,6 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.Optional;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -65,21 +64,21 @@ public class DefaultSchemaQueriesFactoryTest {
 
   private static ImmutableList<ImmutableList<Object>> cassandraVersions =
       ImmutableList.<ImmutableList<Object>>builder()
-          .add(ImmutableList.of("2.1.0", Optional.empty(), Expected.CASS_21))
-          .add(ImmutableList.of("2.2.0", Optional.empty(), Expected.CASS_22))
-          .add(ImmutableList.of("2.2.1", Optional.empty(), Expected.CASS_22))
+          .add(ImmutableList.of("2.1.0", Expected.CASS_21))
+          .add(ImmutableList.of("2.2.0", Expected.CASS_22))
+          .add(ImmutableList.of("2.2.1", Expected.CASS_22))
           // Not a real version, just documenting behaviour of existing impl
-          .add(ImmutableList.of("2.3.0", Optional.empty(), Expected.CASS_22))
+          .add(ImmutableList.of("2.3.0", Expected.CASS_22))
           // We now return you to real versions
-          .add(ImmutableList.of("3.0.0", Optional.empty(), Expected.CASS_3))
-          .add(ImmutableList.of("3.0.1", Optional.empty(), Expected.CASS_3))
-          .add(ImmutableList.of("3.1.0", Optional.empty(), Expected.CASS_3))
-          .add(ImmutableList.of("4.0.0", Optional.empty(), Expected.CASS_4))
-          .add(ImmutableList.of("4.0.1", Optional.empty(), Expected.CASS_4))
-          .add(ImmutableList.of("4.1.0", Optional.empty(), Expected.CASS_4))
+          .add(ImmutableList.of("3.0.0", Expected.CASS_3))
+          .add(ImmutableList.of("3.0.1", Expected.CASS_3))
+          .add(ImmutableList.of("3.1.0", Expected.CASS_3))
+          .add(ImmutableList.of("4.0.0", Expected.CASS_4))
+          .add(ImmutableList.of("4.0.1", Expected.CASS_4))
+          .add(ImmutableList.of("4.1.0", Expected.CASS_4))
           .build();
 
-  @DataProvider(format = "%m %p[1] => %p[0]")
+  @DataProvider(format = "%m %p[0] => %p[1]")
   public static Iterable<?> expected() {
 
     return cassandraVersions;
@@ -88,7 +87,7 @@ public class DefaultSchemaQueriesFactoryTest {
   @Test
   @UseDataProvider("expected")
   public void should_return_correct_schema_queries_impl(
-      String cassandraVersion, Optional<String> ignored, Expected expected) {
+      String cassandraVersion, Expected expected) {
 
     final Node mockNode = mock(Node.class);
     when(mockNode.getCassandraVersion()).thenReturn(Version.parse(cassandraVersion));
