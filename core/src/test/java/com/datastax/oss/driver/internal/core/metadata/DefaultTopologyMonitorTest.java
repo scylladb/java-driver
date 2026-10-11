@@ -696,9 +696,7 @@ public class DefaultTopologyMonitorTest {
       assertThat(nextQuery.parameters).isEqualTo(parameters);
       if (nextQuery.error) {
         Message error =
-            new Error(
-                ProtocolConstants.ErrorCode.SERVER_ERROR,
-                "Unknown keyspace/cf pair (system.peers_v2)");
+            new Error(ProtocolConstants.ErrorCode.INVALID, "Unknown table system.peers_v2");
         return CompletableFutures.failedFuture(new UnexpectedResponseException(queryString, error));
       }
       return CompletableFuture.completedFuture(nextQuery.result);

@@ -17,11 +17,7 @@
  */
 package com.datastax.oss.driver.api.core;
 
-import com.datastax.dse.driver.api.core.cql.continuous.ContinuousSession;
-import com.datastax.dse.driver.api.core.cql.continuous.reactive.ContinuousReactiveSession;
 import com.datastax.dse.driver.api.core.cql.reactive.ReactiveSession;
-import com.datastax.dse.driver.api.core.graph.GraphSession;
-import com.datastax.dse.driver.api.core.graph.reactive.ReactiveGraphSession;
 import com.datastax.oss.driver.api.core.cql.AsyncCqlSession;
 import com.datastax.oss.driver.api.core.cql.SyncCqlSession;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -30,22 +26,10 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 /**
  * The default session type built by the driver.
  *
- * <p>It provides user-friendly execution methods for synchronous, asynchronous, reactive, and
- * continuous-paging CQL requests.
- *
- * <p>Client applications can use this interface even if they don't need all the features. In
- * particular, it can be used with a regular Apache Cassandra &reg; cluster, as long as you don't
- * call continuous-paging methods.
+ * <p>It provides user-friendly execution methods for synchronous, asynchronous, and reactive CQL
+ * requests.
  */
-public interface CqlSession
-    extends Session,
-        SyncCqlSession,
-        AsyncCqlSession,
-        ReactiveSession,
-        ContinuousSession,
-        GraphSession,
-        ContinuousReactiveSession,
-        ReactiveGraphSession {
+public interface CqlSession extends Session, SyncCqlSession, AsyncCqlSession, ReactiveSession {
 
   /**
    * Returns a builder to create a new instance.

@@ -311,7 +311,6 @@ public class BoundStatementCcmIT {
   @Test
   @ScyllaSkip(description = "scylladb/scylla-driver#567 - fails by unknown reason")
   @BackendRequirement(type = BackendType.CASSANDRA)
-  @BackendRequirement(type = BackendType.DSE)
   public void should_propagate_attributes_when_preparing_a_simple_statement() {
     CqlSession session = sessionRule.session();
 

@@ -134,8 +134,8 @@ public class DescribeIT {
         .isEqualTo(scriptContents);
   }
 
-  private boolean atLeastVersion(Version ossVersion) {
-    return serverVersion.compareTo(ossVersion) >= 0;
+  private boolean atLeastVersion(Version version) {
+    return serverVersion.compareTo(version) >= 0;
   }
 
   @Test

@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Possible values: cassandra or dse
+# Possible values: cassandra or scylla
 server_type: cassandra
 # Server version (e.g. 3.11.7 or 6.8.8)
 server_version: 3.11.7

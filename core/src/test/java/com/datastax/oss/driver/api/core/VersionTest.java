@@ -19,15 +19,28 @@ package com.datastax.oss.driver.api.core;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 
+import com.datastax.oss.driver.internal.SerializationHelper;
+import java.util.Base64;
 import org.junit.Test;
 
 public class VersionTest {
+
+  // Serialized with java-driver-core 4.19.2.1. Keep these fixtures immutable so this test detects
+  // accidental changes to Version's serialized field names.
+  private static final String SERIALIZED_WITHOUT_REVISION =
+      "rO0ABXNyAChjb20uZGF0YXN0YXgub3NzLmRyaXZlci5hcGkuY29yZS5WZXJzaW9uAAAAAAAAAAECAAZJ"
+          + "AAhkc2VQYXRjaEkABW1ham9ySQAFbWlub3JJAAVwYXRjaEwABWJ1aWxkdAASTGphdmEvbGFuZy9TdHJp"
+          + "bmc7WwALcHJlUmVsZWFzZXN0ABNbTGphdmEvbGFuZy9TdHJpbmc7eHD/////AAAABAAAABMAAAACcHA=";
+  private static final String SERIALIZED_WITH_REVISION =
+      "rO0ABXNyAChjb20uZGF0YXN0YXgub3NzLmRyaXZlci5hcGkuY29yZS5WZXJzaW9uAAAAAAAAAAECAAZJ"
+          + "AAhkc2VQYXRjaEkABW1ham9ySQAFbWlub3JJAAVwYXRjaEwABWJ1aWxkdAASTGphdmEvbGFuZy9TdHJp"
+          + "bmc7WwALcHJlUmVsZWFzZXN0ABNbTGphdmEvbGFuZy9TdHJpbmc7eHAAAAABAAAABAAAABMAAAACcHA=";
 
   @Test
   public void should_parse_release_version() {
     assertThat(Version.parse("1.2.19"))
         .hasMajorMinorPatch(1, 2, 19)
-        .hasDsePatch(-1)
+        .hasRevision(-1)
         .hasNoPreReleaseLabels()
         .hasBuildLabel(null)
         .hasNextStable("1.2.19")
@@ -43,7 +56,7 @@ public class VersionTest {
   public void should_parse_pre_release_version() {
     assertThat(Version.parse("1.2.0-beta1-SNAPSHOT"))
         .hasMajorMinorPatch(1, 2, 0)
-        .hasDsePatch(-1)
+        .hasRevision(-1)
         .hasPreReleaseLabels("beta1", "SNAPSHOT")
         .hasBuildLabel(null)
         .hasToString("1.2.0-beta1-SNAPSHOT")
@@ -54,7 +67,7 @@ public class VersionTest {
   public void should_allow_tilde_as_first_pre_release_delimiter() {
     assertThat(Version.parse("1.2.0~beta1-SNAPSHOT"))
         .hasMajorMinorPatch(1, 2, 0)
-        .hasDsePatch(-1)
+        .hasRevision(-1)
         .hasPreReleaseLabels("beta1", "SNAPSHOT")
         .hasBuildLabel(null)
         .hasToString("1.2.0-beta1-SNAPSHOT")
@@ -62,12 +75,24 @@ public class VersionTest {
   }
 
   @Test
-  public void should_parse_dse_patch() {
-    assertThat(Version.parse("1.2.19.2-SNAPSHOT"))
-        .hasMajorMinorPatch(1, 2, 19)
-        .hasDsePatch(2)
-        .hasToString("1.2.19.2-SNAPSHOT")
-        .hasNextStable("1.2.19.2");
+  public void should_parse_revision() {
+    assertThat(Version.parse("4.19.2.2-SNAPSHOT"))
+        .hasMajorMinorPatch(4, 19, 2)
+        .hasRevision(2)
+        .hasToString("4.19.2.2-SNAPSHOT")
+        .hasNextStable("4.19.2.2");
+  }
+
+  @Test
+  public void should_deserialize_versions_from_4_19_2_1() {
+    assertThat(deserializeFixture(SERIALIZED_WITHOUT_REVISION))
+        .hasMajorMinorPatch(4, 19, 2)
+        .hasRevision(-1)
+        .hasToString("4.19.2");
+    assertThat(deserializeFixture(SERIALIZED_WITH_REVISION))
+        .hasMajorMinorPatch(4, 19, 2)
+        .hasRevision(1)
+        .hasToString("4.19.2.1");
   }
 
   @Test
@@ -90,7 +115,7 @@ public class VersionTest {
     assertOrder("2.0", "2.0.0", 0);
     assertOrder("2.0", "2.0.1", -1);
 
-    // any DSE version is higher than no DSE version
+    // absent revision vs. present revision
     assertOrder("2.0.0", "2.0.0.0", -1);
     assertOrder("2.0.0", "2.0.0.1", -1);
 
@@ -109,5 +134,9 @@ public class VersionTest {
 
   private void assertOrder(String version1, String version2, int expected) {
     assertThat(Version.parse(version1).compareTo(Version.parse(version2))).isEqualTo(expected);
+  }
+
+  private Version deserializeFixture(String fixture) {
+    return SerializationHelper.deserialize(Base64.getDecoder().decode(fixture));
   }
 }

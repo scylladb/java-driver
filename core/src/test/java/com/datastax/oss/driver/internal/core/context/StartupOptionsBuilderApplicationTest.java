@@ -15,15 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.dse.driver.internal.core.context;
+package com.datastax.oss.driver.internal.core.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.initMocks;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
@@ -32,12 +30,9 @@ import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
-import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
-import com.datastax.oss.driver.internal.core.context.StartupOptionsBuilder;
 import com.datastax.oss.protocol.internal.request.Startup;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
-import java.util.Collections;
 import java.util.UUID;
 import org.junit.Before;
 import org.junit.Test;
@@ -45,11 +40,11 @@ import org.junit.runner.RunWith;
 import org.mockito.Mock;
 
 @RunWith(DataProviderRunner.class)
-public class DseStartupOptionsBuilderTest {
+public class StartupOptionsBuilderApplicationTest {
 
   private DefaultDriverContext driverContext;
 
-  // Mocks for instantiating the DSE driver context
+  // Mocks for instantiating the driver context
   @Mock private DriverConfigLoader configLoader;
   @Mock private DriverConfig driverConfig;
   @Mock private DriverExecutionProfile defaultProfile;
@@ -59,10 +54,6 @@ public class DseStartupOptionsBuilderTest {
     initMocks(this);
     when(configLoader.getInitialConfig()).thenReturn(driverConfig);
     when(driverConfig.getDefaultProfile()).thenReturn(defaultProfile);
-    doReturn(Collections.singletonMap(DriverExecutionProfile.DEFAULT_NAME, defaultProfile))
-        .when(driverConfig)
-        .getProfiles();
-    when(defaultProfile.isDefined(DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE)).thenReturn(true);
   }
 
   private void buildContext(UUID clientId, String applicationName, String applicationVersion) {
@@ -85,7 +76,7 @@ public class DseStartupOptionsBuilderTest {
     Version version = Version.parse(startup.options.get(StartupOptionsBuilder.DRIVER_VERSION_KEY));
     assertThat(version).isEqualTo(Session.OSS_DRIVER_COORDINATES.getVersion());
     assertThat(startup.options).containsKey(StartupOptionsBuilder.CLIENT_ID_KEY);
-    // SESSION_ID is innate and must survive on the DSE path too.
+    // SESSION_ID is innate and must survive when application metadata is omitted.
     assertThat(startup.options).containsKey(StartupOptionsBuilder.SESSION_ID_KEY);
   }
 
@@ -173,9 +164,9 @@ public class DseStartupOptionsBuilderTest {
 
   @Test
   public void should_use_configuration_when_no_programmatic_values_provided() {
-    when(defaultProfile.getString(DseDriverOption.APPLICATION_NAME, null))
+    when(defaultProfile.getString(DefaultDriverOption.APPLICATION_NAME, null))
         .thenReturn("Config_App_Name");
-    when(defaultProfile.getString(DseDriverOption.APPLICATION_VERSION, null))
+    when(defaultProfile.getString(DefaultDriverOption.APPLICATION_VERSION, null))
         .thenReturn("Config_App_Version");
     when(defaultProfile.getString(DefaultDriverOption.PROTOCOL_COMPRESSION, "none"))
         .thenReturn("none");

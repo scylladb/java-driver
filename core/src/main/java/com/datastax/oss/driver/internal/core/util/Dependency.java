@@ -36,7 +36,6 @@ import java.util.List;
 public enum Dependency {
   SNAPPY("org.xerial.snappy.Snappy"),
   LZ4("net.jpountz.lz4.LZ4Compressor"),
-  ESRI("com.esri.core.geometry.ogc.OGCGeometry"),
   REACTIVE_STREAMS("org.reactivestreams.Publisher"),
   JACKSON(
       // jackson-core

@@ -18,8 +18,6 @@
 package com.datastax.oss.driver.api.core.config;
 
 import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
-import com.datastax.oss.driver.internal.core.config.DeprecatedGraphConfig;
-import com.datastax.oss.driver.internal.core.config.map.OptionsMapView;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -32,7 +30,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -67,9 +64,8 @@ public class OptionsMap implements Serializable {
    * Creates a new instance that contains the driver's default configuration.
    *
    * <p>This will produce a configuration that is equivalent to the {@code reference.conf} file
-   * bundled with the driver, except that it retains the deprecated DataStax Insights monitoring
-   * option with a {@code false} default for programmatic compatibility. This method does not load
-   * any file and doesn't require Typesafe config in the classpath.
+   * bundled with the driver. This method does not load any file and does not require Typesafe
+   * config in the classpath.
    */
   @NonNull
   public static OptionsMap driverDefaults() {
@@ -79,23 +75,15 @@ public class OptionsMap implements Serializable {
   }
 
   private final ConcurrentHashMap<String, Map<DriverOption, Object>> map;
-  private final ConcurrentHashMap<String, Set<DriverOption>> explicitOptions;
-  // Older streams cannot distinguish defaults from writes made before deserialization.
-  private final boolean legacyUnknown;
 
   private final List<Consumer<OptionsMap>> changeListeners = new CopyOnWriteArrayList<>();
 
   public OptionsMap() {
-    this(new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), false);
+    this(new ConcurrentHashMap<>());
   }
 
-  private OptionsMap(
-      ConcurrentHashMap<String, Map<DriverOption, Object>> map,
-      ConcurrentHashMap<String, Set<DriverOption>> explicitOptions,
-      boolean legacyUnknown) {
+  private OptionsMap(ConcurrentHashMap<String, Map<DriverOption, Object>> map) {
     this.map = map;
-    this.explicitOptions = explicitOptions;
-    this.legacyUnknown = legacyUnknown;
   }
 
   /**
@@ -110,12 +98,7 @@ public class OptionsMap implements Serializable {
     Objects.requireNonNull(option, "option");
     Objects.requireNonNull(value, "value");
     Object previous = getProfileMap(profile).put(option.getRawOption(), value);
-    boolean newlyExplicit =
-        DeprecatedGraphConfig.isDeprecatedGraphOption(option.getRawOption())
-            && explicitOptions
-                .computeIfAbsent(profile, p -> ConcurrentHashMap.newKeySet())
-                .add(option.getRawOption());
-    if (!value.equals(previous) || newlyExplicit) {
+    if (!value.equals(previous)) {
       for (Consumer<OptionsMap> listener : changeListeners) {
         listener.accept(this);
       }
@@ -165,10 +148,6 @@ public class OptionsMap implements Serializable {
       @NonNull String profile, @NonNull TypedDriverOption<ValueT> option) {
     Objects.requireNonNull(option, "option");
     Object previous = getProfileMap(profile).remove(option.getRawOption());
-    Set<DriverOption> options = explicitOptions.get(profile);
-    if (options != null) {
-      options.remove(option.getRawOption());
-    }
     if (previous != null) {
       for (Consumer<OptionsMap> listener : changeListeners) {
         listener.accept(this);
@@ -233,7 +212,7 @@ public class OptionsMap implements Serializable {
    */
   @NonNull
   protected Map<String, Map<DriverOption, Object>> asRawMap() {
-    return new OptionsMapView(map, explicitOptions, legacyUnknown);
+    return map;
   }
 
   @NonNull
@@ -257,7 +236,7 @@ public class OptionsMap implements Serializable {
    *     store options internally (listeners are transient).
    */
   private Object writeReplace() {
-    return new SerializationProxy(this.map, this.explicitOptions, this.legacyUnknown);
+    return new SerializationProxy(this.map);
   }
 
   // Should never be called since we serialize a proxy
@@ -271,9 +250,6 @@ public class OptionsMap implements Serializable {
     Duration initQueryTimeout = Duration.ofSeconds(5);
     Duration requestTimeout = Duration.ofSeconds(11);
     int requestPageSize = 5000;
-    int continuousMaxPages = 0;
-    int continuousMaxPagesPerSecond = 0;
-    int continuousMaxEnqueuedPages = 4;
 
     // Sorted by order of appearance in reference.conf:
 
@@ -286,7 +262,6 @@ public class OptionsMap implements Serializable {
         CQL4SkipMetadataResolveMethod.SMART.toString());
     map.put(TypedDriverOption.REQUEST_SERIAL_CONSISTENCY, "SERIAL");
     map.put(TypedDriverOption.REQUEST_DEFAULT_IDEMPOTENCE, false);
-    map.put(TypedDriverOption.GRAPH_TRAVERSAL_SOURCE, "g");
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_CLASS, "DefaultLoadBalancingPolicy");
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
     map.put(TypedDriverOption.SESSION_LEAK_THRESHOLD, 4);
@@ -322,24 +297,6 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.REQUEST_TRACE_INTERVAL, Duration.ofMillis(3));
     map.put(TypedDriverOption.REQUEST_TRACE_CONSISTENCY, "ONE");
     map.put(TypedDriverOption.REQUEST_LOG_WARNINGS, true);
-    map.put(TypedDriverOption.GRAPH_PAGING_ENABLED, "AUTO");
-    map.put(TypedDriverOption.GRAPH_CONTINUOUS_PAGING_PAGE_SIZE, requestPageSize);
-    map.put(TypedDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES, continuousMaxPages);
-    map.put(
-        TypedDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND,
-        continuousMaxPagesPerSecond);
-    map.put(
-        TypedDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, continuousMaxEnqueuedPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_PAGE_SIZE, requestPageSize);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_PAGE_SIZE_BYTES, false);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_PAGES, continuousMaxPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, continuousMaxPagesPerSecond);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, continuousMaxEnqueuedPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE, Duration.ofSeconds(2));
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES, Duration.ofSeconds(1));
-    @SuppressWarnings("deprecation")
-    TypedDriverOption<Boolean> legacyMonitorReporting = TypedDriverOption.MONITOR_REPORTING_ENABLED;
-    map.put(legacyMonitorReporting, false);
     map.put(TypedDriverOption.METRICS_SESSION_ENABLED, Collections.emptyList());
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_LOWEST, Duration.ofMillis(1));
@@ -349,31 +306,13 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_INTERVAL, Duration.ofMinutes(5));
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST,
-        Duration.ofMinutes(2));
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST,
-        Duration.ofMillis(10));
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS, 3);
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL,
-        Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_FACTORY_CLASS, "DefaultMetricsFactory");
     map.put(TypedDriverOption.METRICS_ID_GENERATOR_CLASS, "DefaultMetricIdGenerator");
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_HIGHEST, Duration.ofSeconds(12));
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_LOWEST, Duration.ofMillis(1));
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS, 3);
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_INTERVAL, Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_NODE_ENABLED, Collections.emptyList());
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_INTERVAL, Duration.ofMinutes(5));
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST, Duration.ofSeconds(3));
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_LOWEST, Duration.ofMillis(1));
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS, 3);
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_INTERVAL, Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_NODE_EXPIRE_AFTER, Duration.ofHours(1));
     map.put(TypedDriverOption.SOCKET_TCP_NODELAY, true);
     map.put(TypedDriverOption.HEARTBEAT_INTERVAL, Duration.ofSeconds(30));
@@ -384,7 +323,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.METADATA_SCHEMA_ENABLED, true);
     map.put(
         TypedDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES,
-        ImmutableList.of("!system", "!/^system_.*/", "!/^dse_.*/", "!solr_admin", "!OpsCenter"));
+        ImmutableList.of("!system", "!/^system_.*/"));
     map.put(TypedDriverOption.METADATA_SCHEMA_REQUEST_TIMEOUT, Duration.ofSeconds(20));
     map.put(TypedDriverOption.METADATA_SCHEMA_REQUEST_PAGE_SIZE, requestPageSize);
     map.put(TypedDriverOption.METADATA_SCHEMA_WINDOW, Duration.ofSeconds(1));
@@ -426,7 +365,6 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CLIENT_ROUTES_NATIVE_TRANSPORT_PORT, 9042);
     map.put(TypedDriverOption.CLIENT_ROUTES_SHARD_AWARENESS_ENABLED, false);
     map.put(TypedDriverOption.DRIVER_CONFIG_REPORTING_ENABLED, true);
-    map.explicitOptions.clear();
   }
 
   @Immutable
@@ -435,23 +373,13 @@ public class OptionsMap implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private final ConcurrentHashMap<String, Map<DriverOption, Object>> map;
-    @Nullable private final ConcurrentHashMap<String, Set<DriverOption>> explicitOptions;
-    private final boolean legacyUnknown;
 
-    private SerializationProxy(
-        ConcurrentHashMap<String, Map<DriverOption, Object>> map,
-        ConcurrentHashMap<String, Set<DriverOption>> explicitOptions,
-        boolean legacyUnknown) {
+    private SerializationProxy(ConcurrentHashMap<String, Map<DriverOption, Object>> map) {
       this.map = map;
-      this.explicitOptions = explicitOptions;
-      this.legacyUnknown = legacyUnknown;
     }
 
     private Object readResolve() {
-      return new OptionsMap(
-          map,
-          explicitOptions == null ? new ConcurrentHashMap<>() : explicitOptions,
-          explicitOptions == null || legacyUnknown);
+      return new OptionsMap(map);
     }
   }
 }

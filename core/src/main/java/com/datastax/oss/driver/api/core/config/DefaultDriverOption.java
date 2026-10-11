@@ -1206,7 +1206,19 @@ public enum DefaultDriverOption implements DriverOption {
    *
    * <p>Value type: boolean
    */
-  DRIVER_CONFIG_REPORTING_ENABLED("advanced.driver-config-reporting.enabled");
+  DRIVER_CONFIG_REPORTING_ENABLED("advanced.driver-config-reporting.enabled"),
+  /**
+   * The name of the application using the session.
+   *
+   * <p>Value-type: {@link String}
+   */
+  APPLICATION_NAME("basic.application.name"),
+  /**
+   * The version of the application using the session.
+   *
+   * <p>Value-type: {@link String}
+   */
+  APPLICATION_VERSION("basic.application.version");
 
   private final String path;
 

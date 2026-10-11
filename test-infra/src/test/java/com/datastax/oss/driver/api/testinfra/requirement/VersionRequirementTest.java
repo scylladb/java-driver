@@ -28,7 +28,7 @@ import org.junit.Test;
 public class VersionRequirementTest {
   // backend aliases
   private static BackendType CASSANDRA = BackendType.CASSANDRA;
-  private static BackendType DSE = BackendType.DSE;
+  private static BackendType SCYLLA = BackendType.SCYLLA;
 
   // version numbers
   private static Version V_0_0_0 = Version.parse("0.0.0");
@@ -54,7 +54,7 @@ public class VersionRequirementTest {
       new VersionRequirement(CASSANDRA, "1.1.0", "", "");
   private static VersionRequirement CASSANDRA_FROM_3_0_0_TO_3_1_0 =
       new VersionRequirement(CASSANDRA, "3.0.0", "3.1.0", "");
-  private static VersionRequirement DSE_ANY = new VersionRequirement(DSE, "", "", "");
+  private static VersionRequirement SCYLLA_ANY = new VersionRequirement(SCYLLA, "", "", "");
 
   @Test
   public void empty_requirements() {
@@ -62,24 +62,24 @@ public class VersionRequirementTest {
 
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_0_0)).isTrue();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_0_0)).isTrue();
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_0_0_0)).isTrue();
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_1_0_0)).isTrue();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_0_0_0)).isTrue();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_1_0_0)).isTrue();
   }
 
   @Test
   public void single_requirement_any_version() {
     List<VersionRequirement> anyCassandra = Collections.singletonList(CASSANDRA_ANY);
-    List<VersionRequirement> anyDse = Collections.singletonList(DSE_ANY);
+    List<VersionRequirement> anyScylla = Collections.singletonList(SCYLLA_ANY);
 
     assertThat(VersionRequirement.meetsAny(anyCassandra, CASSANDRA, V_0_0_0)).isTrue();
     assertThat(VersionRequirement.meetsAny(anyCassandra, CASSANDRA, V_1_0_0)).isTrue();
-    assertThat(VersionRequirement.meetsAny(anyDse, DSE, V_0_0_0)).isTrue();
-    assertThat(VersionRequirement.meetsAny(anyDse, DSE, V_1_0_0)).isTrue();
+    assertThat(VersionRequirement.meetsAny(anyScylla, SCYLLA, V_0_0_0)).isTrue();
+    assertThat(VersionRequirement.meetsAny(anyScylla, SCYLLA, V_1_0_0)).isTrue();
 
-    assertThat(VersionRequirement.meetsAny(anyDse, CASSANDRA, V_0_0_0)).isFalse();
-    assertThat(VersionRequirement.meetsAny(anyDse, CASSANDRA, V_1_0_0)).isFalse();
-    assertThat(VersionRequirement.meetsAny(anyCassandra, DSE, V_0_0_0)).isFalse();
-    assertThat(VersionRequirement.meetsAny(anyCassandra, DSE, V_1_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(anyScylla, CASSANDRA, V_0_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(anyScylla, CASSANDRA, V_1_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(anyCassandra, SCYLLA, V_0_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(anyCassandra, SCYLLA, V_1_0_0)).isFalse();
   }
 
   @Test
@@ -91,7 +91,7 @@ public class VersionRequirementTest {
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_1_0)).isTrue();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_2_0_0)).isTrue();
 
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_1_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_1_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_1_0)).isFalse();
   }
@@ -103,7 +103,7 @@ public class VersionRequirementTest {
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_0_0)).isTrue();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_1_0)).isTrue();
 
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_0_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_0_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_0_1)).isFalse();
   }
@@ -116,7 +116,7 @@ public class VersionRequirementTest {
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_0_1)).isTrue();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_1_0)).isTrue();
 
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_1_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_1_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_1_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_2_0_0)).isFalse();
@@ -125,20 +125,20 @@ public class VersionRequirementTest {
 
   @Test
   public void multi_requirement_any_version() {
-    List<VersionRequirement> req = ImmutableList.of(CASSANDRA_ANY, DSE_ANY);
+    List<VersionRequirement> req = ImmutableList.of(CASSANDRA_ANY, SCYLLA_ANY);
 
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_0_0)).isTrue();
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_1_0_0)).isTrue();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_1_0_0)).isTrue();
   }
 
   @Test
   public void multi_db_requirement_min_one_any_other() {
-    List<VersionRequirement> req = ImmutableList.of(CASSANDRA_FROM_1_0_0, DSE_ANY);
+    List<VersionRequirement> req = ImmutableList.of(CASSANDRA_FROM_1_0_0, SCYLLA_ANY);
 
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_0_0)).isTrue();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_2_0_0)).isTrue();
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_0_0_0)).isTrue();
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_1_0_0)).isTrue();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_0_0_0)).isTrue();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_1_0_0)).isTrue();
 
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_0_0)).isFalse();
   }
@@ -152,7 +152,7 @@ public class VersionRequirementTest {
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_1_0)).isTrue();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_3_0_0)).isTrue();
 
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_1_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_1_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_2_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_3_1_0)).isFalse();
@@ -168,7 +168,7 @@ public class VersionRequirementTest {
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_1_1_0)).isTrue();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_2_0_0)).isTrue();
 
-    assertThat(VersionRequirement.meetsAny(req, DSE, V_1_0_0)).isFalse();
+    assertThat(VersionRequirement.meetsAny(req, SCYLLA, V_1_0_0)).isFalse();
     assertThat(VersionRequirement.meetsAny(req, CASSANDRA, V_0_0_0)).isFalse();
   }
 

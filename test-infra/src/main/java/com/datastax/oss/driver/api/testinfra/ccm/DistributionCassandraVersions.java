@@ -30,16 +30,6 @@ public abstract class DistributionCassandraVersions {
 
   static {
     {
-      // DSE
-      ImmutableSortedMap<Version, Version> dse =
-          ImmutableSortedMap.of(
-              Version.V1_0_0, CcmBridge.V2_1_19,
-              Version.V5_0_0, CcmBridge.V3_0_15,
-              CcmBridge.V5_1_0, CcmBridge.V3_10,
-              CcmBridge.V6_0_0, CcmBridge.V4_0_0);
-      mappings.put(BackendType.DSE, dse);
-    }
-    {
       // HCD
       ImmutableSortedMap<Version, Version> hcd =
           ImmutableSortedMap.of(Version.V1_0_0, CcmBridge.V4_0_11);

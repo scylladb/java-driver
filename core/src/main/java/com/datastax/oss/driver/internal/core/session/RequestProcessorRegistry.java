@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.session;
 
-import com.datastax.dse.driver.api.core.graph.GraphStatement;
-import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -55,9 +53,6 @@ public class RequestProcessorRegistry {
       } else {
         LOG.trace("[{}] {} cannot process {}, trying next", logPrefix, processor, request);
       }
-    }
-    if (request instanceof GraphStatement) {
-      throw GraphSupportRemoved.exception();
     }
     throw new IllegalArgumentException("No request processor found for " + request);
   }

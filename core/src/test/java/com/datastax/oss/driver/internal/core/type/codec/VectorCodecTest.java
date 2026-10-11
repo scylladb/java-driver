@@ -34,8 +34,8 @@ import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import java.nio.ByteBuffer;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.HashMap;
-import org.apache.commons.lang3.ArrayUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -128,7 +128,9 @@ public class VectorCodecTest {
   @Test
   @UseDataProvider("dataProvider")
   public void should_throw_on_encode_with_too_many_elements(TestDataContainer testData) {
-    Object[] doubled = ArrayUtils.addAll(testData.getValues(), testData.getValues());
+    Object[] values = testData.getValues();
+    Object[] doubled = Arrays.copyOf(values, values.length * 2);
+    System.arraycopy(values, 0, doubled, values.length, values.length);
     TypeCodec<CqlVector<Object>> codec = getCodec(testData.getDataType());
     assertThatThrownBy(() -> codec.encode(CqlVector.newInstance(doubled), ProtocolVersion.DEFAULT))
         .isInstanceOf(IllegalArgumentException.class);

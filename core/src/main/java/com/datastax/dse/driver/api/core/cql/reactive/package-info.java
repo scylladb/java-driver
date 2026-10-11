@@ -18,7 +18,7 @@
 /**
  * Types related to CQL execution using reactive-style programming.
  *
- * <p>Note that this is located in a {@code dse} package for historical reasons; reactive queries
- * can now be used with open-source Cassandra as well.
+ * <p>This package keeps its historical {@code dse} namespace for API compatibility. Its reactive
+ * queries are generic and supported with Cassandra and Scylla.
  */
 package com.datastax.dse.driver.api.core.cql.reactive;

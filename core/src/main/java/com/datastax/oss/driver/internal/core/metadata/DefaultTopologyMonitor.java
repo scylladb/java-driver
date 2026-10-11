@@ -354,11 +354,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
             if (t instanceof UnexpectedResponseException
                 && ((UnexpectedResponseException) t).message instanceof Error) {
               Error error = (Error) ((UnexpectedResponseException) t).message;
-              if (error.code == ProtocolConstants.ErrorCode.INVALID
-                  // Also downgrade on server error with a specific error message (DSE 6.0.0 to
-                  // 6.0.2 with search enabled)
-                  || (error.code == ProtocolConstants.ErrorCode.SERVER_ERROR
-                      && error.message.contains("Unknown keyspace/cf pair (system.peers_v2)"))) {
+              if (error.code == ProtocolConstants.ErrorCode.INVALID) {
                 this.isSchemaV2 = false; // We should not attempt this query in the future.
                 CompletableFutures.completeFrom(
                     query(channel, buildQuery(peersColumns, "system.peers")), peersQuery);

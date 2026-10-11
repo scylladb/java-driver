@@ -38,8 +38,8 @@ import org.reactivestreams.Publisher;
  * the driver and impact performance. Instead, they should asynchronously dispatch received signals
  * to their processing logic.
  *
- * <p>This type is located in a {@code dse} package for historical reasons; reactive result sets
- * work with both Cassandra and DSE.
+ * <p>This type keeps its historical {@code dse} namespace for API compatibility. Reactive result
+ * sets are generic and work with Cassandra and Scylla.
  *
  * @see ReactiveResultSet
  */

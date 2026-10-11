@@ -19,11 +19,6 @@ package com.datastax.oss.driver.internal.core.context;
 
 import static com.datastax.oss.driver.internal.core.util.Dependency.JACKSON;
 
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.internal.core.type.codec.DseTypeCodecsRegistrar;
-import com.datastax.dse.protocol.internal.DseProtocolV1ClientCodecs;
-import com.datastax.dse.protocol.internal.DseProtocolV2ClientCodecs;
-import com.datastax.dse.protocol.internal.ProtocolV4ClientCodecsForDse;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
@@ -58,8 +53,6 @@ import com.datastax.oss.driver.internal.core.addresstranslation.PassThroughAddre
 import com.datastax.oss.driver.internal.core.channel.ChannelFactory;
 import com.datastax.oss.driver.internal.core.channel.DefaultWriteCoalescer;
 import com.datastax.oss.driver.internal.core.channel.WriteCoalescer;
-import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
-import com.datastax.oss.driver.internal.core.config.DeprecatedGraphConfig;
 import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
@@ -98,7 +91,6 @@ import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
 import com.datastax.oss.driver.internal.core.tracker.RequestLogFormatter;
 import com.datastax.oss.driver.internal.core.type.codec.registry.DefaultCodecRegistry;
 import com.datastax.oss.driver.internal.core.util.DefaultDependencyChecker;
-import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.internal.core.util.Reflection;
 import com.datastax.oss.driver.internal.core.util.concurrent.CycleDetector;
 import com.datastax.oss.driver.internal.core.util.concurrent.LazyReference;
@@ -106,6 +98,7 @@ import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.FrameCodec;
 import com.datastax.oss.protocol.internal.PrimitiveCodec;
 import com.datastax.oss.protocol.internal.ProtocolV3ClientCodecs;
+import com.datastax.oss.protocol.internal.ProtocolV4ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV5ClientCodecs;
 import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
 import com.datastax.oss.protocol.internal.SegmentCodec;
@@ -120,7 +113,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -262,7 +254,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final String startupApplicationName;
   private final String startupApplicationVersion;
   private final Object metricRegistry;
-  private volatile Set<String> deprecatedGraphOptions = Collections.emptySet();
 
   public DefaultDriverContext(
       DriverConfigLoader configLoader, ProgrammaticArguments programmaticArguments) {
@@ -273,28 +264,6 @@ public class DefaultDriverContext implements InternalDriverContext {
       this.sessionName = defaultProfile.getString(DefaultDriverOption.SESSION_NAME);
     } else {
       this.sessionName = "s" + SESSION_NAME_COUNTER.getAndIncrement();
-    }
-    warnIfDeprecatedGraphOptionsChanged();
-    @SuppressWarnings("deprecation")
-    DseDriverOption legacyMonitorReporting = DseDriverOption.MONITOR_REPORTING_ENABLED;
-    boolean insightsMonitoringRequested;
-    try {
-      insightsMonitoringRequested = defaultProfile.getBoolean(legacyMonitorReporting, false);
-    } catch (RuntimeException e) {
-      Loggers.warnWithException(
-          LOG,
-          "[{}] Could not read deprecated configuration option {}; it will be ignored",
-          sessionName,
-          legacyMonitorReporting.getPath(),
-          e);
-      insightsMonitoringRequested = false;
-    }
-    if (insightsMonitoringRequested) {
-      LOG.warn(
-          "[{}] Configuration option {} is deprecated and ignored; "
-              + "DataStax Insights monitoring is no longer supported",
-          sessionName,
-          legacyMonitorReporting.getPath());
     }
     this.localDatacentersFromBuilder = programmaticArguments.getLocalDatacenters();
     this.codecRegistry = buildCodecRegistry(programmaticArguments);
@@ -420,8 +389,7 @@ public class DefaultDriverContext implements InternalDriverContext {
         DefaultDriverOption.LOAD_BALANCING_POLICY_CLASS,
         DefaultDriverOption.LOAD_BALANCING_POLICY,
         LoadBalancingPolicy.class,
-        "com.datastax.oss.driver.internal.core.loadbalancing",
-        "com.datastax.dse.driver.internal.core.loadbalancing");
+        "com.datastax.oss.driver.internal.core.loadbalancing");
   }
 
   protected Map<String, RetryPolicy> buildRetryPolicies() {
@@ -622,30 +590,7 @@ public class DefaultDriverContext implements InternalDriverContext {
 
   protected EventBus buildEventBus() {
     EventBus eventBus = new EventBus(getSessionName());
-    eventBus.register(ConfigChangeEvent.class, event -> warnIfDeprecatedGraphOptionsChanged());
     return eventBus;
-  }
-
-  private void warnIfDeprecatedGraphOptionsChanged() {
-    Set<String> configuredOptions;
-    try {
-      configuredOptions = DeprecatedGraphConfig.findConfiguredOptions(config);
-    } catch (RuntimeException e) {
-      LOG.debug(
-          "[{}] Could not inspect deprecated DSE Graph configuration: {}",
-          getSessionName(),
-          e.toString());
-      return;
-    }
-    if (!configuredOptions.equals(deprecatedGraphOptions)) {
-      deprecatedGraphOptions = configuredOptions;
-      if (!configuredOptions.isEmpty()) {
-        LOG.warn(
-            "[{}] DSE Graph configuration is deprecated and ignored: {}",
-            getSessionName(),
-            configuredOptions);
-      }
-    }
   }
 
   protected Compressor<ByteBuf> buildCompressor() {
@@ -664,11 +609,9 @@ public class DefaultDriverContext implements InternalDriverContext {
         getPrimitiveCodec(),
         getCompressor(),
         new ProtocolV3ClientCodecs(),
-        new ProtocolV4ClientCodecsForDse(),
+        new ProtocolV4ClientCodecs(),
         new ProtocolV5ClientCodecs(),
-        new ProtocolV6ClientCodecs(),
-        new DseProtocolV1ClientCodecs(),
-        new DseProtocolV2ClientCodecs());
+        new ProtocolV6ClientCodecs());
   }
 
   protected SegmentCodec<ByteBuf> buildSegmentCodec() {
@@ -772,7 +715,6 @@ public class DefaultDriverContext implements InternalDriverContext {
       registry = new DefaultCodecRegistry(this.sessionName);
     }
     registry.register(arguments.getTypeCodecs());
-    DseTypeCodecsRegistrar.registerDseCodecs(registry);
     return registry;
   }
 
