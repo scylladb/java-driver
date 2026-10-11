@@ -392,8 +392,7 @@ public class ProgrammaticArguments {
     @NonNull
     @Deprecated
     public Builder withCloudProxyAddress(@Nullable InetSocketAddress cloudAddress) {
-      this.cloudProxyAddress = cloudAddress;
-      return this;
+      throw new UnsupportedOperationException("DataStax Astra connections are no longer supported");
     }
 
     @NonNull

@@ -818,6 +818,10 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
               : defaultConfigLoader(programmaticArguments.getClassLoader());
 
       DriverExecutionProfile defaultConfig = configLoader.getInitialConfig().getDefaultProfile();
+      if (defaultConfig.isDefined(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE)) {
+        throw new UnsupportedOperationException(
+            "DataStax Astra secure connect bundles are no longer supported");
+      }
       List<String> configContactPoints =
           defaultConfig.getStringList(DefaultDriverOption.CONTACT_POINTS, Collections.emptyList());
 

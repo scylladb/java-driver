@@ -212,6 +212,15 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
     }
 
     /**
+     * @deprecated Preserved for subclasses compiled against the two-argument constructor. Use
+     *     {@link #PlainTextAuthenticator(Credentials, EndPoint, String)} instead.
+     */
+    @Deprecated
+    protected PlainTextAuthenticator(@NonNull Credentials credentials, @NonNull EndPoint endPoint) {
+      this(credentials, endPoint, "org.apache.cassandra.auth.PasswordAuthenticator");
+    }
+
+    /**
      * @deprecated Preserved for backward compatibility, implementors should use the 3-arg
      *     constructor {@code PlainTextAuthenticator(Credentials, EndPoint, String)} instead.
      */
@@ -254,13 +263,10 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
 
     @Nullable
     @Override
-    public ByteBuffer initialResponseSync() {
-      return encodedCredentials;
-    }
-
-    @Nullable
-    @Override
     public ByteBuffer evaluateChallengeSync(@Nullable ByteBuffer challenge) {
+      if (SERVER_INITIAL_CHALLENGE.equals(challenge)) {
+        return encodedCredentials;
+      }
       throw new AuthenticationException(endPoint, "Incorrect challenge from server");
     }
   }
