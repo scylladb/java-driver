@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.metadata;
 
-import com.datastax.dse.driver.api.core.metadata.DseNodeProperties;
-import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
@@ -51,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -73,14 +70,13 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
 
   // A few system.peers columns which get special handling below
   private static final String NATIVE_PORT = "native_port";
-  private static final String NATIVE_TRANSPORT_PORT = "native_transport_port";
 
   /**
    * The columns we actually read from {@code system.local}. Used to intersect with the full column
    * list returned by the first {@code SELECT *} response, so that subsequent projected queries only
    * fetch columns the driver uses.
    *
-   * <p>Includes DSE-specific columns; absent columns are silently ignored by the intersection step.
+   * <p>Absent columns are silently ignored by the intersection step.
    */
   @VisibleForTesting
   static final ImmutableSet<String> LOCAL_COLUMNS_OF_INTEREST =
@@ -93,9 +89,6 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           "rpc_address",
           "rpc_port",
           "native_address",
-          "native_transport_address",
-          "native_transport_port",
-          "native_transport_port_ssl",
           // Node metadata
           "data_center",
           "rack",
@@ -103,16 +96,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           "tokens",
           "partitioner",
           "host_id",
-          "schema_version",
-          // DSE-specific
-          "dse_version",
-          "graph",
-          "workload",
-          "workloads",
-          "server_id",
-          "storage_port",
-          "storage_port_ssl",
-          "jmx_port");
+          "schema_version");
 
   /**
    * The columns we actually read from {@code system.peers}. Mirrors {@link
@@ -130,9 +114,6 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           "rpc_address",
           "rpc_port",
           "native_address",
-          "native_transport_address",
-          "native_transport_port",
-          "native_transport_port_ssl",
           // Node metadata
           "data_center",
           "rack",
@@ -140,16 +121,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           "tokens",
           "partitioner",
           "host_id",
-          "schema_version",
-          // DSE-specific
-          "dse_version",
-          "graph",
-          "workload",
-          "workloads",
-          "server_id",
-          "storage_port",
-          "storage_port_ssl",
-          "jmx_port");
+          "schema_version");
 
   /**
    * The columns we actually read from {@code system.peers_v2} (Cassandra ≥ 4.0). Replaces {@code
@@ -169,9 +141,6 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           "broadcast_address",
           "broadcast_port",
           "rpc_address",
-          "native_transport_address",
-          "native_transport_port",
-          "native_transport_port_ssl",
           // Node metadata
           "data_center",
           "rack",
@@ -179,16 +148,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
           "tokens",
           "partitioner",
           "host_id",
-          "schema_version",
-          // DSE-specific
-          "dse_version",
-          "graph",
-          "workload",
-          "workloads",
-          "server_id",
-          "storage_port",
-          "storage_port_ssl",
-          "jmx_port");
+          "schema_version");
 
   private final String logPrefix;
   protected final InternalDriverContext context;
@@ -586,41 +546,6 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
                     "host_id is null in system.local, node may still be bootstrapping"))
             .withSchemaVersion(row.getUuid("schema_version"));
 
-    // Handle DSE-specific columns, if present
-    String rawVersion = row.getString("dse_version");
-    if (rawVersion != null) {
-      builder.withExtra(DseNodeProperties.DSE_VERSION, Version.parse(rawVersion));
-    }
-
-    ImmutableSet.Builder<String> workloadsBuilder = ImmutableSet.builder();
-    Boolean legacyGraph = row.getBoolean("graph"); // DSE 5.0
-    if (legacyGraph != null && legacyGraph) {
-      workloadsBuilder.add("Graph");
-    }
-    String legacyWorkload = row.getString("workload"); // DSE 5.0 (other than graph)
-    if (legacyWorkload != null) {
-      workloadsBuilder.add(legacyWorkload);
-    }
-    Set<String> modernWorkloads = row.getSetOfString("workloads"); // DSE 5.1+
-    if (modernWorkloads != null) {
-      workloadsBuilder.addAll(modernWorkloads);
-    }
-    ImmutableSet<String> workloads = workloadsBuilder.build();
-    if (!workloads.isEmpty()) {
-      builder.withExtra(DseNodeProperties.DSE_WORKLOADS, workloads);
-    }
-
-    // Note: withExtra discards null values
-    builder
-        .withExtra(DseNodeProperties.SERVER_ID, row.getString("server_id"))
-        .withExtra(DseNodeProperties.NATIVE_TRANSPORT_PORT, row.getInteger("native_transport_port"))
-        .withExtra(
-            DseNodeProperties.NATIVE_TRANSPORT_PORT_SSL,
-            row.getInteger("native_transport_port_ssl"))
-        .withExtra(DseNodeProperties.STORAGE_PORT, row.getInteger("storage_port"))
-        .withExtra(DseNodeProperties.STORAGE_PORT_SSL, row.getInteger("storage_port_ssl"))
-        .withExtra(DseNodeProperties.JMX_PORT, row.getInteger("jmx_port"));
-
     return builder;
   }
 
@@ -731,9 +656,6 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
         Iterators.forArray(
             // in system.peers_v2 (Cassandra >= 4.0)
             "native_address",
-            // DSE 6.8 introduced native_transport_address and native_transport_port for the
-            // listen address.
-            "native_transport_address",
             // in system.peers or system.local
             "rpc_address");
 
@@ -755,22 +677,12 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
         Iterators.forArray(
             // in system.peers_v2 (Cassandra >= 4.0)
             NATIVE_PORT,
-            // DSE 6.8 introduced native_transport_address and native_transport_port for the
-            // listen address.
-            NATIVE_TRANSPORT_PORT,
             // system.local for Cassandra >= 4.0
             "rpc_port");
 
     while ((broadcastRpcPort == null || broadcastRpcPort == 0) && portCandidates.hasNext()) {
 
-      String colName = portCandidates.next();
-      broadcastRpcPort = row.getInteger(colName);
-      // Support override for SSL port (if enabled) in DSE
-      if (NATIVE_TRANSPORT_PORT.equals(colName) && context.getSslEngineFactory().isPresent()) {
-
-        String sslColName = colName + "_ssl";
-        broadcastRpcPort = row.getInteger(sslColName);
-      }
+      broadcastRpcPort = row.getInteger(portCandidates.next());
     }
     // use the default port if no port information was found in the row;
     // note that in rare situations, the default port might not be known, in which case we
