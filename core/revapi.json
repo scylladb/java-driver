@@ -11,6 +11,11 @@
             "org\\.assertj(\\..+)?"
           ]
         }
+      },
+      "checks": {
+        "varargOverloadsOnlyDifferInVarargParameter": {
+          "reportUnchanged": false
+        }
       }
     },
     "ignore": [
@@ -7399,10 +7404,6 @@
       },
       {
         "code": "java.class.externalClassExposedInAPI",
-        "justification": "CASSJAVA-102: Migrate revapi config into dedicated config files, ported from pom.xml"
-      },
-      {
-        "code": "java.method.varargOverloadsOnlyDifferInVarargParameter",
         "justification": "CASSJAVA-102: Migrate revapi config into dedicated config files, ported from pom.xml"
       },
       {

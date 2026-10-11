@@ -36,6 +36,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -67,6 +68,7 @@ public class ProgrammaticArguments {
   private final ClassLoader classLoader;
   private final AuthProvider authProvider;
   private final SslEngineFactory sslEngineFactory;
+  private final InetSocketAddress cloudProxyAddress;
   private final UUID startupClientId;
   private final String startupApplicationName;
   private final String startupApplicationVersion;
@@ -86,6 +88,7 @@ public class ProgrammaticArguments {
       @Nullable ClassLoader classLoader,
       @Nullable AuthProvider authProvider,
       @Nullable SslEngineFactory sslEngineFactory,
+      @Nullable InetSocketAddress cloudProxyAddress,
       @Nullable UUID startupClientId,
       @Nullable String startupApplicationName,
       @Nullable String startupApplicationVersion,
@@ -104,6 +107,7 @@ public class ProgrammaticArguments {
     this.classLoader = classLoader;
     this.authProvider = authProvider;
     this.sslEngineFactory = sslEngineFactory;
+    this.cloudProxyAddress = cloudProxyAddress;
     this.startupClientId = startupClientId;
     this.startupApplicationName = startupApplicationName;
     this.startupApplicationVersion = startupApplicationVersion;
@@ -169,6 +173,13 @@ public class ProgrammaticArguments {
     return sslEngineFactory;
   }
 
+  /** @deprecated DataStax Astra cloud proxy addresses are no longer supported. */
+  @Nullable
+  @Deprecated
+  public InetSocketAddress getCloudProxyAddress() {
+    return cloudProxyAddress;
+  }
+
   @Nullable
   public UUID getStartupClientId() {
     return startupClientId;
@@ -214,6 +225,7 @@ public class ProgrammaticArguments {
     private ClassLoader classLoader;
     private AuthProvider authProvider;
     private SslEngineFactory sslEngineFactory;
+    private InetSocketAddress cloudProxyAddress;
     private UUID startupClientId;
     private String startupApplicationName;
     private String startupApplicationVersion;
@@ -378,6 +390,13 @@ public class ProgrammaticArguments {
       return this;
     }
 
+    /** @deprecated DataStax Astra cloud proxy addresses are no longer supported. */
+    @NonNull
+    @Deprecated
+    public Builder withCloudProxyAddress(@Nullable InetSocketAddress cloudAddress) {
+      throw new UnsupportedOperationException("DataStax Astra connections are no longer supported");
+    }
+
     @NonNull
     public Builder withAuthProvider(@Nullable AuthProvider authProvider) {
       this.authProvider = authProvider;
@@ -440,6 +459,7 @@ public class ProgrammaticArguments {
           classLoader,
           authProvider,
           sslEngineFactory,
+          cloudProxyAddress,
           startupClientId,
           startupApplicationName,
           startupApplicationVersion,

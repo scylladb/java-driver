@@ -698,6 +698,13 @@ public class TypedDriverOption<ValueT> {
   /** Whether the threads created by the driver should be daemon threads. */
   public static final TypedDriverOption<Boolean> NETTY_DAEMON =
       new TypedDriverOption<>(DefaultDriverOption.NETTY_DAEMON, GenericType.BOOLEAN);
+  /**
+   * The location of the cloud secure bundle used to connect to DataStax Apache Cassandra as a
+   * service.
+   */
+  @Deprecated
+  public static final TypedDriverOption<String> CLOUD_SECURE_CONNECT_BUNDLE =
+      new TypedDriverOption<>(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE, GenericType.STRING);
   /** Whether the slow replica avoidance should be enabled in the default LBP. */
   public static final TypedDriverOption<Boolean> LOAD_BALANCING_POLICY_SLOW_AVOIDANCE =
       new TypedDriverOption<>(
@@ -715,6 +722,41 @@ public class TypedDriverOption<ValueT> {
   /** The version of the application using the session. */
   public static final TypedDriverOption<String> APPLICATION_VERSION =
       new TypedDriverOption<>(DseDriverOption.APPLICATION_VERSION, GenericType.STRING);
+  /**
+   * Proxy authentication for GSSAPI authentication: allows to login as another user or role.
+   *
+   * @deprecated DSE-specific proxy authorization is retained for binary compatibility.
+   */
+  @Deprecated
+  public static final TypedDriverOption<String> AUTH_PROVIDER_AUTHORIZATION_ID =
+      new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID, GenericType.STRING);
+  /**
+   * Service name for GSSAPI authentication.
+   *
+   * @deprecated DSE GSSAPI integration is no longer supported; retained for binary compatibility.
+   */
+  @Deprecated
+  public static final TypedDriverOption<String> AUTH_PROVIDER_SERVICE =
+      new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_SERVICE, GenericType.STRING);
+  /**
+   * Login configuration for GSSAPI authentication.
+   *
+   * @deprecated DSE GSSAPI integration is no longer supported; retained for binary compatibility.
+   */
+  @Deprecated
+  public static final TypedDriverOption<String> AUTH_PROVIDER_LOGIN_CONFIGURATION =
+      new TypedDriverOption<>(
+          DseDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION, GenericType.STRING);
+  /**
+   * Internal SASL properties, if any, such as QOP, for GSSAPI authentication.
+   *
+   * @deprecated DSE GSSAPI integration is no longer supported; retained for binary compatibility.
+   */
+  @Deprecated
+  public static final TypedDriverOption<Map<String, String>> AUTH_PROVIDER_SASL_PROPERTIES =
+      new TypedDriverOption<>(
+          DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES,
+          GenericType.mapOf(GenericType.STRING, GenericType.STRING));
   /** The page size for continuous paging. */
   public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_PAGE_SIZE =
       new TypedDriverOption<>(DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE, GenericType.INTEGER);

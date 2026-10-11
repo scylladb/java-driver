@@ -35,6 +35,44 @@ public enum DseDriverOption implements DriverOption {
   APPLICATION_VERSION("basic.application.version"),
 
   /**
+   * Proxy authentication for GSSAPI authentication: allows to login as another user or role.
+   *
+   * <p>Value type: {@link String}
+   *
+   * @deprecated DSE-specific proxy authorization is retained for binary compatibility. Configure
+   *     {@code advanced.auth-provider.authorization-id} only for servers that support it.
+   */
+  @Deprecated
+  AUTH_PROVIDER_AUTHORIZATION_ID("advanced.auth-provider.authorization-id"),
+  /**
+   * Service name for GSSAPI authentication.
+   *
+   * <p>Value type: {@link String}
+   *
+   * @deprecated DSE GSSAPI integration is no longer supported; retained for binary compatibility.
+   */
+  @Deprecated
+  AUTH_PROVIDER_SERVICE("advanced.auth-provider.service"),
+  /**
+   * Login configuration for GSSAPI authentication.
+   *
+   * <p>Value type: {@link java.util.Map Map}&#60;{@link String},{@link String}&#62;
+   *
+   * @deprecated DSE GSSAPI integration is no longer supported; retained for binary compatibility.
+   */
+  @Deprecated
+  AUTH_PROVIDER_LOGIN_CONFIGURATION("advanced.auth-provider.login-configuration"),
+  /**
+   * Internal SASL properties, if any, such as QOP, for GSSAPI authentication.
+   *
+   * <p>Value type: {@link java.util.Map Map}&#60;{@link String},{@link String}&#62;
+   *
+   * @deprecated DSE GSSAPI integration is no longer supported; retained for binary compatibility.
+   */
+  @Deprecated
+  AUTH_PROVIDER_SASL_PROPERTIES("advanced.auth-provider.sasl-properties"),
+
+  /**
    * The page size for continuous paging.
    *
    * <p>Value type: int

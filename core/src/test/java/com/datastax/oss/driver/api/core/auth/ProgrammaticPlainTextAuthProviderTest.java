@@ -52,23 +52,25 @@ public class ProgrammaticPlainTextAuthProviderTest {
   }
 
   @Test
-  public void should_use_standard_sasl_plain_response_for_dse_authenticator() {
+  public void should_negotiate_plain_with_dse_authenticator() {
     ProgrammaticPlainTextAuthProvider provider =
         new ProgrammaticPlainTextAuthProvider("user", "pass");
 
-    ByteBuffer response =
-        provider
-            .newAuthenticator(endpoint, "com.datastax.bdp.cassandra.auth.DseAuthenticator")
-            .initialResponse()
-            .toCompletableFuture()
-            .join();
+    Authenticator authenticator =
+        provider.newAuthenticator(endpoint, "com.datastax.bdp.cassandra.auth.DseAuthenticator");
 
-    assertThat(response)
+    assertThat(authenticator.initialResponse().toCompletableFuture().join())
+        .isEqualTo(ByteBuffer.wrap("PLAIN".getBytes(StandardCharsets.UTF_8)));
+    assertThat(
+            authenticator
+                .evaluateChallenge(ByteBuffer.wrap("PLAIN-START".getBytes(StandardCharsets.UTF_8)))
+                .toCompletableFuture()
+                .join())
         .isEqualTo(ByteBuffer.wrap(new byte[] {0, 'u', 's', 'e', 'r', 0, 'p', 'a', 's', 's'}));
   }
 
   @Test
-  public void should_reject_dse_plain_start_challenge() {
+  public void should_reject_unexpected_dse_challenge() {
     ProgrammaticPlainTextAuthProvider provider =
         new ProgrammaticPlainTextAuthProvider("user", "pass");
 
@@ -78,7 +80,7 @@ public class ProgrammaticPlainTextAuthProviderTest {
                 provider
                     .newAuthenticator(endpoint, "com.datastax.bdp.cassandra.auth.DseAuthenticator")
                     .evaluateChallenge(
-                        ByteBuffer.wrap("PLAIN-START".getBytes(StandardCharsets.UTF_8)))
+                        ByteBuffer.wrap("unexpected".getBytes(StandardCharsets.UTF_8)))
                     .toCompletableFuture()
                     .join())
         .withCauseInstanceOf(AuthenticationException.class);
@@ -90,6 +92,17 @@ public class ProgrammaticPlainTextAuthProviderTest {
     PlainTextAuthProviderBase.PlainTextAuthenticator authenticator =
         new PlainTextAuthProviderBase.PlainTextAuthenticator(
             new Credentials("user".toCharArray(), "pass".toCharArray()));
+
+    assertThat(authenticator.initialResponse().toCompletableFuture().join())
+        .isEqualTo(ByteBuffer.wrap(new byte[] {0, 'u', 's', 'e', 'r', 0, 'p', 'a', 's', 's'}));
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_preserve_two_argument_plaintext_authenticator_constructor() {
+    PlainTextAuthProviderBase.PlainTextAuthenticator authenticator =
+        new PlainTextAuthProviderBase.PlainTextAuthenticator(
+            new Credentials("user".toCharArray(), "pass".toCharArray()), endpoint);
 
     assertThat(authenticator.initialResponse().toCompletableFuture().join())
         .isEqualTo(ByteBuffer.wrap(new byte[] {0, 'u', 's', 'e', 'r', 0, 'p', 'a', 's', 's'}));
