@@ -56,6 +56,16 @@ public class DseGraphTableMetadataTest {
   @SuppressWarnings("deprecation")
   public void should_describe_edge_label_and_sides() {
     DseGraphTableMetadata table = table();
+    DseEdgeMetadata edge = edge();
+    when(table.getEdge()).thenReturn(Optional.of(edge));
+
+    assertThat(table.describe(false))
+        .contains("EDGE LABEL \"knows\"")
+        .contains("FROM\"person\"(\"from_id\")")
+        .contains("TO\"person\"(\"to_id\")");
+  }
+
+  private static DseEdgeMetadata edge() {
     DseEdgeMetadata edge = mock(DseEdgeMetadata.class);
     when(edge.getLabelName()).thenReturn(fromCql("knows"));
     when(edge.getFromTable()).thenReturn(fromCql("vertices"));
@@ -66,12 +76,7 @@ public class DseGraphTableMetadataTest {
     when(edge.getToLabel()).thenReturn(fromCql("person"));
     when(edge.getToPartitionKeyColumns()).thenReturn(ImmutableList.of(fromCql("to_id")));
     when(edge.getToClusteringColumns()).thenReturn(ImmutableList.of());
-    when(table.getEdge()).thenReturn(Optional.of(edge));
-
-    assertThat(table.describe(false))
-        .contains("EDGE LABEL \"knows\"")
-        .contains("FROM\"person\"(\"from_id\")")
-        .contains("TO\"person\"(\"to_id\")");
+    return edge;
   }
 
   private static DseGraphTableMetadata table() {

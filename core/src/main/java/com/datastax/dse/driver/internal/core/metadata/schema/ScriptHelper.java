@@ -25,7 +25,6 @@ public class ScriptHelper {
 
   public static void appendEdgeSide(
       ScriptBuilder builder,
-      CqlIdentifier table,
       CqlIdentifier label,
       List<CqlIdentifier> partitionKeyColumns,
       List<CqlIdentifier> clusteringColumns,

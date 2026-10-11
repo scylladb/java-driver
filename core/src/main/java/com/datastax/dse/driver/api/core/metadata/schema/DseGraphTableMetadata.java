@@ -132,14 +132,12 @@ public interface DseGraphTableMetadata extends DseTableMetadata {
               builder.andWith().append("EDGE LABEL").append(" ").append(edge.getLabelName());
               ScriptHelper.appendEdgeSide(
                   builder,
-                  edge.getFromTable(),
                   edge.getFromLabel(),
                   edge.getFromPartitionKeyColumns(),
                   edge.getFromClusteringColumns(),
                   "FROM");
               ScriptHelper.appendEdgeSide(
                   builder,
-                  edge.getToTable(),
                   edge.getToLabel(),
                   edge.getToPartitionKeyColumns(),
                   edge.getToClusteringColumns(),
