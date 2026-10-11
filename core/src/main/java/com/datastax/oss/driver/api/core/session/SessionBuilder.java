@@ -369,7 +369,8 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   /**
    * Configures plaintext authentication with proxy authorization as the given user or role.
    *
-   * @deprecated DSE-specific proxy authentication is retained for compatibility.
+   * @deprecated Use {@code withAuthProvider(new ProgrammaticPlainTextAuthProvider(username,
+   *     password, authorizationId))} to supply a proxy authorization ID explicitly.
    */
   @Deprecated
   @NonNull
@@ -392,7 +393,8 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   /**
    * Alias for {@link #withAuthCredentials(String, String, String)}.
    *
-   * @deprecated DSE-specific proxy authentication is retained for compatibility.
+   * @deprecated Use {@code withAuthProvider(new ProgrammaticPlainTextAuthProvider(username,
+   *     password, authorizationId))} to supply a proxy authorization ID explicitly.
    */
   @Deprecated
   @NonNull

@@ -26,6 +26,12 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
 import java.util.Map;
 
+/**
+ * Adds a DSE proxy-execution identity to a statement's custom payload.
+ *
+ * @deprecated DSE proxy execution support is retained for binary compatibility. Use {@link
+ *     Statement#setCustomPayload(Map)} to set server-specific payloads directly.
+ */
 @Deprecated
 public class ProxyAuthentication {
   private static final String PROXY_EXECUTE = "ProxyExecute";

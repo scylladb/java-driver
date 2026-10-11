@@ -173,6 +173,7 @@ public class ProgrammaticArguments {
     return sslEngineFactory;
   }
 
+  /** @deprecated DataStax Astra cloud proxy addresses are no longer supported. */
   @Nullable
   @Deprecated
   public InetSocketAddress getCloudProxyAddress() {
@@ -389,6 +390,7 @@ public class ProgrammaticArguments {
       return this;
     }
 
+    /** @deprecated DataStax Astra cloud proxy addresses are no longer supported. */
     @NonNull
     @Deprecated
     public Builder withCloudProxyAddress(@Nullable InetSocketAddress cloudAddress) {

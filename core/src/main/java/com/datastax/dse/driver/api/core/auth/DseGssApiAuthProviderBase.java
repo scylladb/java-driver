@@ -48,6 +48,12 @@ import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Base class for the DSE GSSAPI authentication providers.
+ *
+ * @deprecated DSE GSSAPI integration is no longer supported. This type is retained for binary
+ *     compatibility; use a custom {@link AuthProvider} for server-specific authentication.
+ */
 @ThreadSafe
 @Deprecated
 public abstract class DseGssApiAuthProviderBase implements AuthProvider {

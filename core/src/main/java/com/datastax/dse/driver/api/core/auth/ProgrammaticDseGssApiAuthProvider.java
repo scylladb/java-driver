@@ -156,6 +156,8 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  * @see <a
  *     href="http://docs.datastax.com/en/dse/5.1/dse-admin/datastax_enterprise/security/securityTOC.html">Authenticating
  *     a DSE cluster with Kerberos</a>
+ * @deprecated DSE GSSAPI integration is retained for binary compatibility. Use a custom {@link
+ *     com.datastax.oss.driver.api.core.auth.AuthProvider} for server-specific authentication.
  */
 @Deprecated
 public class ProgrammaticDseGssApiAuthProvider extends DseGssApiAuthProviderBase {

@@ -26,6 +26,9 @@ import net.jcip.annotations.ThreadSafe;
 /**
  * Base class for {@link SyncAuthenticator} implementations that want to make use of the
  * authentication scheme negotiation in <code>DseAuthenticator</code>.
+ *
+ * @deprecated DSE-specific authentication is retained for binary compatibility. Implement {@link
+ *     SyncAuthenticator} directly for server-specific authentication.
  */
 @ThreadSafe
 @Deprecated
