@@ -37,10 +37,10 @@ If `basic.load-balancing-policy.class` names `DseLoadBalancingPolicy` or
 `DcInferringLoadBalancingPolicy`, respectively. The DSE policy classes have been removed.
 
 Serialized `OptionsMap` instances from 4.19.2.1 or 4.19.2.2 that contain `DseDriverOption` entries
-cannot be deserialized with this release because that enum has been removed. In particular,
-`OptionsMap.driverDefaults()` in 4.19.2.2 includes Graph defaults backed by `DseDriverOption`.
-Rebuild those maps with the remaining options before upgrading; the serialization compatibility
-noted under 4.19.2.2 below does not extend to these maps.
+cannot be deserialized with this release because that enum has been removed. This includes every
+map created with `OptionsMap.driverDefaults()` in those releases, even if the application did not
+configure DSE features. Rebuild those maps with the remaining options before upgrading; the
+serialization compatibility noted under 4.19.2.2 below does not extend to these maps.
 
 For four-part versions, replace `Version.getDSEPatch()` with `Version.getRevision()`; it returns
 the fourth component, or `-1` when that component is absent.
