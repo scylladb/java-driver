@@ -24,6 +24,7 @@ import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.OptionsMap;
 import com.datastax.oss.driver.api.core.config.TypedDriverOption;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import java.io.ByteArrayInputStream;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletionException;
 import org.junit.Test;
@@ -64,6 +65,18 @@ public class LegacyCloudCompatibilityTest {
                     .toCompletableFuture()
                     .join())
         .withCauseInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_reject_legacy_cloud_config_input_stream() {
+    TestSessionBuilder builder = new TestSessionBuilder();
+    builder.cloudConfigInputStream = () -> new ByteArrayInputStream(new byte[0]);
+
+    assertThatExceptionOfType(CompletionException.class)
+        .isThrownBy(() -> builder.buildAsync().toCompletableFuture().join())
+        .withCauseInstanceOf(UnsupportedOperationException.class)
+        .withMessageContaining("DataStax Astra");
   }
 
   @Test

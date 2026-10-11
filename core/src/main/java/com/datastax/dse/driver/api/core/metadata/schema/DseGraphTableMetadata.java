@@ -47,6 +47,6 @@ public interface DseGraphTableMetadata extends DseTableMetadata {
   @NonNull
   @Override
   default String describe(boolean pretty) {
-    throw new UnsupportedOperationException("DSE Graph metadata is no longer supported");
+    return DseTableMetadata.super.describe(pretty);
   }
 }

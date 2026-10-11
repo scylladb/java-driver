@@ -366,7 +366,11 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     return withAuthProvider(new ProgrammaticPlainTextAuthProvider(username, password));
   }
 
-  /** @deprecated DSE proxy authentication is no longer supported. */
+  /**
+   * Configures plaintext authentication with proxy authorization as the given user or role.
+   *
+   * @deprecated DSE-specific proxy authentication is retained for compatibility.
+   */
   @Deprecated
   @NonNull
   public SelfT withAuthCredentials(
@@ -385,7 +389,11 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     return withAuthCredentials(username, password);
   }
 
-  /** @deprecated DSE proxy authentication is no longer supported. */
+  /**
+   * Alias for {@link #withAuthCredentials(String, String, String)}.
+   *
+   * @deprecated DSE-specific proxy authentication is retained for compatibility.
+   */
   @Deprecated
   @NonNull
   public SelfT withCredentials(
@@ -809,6 +817,11 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   @NonNull
   protected final CompletionStage<CqlSession> buildDefaultSessionAsync() {
     try {
+
+      if (cloudConfigInputStream != null) {
+        throw new UnsupportedOperationException(
+            "DataStax Astra secure connect bundles are no longer supported");
+      }
 
       ProgrammaticArguments programmaticArguments = programmaticArgumentsBuilder.build();
 
