@@ -17,7 +17,6 @@
  */
 package com.datastax.oss.driver.api.testinfra.session;
 
-import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.testinfra.CassandraResourceRule;
@@ -31,9 +30,6 @@ public class CqlSessionRuleBuilder extends SessionRuleBuilder<CqlSessionRuleBuil
 
   @Override
   public SessionRule<CqlSession> build() {
-    if (createGraph) {
-      throw GraphSupportRemoved.exception();
-    }
     DriverConfigLoader actualLoader = copyForSession(loader);
     return new SessionRule<>(
         cassandraResource, createKeyspace, nodeStateListener, schemaChangeListener, actualLoader);

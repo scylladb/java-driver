@@ -462,6 +462,6 @@ queries (`execute(Statement)`, `prepare(String)`, etc).
 However, the request execution logic is completely pluggable, and supports arbitrary request types
 (as long as you write the boilerplate to convert them to protocol messages).
 
-The driver uses that mechanism to implement its reactive API. You can also take advantage of it to
-plug your own request types (if you're interested, take a look at `RequestProcessor` in the internal
-API).
+The driver uses this extension point for reactive CQL execution. You can also take advantage of it
+to plug your own request types (if you're interested, take a look at
+`RequestProcessor` in the internal API).

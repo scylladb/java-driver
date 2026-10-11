@@ -176,7 +176,8 @@
                   optional for dependencies declared as non-optional in the pom files.
                   -->org.reactivestreams.*;resolution:=optional, *
                 </Import-Package>
-                <Export-Package>com.datastax.*.driver.*.mapper.*</Export-Package>
+                <!-- The DSE-namespaced packages contain generic reactive mapper APIs retained for compatibility. -->
+                <Export-Package>com.datastax.oss.driver.*.mapper.*, com.datastax.dse.driver.api.mapper.reactive, com.datastax.dse.driver.internal.mapper.reactive</Export-Package>
               </instructions>
             </configuration>
           </execution>

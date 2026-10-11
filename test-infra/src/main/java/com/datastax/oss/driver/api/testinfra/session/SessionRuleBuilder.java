@@ -33,12 +33,6 @@ public abstract class SessionRuleBuilder<
   protected NodeStateListener nodeStateListener;
   protected SchemaChangeListener schemaChangeListener;
   protected DriverConfigLoader loader;
-  /** @deprecated DSE Graph is no longer supported. */
-  @Deprecated protected boolean createGraph;
-  /** @deprecated DSE Graph is no longer supported. */
-  @Deprecated protected boolean isCoreGraph;
-  /** @deprecated DSE Graph is no longer supported. */
-  @Deprecated protected String graphProtocol;
 
   @SuppressWarnings("unchecked")
   protected final SelfT self = (SelfT) this;
@@ -79,32 +73,6 @@ public abstract class SessionRuleBuilder<
 
   public SelfT withSchemaChangeListener(SchemaChangeListener listener) {
     this.schemaChangeListener = listener;
-    return self;
-  }
-
-  /**
-   * Requests Graph creation when the rule is built. Graph creation is unsupported and will fail
-   * with migration guidance.
-   *
-   * @deprecated DSE Graph is no longer supported.
-   */
-  @Deprecated
-  public SelfT withCreateGraph() {
-    this.createGraph = true;
-    return self;
-  }
-
-  /** @deprecated DSE Graph is no longer supported; this setting is ignored. */
-  @Deprecated
-  public SelfT withCoreEngine() {
-    this.isCoreGraph = true;
-    return self;
-  }
-
-  /** @deprecated DSE Graph is no longer supported; this setting is ignored. */
-  @Deprecated
-  public SelfT withGraphProtocol(String graphProtocol) {
-    this.graphProtocol = graphProtocol;
     return self;
   }
 

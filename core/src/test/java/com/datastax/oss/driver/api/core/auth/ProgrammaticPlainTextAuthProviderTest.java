@@ -18,13 +18,10 @@
 package com.datastax.oss.driver.api.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import com.datastax.oss.driver.api.core.auth.PlainTextAuthProviderBase.Credentials;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.concurrent.CompletionException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -48,50 +45,6 @@ public class ProgrammaticPlainTextAuthProviderTest {
             .join();
 
     assertThat(response)
-        .isEqualTo(ByteBuffer.wrap(new byte[] {0, 'u', 's', 'e', 'r', 0, 'p', 'a', 's', 's'}));
-  }
-
-  @Test
-  public void should_use_standard_sasl_plain_response_for_dse_authenticator() {
-    ProgrammaticPlainTextAuthProvider provider =
-        new ProgrammaticPlainTextAuthProvider("user", "pass");
-
-    ByteBuffer response =
-        provider
-            .newAuthenticator(endpoint, "com.datastax.bdp.cassandra.auth.DseAuthenticator")
-            .initialResponse()
-            .toCompletableFuture()
-            .join();
-
-    assertThat(response)
-        .isEqualTo(ByteBuffer.wrap(new byte[] {0, 'u', 's', 'e', 'r', 0, 'p', 'a', 's', 's'}));
-  }
-
-  @Test
-  public void should_reject_dse_plain_start_challenge() {
-    ProgrammaticPlainTextAuthProvider provider =
-        new ProgrammaticPlainTextAuthProvider("user", "pass");
-
-    assertThatExceptionOfType(CompletionException.class)
-        .isThrownBy(
-            () ->
-                provider
-                    .newAuthenticator(endpoint, "com.datastax.bdp.cassandra.auth.DseAuthenticator")
-                    .evaluateChallenge(
-                        ByteBuffer.wrap("PLAIN-START".getBytes(StandardCharsets.UTF_8)))
-                    .toCompletableFuture()
-                    .join())
-        .withCauseInstanceOf(AuthenticationException.class);
-  }
-
-  @Test
-  @SuppressWarnings("deprecation")
-  public void should_preserve_legacy_plaintext_authenticator_constructor() {
-    PlainTextAuthProviderBase.PlainTextAuthenticator authenticator =
-        new PlainTextAuthProviderBase.PlainTextAuthenticator(
-            new Credentials("user".toCharArray(), "pass".toCharArray()));
-
-    assertThat(authenticator.initialResponse().toCompletableFuture().join())
         .isEqualTo(ByteBuffer.wrap(new byte[] {0, 'u', 's', 'e', 'r', 0, 'p', 'a', 's', 's'}));
   }
 

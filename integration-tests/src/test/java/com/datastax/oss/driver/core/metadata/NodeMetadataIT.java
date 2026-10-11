@@ -70,8 +70,7 @@ public class NodeMetadataIT {
         assertThat(node.getRack()).isEqualTo("r1");
       }
       if (CcmBridge.isDistributionOf(BackendType.CASSANDRA)) {
-        // CcmBridge does not report accurate C* versions for other distributions (e.g. DSE), only
-        // approximated values
+        // CcmBridge reports exact Cassandra versions only for the Cassandra distribution.
         assertThat(node.getCassandraVersion()).isEqualTo(ccmRule.getCassandraVersion());
       }
       assertThat(node.getState()).isSameAs(NodeState.UP);

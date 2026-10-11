@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core;
 
-import com.datastax.dse.driver.api.core.DseProtocolVersion;
-import com.datastax.dse.driver.internal.core.DseProtocolFeature;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
@@ -34,19 +32,13 @@ import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Built-in implementation of the protocol version registry, supports all Cassandra and DSE
- * versions.
- */
+/** Built-in implementation of the protocol version registry. */
 @ThreadSafe
 public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
 
   private static final Logger LOG = LoggerFactory.getLogger(DefaultProtocolVersionRegistry.class);
-  private static final List<ProtocolVersion> allVersions =
-      ImmutableList.<ProtocolVersion>builder()
-          .add(DefaultProtocolVersion.values())
-          .add(DseProtocolVersion.values())
-          .build();
+  private static final List<ProtocolVersion> ALL_VERSIONS =
+      ImmutableList.copyOf(DefaultProtocolVersion.values());
 
   private final String logPrefix;
 
@@ -58,39 +50,30 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
   public ProtocolVersion fromName(String name) {
     try {
       return DefaultProtocolVersion.valueOf(name);
-    } catch (IllegalArgumentException noOssVersion) {
-      try {
-        return DseProtocolVersion.valueOf(name);
-      } catch (IllegalArgumentException noDseVersion) {
-        throw new IllegalArgumentException("Unknown protocol version name: " + name);
-      }
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown protocol version name: " + name);
     }
   }
 
   @Override
   public ProtocolVersion highestNonBeta() {
-    ProtocolVersion highest = allVersions.get(allVersions.size() - 1);
-    if (!highest.isBeta()) {
-      return highest;
-    } else {
-      return downgrade(highest)
-          .orElseThrow(() -> new AssertionError("There should be at least one non-beta version"));
-    }
+    ProtocolVersion highest = ALL_VERSIONS.get(ALL_VERSIONS.size() - 1);
+    return highest.isBeta()
+        ? downgrade(highest)
+            .orElseThrow(() -> new AssertionError("There should be at least one non-beta version"))
+        : highest;
   }
 
   @Override
   public Optional<ProtocolVersion> downgrade(ProtocolVersion version) {
-    int index = allVersions.indexOf(version);
+    int index = ALL_VERSIONS.indexOf(version);
     if (index < 0) {
-      // This method is called with a value obtained from fromName, so this should never happen
       throw new AssertionError(version + " is not a known version");
     } else if (index == 0) {
       return Optional.empty();
-    } else {
-      ProtocolVersion previousVersion = allVersions.get(index - 1);
-      // Beta versions are skipped during negotiation
-      return previousVersion.isBeta() ? downgrade(previousVersion) : Optional.of(previousVersion);
     }
+    ProtocolVersion previousVersion = ALL_VERSIONS.get(index - 1);
+    return previousVersion.isBeta() ? downgrade(previousVersion) : Optional.of(previousVersion);
   }
 
   @Override
@@ -99,20 +82,15 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
       throw new IllegalArgumentException("Expected at least one node");
     }
 
-    // Start with all non-beta versions (beta versions are always forced, and we don't call this
-    // method if the version was forced).
     Set<ProtocolVersion> candidates = new LinkedHashSet<>();
-    for (ProtocolVersion version : allVersions) {
+    for (ProtocolVersion version : ALL_VERSIONS) {
       if (!version.isBeta()) {
         candidates.add(version);
       }
     }
-    // Keep an unfiltered copy in case we need to throw an exception below
     ImmutableList<ProtocolVersion> initialCandidates = ImmutableList.copyOf(candidates);
 
-    // For each node, remove the versions it doesn't support
     for (Node node : nodes) {
-
       Version cassandraVersion = node.getCassandraVersion();
       if (cassandraVersion == null) {
         LOG.warn(
@@ -137,25 +115,21 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
                 node.getEndPoint(), cassandraVersion),
             ImmutableList.of(DefaultProtocolVersion.V3, DefaultProtocolVersion.V4));
       } else if (cassandraVersion.compareTo(Version.V2_2_0) < 0) {
-        // 2.1.0
-        removeHigherThan(DefaultProtocolVersion.V3, null, candidates);
+        removeHigherThan(DefaultProtocolVersion.V3, candidates);
       } else if (cassandraVersion.compareTo(Version.V4_0_0) < 0) {
-        // 2.2, 3.x
-        removeHigherThan(DefaultProtocolVersion.V4, null, candidates);
+        removeHigherThan(DefaultProtocolVersion.V4, candidates);
       } else {
-        // 4.0
-        removeHigherThan(DefaultProtocolVersion.V5, null, candidates);
+        removeHigherThan(DefaultProtocolVersion.V5, candidates);
       }
     }
 
-    // If we have versions left, return the highest one
     ProtocolVersion max = null;
     for (ProtocolVersion candidate : candidates) {
       if (max == null || max.getCode() < candidate.getCode()) {
         max = candidate;
       }
     }
-    if (max == null) { // Note: with the current algorithm, this never happens
+    if (max == null) {
       throw new UnsupportedProtocolVersionException(
           null,
           String.format(
@@ -163,26 +137,15 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
                   + "enable DEBUG logs for '%s' for more details",
               LOG.getName()),
           initialCandidates);
-    } else {
-      return max;
     }
+    return max;
   }
 
-  // Removes all versions strictly higher than the given versions from candidates. A null
-  // maxDseVersion means "remove all DSE versions".
   private void removeHigherThan(
-      DefaultProtocolVersion maxOssVersion,
-      DseProtocolVersion maxDseVersion,
-      Set<ProtocolVersion> candidates) {
-    for (DefaultProtocolVersion ossVersion : DefaultProtocolVersion.values()) {
-      if (ossVersion.compareTo(maxOssVersion) > 0 && candidates.remove(ossVersion)) {
-        LOG.debug("[{}] Excluding protocol {}", logPrefix, ossVersion);
-      }
-    }
-    for (DseProtocolVersion dseVersion : DseProtocolVersion.values()) {
-      if ((maxDseVersion == null || dseVersion.compareTo(maxDseVersion) > 0)
-          && candidates.remove(dseVersion)) {
-        LOG.debug("[{}] Excluding protocol {}", logPrefix, dseVersion);
+      DefaultProtocolVersion maxVersion, Set<ProtocolVersion> candidates) {
+    for (DefaultProtocolVersion version : DefaultProtocolVersion.values()) {
+      if (version.compareTo(maxVersion) > 0 && candidates.remove(version)) {
+        LOG.debug("[{}] Excluding protocol {}", logPrefix, version);
       }
     }
   }
@@ -193,23 +156,12 @@ public class DefaultProtocolVersionRegistry implements ProtocolVersionRegistry {
     if (DefaultProtocolFeature.SMALLINT_AND_TINYINT_TYPES.equals(feature)
         || DefaultProtocolFeature.DATE_TYPE.equals(feature)
         || DefaultProtocolFeature.UNSET_BOUND_VALUES.equals(feature)) {
-      // All DSE versions and all OSS V4+
       return DefaultProtocolVersion.V4.getCode() <= code;
-    } else if (DefaultProtocolFeature.PER_REQUEST_KEYSPACE.equals(feature)) {
-      // Only DSE_V2+ and OSS V5+
-      return (DefaultProtocolVersion.V5.getCode() <= code
-              && code < DseProtocolVersion.DSE_V1.getCode())
-          || DseProtocolVersion.DSE_V2.getCode() <= code;
-    } else if (DefaultProtocolFeature.NOW_IN_SECONDS.equals(feature)
+    } else if (DefaultProtocolFeature.PER_REQUEST_KEYSPACE.equals(feature)
+        || DefaultProtocolFeature.NOW_IN_SECONDS.equals(feature)
         || DefaultProtocolFeature.MODERN_FRAMING.equals(feature)) {
-      // OSS only, V5+
-      return DefaultProtocolVersion.V5.getCode() <= code
-          && code < DseProtocolVersion.DSE_V1.getCode();
-    } else if (DseProtocolFeature.CONTINUOUS_PAGING.equals(feature)) {
-      // All DSE versions
-      return DseProtocolVersion.DSE_V1.getCode() <= code;
-    } else {
-      throw new IllegalArgumentException("Unhandled protocol feature: " + feature);
+      return DefaultProtocolVersion.V5.getCode() <= code;
     }
+    throw new IllegalArgumentException("Unhandled protocol feature: " + feature);
   }
 }

@@ -17,8 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core;
 
-import static com.datastax.dse.driver.api.core.DseProtocolVersion.DSE_V1;
-import static com.datastax.dse.driver.api.core.DseProtocolVersion.DSE_V2;
 import static com.datastax.oss.driver.api.core.ProtocolVersion.V3;
 import static com.datastax.oss.driver.api.core.ProtocolVersion.V4;
 import static com.datastax.oss.driver.api.core.ProtocolVersion.V5;
@@ -28,7 +26,6 @@ import static com.datastax.oss.driver.internal.core.DefaultProtocolFeature.SMALL
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.datastax.dse.driver.api.core.DseProtocolVersion;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.Version;
@@ -49,17 +46,12 @@ public class DefaultProtocolVersionRegistryTest {
   @Test
   public void should_find_version_by_name() {
     assertThat(registry.fromName("V4")).isEqualTo(ProtocolVersion.V4);
-    assertThat(registry.fromName("DSE_V1")).isEqualTo(DseProtocolVersion.DSE_V1);
   }
 
   @Test
   public void should_fail_to_find_version_by_name_different_case() {
     assertThatThrownBy(() -> registry.fromName("v4")).isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> registry.fromName("dse_v1"))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> registry.fromName("dDSE_v1"))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> registry.fromName("dse_v1"))
+    assertThatThrownBy(() -> registry.fromName("DSE_V1"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -75,15 +67,22 @@ public class DefaultProtocolVersionRegistryTest {
     assertThat(downgraded.isPresent()).isFalse();
   }
 
-  @Test
-  public void should_downgrade_from_dse_to_oss() {
-    assertThat(registry.downgrade(DseProtocolVersion.DSE_V1).get()).isEqualTo(ProtocolVersion.V5);
-  }
-
   @Test(expected = UnsupportedProtocolVersionException.class)
   public void should_fail_to_pick_highest_common_when_one_node_is_2_0() {
     registry.highestCommon(
         ImmutableList.of(mockCassandraNode("3.0.0"), mockCassandraNode("2.0.9")));
+  }
+
+  @Test
+  public void should_pick_oss_v3_as_highest_common_when_one_node_is_cassandra_2_1() {
+    assertThat(
+            registry.highestCommon(
+                ImmutableList.of(
+                    mockCassandraNode("3.11"), // oss v4
+                    mockCassandraNode("4.0"), // oss v5
+                    mockCassandraNode("2.1") // oss v3
+                    )))
+        .isEqualTo(ProtocolVersion.V3);
   }
 
   @Test
@@ -92,8 +91,6 @@ public class DefaultProtocolVersionRegistryTest {
     assertThat(registry.supports(V4, DATE_TYPE)).isTrue();
     assertThat(registry.supports(V5, DATE_TYPE)).isTrue();
     assertThat(registry.supports(V6, DATE_TYPE)).isTrue();
-    assertThat(registry.supports(DSE_V1, DATE_TYPE)).isTrue();
-    assertThat(registry.supports(DSE_V2, DATE_TYPE)).isTrue();
   }
 
   @Test
@@ -102,8 +99,6 @@ public class DefaultProtocolVersionRegistryTest {
     assertThat(registry.supports(V4, SMALLINT_AND_TINYINT_TYPES)).isTrue();
     assertThat(registry.supports(V5, SMALLINT_AND_TINYINT_TYPES)).isTrue();
     assertThat(registry.supports(V6, SMALLINT_AND_TINYINT_TYPES)).isTrue();
-    assertThat(registry.supports(DSE_V1, SMALLINT_AND_TINYINT_TYPES)).isTrue();
-    assertThat(registry.supports(DSE_V2, SMALLINT_AND_TINYINT_TYPES)).isTrue();
   }
 
   private Node mockCassandraNode(String rawVersion) {

@@ -26,13 +26,12 @@ import java.util.List;
 
 public class AuthUtils {
   /**
-   * Utility function that checks for the existence of settings and throws an exception if they
-   * aren't present
+   * Checks that required authentication settings are present in the execution profile.
    *
-   * @param config Current working driver configuration
-   * @param authenticatorName name of authenticator for logging purposes
-   * @param endPoint the host we are attempting to authenticate to
-   * @param options a list of DriverOptions to check to see if they are present
+   * @param config current driver configuration
+   * @param authenticatorName authenticator name used in the error message
+   * @param endPoint host being authenticated
+   * @param options required options
    */
   public static void validateConfigPresent(
       DriverExecutionProfile config,
@@ -41,18 +40,19 @@ public class AuthUtils {
       DriverOption... options) {
     List<DriverOption> missingOptions = new ArrayList<>();
     for (DriverOption option : options) {
-
       if (!config.isDefined(option)) {
         missingOptions.add(option);
       }
-      if (missingOptions.size() > 0) {
-        String message =
-            "Missing required configuration options for authenticator " + authenticatorName + ":";
-        for (DriverOption missingOption : missingOptions) {
-          message = message + " " + missingOption.getPath();
-        }
-        throw new AuthenticationException(endPoint, message);
+    }
+    if (!missingOptions.isEmpty()) {
+      StringBuilder message =
+          new StringBuilder("Missing required configuration options for authenticator ")
+              .append(authenticatorName)
+              .append(':');
+      for (DriverOption missingOption : missingOptions) {
+        message.append(' ').append(missingOption.getPath());
       }
+      throw new AuthenticationException(endPoint, message.toString());
     }
   }
 }

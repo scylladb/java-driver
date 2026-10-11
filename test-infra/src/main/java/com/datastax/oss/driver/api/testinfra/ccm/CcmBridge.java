@@ -77,8 +77,6 @@ public class CcmBridge implements AutoCloseable {
 
   public static final String BRANCH = System.getProperty("ccm.branch");
 
-  public static final Boolean DSE_ENABLEMENT = Boolean.getBoolean("ccm.dse");
-
   public static final Boolean SCYLLA_ENTERPRISE =
       String.valueOf(VERSION.getMajor()).matches("\\d{4}");
 
@@ -132,16 +130,7 @@ public class CcmBridge implements AutoCloseable {
   // @IntegrationTestDisabledCassandra3Failure @IntegrationTestDisabledSSL
   // = createTempStore(DEFAULT_SERVER_LOCALHOST_KEYSTORE_PATH);
 
-  // major DSE versions
-  public static final Version V6_0_0 = Version.parse("6.0.0");
-  public static final Version V5_1_0 = Version.parse("5.1.0");
-  public static final Version V5_0_0 = Version.parse("5.0.0");
-
-  // mapped C* versions from DSE versions
-  public static final Version V4_0_0 = Version.parse("4.0.0");
-  public static final Version V3_10 = Version.parse("3.10");
   public static final Version V3_0_15 = Version.parse("3.0.15");
-  public static final Version V2_1_19 = Version.parse("2.1.19");
 
   // mapped C* versions from HCD versions
   public static final Version V4_0_11 = Version.parse("4.0.11");
@@ -180,10 +169,7 @@ public class CcmBridge implements AutoCloseable {
   private final AtomicBoolean created = new AtomicBoolean();
   private final String ipPrefix;
   private final Map<String, Object> cassandraConfiguration;
-  private final Map<String, Object> dseConfiguration;
-  private final List<String> rawDseYaml;
   private final List<String> createOptions;
-  private final List<String> dseWorkloads;
   private final String jvmArgs;
 
   private CcmBridge(
@@ -191,11 +177,8 @@ public class CcmBridge implements AutoCloseable {
       int[] nodes,
       String ipPrefix,
       Map<String, Object> cassandraConfiguration,
-      Map<String, Object> dseConfiguration,
-      List<String> dseConfigurationRawYaml,
       List<String> createOptions,
-      Collection<String> jvmArgs,
-      List<String> dseWorkloads) {
+      Collection<String> jvmArgs) {
     this.configDirectory = configDirectory;
     if (nodes.length == 1) {
       // Hack to ensure that the default DC is always called 'dc1': pass a list ('-nX:0') even if
@@ -214,8 +197,6 @@ public class CcmBridge implements AutoCloseable {
     }
 
     this.cassandraConfiguration = cassandraConfiguration;
-    this.dseConfiguration = dseConfiguration;
-    this.rawDseYaml = dseConfigurationRawYaml;
     this.createOptions = createOptions;
 
     if ((getCassandraVersion().nextStable().compareTo(Version.V4_1_0) >= 0)
@@ -236,7 +217,6 @@ public class CcmBridge implements AutoCloseable {
       allJvmArgs.append(quote);
     }
     this.jvmArgs = allJvmArgs.toString();
-    this.dseWorkloads = dseWorkloads;
   }
 
   // Copied from Netty's PlatformDependent to avoid the dependency on Netty
@@ -294,10 +274,6 @@ public class CcmBridge implements AutoCloseable {
     return isDistributionOf(BackendType.SCYLLA)
         ? Optional.of(System.getProperty("ccm.version"))
         : Optional.empty();
-  }
-
-  public Optional<Version> getDseVersion() {
-    return DSE_ENABLEMENT ? Optional.of(VERSION) : Optional.empty();
   }
 
   public static boolean isDistributionOf(BackendType type) {
@@ -407,32 +383,11 @@ public class CcmBridge implements AutoCloseable {
       if (updateConfArguments.length() > 0) {
         execute("updateconf", updateConfArguments.toString());
       }
-
-      // Note that we aren't performing any substitution on DSE key/value props (at least for now)
-      if (isDistributionOf(BackendType.DSE)) {
-        for (Map.Entry<String, Object> conf : dseConfiguration.entrySet()) {
-          execute("updatedseconf", String.format("%s:%s", conf.getKey(), conf.getValue()));
-        }
-        for (String yaml : rawDseYaml) {
-          executeUnsanitized("updatedseconf", "-y", yaml);
-        }
-        if (!dseWorkloads.isEmpty()) {
-          execute("setworkload", String.join(",", dseWorkloads));
-        }
-      }
     }
   }
 
   public void nodetool(int node, String... args) {
     execute(String.format("node%d nodetool %s", node, Joiner.on(" ").join(args)));
-  }
-
-  public void dsetool(int node, String... args) {
-    execute(String.format("node%d dsetool %s", node, Joiner.on(" ").join(args)));
-  }
-
-  public void reloadCore(int node, String keyspace, String table, boolean reindex) {
-    dsetool(node, "reload_core", keyspace + "." + table, "reindex=" + reindex);
   }
 
   public void start() {
@@ -685,12 +640,9 @@ public class CcmBridge implements AutoCloseable {
   public static class Builder {
     private int[] nodes = {1};
     private final Map<String, Object> cassandraConfiguration = new LinkedHashMap<>();
-    private final Map<String, Object> dseConfiguration = new LinkedHashMap<>();
-    private final List<String> dseRawYaml = new ArrayList<>();
     private final List<String> jvmArgs = new ArrayList<>();
     private String ipPrefix;
     private final List<String> createOptions = new ArrayList<>();
-    private final List<String> dseWorkloads = new ArrayList<>();
 
     private final Path configDirectory;
 
@@ -709,16 +661,6 @@ public class CcmBridge implements AutoCloseable {
 
     public Builder withCassandraConfiguration(String key, Object value) {
       cassandraConfiguration.put(key, value);
-      return this;
-    }
-
-    public Builder withDseConfiguration(String key, Object value) {
-      dseConfiguration.put(key, value);
-      return this;
-    }
-
-    public Builder withDseConfiguration(String rawYaml) {
-      dseRawYaml.add(rawYaml);
       return this;
     }
 
@@ -793,22 +735,9 @@ public class CcmBridge implements AutoCloseable {
       return this;
     }
 
-    public Builder withDseWorkloads(String... workloads) {
-      this.dseWorkloads.addAll(Arrays.asList(workloads));
-      return this;
-    }
-
     public CcmBridge build() {
       return new CcmBridge(
-          configDirectory,
-          nodes,
-          ipPrefix,
-          cassandraConfiguration,
-          dseConfiguration,
-          dseRawYaml,
-          createOptions,
-          jvmArgs,
-          dseWorkloads);
+          configDirectory, nodes, ipPrefix, cassandraConfiguration, createOptions, jvmArgs);
     }
   }
 

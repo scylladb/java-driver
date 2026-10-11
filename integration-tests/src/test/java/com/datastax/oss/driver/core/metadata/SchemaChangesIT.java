@@ -61,10 +61,7 @@ public class SchemaChangesIT {
 
   static {
     CustomCcmRule.Builder builder = CustomCcmRule.builder();
-    if (!CcmBridge.isDistributionOf(
-        BackendType.DSE, (dist, cass) -> cass.nextStable().compareTo(Version.V4_0_0) >= 0)) {
-      builder.withCassandraConfiguration("enable_materialized_views", true);
-    }
+    builder.withCassandraConfiguration("enable_materialized_views", true);
     CCM_RULE = builder.build();
   }
 

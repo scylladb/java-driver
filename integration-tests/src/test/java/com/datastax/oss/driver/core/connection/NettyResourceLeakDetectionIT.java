@@ -127,9 +127,6 @@ public class NettyResourceLeakDetectionIT {
   }
 
   @BackendRequirement(
-      type = BackendType.DSE,
-      description = "Snappy is not supported in OSS C* 4.0+ with protocol v5")
-  @BackendRequirement(
       type = BackendType.CASSANDRA,
       maxExclusive = "4.0.0",
       description = "Snappy is not supported in OSS C* 4.0+ with protocol v5")

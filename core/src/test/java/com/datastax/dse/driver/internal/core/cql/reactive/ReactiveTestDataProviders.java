@@ -15,25 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datastax.dse.driver.api.core;
+package com.datastax.dse.driver.internal.core.cql.reactive;
 
-import com.datastax.oss.driver.api.core.CqlSession;
-import com.datastax.oss.driver.api.core.session.SessionBuilder;
+import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.tngtech.java.junit.dataprovider.DataProvider;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import net.jcip.annotations.NotThreadSafe;
+import java.util.Arrays;
+import java.util.stream.Stream;
 
-/**
- * @deprecated DSE functionality is now exposed directly on {@link CqlSession}. This class is
- *     preserved for backward compatibility, but {@link CqlSession#builder()} should be used
- *     instead.
- */
-@NotThreadSafe
-@Deprecated
-public class DseSessionBuilder extends SessionBuilder<DseSessionBuilder, DseSession> {
+public class ReactiveTestDataProviders {
+
+  @DataProvider
+  public static Object[][] allOssProtocolVersions() {
+    return concat(DefaultProtocolVersion.values());
+  }
 
   @NonNull
-  @Override
-  protected DseSession wrap(@NonNull CqlSession defaultSession) {
-    return new com.datastax.dse.driver.internal.core.session.DefaultDseSession(defaultSession);
+  private static Object[][] concat(Object[]... values) {
+    return Stream.of(values)
+        .flatMap(Arrays::stream)
+        .map(o -> new Object[] {o})
+        .toArray(Object[][]::new);
   }
 }

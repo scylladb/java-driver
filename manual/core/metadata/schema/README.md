@@ -176,7 +176,7 @@ If an element is malformed, or if its regex has a syntax error, a warning is log
 element is ignored.
 
 The default configuration (see [reference.conf](../../configuration/reference/)) excludes all
-Cassandra and DSE system keyspaces.
+Cassandra system keyspaces.
 
 Try to use only exact name inclusions if possible. This allows the driver to filter on the server
 side with a `WHERE IN` clause. If you use any other rule, it has to fetch all system rows and filter
@@ -315,6 +315,5 @@ take a look at the [Performance](../../performance/#schema-updates) page for a f
 [Session#checkSchemaAgreementAsync]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/Session.html#checkSchemaAgreementAsync--
 [SessionBuilder#addSchemaChangeListener]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/SessionBuilder.html#addSchemaChangeListener-com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener-
 [ExecutionInfo#isSchemaInAgreement]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/ExecutionInfo.html#isSchemaInAgreement--
-
 [JAVA-750]: https://datastax-oss.atlassian.net/browse/JAVA-750
 [java.util.regex.Pattern]: https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/regex/Pattern.html

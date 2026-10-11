@@ -57,7 +57,7 @@ public class DeleteReactiveIT extends InventoryITBase {
 
   @ClassRule public static TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
 
-  private static DseProductDao dao;
+  private static ProductDao dao;
 
   @BeforeClass
   public static void setup() {
@@ -68,8 +68,7 @@ public class DeleteReactiveIT extends InventoryITBase {
           SimpleStatement.builder(query).setExecutionProfile(sessionRule.slowProfile()).build());
     }
 
-    DseInventoryMapper inventoryMapper =
-        new DeleteReactiveIT_DseInventoryMapperBuilder(session).build();
+    InventoryMapper inventoryMapper = new DeleteReactiveIT_InventoryMapperBuilder(session).build();
     dao = inventoryMapper.productDao(sessionRule.keyspace());
   }
 
@@ -153,14 +152,14 @@ public class DeleteReactiveIT extends InventoryITBase {
   }
 
   @Mapper
-  public interface DseInventoryMapper {
+  public interface InventoryMapper {
     @DaoFactory
-    DseProductDao productDao(@DaoKeyspace CqlIdentifier keyspace);
+    ProductDao productDao(@DaoKeyspace CqlIdentifier keyspace);
   }
 
   @Dao
   @DefaultNullSavingStrategy(NullSavingStrategy.SET_TO_NULL)
-  public interface DseProductDao {
+  public interface ProductDao {
 
     @Delete
     ReactiveResultSet deleteEntityReactive(Product product);

@@ -53,7 +53,7 @@ OSGi ones, you can do so as follows:
 You can pass the following system properties to your tests:
 
 1. `ccm.version`: the CCM version to use
-2. `ccm.distribution`: choose target backend type (e.g. DSE, HCD)
+2. `ccm.distribution`: choose target backend type (for example Cassandra, Scylla, or HCD)
 3. `osgi.debug`: whether to enable remote debugging of the OSGi container (see
    below).
    
