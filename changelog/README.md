@@ -23,6 +23,7 @@ under the License.
 
 ### 4.19.2.3
 
+- [breaking] Remove DSE geometry and DateRange APIs, codecs, and the ESRI dependency (#1029)
 - [breaking] Remove public DSE metadata and query-builder APIs, plus related schema support;
   DSE connections are unsupported (#1031)
 
