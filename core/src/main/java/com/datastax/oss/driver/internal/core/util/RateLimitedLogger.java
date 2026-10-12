@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.util;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,33 +34,35 @@ import org.slf4j.Logger;
 @ThreadSafe
 public final class RateLimitedLogger {
   private static final String SUPPRESSED_SUFFIX = " (suppressed {} similar messages)";
-  private final Logger delegate;
-  private final Supplier<Duration> interval;
-  private final ConcurrentMap<String, Window> windows = new ConcurrentHashMap<>();
-  private final LongSupplier clock;
+  @NonNull private final Logger delegate;
+  @NonNull private final Supplier<Duration> interval;
+  @NonNull private final ConcurrentMap<String, Window> windows = new ConcurrentHashMap<>();
+  @NonNull private final LongSupplier clock;
 
-  public RateLimitedLogger(Logger delegate, DriverContext context) {
+  public RateLimitedLogger(@NonNull Logger delegate, @NonNull DriverContext context) {
     this(delegate, () -> configuredInterval(context));
   }
 
-  private static Duration configuredInterval(DriverContext context) {
+  @NonNull
+  private static Duration configuredInterval(@NonNull DriverContext context) {
     DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
     return profile.isDefined(DefaultDriverOption.REPEATED_LOG_INTERVAL)
         ? profile.getDuration(DefaultDriverOption.REPEATED_LOG_INTERVAL)
         : Duration.ofMinutes(1);
   }
 
-  public RateLimitedLogger(Logger delegate, Supplier<Duration> interval) {
+  public RateLimitedLogger(@NonNull Logger delegate, @NonNull Supplier<Duration> interval) {
     this(delegate, interval, System::nanoTime);
   }
 
-  RateLimitedLogger(Logger delegate, Supplier<Duration> interval, LongSupplier clock) {
+  RateLimitedLogger(
+      @NonNull Logger delegate, @NonNull Supplier<Duration> interval, @NonNull LongSupplier clock) {
     this.delegate = delegate;
     this.interval = interval;
     this.clock = clock;
   }
 
-  public void warn(String format, Object... arguments) {
+  public void warn(@NonNull String format, @NonNull Object... arguments) {
     if (delegate.isWarnEnabled()) {
       long suppressed = record("warn:" + format);
       if (suppressed >= 0) {
@@ -70,7 +73,7 @@ public final class RateLimitedLogger {
     }
   }
 
-  public void warnWithException(String format, Object... arguments) {
+  public void warnWithException(@NonNull String format, @NonNull Object... arguments) {
     if (delegate.isWarnEnabled()) {
       long suppressed = record("warn:" + format);
       if (suppressed >= 0) {
@@ -82,7 +85,7 @@ public final class RateLimitedLogger {
     }
   }
 
-  public void error(String format, Object... arguments) {
+  public void error(@NonNull String format, @NonNull Object... arguments) {
     if (delegate.isErrorEnabled()) {
       long suppressed = record("error:" + format);
       if (suppressed >= 0) {
@@ -93,7 +96,7 @@ public final class RateLimitedLogger {
     }
   }
 
-  private long record(String key) {
+  private long record(@NonNull String key) {
     Duration interval;
     try {
       interval = this.interval.get();
@@ -113,7 +116,8 @@ public final class RateLimitedLogger {
     return windows.computeIfAbsent(key, ignored -> new Window()).record(now, nanos);
   }
 
-  private static Object[] withSuppressedCount(Object[] arguments, long suppressed) {
+  @NonNull
+  private static Object[] withSuppressedCount(@NonNull Object[] arguments, long suppressed) {
     int size = arguments.length;
     Object[] result = Arrays.copyOf(arguments, size + 1);
     if (size > 0 && arguments[size - 1] instanceof Throwable) {
