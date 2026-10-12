@@ -30,6 +30,9 @@ public class CqlSessionRuleBuilder extends SessionRuleBuilder<CqlSessionRuleBuil
 
   @Override
   public SessionRule<CqlSession> build() {
+    if (createGraph || isCoreGraph || graphProtocol != null) {
+      throw new UnsupportedOperationException("DSE Graph test fixtures are no longer supported");
+    }
     DriverConfigLoader actualLoader = copyForSession(loader);
     return new SessionRule<>(
         cassandraResource, createKeyspace, nodeStateListener, schemaChangeListener, actualLoader);

@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.api.testinfra.session;
 
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -95,6 +96,37 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
     this.configLoader = configLoader;
   }
 
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated
+  public SessionRule(
+      CassandraResourceRule cassandraResource,
+      boolean createKeyspace,
+      NodeStateListener nodeStateListener,
+      SchemaChangeListener schemaChangeListener,
+      DriverConfigLoader configLoader,
+      String graphName) {
+    this(cassandraResource, createKeyspace, nodeStateListener, schemaChangeListener, configLoader);
+    if (graphName != null) {
+      throw GraphSupportRemoved.exception();
+    }
+  }
+
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated
+  public SessionRule(
+      CassandraResourceRule cassandraResource,
+      boolean createKeyspace,
+      NodeStateListener nodeStateListener,
+      SchemaChangeListener schemaChangeListener,
+      DriverConfigLoader configLoader,
+      String graphName,
+      boolean isCoreGraph) {
+    this(cassandraResource, createKeyspace, nodeStateListener, schemaChangeListener, configLoader);
+    if (graphName != null || isCoreGraph) {
+      throw GraphSupportRemoved.exception();
+    }
+  }
+
   @Override
   protected void before() {
     session =
@@ -132,6 +164,12 @@ public class SessionRule<SessionT extends Session> extends ExternalResource {
    */
   public CqlIdentifier keyspace() {
     return keyspace;
+  }
+
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated
+  public String getGraphName() {
+    return null;
   }
 
   /** @return a config profile where the request timeout is 30 seconds. * */

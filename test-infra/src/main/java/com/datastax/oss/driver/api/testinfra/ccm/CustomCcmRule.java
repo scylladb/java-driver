@@ -94,6 +94,24 @@ public class CustomCcmRule extends BaseCcmRule {
       return this;
     }
 
+    /** @deprecated DSE CCM configuration is no longer supported. */
+    @Deprecated
+    public Builder withDseConfiguration(String key, Object value) {
+      throw new UnsupportedOperationException("DSE CCM configuration is no longer supported");
+    }
+
+    /** @deprecated DSE CCM configuration is no longer supported. */
+    @Deprecated
+    public Builder withDseConfiguration(String rawYaml) {
+      throw new UnsupportedOperationException("DSE CCM configuration is no longer supported");
+    }
+
+    /** @deprecated DSE CCM workloads are no longer supported. */
+    @Deprecated
+    public Builder withDseWorkloads(String... workloads) {
+      throw new UnsupportedOperationException("DSE CCM workloads are no longer supported");
+    }
+
     public Builder withJvmArgs(String... jvmArgs) {
       bridgeBuilder.withJvmArgs(jvmArgs);
       return this;

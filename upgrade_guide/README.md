@@ -21,13 +21,16 @@ under the License.
 
 ### 4.19.2.3
 
-#### DSE compatibility APIs and runtime support
+#### DSE runtime was removed; deprecated API shells remain
 
-The DSE protocol versions, continuous paging, Graph API shells, and geometry and DateRange types
-are no longer available. DSE metadata and query builder types remain as deprecated API shells;
-their runtime support has been removed. Remove usages of `DseSession`, unsupported `DseDriverOption` constants, and
-the Graph and continuous paging APIs before upgrading. Deprecated DSE authentication option
-constants remain available as described below.
+DSE protocol negotiation, continuous paging, Graph execution, and DSE type codecs are no longer
+supported. Their public types and option constants remain deprecated for source and binary
+compatibility. `DseSession.builder().buildAsync()` fails with migration guidance. Continuous paging
+and Graph execution methods on `CqlSession` fail with `UnsupportedOperationException`: synchronous
+methods throw, asynchronous methods return failed `CompletionStage`s, and reactive methods return
+result publishers that signal the error on subscription. Their metadata publishers signal the same
+error. Handle async failures with stage handlers such as `exceptionally`, and reactive failures with
+subscriber `onError` handlers.
 
 The generic reactive CQL and mapper APIs remain available under their existing
 `com.datastax.dse` package names.
@@ -41,6 +44,26 @@ longer produces DSE metadata or node extras. The `DseGraphTableMetadata.describe
 method, and description methods that delegate to it such as `describeWithChildren`, throw because
 Graph schema support has been removed.
 
+Graph statement, result, session, predicate, and remote-connection signatures remain deprecated
+compatibility stubs. `CqlSession` still exposes the Graph session interfaces, and creating or
+executing Graph requests fails with `UnsupportedOperationException` with migration guidance. The
+Graph overload of `ProxyAuthentication.executeAs` also fails this way. `gremlin-core` remains an
+optional dependency for the public signatures; no Graph runtime is restored.
+
+Geometry value types remain as deprecated API for source and binary compatibility. Their local
+construction and conversion helpers still work, but the DSE geometry codecs and server support are
+not restored. Applications using these helpers, such as `Point.fromWellKnownText`, must declare
+`com.esri.geometry:esri-geometry-api` themselves: this optional dependency is not propagated to
+downstream applications.
+
+DateRange value types also remain available for local construction and parsing. The deprecated
+`DseTypeCodecs` fields retain their signatures but throw when encoding or decoding DSE values.
+
+Deprecated DSE test-infra and OSGi service signatures remain available. DSE CCM setup, tooling,
+and Graph fixture requests throw when used; generic test infrastructure continues to work.
+`DseRequirement` retains backend matching: a DSE-only requirement skips tests on supported backends,
+while another matching backend requirement can allow the test to run.
+
 Replace `DseDriverOption.APPLICATION_NAME` and `DseDriverOption.APPLICATION_VERSION` with
 `DefaultDriverOption.APPLICATION_NAME` and `DefaultDriverOption.APPLICATION_VERSION`. The
 `basic.application.name` and `basic.application.version` configuration paths are unchanged.
@@ -48,14 +71,13 @@ If `basic.load-balancing-policy.class` names `DseLoadBalancingPolicy` or
 `DseDcInferringLoadBalancingPolicy`, replace it with `DefaultLoadBalancingPolicy` or
 `DcInferringLoadBalancingPolicy`, respectively. The DSE policy classes have been removed.
 
-Serialized `OptionsMap` instances from 4.19.2.1 or 4.19.2.2 that contain removed
-`DseDriverOption` constants cannot be deserialized with this release. This includes every map
-created with `OptionsMap.driverDefaults()` in those releases, even if the application did not
-configure DSE features. Rebuild those maps with the remaining options before upgrading; the
-serialization compatibility noted under 4.19.2.2 below does not extend to these maps.
+`DseDriverOption` constants remain available but do not enable removed DSE features. Older
+serialized `OptionsMap` values containing those constants remain readable; a 4.19.2.1 Graph-option
+fixture is covered by a compatibility test. Remove unsupported DSE settings before creating new
+sessions.
 
-For four-part versions, replace `Version.getDSEPatch()` with `Version.getRevision()`; it returns
-the fourth component, or `-1` when that component is absent.
+For four-part versions, use `Version.getRevision()`. The deprecated `getDSEPatch()` alias remains
+available and returns the same fourth component, or `-1` when absent.
 
 #### DSE authentication and proxy execution were removed
 
@@ -88,8 +110,7 @@ Configuring their old option keys with built-in plaintext authentication fails s
 before connecting. Custom authentication providers may use these names for their own options; a
 programmatic provider takes precedence over the configured provider class. The
 `DsePlainTextAuthProviderBase` alias remains available for ordinary SASL PLAIN authentication.
-The Graph overload of `ProxyAuthentication.executeAs` remains unavailable with the removed Graph
-API.
+The Graph overload of `ProxyAuthentication.executeAs` remains available as a deprecated stub.
 
 `PlainTextAuthProviderBase.PlainTextAuthenticator` retains its `BaseDseAuthenticator` superclass
 and its three-argument constructor `(Credentials, EndPoint, String)` for ordinary authentication.
@@ -146,6 +167,46 @@ configuration. Its public constants remain deprecated for source and binary comp
 option now defaults to `false`. If it is set to `true` in an application configuration, the driver
 logs a warning whenever a session is created; remove that setting.
 
+#### DSE Graph before and after 4.19.2.3
+
+##### Before 4.19.2.3
+
+The driver exposed DSE Graph execution APIs through `CqlSession`, including synchronous,
+asynchronous, and reactive execution. TinkerPop was an optional dependency starting with driver
+4.10.0. Applications using those APIs also configured requests through the `basic.graph` and
+`advanced.graph` trees and could enable the `graph-requests`, `graph-client-timeouts`, and
+`graph-messages` metrics.
+
+##### Starting with 4.19.2.3
+
+DSE Graph execution is no longer supported. Graph request processors, serializers, and the
+TinkerPop integration were removed. Public Graph API types remain temporarily for binary and source
+compatibility, but are deprecated. Creating Graph requests and synchronous execution throw an
+`UnsupportedOperationException` with migration guidance. Async execution returns a failed stage;
+reactive execution returns a result publisher whose node and execution-info subscriptions signal
+the same error. Applications that still execute DSE Graph requests must remain on 4.19.2.2 or
+migrate that workload before upgrading.
+
+The deprecated Graph compatibility APIs have the following limitations:
+
+* `DseDriverOption` and `TypedDriverOption` Graph constants remain available but are deprecated.
+* Graph statement, result, session, predicate, and remote-connection APIs remain available but are
+  deprecated and fail fast when used.
+* `DseGraph.g` remains as a deprecated field for compatibility. With `gremlin-core` present, its
+  traversal methods fail with migration guidance; without it, the field is `null`.
+* `basic.graph` and `advanced.graph` settings no longer affect driver behavior. Graph defaults have
+  been removed from `reference.conf` and `OptionsMap.driverDefaults()`.
+* `DseNodeMetric.GRAPH_MESSAGES`, `DseSessionMetric.GRAPH_REQUESTS`, and
+  `DseSessionMetric.GRAPH_CLIENT_TIMEOUTS` remain available but are deprecated. Enabling their
+  metric names produces no metrics.
+* Graph helpers in `java-driver-test-infra` remain as deprecated signatures. Requests to create a
+  Graph or configure its engine or protocol fail because DSE test fixtures are unsupported.
+
+The TinkerPop runtime integration and JavaTuples dependency are removed. `gremlin-core` remains an
+optional, signature-only build dependency while the deprecated API shells exist; it is not supplied
+transitively to applications. Applications compiling against those signatures must continue to
+declare their own TinkerPop dependency.
+
 ### 4.19.2.2
 
 #### The local-DC check no longer inspects contact points
@@ -199,46 +260,10 @@ no longer fails `CqlSession.build()`. What changes:
   (`resolve-contact-points = true`, a programmatic resolved `InetSocketAddress`), custom `EndPoint`s
   and every node discovered from the cluster are tried as they are.
 
-#### DSE Graph before and after 4.19.2.2
+#### Serialized configuration maps remain readable
 
-##### Before 4.19.2.2
-
-The driver exposed DSE Graph execution APIs through `CqlSession`, including synchronous,
-asynchronous, and reactive execution. TinkerPop was an optional dependency starting with driver
-4.10.0. Applications using those APIs also configured requests through the `basic.graph` and
-`advanced.graph` trees and could enable the `graph-requests`, `graph-client-timeouts`, and
-`graph-messages` metrics.
-
-##### Starting with 4.19.2.2
-
-DSE Graph execution is no longer supported. Graph request processors, serializers, and the
-TinkerPop integration were removed. Public Graph API types remain temporarily for binary and source
-compatibility, but are deprecated. Creating or executing Graph requests throws an
-`UnsupportedOperationException` with migration guidance. Applications that still execute DSE Graph
-requests must remain on 4.19.2.1 or migrate that workload before upgrading.
-
-Legacy configuration remains compatible during the transition:
-
-* `DseDriverOption` and `TypedDriverOption` Graph constants remain available but are deprecated.
-* Graph statement, result, session, predicate, and remote-connection APIs remain available but are
-  deprecated and fail fast when used.
-* `DseGraph.g` remains as a deprecated field for compatibility. With `gremlin-core` present, its
-  traversal methods fail with migration guidance; without it, the field is `null`.
-* `basic.graph`, `advanced.graph`, and Graph metric settings are accepted and ignored. The driver
-  logs a deprecation warning when an application explicitly configures them.
-* Legacy Graph defaults remain readable from `reference.conf` and `OptionsMap.driverDefaults()`.
-* Serialized `OptionsMap` instances created by older driver versions remain deserializable in
-  4.19.2.2. See the 4.19.2.3 note above for maps containing removed `DseDriverOption` entries.
-* Graph helpers in `java-driver-test-infra` remain as deprecated signatures. Requests to create a
-  Graph fail fast; Graph engine and protocol settings are ignored.
-* `DseNodeMetric.GRAPH_MESSAGES`, `DseSessionMetric.GRAPH_REQUESTS`, and
-  `DseSessionMetric.GRAPH_CLIENT_TIMEOUTS` remain available but are deprecated. Enabling their metric
-  names produces no metrics.
-
-The TinkerPop runtime integration and JavaTuples dependency are removed. `gremlin-core` remains an
-optional, signature-only build dependency while the deprecated API shells exist; it is not supplied
-transitively to applications. Applications compiling against those signatures must continue to
-declare their own TinkerPop dependency.
+Serialized `OptionsMap` instances created by older driver versions remain deserializable in
+4.19.2.2. A 4.19.2.1 Graph-option fixture is also readable in 4.19.2.3.
 
 ### 4.19.2.1
 

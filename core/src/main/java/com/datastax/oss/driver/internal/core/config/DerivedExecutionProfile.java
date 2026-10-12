@@ -35,12 +35,13 @@ public class DerivedExecutionProfile implements DriverExecutionProfile {
 
   public static DerivedExecutionProfile with(
       DriverExecutionProfile baseProfile, DriverOption option, Object value) {
+    option = DriverOptionAliases.canonicalize(option);
     if (baseProfile instanceof DerivedExecutionProfile) {
       // Don't nest derived profiles, use same base and add to overrides
       DerivedExecutionProfile previousDerived = (DerivedExecutionProfile) baseProfile;
       ImmutableMap.Builder<DriverOption, Object> newOverrides = ImmutableMap.builder();
       for (Map.Entry<DriverOption, Object> override : previousDerived.overrides.entrySet()) {
-        if (!override.getKey().equals(option)) {
+        if (!DriverOptionAliases.canonicalize(override.getKey()).equals(option)) {
           newOverrides.put(override.getKey(), override.getValue());
         }
       }
@@ -73,10 +74,13 @@ public class DerivedExecutionProfile implements DriverExecutionProfile {
 
   @Override
   public boolean isDefined(@NonNull DriverOption option) {
-    if (overrides.containsKey(option)) {
-      return overrides.get(option) != NO_VALUE;
+    DriverOption canonicalOption = DriverOptionAliases.canonicalize(option);
+    DriverOption overrideKey = DriverOptionAliases.resolveKey(overrides, option);
+    if (overrides.containsKey(overrideKey)) {
+      return overrides.get(overrideKey) != NO_VALUE;
     } else {
-      return baseProfile.isDefined(option);
+      return baseProfile.isDefined(option)
+          || (canonicalOption != option && baseProfile.isDefined(canonicalOption));
     }
   }
 
@@ -170,9 +174,13 @@ public class DerivedExecutionProfile implements DriverExecutionProfile {
   private <ValueT> ValueT get(
       @NonNull DriverOption option,
       BiFunction<DriverExecutionProfile, DriverOption, ValueT> getter) {
-    Object value = overrides.get(option);
+    DriverOption canonicalOption = DriverOptionAliases.canonicalize(option);
+    Object value = overrides.get(DriverOptionAliases.resolveKey(overrides, option));
     if (value == null) {
-      value = getter.apply(baseProfile, option);
+      // Preserve custom profiles that support the legacy key directly.
+      DriverOption baseOption =
+          canonicalOption != option && baseProfile.isDefined(option) ? option : canonicalOption;
+      value = getter.apply(baseProfile, baseOption);
     }
     if (value == null || value == NO_VALUE) {
       throw new IllegalArgumentException("Missing configuration option " + option.getPath());
@@ -188,7 +196,8 @@ public class DerivedExecutionProfile implements DriverExecutionProfile {
     // builder.add() has no effect if the element already exists, so process the overrides first
     // since they have higher precedence
     for (Map.Entry<DriverOption, Object> entry : overrides.entrySet()) {
-      if (entry.getValue() != NO_VALUE) {
+      if (entry.getValue() != NO_VALUE
+          && DriverOptionAliases.resolveKey(overrides, entry.getKey()).equals(entry.getKey())) {
         builder.add(new AbstractMap.SimpleEntry<>(entry.getKey().getPath(), entry.getValue()));
       }
     }

@@ -172,6 +172,12 @@ public class Version implements Comparable<Version>, Serializable {
     return dsePatch;
   }
 
+  /** @deprecated Use {@link #getRevision()} for the optional fourth version component. */
+  @Deprecated
+  public int getDSEPatch() {
+    return getRevision();
+  }
+
   /**
    * The pre-release labels if relevant, i.e. label1 and label2 in X.Y.Z-label1-lable2.
    *

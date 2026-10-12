@@ -33,6 +33,12 @@ public abstract class SessionRuleBuilder<
   protected NodeStateListener nodeStateListener;
   protected SchemaChangeListener schemaChangeListener;
   protected DriverConfigLoader loader;
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated protected boolean createGraph;
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated protected boolean isCoreGraph;
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated protected String graphProtocol;
 
   @SuppressWarnings("unchecked")
   protected final SelfT self = (SelfT) this;
@@ -74,6 +80,24 @@ public abstract class SessionRuleBuilder<
   public SelfT withSchemaChangeListener(SchemaChangeListener listener) {
     this.schemaChangeListener = listener;
     return self;
+  }
+
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated
+  public SelfT withCreateGraph() {
+    throw new UnsupportedOperationException("DSE Graph test fixtures are no longer supported");
+  }
+
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated
+  public SelfT withCoreEngine() {
+    throw new UnsupportedOperationException("DSE Graph test fixtures are no longer supported");
+  }
+
+  /** @deprecated DSE Graph test fixtures are no longer supported. */
+  @Deprecated
+  public SelfT withGraphProtocol(String graphProtocol) {
+    throw new UnsupportedOperationException("DSE Graph test fixtures are no longer supported");
   }
 
   public abstract SessionRule<SessionT> build();

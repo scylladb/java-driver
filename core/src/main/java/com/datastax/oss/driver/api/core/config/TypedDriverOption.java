@@ -741,6 +741,234 @@ public class TypedDriverOption<ValueT> {
       new TypedDriverOption<>(
           DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES,
           GenericType.mapOf(GenericType.STRING, GenericType.STRING));
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_PAGE_SIZE =
+      new TypedDriverOption<>(DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE, GenericType.INTEGER);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Boolean> CONTINUOUS_PAGING_PAGE_SIZE_BYTES =
+      new TypedDriverOption<>(
+          DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE_BYTES, GenericType.BOOLEAN);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_MAX_PAGES =
+      new TypedDriverOption<>(DseDriverOption.CONTINUOUS_PAGING_MAX_PAGES, GenericType.INTEGER);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND =
+      new TypedDriverOption<>(
+          DseDriverOption.CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, GenericType.INTEGER);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES =
+      new TypedDriverOption<>(
+          DseDriverOption.CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, GenericType.INTEGER);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE =
+      new TypedDriverOption<>(
+          DseDriverOption.CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE, GenericType.DURATION);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES =
+      new TypedDriverOption<>(
+          DseDriverOption.CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES, GenericType.DURATION);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration>
+      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST =
+          new TypedDriverOption<>(
+              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST,
+              GenericType.DURATION);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration>
+      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST =
+          new TypedDriverOption<>(
+              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST,
+              GenericType.DURATION);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<List<Duration>>
+      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_SLO =
+          new TypedDriverOption<>(
+              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_SLO,
+              GenericType.listOf(GenericType.DURATION));
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<List<Double>>
+      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer>
+      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS =
+          new TypedDriverOption<>(
+              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS,
+              GenericType.INTEGER);
+  /** @deprecated Continuous paging is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration>
+      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL =
+          new TypedDriverOption<>(
+              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL,
+              GenericType.DURATION);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<String> GRAPH_READ_CONSISTENCY_LEVEL =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_READ_CONSISTENCY_LEVEL, GenericType.STRING);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<String> GRAPH_WRITE_CONSISTENCY_LEVEL =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_WRITE_CONSISTENCY_LEVEL, GenericType.STRING);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<String> GRAPH_TRAVERSAL_SOURCE =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_TRAVERSAL_SOURCE, GenericType.STRING);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<String> GRAPH_SUB_PROTOCOL =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_SUB_PROTOCOL, GenericType.STRING);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Boolean> GRAPH_IS_SYSTEM_QUERY =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_IS_SYSTEM_QUERY, GenericType.BOOLEAN);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<String> GRAPH_NAME =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_NAME, GenericType.STRING);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> GRAPH_TIMEOUT =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_TIMEOUT, GenericType.DURATION);
+
+  /**
+   * Legacy no-op option that controlled DataStax Insights monitoring.
+   *
+   * @deprecated DataStax Insights monitoring is no longer supported; there is no replacement. This
+   *     constant is retained for source and binary compatibility.
+   */
+  @Deprecated
+  public static final TypedDriverOption<Boolean> MONITOR_REPORTING_ENABLED =
+      new TypedDriverOption<>(DseDriverOption.MONITOR_REPORTING_ENABLED, GenericType.BOOLEAN);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<String> GRAPH_PAGING_ENABLED =
+      new TypedDriverOption<>(DseDriverOption.GRAPH_PAGING_ENABLED, GenericType.STRING);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_PAGE_SIZE =
+      new TypedDriverOption<>(
+          DseDriverOption.GRAPH_CONTINUOUS_PAGING_PAGE_SIZE, GenericType.INTEGER);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_PAGES =
+      new TypedDriverOption<>(
+          DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES, GenericType.INTEGER);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND =
+      new TypedDriverOption<>(
+          DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, GenericType.INTEGER);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES =
+      new TypedDriverOption<>(
+          DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, GenericType.INTEGER);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_HIGHEST =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_HIGHEST, GenericType.DURATION);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_LOWEST =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_LOWEST, GenericType.DURATION);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<List<Duration>> METRICS_SESSION_GRAPH_REQUESTS_SLO =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_SLO,
+          GenericType.listOf(GenericType.DURATION));
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<List<Double>>
+      METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> METRICS_SESSION_GRAPH_REQUESTS_DIGITS =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS, GenericType.INTEGER);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_INTERVAL =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_INTERVAL, GenericType.DURATION);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_HIGHEST =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST, GenericType.DURATION);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_LOWEST =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_LOWEST, GenericType.DURATION);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<List<Duration>> METRICS_NODE_GRAPH_MESSAGES_SLO =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_SLO,
+          GenericType.listOf(GenericType.DURATION));
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<List<Double>>
+      METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES =
+          new TypedDriverOption<>(
+              DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES,
+              GenericType.listOf(GenericType.DOUBLE));
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Integer> METRICS_NODE_GRAPH_MESSAGES_DIGITS =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS, GenericType.INTEGER);
+
+  /** @deprecated DSE Graph is no longer supported; this option is ignored. */
+  @Deprecated
+  public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_INTERVAL =
+      new TypedDriverOption<>(
+          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_INTERVAL, GenericType.DURATION);
+
   /** The time after which the node level metrics will be evicted. */
   public static final TypedDriverOption<Duration> METRICS_NODE_EXPIRE_AFTER =
       new TypedDriverOption<>(DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER, GenericType.DURATION);

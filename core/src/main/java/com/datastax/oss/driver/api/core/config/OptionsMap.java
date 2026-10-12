@@ -17,7 +17,9 @@
  */
 package com.datastax.oss.driver.api.core.config;
 
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.CQL4SkipMetadataResolveMethod;
+import com.datastax.oss.driver.internal.core.config.DriverOptionAliases;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -97,7 +99,8 @@ public class OptionsMap implements Serializable {
       @NonNull String profile, @NonNull TypedDriverOption<ValueT> option, @NonNull ValueT value) {
     Objects.requireNonNull(option, "option");
     Objects.requireNonNull(value, "value");
-    Object previous = getProfileMap(profile).put(option.getRawOption(), value);
+    Object previous =
+        getProfileMap(profile).put(DriverOptionAliases.canonicalize(option.getRawOption()), value);
     if (!value.equals(previous)) {
       for (Consumer<OptionsMap> listener : changeListeners) {
         listener.accept(this);
@@ -124,7 +127,8 @@ public class OptionsMap implements Serializable {
   @Nullable
   public <ValueT> ValueT get(@NonNull String profile, @NonNull TypedDriverOption<ValueT> option) {
     Objects.requireNonNull(option, "option");
-    Object result = getProfileMap(profile).get(option.getRawOption());
+    Object result =
+        getProfileMap(profile).get(DriverOptionAliases.canonicalize(option.getRawOption()));
     return cast(result);
   }
 
@@ -147,7 +151,8 @@ public class OptionsMap implements Serializable {
   public <ValueT> ValueT remove(
       @NonNull String profile, @NonNull TypedDriverOption<ValueT> option) {
     Objects.requireNonNull(option, "option");
-    Object previous = getProfileMap(profile).remove(option.getRawOption());
+    Object previous =
+        getProfileMap(profile).remove(DriverOptionAliases.canonicalize(option.getRawOption()));
     if (previous != null) {
       for (Consumer<OptionsMap> listener : changeListeners) {
         listener.accept(this);
@@ -379,7 +384,18 @@ public class OptionsMap implements Serializable {
       this.map = map;
     }
 
+    @SuppressWarnings("deprecation")
     private Object readResolve() {
+      for (Map<DriverOption, Object> profile : map.values()) {
+        Object applicationName = profile.remove(DseDriverOption.APPLICATION_NAME);
+        if (applicationName != null) {
+          profile.putIfAbsent(DefaultDriverOption.APPLICATION_NAME, applicationName);
+        }
+        Object applicationVersion = profile.remove(DseDriverOption.APPLICATION_VERSION);
+        if (applicationVersion != null) {
+          profile.putIfAbsent(DefaultDriverOption.APPLICATION_VERSION, applicationVersion);
+        }
+      }
       return new OptionsMap(map);
     }
   }

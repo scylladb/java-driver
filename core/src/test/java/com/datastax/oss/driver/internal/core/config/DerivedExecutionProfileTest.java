@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.DriverOption;
 import com.tngtech.java.junit.dataprovider.DataProvider;
@@ -162,6 +164,97 @@ public class DerivedExecutionProfileTest {
         DerivedExecutionProfile.with(base, OTHER_OPTION, "something else");
 
     assertThat(invoke.apply(derived)).isEqualTo(value);
+  }
+
+  @DataProvider
+  @SuppressWarnings("deprecation")
+  public static Object[][] applicationOptionAliases() {
+    return new Object[][] {
+      {DseDriverOption.APPLICATION_NAME, DefaultDriverOption.APPLICATION_NAME},
+      {DseDriverOption.APPLICATION_VERSION, DefaultDriverOption.APPLICATION_VERSION}
+    };
+  }
+
+  @Test
+  @UseDataProvider("applicationOptionAliases")
+  public void should_read_legacy_alias_from_identity_based_base(
+      DriverOption alias, DriverOption canonicalOption) {
+    when(base.isDefined(canonicalOption)).thenReturn(true);
+    when(base.getString(canonicalOption)).thenReturn("from base");
+    DriverExecutionProfile derived = DerivedExecutionProfile.with(base, OTHER_OPTION, "override");
+
+    assertThat(derived.getString(alias)).isEqualTo("from base");
+  }
+
+  @Test
+  @UseDataProvider("applicationOptionAliases")
+  public void should_report_legacy_alias_defined_in_identity_based_base(
+      DriverOption alias, DriverOption canonicalOption) {
+    when(base.isDefined(canonicalOption)).thenReturn(true);
+    DriverExecutionProfile derived = DerivedExecutionProfile.with(base, OTHER_OPTION, "override");
+
+    assertThat(derived.isDefined(alias)).isTrue();
+  }
+
+  @Test
+  @UseDataProvider("applicationOptionAliases")
+  public void should_preserve_legacy_alias_defined_in_identity_based_base(
+      DriverOption alias, DriverOption canonicalOption) {
+    when(base.isDefined(alias)).thenReturn(true);
+    when(base.getString(alias)).thenReturn("legacy value");
+    DriverExecutionProfile derived = DerivedExecutionProfile.with(base, OTHER_OPTION, "override");
+
+    assertThat(derived.isDefined(alias)).isTrue();
+    assertThat(derived.getString(alias)).isEqualTo("legacy value");
+  }
+
+  @Test
+  @UseDataProvider("applicationOptionAliases")
+  public void should_preserve_requested_key_when_base_defines_both_aliases(
+      DriverOption alias, DriverOption canonicalOption) {
+    when(base.isDefined(alias)).thenReturn(true);
+    when(base.getString(alias)).thenReturn("legacy value");
+    when(base.isDefined(canonicalOption)).thenReturn(true);
+    when(base.getString(canonicalOption)).thenReturn("current value");
+    DriverExecutionProfile derived = DerivedExecutionProfile.with(base, OTHER_OPTION, "override");
+
+    assertThat(derived.isDefined(alias)).isTrue();
+    assertThat(derived.getString(alias)).isEqualTo("legacy value");
+    assertThat(derived.isDefined(canonicalOption)).isTrue();
+    assertThat(derived.getString(canonicalOption)).isEqualTo("current value");
+  }
+
+  @Test
+  @UseDataProvider("applicationOptionAliases")
+  public void should_apply_alias_overrides_and_removals_before_base_fallback(
+      DriverOption alias, DriverOption canonicalOption) {
+    when(base.isDefined(alias)).thenReturn(true);
+    when(base.getString(alias)).thenReturn("legacy value");
+    DriverExecutionProfile derived =
+        DerivedExecutionProfile.with(base, canonicalOption, "override");
+
+    assertThat(derived.isDefined(alias)).isTrue();
+    assertThat(derived.getString(alias)).isEqualTo("override");
+
+    DriverExecutionProfile removed = derived.without(alias);
+    assertThat(removed.isDefined(alias)).isFalse();
+    assertThat(removed.isDefined(canonicalOption)).isFalse();
+    assertThatThrownBy(() -> removed.getString(alias)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> removed.getString(canonicalOption))
+        .isInstanceOf(IllegalArgumentException.class);
+    Mockito.verifyNoInteractions(base);
+  }
+
+  @Test
+  public void should_preserve_custom_option_with_application_alias_path() {
+    DriverOption customOption = () -> DefaultDriverOption.APPLICATION_NAME.getPath();
+    when(base.isDefined(customOption)).thenReturn(true);
+    when(base.getString(customOption)).thenReturn("custom value");
+    when(base.getString(DefaultDriverOption.APPLICATION_NAME)).thenReturn("current value");
+    DriverExecutionProfile derived = DerivedExecutionProfile.with(base, OTHER_OPTION, "override");
+
+    assertThat(derived.isDefined(customOption)).isTrue();
+    assertThat(derived.getString(customOption)).isEqualTo("custom value");
   }
 
   /**

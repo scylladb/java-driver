@@ -80,6 +80,11 @@
       <artifactId>metrics-core</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.esri.geometry</groupId>
+      <artifactId>esri-geometry-api</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
       <groupId>org.hdrhistogram</groupId>
       <artifactId>HdrHistogram</artifactId>
     </dependency>
@@ -94,6 +99,12 @@
     <dependency>
       <groupId>org.reactivestreams</groupId>
       <artifactId>reactive-streams</artifactId>
+    </dependency>
+    <!-- Required only by deprecated Graph API signatures; no Graph implementation remains. -->
+    <dependency>
+      <groupId>org.apache.tinkerpop</groupId>
+      <artifactId>gremlin-core</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>com.github.stephenc.jcip</groupId>
@@ -288,10 +299,10 @@
                   Note: dependencies marked as optional are by default included with optional
                   resolution in the manifest; we only need to manually set the resolution to
                   optional for dependencies declared as non-optional in the pom files.
-                  -->jnr.*;resolution:=optional, org.reactivestreams.*;resolution:=optional, reactor.blockhound.*;resolution:=optional, *
+                  -->jnr.*;resolution:=optional, com.esri.core.geometry.*;resolution:=optional, org.reactivestreams.*;resolution:=optional, org.apache.tinkerpop.*;resolution:=optional, reactor.blockhound.*;resolution:=optional, *
                 </Import-Package>
-                <!-- The DSE-namespaced packages below contain APIs retained for compatibility. -->
-                <Export-Package>com.datastax.oss.driver.*.core.*, com.datastax.dse.driver.api.core.auth, com.datastax.dse.driver.api.core.config, com.datastax.dse.driver.api.core.cql.reactive, com.datastax.dse.driver.api.core.metadata.*, com.datastax.dse.driver.internal.core.cql.reactive, com.datastax.dse.driver.internal.core.util.concurrent</Export-Package>
+                <!-- Export retained generic reactive and deprecated DSE compatibility APIs. -->
+                <Export-Package>com.datastax.oss.driver.*.core.*, com.datastax.dse.driver.*.core.*</Export-Package>
               </instructions>
             </configuration>
           </execution>
