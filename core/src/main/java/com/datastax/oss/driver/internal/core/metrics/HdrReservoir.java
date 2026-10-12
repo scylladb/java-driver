@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.metrics;
 
 import com.codahale.metrics.Reservoir;
 import com.codahale.metrics.Snapshot;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -50,6 +51,7 @@ public class HdrReservoir implements Reservoir {
 
   private final String logPrefix;
   private final String highestLatencyOptionPath;
+  private final RateLimitedLogger limitedLogger;
   private final Recorder recorder;
   private final long refreshIntervalNanos;
 
@@ -72,9 +74,11 @@ public class HdrReservoir implements Reservoir {
       int numberOfSignificantValueDigits,
       Duration refreshInterval,
       String logPrefix,
-      String highestLatencyOptionPath) {
+      String highestLatencyOptionPath,
+      RateLimitedLogger limitedLogger) {
     this.logPrefix = logPrefix;
     this.highestLatencyOptionPath = highestLatencyOptionPath;
+    this.limitedLogger = limitedLogger;
     // The Reservoir interface is supposed to be agnostic to the unit. However, the Metrics library
     // heavily leans towards nanoseconds (for example, Timer feeds nanoseconds to update(); JmxTimer
     // assumes that the snapshot results are in nanoseconds).
@@ -93,7 +97,7 @@ public class HdrReservoir implements Reservoir {
     try {
       recorder.recordValue(value / 1000);
     } catch (ArrayIndexOutOfBoundsException e) {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Recorded value ({}) is out of bounds, discarding. Increase {}.",
           logPrefix,
           Duration.ofNanos(value),
@@ -192,7 +196,7 @@ public class HdrReservoir implements Reservoir {
       // 59 hours). However handle gracefully just in case.
       int size;
       if (longSize > Integer.MAX_VALUE) {
-        LOG.warn("[{}] Too many recorded values, truncating", logPrefix);
+        limitedLogger.warn("[{}] Too many recorded values, truncating", logPrefix);
         size = Integer.MAX_VALUE;
       } else {
         size = (int) longSize;

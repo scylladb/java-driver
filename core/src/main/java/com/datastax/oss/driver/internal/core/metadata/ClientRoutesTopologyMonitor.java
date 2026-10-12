@@ -27,6 +27,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.clientroutes.ClientRouteRecord;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -93,6 +94,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   private final Map<String, String> connectionAddrOverrides;
 
   private final String logPrefix;
+  private final RateLimitedLogger limitedLogger;
   private final AtomicReference<Map<UUID, ClientRouteRecord>> resolvedRoutesCache;
 
   /**
@@ -172,6 +174,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                         ClientRouteProxy::getConnectionId,
                         ClientRouteProxy::getConnectionAddrOverride)));
     this.logPrefix = context.getSessionName();
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
     this.resolvedRoutesCache = new AtomicReference<>(Collections.emptyMap());
     this.useSSL = context.getSslEngineFactory().isPresent();
   }
@@ -282,7 +285,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       }
       backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS);
     }
-    LOG.warn(
+    limitedLogger.warn(
         "[{}] Client routes refresh dropped: CAS contention after {} attempts",
         logPrefix,
         MAX_CAS_ATTEMPTS);
@@ -304,7 +307,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
 
     DriverChannel channel = context.getControlConnection().channel();
     if (channel == null) {
-      LOG.warn("[{}] Control connection channel is null, cannot query client routes", logPrefix);
+      limitedLogger.warn(
+          "[{}] Control connection channel is null, cannot query client routes", logPrefix);
       completeAndDrain(sentinel);
       return sentinel;
     }
@@ -369,7 +373,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                     // Skip the record if the required port column is absent.
                     effectivePort = row.isNull(portColumn) ? null : row.getInteger(portColumn);
                     if (effectivePort == null) {
-                      LOG.error(
+                      limitedLogger.error(
                           "[{}] Skipping client route for host_id={} ({}): "
                               + "required port column ({}) is not set in client routes table",
                           logPrefix,
@@ -381,7 +385,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
 
                     newRoutes.put(hostId, new ClientRouteRecord(hostId, address, effectivePort));
                   } catch (RuntimeException e) {
-                    LOG.warn(
+                    limitedLogger.warn(
                         "[{}] Skipping unusable client_routes row (host_id={}, address={}, {}={})",
                         logPrefix,
                         hostId,
@@ -420,7 +424,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                     try {
                       hostId = UUID.fromString(hostIdStr);
                     } catch (IllegalArgumentException e) {
-                      LOG.warn(
+                      limitedLogger.warn(
                           "[{}] Skipping route with malformed host_id: {}",
                           logPrefix,
                           hostIdStr,
@@ -448,7 +452,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
                     // one path to an empty cache that never reaches it.
                     carryOverCounts.set(Collections.emptyMap());
                     consecutiveEmptyResults.set(0);
-                    LOG.warn(
+                    limitedLogger.warn(
                         "[{}] Client routes query returned 0 rows {} consecutive times; "
                             + "clearing {} stale cached routes",
                         logPrefix,
@@ -490,13 +494,15 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
               })
           .exceptionally(
               e -> {
-                LOG.error("[{}] Failed to query client routes: {}", logPrefix, e.getMessage(), e);
+                limitedLogger.error(
+                    "[{}] Failed to query client routes: {}", logPrefix, e.getMessage(), e);
                 return null;
               })
           .whenComplete((v, t) -> completeAndDrain(sentinel));
       return sentinel;
     } catch (Exception e) {
-      LOG.warn("[{}] Exception while querying client routes: {}", logPrefix, e.getMessage(), e);
+      limitedLogger.warn(
+          "[{}] Exception while querying client routes: {}", logPrefix, e.getMessage(), e);
       completeAndDrain(sentinel);
       return sentinel;
     }
@@ -517,13 +523,13 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
   @Nullable
   private UUID readHostId(@NonNull AdminRow row) {
     if (row.isNull("host_id")) {
-      LOG.warn("[{}] Skipping client_routes row: host_id is not set", logPrefix);
+      limitedLogger.warn("[{}] Skipping client_routes row: host_id is not set", logPrefix);
       return null;
     }
     try {
       return Objects.requireNonNull(row.getUuid("host_id"));
     } catch (RuntimeException e) {
-      LOG.warn("[{}] Skipping client_routes row: host_id is not readable", logPrefix, e);
+      limitedLogger.warn("[{}] Skipping client_routes row: host_id is not readable", logPrefix, e);
       return null;
     }
   }
@@ -639,7 +645,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       @NonNull EndPoint localEndPoint) {
     UUID hostId = row.getUuid("host_id");
     if (hostId == null) {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] host_id is null in system row for address {} — cannot assign a client route. "
               + "This may indicate corrupted system tables. "
               + "Falling back to default endpoint resolution.",
@@ -788,7 +794,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       if (hostIdsInResult.isEmpty() && cachedRoutes.isEmpty()) {
         // Nothing read and nothing held: the keep rule has nothing to keep, and reporting that it
         // kept all zero of them would be the calmest line in the log on the worst path there is.
-        LOG.error(
+        limitedLogger.error(
             "[{}] None of the {} client_routes rows named a readable host_id and no route was "
                 + "cached, so this refresh installs none: every node falls back to the address it "
                 + "broadcasts, which is the one client routes exist to avoid. Check those rows "
@@ -796,14 +802,14 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
             logPrefix,
             rowCount);
       } else if (hostIdsInResult.isEmpty()) {
-        LOG.error(
+        limitedLogger.error(
             "[{}] None of the {} client_routes rows named a readable host_id; "
                 + "keeping all {} existing cached routes",
             logPrefix,
             rowCount,
             cachedRoutes.size());
       } else {
-        LOG.warn(
+        limitedLogger.warn(
             "[{}] {} of {} client_routes rows named no readable host_id; keeping the "
                 + "cached routes this refresh cannot prove deleted",
             logPrefix,
@@ -878,7 +884,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       // blame is not knowable here -- once a row cannot be attributed to any host, every cached
       // route becomes keepable, so a host whose row was genuinely absent lands in this list
       // beside one whose row came back unreadable.
-      LOG.error(
+      limitedLogger.error(
           "[{}] Serving {} client route(s) this refresh did not rebuild, with the number of "
               + "consecutive refreshes that could not confirm each: {}. Some rows in "
               + "system.client_routes could not be read or attributed to a host, so a route the "
@@ -976,7 +982,8 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
       // then retry — matches gocql's MergeWithResolved loop.
       incoming = candidate;
     }
-    LOG.warn("[{}] Failed to update client routes cache after 10 CAS attempts", logPrefix);
+    limitedLogger.warn(
+        "[{}] Failed to update client routes cache after 10 CAS attempts", logPrefix);
   }
 
   /**
@@ -996,7 +1003,7 @@ public class ClientRoutesTopologyMonitor extends DefaultTopologyMonitor {
         return;
       }
     }
-    LOG.warn(
+    limitedLogger.warn(
         "[{}] Failed to remove client route for host_id={} after 10 CAS attempts",
         logPrefix,
         hostId);

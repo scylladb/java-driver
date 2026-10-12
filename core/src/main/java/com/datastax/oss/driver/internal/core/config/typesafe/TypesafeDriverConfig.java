@@ -19,10 +19,11 @@ package com.datastax.oss.driver.internal.core.config.typesafe;
 
 import static com.typesafe.config.ConfigValueType.OBJECT;
 
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.DriverOption;
-import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigObject;
@@ -32,6 +33,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import net.jcip.annotations.ThreadSafe;
@@ -48,6 +50,7 @@ public class TypesafeDriverConfig implements DriverConfig {
   private volatile Config lastLoadedConfig;
 
   private final TypesafeDriverExecutionProfile.Base defaultProfile;
+  private final RateLimitedLogger limitedLogger;
 
   public TypesafeDriverConfig(Config config) {
     this.lastLoadedConfig = config;
@@ -62,6 +65,12 @@ public class TypesafeDriverConfig implements DriverConfig {
     }
     this.profiles = builder.build();
     this.defaultProfile = profiles.get(DriverExecutionProfile.DEFAULT_NAME);
+    this.limitedLogger =
+        new RateLimitedLogger(
+            LOG,
+            () ->
+                defaultProfile.getDuration(
+                    DefaultDriverOption.REPEATED_LOG_INTERVAL, Duration.ofMinutes(1)));
   }
 
   /** @return whether the configuration changed */
@@ -76,7 +85,7 @@ public class TypesafeDriverConfig implements DriverConfig {
           String profileName = entry.getKey();
           TypesafeDriverExecutionProfile.Base profile = this.profiles.get(profileName);
           if (profile == null) {
-            LOG.warn(
+            limitedLogger.warn(
                 "Unknown profile '{}' while reloading configuration. "
                     + "Adding profiles at runtime is not supported.",
                 profileName);
@@ -86,7 +95,7 @@ public class TypesafeDriverConfig implements DriverConfig {
         }
         return true;
       } catch (Throwable t) {
-        Loggers.warnWithException(LOG, "Error reloading configuration, keeping previous one", t);
+        limitedLogger.warnWithException("Error reloading configuration, keeping previous one", t);
         return false;
       }
     }

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.TestDataProviders;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy.ReconnectionSchedule;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -39,6 +40,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.slf4j.LoggerFactory;
 
 @RunWith(DataProviderRunner.class)
 public class ReconnectionTest {
@@ -67,7 +69,9 @@ public class ReconnectionTest {
             () -> reconnectionSchedule,
             reconnectionTask,
             onStartCallback,
-            onStopCallback);
+            onStopCallback,
+            new RateLimitedLogger(
+                LoggerFactory.getLogger(Reconnection.class), () -> Duration.ofMinutes(1)));
   }
 
   @Test

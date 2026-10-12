@@ -707,6 +707,9 @@ public class TypedDriverOption<ValueT> {
   /** The maximum number of live sessions that are allowed to coexist in a given VM. */
   public static final TypedDriverOption<Integer> SESSION_LEAK_THRESHOLD =
       new TypedDriverOption<>(DefaultDriverOption.SESSION_LEAK_THRESHOLD, GenericType.INTEGER);
+  /** Minimum time between repeated driver warnings and errors. */
+  public static final TypedDriverOption<Duration> REPEATED_LOG_INTERVAL =
+      new TypedDriverOption<>(DefaultDriverOption.REPEATED_LOG_INTERVAL, GenericType.DURATION);
 
   /** The name of the application using the session. */
   public static final TypedDriverOption<String> APPLICATION_NAME =

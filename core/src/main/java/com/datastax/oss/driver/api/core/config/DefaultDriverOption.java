@@ -906,6 +906,14 @@ public enum DefaultDriverOption implements DriverOption {
    */
   SESSION_LEAK_THRESHOLD("advanced.session-leak.threshold"),
   /**
+   * Minimum time between repeated WARN and ERROR messages at driver call sites that can run
+   * frequently. The next emitted message reports how many occurrences were suppressed. Zero logs
+   * every occurrence.
+   *
+   * <p>Value-type: {@link java.time.Duration Duration}
+   */
+  REPEATED_LOG_INTERVAL("advanced.repeated-log-interval"),
+  /**
    * The period of inactivity after which the node level metrics will be evicted. The eviction will
    * happen only if none of the enabled node-level metrics is updated for a given node within this
    * time window.

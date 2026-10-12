@@ -27,6 +27,7 @@ import com.codahale.metrics.Timer;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.DriverOption;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.time.Duration;
 import java.util.Set;
@@ -199,6 +200,7 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
         significantDigits,
         refreshInterval,
         id.getName(),
-        highestLatencyOption.getPath());
+        highestLatencyOption.getPath(),
+        new RateLimitedLogger(LoggerFactory.getLogger(HdrReservoir.class), context));
   }
 }

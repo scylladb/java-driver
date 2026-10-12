@@ -32,7 +32,7 @@ import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.pool.ChannelPoolFactory;
-import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.ReplayingEventFilter;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
@@ -89,12 +89,14 @@ public class PoolManager implements AsyncAutoCloseable {
   private final String logPrefix;
   private final EventExecutor adminExecutor;
   private final DriverExecutionProfile config;
+  private final RateLimitedLogger limitedLogger;
   private final SingleThreaded singleThreaded;
 
   public PoolManager(InternalDriverContext context) {
     this.logPrefix = context.getSessionName();
     this.adminExecutor = context.getNettyOptions().adminEventExecutorGroup().next();
     this.config = context.getConfig().getDefaultProfile();
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
     this.singleThreaded = new SingleThreaded(context);
 
     if (config.getBoolean(DefaultDriverOption.PREPARED_CACHE_WEAK_VALUES, true)) {
@@ -287,14 +289,14 @@ public class PoolManager implements AsyncAutoCloseable {
           pool.closeAsync()
               .exceptionally(
                   error -> {
-                    Loggers.warnWithException(LOG, "[{}] Error closing pool", logPrefix, error);
+                    limitedLogger.warnWithException("[{}] Error closing pool", logPrefix, error);
                     return null;
                   });
         }
       } else {
         NodeState state = node.getState();
         if (state == NodeState.FORCED_DOWN) {
-          LOG.warn(
+          limitedLogger.warn(
               "[{}] {} became {} but it is FORCED_DOWN, ignoring", logPrefix, node, newDistance);
           return;
         }
@@ -334,7 +336,7 @@ public class PoolManager implements AsyncAutoCloseable {
           pool.closeAsync()
               .exceptionally(
                   error -> {
-                    Loggers.warnWithException(LOG, "[{}] Error closing pool", logPrefix, error);
+                    limitedLogger.warnWithException("[{}] Error closing pool", logPrefix, error);
                     return null;
                   });
         }
@@ -400,8 +402,8 @@ public class PoolManager implements AsyncAutoCloseable {
               .handleAsync(
                   (result, error) -> {
                     if (error != null) {
-                      Loggers.warnWithException(
-                          LOG, "Error while switching keyspace to " + keyspace, error);
+                      limitedLogger.warnWithException(
+                          "Error while switching keyspace to {}", keyspace, error);
                     }
                     reprepareStatements(pool);
                     return null;

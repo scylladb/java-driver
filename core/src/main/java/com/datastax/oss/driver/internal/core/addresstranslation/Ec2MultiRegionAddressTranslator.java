@@ -20,10 +20,12 @@ package com.datastax.oss.driver.internal.core.addresstranslation;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.time.Duration;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import javax.naming.Context;
@@ -61,10 +63,12 @@ public class Ec2MultiRegionAddressTranslator implements AddressTranslator {
 
   private final DirContext ctx;
   private final String logPrefix;
+  private final RateLimitedLogger limitedLogger;
 
   public Ec2MultiRegionAddressTranslator(
       @SuppressWarnings("unused") @NonNull DriverContext context) {
     this.logPrefix = context.getSessionName();
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
     @SuppressWarnings("JdkObsolete")
     Hashtable<Object, Object> env = new Hashtable<>();
     env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.dns.DnsContextFactory");
@@ -79,6 +83,7 @@ public class Ec2MultiRegionAddressTranslator implements AddressTranslator {
   Ec2MultiRegionAddressTranslator(@NonNull DirContext ctx) {
     this.logPrefix = "test";
     this.ctx = ctx;
+    this.limitedLogger = new RateLimitedLogger(LOG, () -> Duration.ofMinutes(1));
   }
 
   @NonNull
@@ -91,7 +96,8 @@ public class Ec2MultiRegionAddressTranslator implements AddressTranslator {
       // We use an alternate implementation:
       String domainName = lookupPtrRecord(reverse(address));
       if (domainName == null) {
-        LOG.warn("[{}] Found no domain name for {}, returning it as-is", logPrefix, address);
+        limitedLogger.warn(
+            "[{}] Found no domain name for {}, returning it as-is", logPrefix, address);
         return socketAddress;
       }
 
@@ -99,8 +105,8 @@ public class Ec2MultiRegionAddressTranslator implements AddressTranslator {
       LOG.debug("[{}] Resolved {} to {}", logPrefix, address, translatedAddress);
       return new InetSocketAddress(translatedAddress, socketAddress.getPort());
     } catch (Exception e) {
-      Loggers.warnWithException(
-          LOG, "[{}] Error resolving {}, returning it as-is", logPrefix, address, e);
+      limitedLogger.warnWithException(
+          "[{}] Error resolving {}, returning it as-is", logPrefix, address, e);
       return socketAddress;
     }
   }
