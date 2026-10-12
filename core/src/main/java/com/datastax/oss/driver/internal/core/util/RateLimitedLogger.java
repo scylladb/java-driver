@@ -129,6 +129,7 @@ public final class RateLimitedLogger {
     return result;
   }
 
+  @ThreadSafe
   private static final class Window {
     private long lastLogTime = Long.MIN_VALUE;
     private long suppressed;

@@ -571,7 +571,7 @@ public class ChannelPool implements AsyncAutoCloseable {
         // This will likely be thrown by all channels, but finish the loop cleanly
         onFatal.accept(error);
       } else if (error instanceof AuthenticationException) {
-        // Rate-limit this warning because it is most likely something the operator needs to fix.
+        // This likely needs operator action; rate-limit repeated warnings from failed channels.
         // Keep going to reconnect if it can be fixed without bouncing the client.
         limitedLogger.warnWithException("[{}] Authentication error", logPrefix, error);
       } else if (error instanceof InvalidKeyspaceException) {
