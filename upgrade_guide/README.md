@@ -21,13 +21,24 @@ under the License.
 
 ### 4.19.2.3
 
-#### Remaining DSE compatibility APIs were removed
+#### DSE compatibility APIs and runtime support
 
-The DSE protocol versions, continuous paging, Graph API shells, geometry and DateRange types,
-DSE metadata extensions, and DSE query builder extensions are no longer available. Remove usages
-of `DseSession`, `DseDriverOption`, and the Graph and continuous paging APIs before upgrading.
+The DSE protocol versions, continuous paging, Graph API shells, and geometry and DateRange types
+are no longer available. DSE metadata and query builder types remain as deprecated API shells;
+their runtime support has been removed. Remove usages of `DseSession`, `DseDriverOption`, and the
+Graph and continuous paging APIs before upgrading.
+
 The generic reactive CQL and mapper APIs remain available under their existing
 `com.datastax.dse` package names.
+
+`DseSchemaBuilder` keeps its old method signatures. Its DSE-specific schema entry points and
+`DseGraphEdgeSide.table` throw `UnsupportedOperationException` for valid arguments. Ordinary
+Cassandra schema methods still delegate to
+`SchemaBuilder`. `DseQueryBuilder` remains a working alias for ordinary DML queries. DSE metadata
+interfaces and `DseNodeProperties` constants remain available for compatibility, but the driver no
+longer produces DSE metadata or node extras. The `DseGraphTableMetadata.describe` compatibility
+method, and description methods that delegate to it such as `describeWithChildren`, throw because
+Graph schema support has been removed.
 
 Replace `DseDriverOption.APPLICATION_NAME` and `DseDriverOption.APPLICATION_VERSION` with
 `DefaultDriverOption.APPLICATION_NAME` and `DefaultDriverOption.APPLICATION_VERSION`. The
