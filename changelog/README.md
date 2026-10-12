@@ -25,8 +25,8 @@ under the License.
 
 - [breaking] Remove DSE geometry and DateRange APIs and codecs, including `DseDataTypes`
   and `DseTypeCodecs`, plus the ESRI dependency (#1029)
-- [breaking] Remove public DSE metadata and query-builder APIs, plus related schema support;
-  DSE connections are unsupported (#1031)
+- [breaking] Remove DSE metadata and schema runtime support; public metadata and query-builder APIs
+  remain as deprecated compatibility shells. DSE connections are unsupported (#1031, #1238)
 
 ### 4.19.2.2
 
