@@ -17,6 +17,8 @@
  */
 package com.datastax.dse.driver.api.core.auth;
 
+import com.datastax.dse.driver.api.core.graph.GraphStatement;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
@@ -31,5 +33,13 @@ public class ProxyAuthentication {
   public static <StatementT extends Statement<StatementT>> StatementT executeAs(
       @NonNull String userOrRole, @NonNull StatementT statement) {
     throw new UnsupportedOperationException("DSE proxy execution is no longer supported");
+  }
+
+  /** @deprecated DSE Graph proxy execution is no longer supported. */
+  @Deprecated
+  @NonNull
+  public static <StatementT extends GraphStatement<StatementT>> StatementT executeAs(
+      @NonNull String userOrRole, @NonNull StatementT statement) {
+    throw GraphSupportRemoved.exception();
   }
 }

@@ -23,13 +23,24 @@ under the License.
 
 #### Remaining DSE compatibility APIs were removed
 
-The DSE protocol versions, continuous paging, Graph API shells, geometry and DateRange types,
-DSE metadata extensions, and DSE query builder extensions are no longer available. Remove usages
-of `DseSession`, unsupported `DseDriverOption` constants, and the Graph and continuous paging APIs
-before upgrading. Deprecated DSE authentication option constants remain available as described
-below.
+The DSE protocol versions, continuous paging, DateRange types, DSE metadata extensions, and DSE
+query builder extensions are no longer available. Deprecated Graph API shells
+remain available but fail when used. Remove usages of `DseSession`, unsupported `DseDriverOption`
+constants, and continuous paging APIs before upgrading. Deprecated DSE authentication option
+constants remain available as described below.
+
 The generic reactive CQL and mapper APIs remain available under their existing
 `com.datastax.dse` package names.
+
+Graph statement, result, session, predicate, and remote-connection signatures remain deprecated
+compatibility stubs. `CqlSession` still exposes the Graph session interfaces, and creating or
+executing Graph requests throws `UnsupportedOperationException` with migration guidance. The Graph
+overload of `ProxyAuthentication.executeAs` also fails this way. `gremlin-core` remains an optional
+dependency for the public signatures; no Graph runtime is restored.
+
+Geometry value types remain as deprecated API for source and binary compatibility. Their local
+construction and conversion helpers still work, but the DSE geometry codecs and server support are
+not restored. `esri-geometry-api` remains an optional dependency for these value types.
 
 Replace `DseDriverOption.APPLICATION_NAME` and `DseDriverOption.APPLICATION_VERSION` with
 `DefaultDriverOption.APPLICATION_NAME` and `DefaultDriverOption.APPLICATION_VERSION`. The
@@ -74,8 +85,7 @@ empty ID. Custom credentials that return a nonempty authorization ID are rejecte
 the authentication response.
 Configuring their old option keys fails session creation before connecting. The
 `DsePlainTextAuthProviderBase` alias remains available for ordinary SASL PLAIN authentication.
-The Graph overload of `ProxyAuthentication.executeAs` remains unavailable with the removed Graph
-API.
+The Graph overload of `ProxyAuthentication.executeAs` remains available as a deprecated stub.
 
 `PlainTextAuthProviderBase.PlainTextAuthenticator` retains its `BaseDseAuthenticator` superclass
 and its three-argument constructor `(Credentials, EndPoint, String)` for ordinary authentication.
