@@ -23,6 +23,7 @@
  */
 package com.datastax.oss.driver.api.core.session;
 
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
@@ -398,6 +399,15 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
     return withAuthProvider(new ProgrammaticPlainTextAuthProvider(username, password));
   }
 
+  /** @deprecated Only an empty authorization ID is supported for ordinary authentication. */
+  @Deprecated
+  @NonNull
+  public SelfT withAuthCredentials(
+      @NonNull String username, @NonNull String password, @NonNull String authorizationId) {
+    return withAuthProvider(
+        new ProgrammaticPlainTextAuthProvider(username, password, authorizationId));
+  }
+
   /**
    * @deprecated this method only exists to ease the transition from driver 3, it is an alias for
    *     {@link #withAuthCredentials(String, String)}.
@@ -406,6 +416,14 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   @NonNull
   public SelfT withCredentials(@NonNull String username, @NonNull String password) {
     return withAuthCredentials(username, password);
+  }
+
+  /** @deprecated Only an empty authorization ID is supported for ordinary authentication. */
+  @Deprecated
+  @NonNull
+  public SelfT withCredentials(
+      @NonNull String username, @NonNull String password, @NonNull String authorizationId) {
+    return withAuthCredentials(username, password, authorizationId);
   }
 
   /**
@@ -808,6 +826,12 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
       if (cloudConfigInputStream != null
           || defaultConfig.isDefined(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE)) {
         throw unsupportedAstra();
+      }
+      if (defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID)
+          || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_SERVICE)
+          || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION)
+          || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES)) {
+        throw new UnsupportedOperationException("DSE authentication is no longer supported");
       }
       List<String> configContactPoints =
           defaultConfig.getStringList(DefaultDriverOption.CONTACT_POINTS, Collections.emptyList());
