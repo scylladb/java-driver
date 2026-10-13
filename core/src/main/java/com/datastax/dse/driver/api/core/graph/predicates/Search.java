@@ -21,7 +21,7 @@ import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import org.apache.tinkerpop.gremlin.process.traversal.P;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 
-/** @deprecated DSE Graph is not supported starting with driver 4.19.2.2. */
+/** @deprecated DSE Graph is not supported starting with driver 4.19.2.3. */
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated
 public interface Search {

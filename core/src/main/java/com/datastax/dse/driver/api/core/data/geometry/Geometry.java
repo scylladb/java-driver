@@ -24,13 +24,16 @@ import java.nio.ByteBuffer;
  * The driver-side representation for a DSE geospatial type.
  *
  * <pre>
- *     Row row = dseSession.execute("SELECT coords FROM points_of_interest WHERE name = 'Eiffel Tower'").one();
- *     Point coords = row.get("coords", Point.class);
+ *     Point coords = Point.fromCoordinates(2.2945, 48.8584);
+ *     String text = coords.asWellKnownText();
  * </pre>
  *
  * The default implementations returned by the driver are immutable and serializable. If you write
  * your own implementations, they should at least be thread-safe; serializability is not mandatory,
  * but recommended for use with some 3rd-party tools like Apache Spark &trade;.
+ *
+ * @deprecated Retained for local geometry value compatibility. DSE geometry codecs and Graph
+ *     execution are no longer supported.
  */
 @Deprecated
 public interface Geometry {

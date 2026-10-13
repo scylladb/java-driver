@@ -30,7 +30,7 @@ import java.time.Duration;
 import java.util.Map;
 import net.jcip.annotations.NotThreadSafe;
 
-/** @deprecated DSE Graph is not supported starting with driver 4.19.2.2. */
+/** @deprecated DSE Graph is not supported starting with driver 4.19.2.3. */
 @NotThreadSafe
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated

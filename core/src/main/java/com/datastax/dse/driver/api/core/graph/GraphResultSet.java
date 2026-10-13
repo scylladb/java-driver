@@ -40,7 +40,7 @@ import java.util.List;
  *
  * @see GraphNode
  * @see GraphSession#execute(GraphStatement)
- * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated

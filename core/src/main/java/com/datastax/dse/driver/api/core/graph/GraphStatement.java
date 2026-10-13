@@ -42,7 +42,7 @@ import java.util.concurrent.CompletionStage;
  * A request to execute a DSE Graph query.
  *
  * @param <SelfT> the "self type" used for covariant returns in subtypes.
- * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated

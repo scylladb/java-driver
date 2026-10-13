@@ -26,7 +26,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  * A {@link Session} that offers utility methods to issue graph queries using reactive-style
  * programming.
  *
- * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated

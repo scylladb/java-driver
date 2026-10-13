@@ -27,7 +27,7 @@ import org.apache.tinkerpop.gremlin.process.traversal.P;
  *
  * <p>Note: CQL collection predicates are only available when using the binary subprotocol.
  *
- * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated

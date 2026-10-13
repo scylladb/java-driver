@@ -17,12 +17,15 @@
  */
 package com.datastax.dse.driver.internal.core.graph;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+
 public final class GraphSupportRemoved {
 
   public static final String MESSAGE =
-      "DSE Graph is not supported starting with Java driver 4.19.2.2; "
-          + "use 4.19.2.1 or migrate the Graph workload before upgrading";
+      "DSE Graph is not supported starting with Java driver 4.19.2.3; "
+          + "use 4.19.2.2 or migrate the Graph workload before upgrading";
 
+  @NonNull
   public static UnsupportedOperationException exception() {
     return new UnsupportedOperationException(MESSAGE);
   }

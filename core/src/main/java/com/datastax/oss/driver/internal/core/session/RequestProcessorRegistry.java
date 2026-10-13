@@ -17,6 +17,8 @@
  */
 package com.datastax.oss.driver.internal.core.session;
 
+import com.datastax.dse.driver.api.core.graph.GraphStatement;
+import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -41,6 +43,10 @@ public class RequestProcessorRegistry {
   @SuppressWarnings("deprecation")
   public <RequestT extends Request, ResultT> RequestProcessor<RequestT, ResultT> processorFor(
       RequestT request, GenericType<ResultT> resultType) {
+
+    if (request instanceof GraphStatement) {
+      throw GraphSupportRemoved.exception();
+    }
 
     for (RequestProcessor<?, ?> processor : processors) {
       if (processor.canProcess(request, resultType)) {

@@ -38,7 +38,7 @@ import java.util.Map;
  * GraphResultSet graphResultSet = dseSession.execute(statement);
  * }</pre>
  *
- * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated

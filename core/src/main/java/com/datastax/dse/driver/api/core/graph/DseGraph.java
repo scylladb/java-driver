@@ -31,7 +31,7 @@ import org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph;
  * General purpose utility class for interaction with DSE Graph via the DataStax Enterprise Java
  * driver.
  *
- * @deprecated DSE Graph is not supported starting with driver 4.19.2.2.
+ * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
 @SuppressWarnings("DoNotCallSuggester")
 @Deprecated

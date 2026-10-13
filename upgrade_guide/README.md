@@ -24,9 +24,9 @@ under the License.
 #### Remaining DSE compatibility APIs were removed
 
 The DSE protocol versions, continuous paging, DateRange types, DSE metadata extensions, and DSE
-query builder extensions are no longer available. Deprecated Graph API shells
-remain available but fail when used. Remove usages of `DseSession`, unsupported `DseDriverOption`
-constants, and continuous paging APIs before upgrading. Deprecated DSE authentication option
+query builder extensions are no longer available. Deprecated Graph APIs remain available,
+but Graph construction and execution fail. Local geometry value helpers remain usable. Remove usages
+of `DseSession`, unsupported `DseDriverOption` constants, and continuous paging APIs before upgrading. Deprecated DSE authentication option
 constants remain available as described below.
 
 The generic reactive CQL and mapper APIs remain available under their existing
