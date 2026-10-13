@@ -93,6 +93,40 @@ public class RateLimitedLoggerTest {
   }
 
   @Test
+  public void should_share_windows_within_context_and_component() {
+    DriverConfig config = mock(DriverConfig.class);
+    DriverExecutionProfile profile = mock(DriverExecutionProfile.class);
+    when(config.getDefaultProfile()).thenReturn(profile);
+    DriverContext context = mock(DriverContext.class);
+    DriverContext otherContext = mock(DriverContext.class);
+    when(context.getConfig()).thenReturn(config);
+    when(otherContext.getConfig()).thenReturn(config);
+
+    Logger first = mock(Logger.class);
+    Logger second = mock(Logger.class);
+    Logger otherComponent = mock(Logger.class);
+    Logger otherDriver = mock(Logger.class);
+    when(first.getName()).thenReturn("ChannelPool");
+    when(second.getName()).thenReturn("ChannelPool");
+    when(otherComponent.getName()).thenReturn("Reconnection");
+    when(otherDriver.getName()).thenReturn("ChannelPool");
+    when(first.isWarnEnabled()).thenReturn(true);
+    when(second.isWarnEnabled()).thenReturn(true);
+    when(otherComponent.isWarnEnabled()).thenReturn(true);
+    when(otherDriver.isWarnEnabled()).thenReturn(true);
+
+    new RateLimitedLogger(first, context).warn("message");
+    new RateLimitedLogger(second, context).warn("message");
+    new RateLimitedLogger(otherComponent, context).warn("message");
+    new RateLimitedLogger(otherDriver, otherContext).warn("message");
+
+    verify(first).warn(eq("message"), any(Object[].class));
+    verify(second, never()).warn(eq("message"), any(Object[].class));
+    verify(otherComponent).warn(eq("message"), any(Object[].class));
+    verify(otherDriver).warn(eq("message"), any(Object[].class));
+  }
+
+  @Test
   public void disabling_limit_should_report_pending_count_then_log_every_warning() {
     Logger delegate = mock(Logger.class);
     when(delegate.isWarnEnabled()).thenReturn(true);

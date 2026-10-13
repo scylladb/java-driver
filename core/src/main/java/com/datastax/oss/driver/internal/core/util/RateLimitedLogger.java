@@ -23,6 +23,9 @@ import com.datastax.oss.driver.api.core.context.DriverContext;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.LongSupplier;
@@ -34,13 +37,34 @@ import org.slf4j.Logger;
 @ThreadSafe
 public final class RateLimitedLogger {
   private static final String SUPPRESSED_SUFFIX = " (suppressed {} similar messages)";
+  // The values do not reference their context, so closed driver contexts can be collected.
+  private static final Map<DriverContext, Map<String, ConcurrentMap<String, Window>>>
+      WINDOWS_BY_CONTEXT = new WeakHashMap<>();
+
   @NonNull private final Logger delegate;
   @NonNull private final Supplier<Duration> interval;
-  @NonNull private final ConcurrentMap<String, Window> windows = new ConcurrentHashMap<>();
+  @NonNull private final ConcurrentMap<String, Window> windows;
   @NonNull private final LongSupplier clock;
 
   public RateLimitedLogger(@NonNull Logger delegate, @NonNull DriverContext context) {
-    this(delegate, () -> configuredInterval(context));
+    this(
+        delegate,
+        () -> configuredInterval(context),
+        System::nanoTime,
+        sharedWindows(context, delegate));
+  }
+
+  @NonNull
+  private static ConcurrentMap<String, Window> sharedWindows(
+      @NonNull DriverContext context, @NonNull Logger delegate) {
+    synchronized (WINDOWS_BY_CONTEXT) {
+      Map<String, ConcurrentMap<String, Window>> byComponent = WINDOWS_BY_CONTEXT.get(context);
+      if (byComponent == null) {
+        byComponent = new HashMap<>();
+        WINDOWS_BY_CONTEXT.put(context, byComponent);
+      }
+      return byComponent.computeIfAbsent(delegate.getName(), ignored -> new ConcurrentHashMap<>());
+    }
   }
 
   @NonNull
@@ -57,9 +81,18 @@ public final class RateLimitedLogger {
 
   RateLimitedLogger(
       @NonNull Logger delegate, @NonNull Supplier<Duration> interval, @NonNull LongSupplier clock) {
+    this(delegate, interval, clock, new ConcurrentHashMap<>());
+  }
+
+  private RateLimitedLogger(
+      @NonNull Logger delegate,
+      @NonNull Supplier<Duration> interval,
+      @NonNull LongSupplier clock,
+      @NonNull ConcurrentMap<String, Window> windows) {
     this.delegate = delegate;
     this.interval = interval;
     this.clock = clock;
+    this.windows = windows;
   }
 
   public void warn(@NonNull String format, @NonNull Object... arguments) {
