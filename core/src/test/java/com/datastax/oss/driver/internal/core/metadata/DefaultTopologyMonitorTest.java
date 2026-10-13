@@ -689,11 +689,15 @@ public class DefaultTopologyMonitorTest {
   public void should_not_warn_when_rpc_port_columns_are_absent(boolean peer, int port) {
     AdminRow row = peer ? mockPeersRow(2, node2.getHostId()) : mockLocalRow(1, node1.getHostId());
     topologyMonitor.port = port;
+    logger.setLevel(Level.DEBUG);
 
     InetSocketAddress address = topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
 
     assertThat(address.getPort()).isEqualTo(port == -1 ? 0 : port);
-    verify(appender, never()).doAppend(any());
+    verify(appender, times(1)).doAppend(loggingEventCaptor.capture());
+    assertThat(loggingEventCaptor.getValue().getLevel()).isEqualTo(Level.DEBUG);
+    assertThat(loggingEventCaptor.getValue().getFormattedMessage())
+        .contains("Broadcast RPC port columns are absent");
   }
 
   @Test
