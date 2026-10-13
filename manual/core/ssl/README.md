@@ -104,6 +104,16 @@ Secure Socket Extension).
 
 To enable it, you need to define an engine factory in the [configuration](../configuration/).
 
+The standard JDK handler factory prepares SSL engines on two dedicated worker threads before opening
+connections. Reverse DNS lookup, when enabled, therefore does not block existing connections' I/O.
+Preparation is bounded by `advanced.connection.connect-timeout`; the subsequent TCP connection has
+its own timeout of the same duration. Setting the timeout to zero disables both limits.
+
+Reverse DNS remains enabled by default for compatibility. Set
+`advanced.ssl-engine-factory.allow-dns-reverse-lookup-san = false` if certificate matching does not
+require it. This option is independent of hostname validation. For a programmatic factory, use the
+four-argument `ProgrammaticSslEngineFactory` constructor to control reverse lookup.
+
 #### JSSE, property-based
 
 ```
