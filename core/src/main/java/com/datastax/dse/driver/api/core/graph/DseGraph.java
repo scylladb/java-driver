@@ -19,6 +19,7 @@ package com.datastax.dse.driver.api.core.graph;
 
 import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.CqlSession;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import org.apache.tinkerpop.gremlin.process.traversal.Traversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal;
 import org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource;
@@ -43,7 +44,7 @@ public class DseGraph {
    *
    * @deprecated DSE Graph is no longer supported.
    */
-  @Deprecated public static final GraphTraversalSource g = unsupportedTraversalSource();
+  @Nullable @Deprecated public static final GraphTraversalSource g = unsupportedTraversalSource();
 
   /**
    * Previously returned a remote connection builder for DSE Graph. This method now always throws
@@ -56,6 +57,7 @@ public class DseGraph {
     throw GraphSupportRemoved.exception();
   }
 
+  @Nullable
   private static GraphTraversalSource unsupportedTraversalSource() {
     try {
       Class<?> type = Class.forName(DseGraph.class.getName() + "$UnsupportedTraversalSource");
