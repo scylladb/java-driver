@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.api.core.config;
 
+import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -721,6 +722,25 @@ public class TypedDriverOption<ValueT> {
   /** The version of the application using the session. */
   public static final TypedDriverOption<String> APPLICATION_VERSION =
       new TypedDriverOption<>(DefaultDriverOption.APPLICATION_VERSION, GenericType.STRING);
+  /** @deprecated DSE proxy authentication is no longer supported. */
+  @Deprecated
+  public static final TypedDriverOption<String> AUTH_PROVIDER_AUTHORIZATION_ID =
+      new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID, GenericType.STRING);
+  /** @deprecated DSE GSSAPI authentication is no longer supported. */
+  @Deprecated
+  public static final TypedDriverOption<String> AUTH_PROVIDER_SERVICE =
+      new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_SERVICE, GenericType.STRING);
+  /** @deprecated DSE GSSAPI authentication is no longer supported. */
+  @Deprecated
+  public static final TypedDriverOption<String> AUTH_PROVIDER_LOGIN_CONFIGURATION =
+      new TypedDriverOption<>(
+          DseDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION, GenericType.STRING);
+  /** @deprecated DSE GSSAPI authentication is no longer supported. */
+  @Deprecated
+  public static final TypedDriverOption<Map<String, String>> AUTH_PROVIDER_SASL_PROPERTIES =
+      new TypedDriverOption<>(
+          DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES,
+          GenericType.mapOf(GenericType.STRING, GenericType.STRING));
   /** The time after which the node level metrics will be evicted. */
   public static final TypedDriverOption<Duration> METRICS_NODE_EXPIRE_AFTER =
       new TypedDriverOption<>(DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER, GenericType.DURATION);

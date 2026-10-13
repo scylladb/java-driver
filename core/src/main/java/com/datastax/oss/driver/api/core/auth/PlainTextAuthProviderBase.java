@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.api.core.auth;
 
+import com.datastax.dse.driver.api.core.auth.BaseDseAuthenticator;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.shaded.guava.common.base.Charsets;
@@ -72,7 +73,8 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
   public Authenticator newAuthenticator(
       @NonNull EndPoint endPoint, @NonNull String serverAuthenticator)
       throws AuthenticationException {
-    return new PlainTextAuthenticator(getCredentials(endPoint, serverAuthenticator), endPoint);
+    return new PlainTextAuthenticator(
+        getCredentials(endPoint, serverAuthenticator), endPoint, serverAuthenticator);
   }
 
   @Override
@@ -100,6 +102,16 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       this.password = Objects.requireNonNull(password);
     }
 
+    /** @deprecated Only an empty authorization ID is supported for ordinary authentication. */
+    @Deprecated
+    public Credentials(
+        @NonNull char[] username, @NonNull char[] password, @NonNull char[] authorizationId) {
+      this(username, password);
+      if (Objects.requireNonNull(authorizationId).length != 0) {
+        throw new UnsupportedOperationException("DSE proxy authentication is no longer supported");
+      }
+    }
+
     @NonNull
     public char[] getUsername() {
       return username;
@@ -120,6 +132,17 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       return password;
     }
 
+    /**
+     * Returns an empty authorization ID for ordinary authentication.
+     *
+     * @deprecated DSE proxy authentication is no longer supported.
+     */
+    @Deprecated
+    @NonNull
+    public char[] getAuthorizationId() {
+      return new char[0];
+    }
+
     /** Clears the credentials from memory when they're no longer needed. */
     protected void clear() {
       // Note: this is a bit irrelevant with the built-in provider, because the config already
@@ -130,7 +153,10 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
     }
   }
 
-  protected static class PlainTextAuthenticator implements SyncAuthenticator {
+  protected static class PlainTextAuthenticator extends BaseDseAuthenticator {
+
+    private static final ByteBuffer SERVER_INITIAL_CHALLENGE =
+        ByteBuffer.wrap("PLAIN-START".getBytes(Charsets.UTF_8)).asReadOnlyBuffer();
 
     private static final EndPoint DUMMY_END_POINT =
         new EndPoint() {
@@ -151,8 +177,26 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
     private final EndPoint endPoint;
 
     protected PlainTextAuthenticator(@NonNull Credentials credentials, @NonNull EndPoint endPoint) {
+      this(credentials, endPoint, "org.apache.cassandra.auth.PasswordAuthenticator");
+    }
+
+    /**
+     * Builds an authenticator for ordinary SASL PLAIN authentication.
+     *
+     * @deprecated DSE authentication negotiation is no longer supported. Ordinary server
+     *     authenticators remain supported.
+     */
+    @Deprecated
+    protected PlainTextAuthenticator(
+        @NonNull Credentials credentials,
+        @NonNull EndPoint endPoint,
+        @NonNull String serverAuthenticator) {
+      super(serverAuthenticator);
       Objects.requireNonNull(credentials);
       Objects.requireNonNull(endPoint);
+      if (Objects.requireNonNull(credentials.getAuthorizationId()).length != 0) {
+        throw new UnsupportedOperationException("DSE proxy authentication is no longer supported");
+      }
 
       ByteBuffer username = toUtf8Bytes(credentials.getUsername());
       ByteBuffer password = toUtf8Bytes(credentials.getPassword());
@@ -192,15 +236,34 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       }
     }
 
+    /** @deprecated DSE authentication negotiation is no longer supported. */
+    @Deprecated
+    @NonNull
+    @Override
+    public ByteBuffer getMechanism() {
+      return ByteBuffer.wrap("PLAIN".getBytes(Charsets.UTF_8)).asReadOnlyBuffer();
+    }
+
+    /** @deprecated DSE authentication negotiation is no longer supported. */
+    @Deprecated
+    @NonNull
+    @Override
+    public ByteBuffer getInitialServerChallenge() {
+      return SERVER_INITIAL_CHALLENGE.asReadOnlyBuffer();
+    }
+
     @Nullable
     @Override
     public ByteBuffer initialResponseSync() {
-      return encodedCredentials;
+      return super.initialResponseSync();
     }
 
     @Nullable
     @Override
     public ByteBuffer evaluateChallengeSync(@Nullable ByteBuffer challenge) {
+      if (SERVER_INITIAL_CHALLENGE.equals(challenge)) {
+        return encodedCredentials;
+      }
       throw new AuthenticationException(endPoint, "Incorrect challenge from server");
     }
 

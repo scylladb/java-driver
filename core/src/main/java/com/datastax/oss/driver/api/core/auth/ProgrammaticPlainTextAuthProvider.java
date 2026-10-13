@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.session.SessionBuilder;
 import com.datastax.oss.driver.internal.core.util.Strings;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import java.util.Objects;
 import net.jcip.annotations.ThreadSafe;
 
 /**
@@ -66,6 +67,16 @@ public class ProgrammaticPlainTextAuthProvider extends PlainTextAuthProviderBase
     this.password = Strings.requireNotEmpty(password, "password").toCharArray();
   }
 
+  /** @deprecated Only an empty authorization ID is supported for ordinary authentication. */
+  @Deprecated
+  public ProgrammaticPlainTextAuthProvider(
+      @NonNull String username, @NonNull String password, @NonNull String authorizationId) {
+    this(username, password);
+    if (!Objects.requireNonNull(authorizationId).isEmpty()) {
+      throw new UnsupportedOperationException("DSE proxy authentication is no longer supported");
+    }
+  }
+
   /**
    * Changes the username.
    *
@@ -86,6 +97,14 @@ public class ProgrammaticPlainTextAuthProvider extends PlainTextAuthProviderBase
    */
   public void setPassword(@NonNull String password) {
     this.password = Strings.requireNotEmpty(password, "password").toCharArray();
+  }
+
+  /** @deprecated Only an empty authorization ID is supported for ordinary authentication. */
+  @Deprecated
+  public void setAuthorizationId(@NonNull String authorizationId) {
+    if (!Objects.requireNonNull(authorizationId).isEmpty()) {
+      throw new UnsupportedOperationException("DSE proxy authentication is no longer supported");
+    }
   }
 
   /**
