@@ -56,7 +56,10 @@ import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -64,6 +67,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
 import javax.net.ssl.SSLContext;
@@ -82,6 +86,9 @@ import org.slf4j.LoggerFactory;
 @NotThreadSafe
 public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
 
+  /** @deprecated DataStax Astra secure connect bundle support has been removed. */
+  @Deprecated public static final String ASTRA_PAYLOAD_KEY = "traceparent";
+
   private static final Logger LOG = LoggerFactory.getLogger(SessionBuilder.class);
 
   @SuppressWarnings("unchecked")
@@ -90,8 +97,44 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   protected DriverConfigLoader configLoader;
   protected Set<EndPoint> programmaticContactPoints = new HashSet<>();
   protected CqlIdentifier keyspace;
+  /** @deprecated DataStax Astra secure connect bundle support has been removed. */
+  @Deprecated protected Callable<InputStream> cloudConfigInputStream;
+
   protected ProgrammaticArguments.Builder programmaticArgumentsBuilder =
       ProgrammaticArguments.builder();
+
+  /** @deprecated DataStax Astra secure connect bundle support has been removed. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudSecureConnectBundle(@NonNull Path cloudConfigPath) {
+    throw unsupportedAstra();
+  }
+
+  /** @deprecated DataStax Astra secure connect bundle support has been removed. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudSecureConnectBundle(@NonNull URL cloudConfigUrl) {
+    throw unsupportedAstra();
+  }
+
+  /** @deprecated DataStax Astra secure connect bundle support has been removed. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudSecureConnectBundle(@NonNull InputStream cloudConfigInputStream) {
+    throw unsupportedAstra();
+  }
+
+  /** @deprecated DataStax Astra cloud proxy support has been removed. */
+  @Deprecated
+  @NonNull
+  public SelfT withCloudProxyAddress(@Nullable InetSocketAddress cloudProxyAddress) {
+    throw unsupportedAstra();
+  }
+
+  private static UnsupportedOperationException unsupportedAstra() {
+    return new UnsupportedOperationException(
+        "DataStax Astra support has been removed; use Scylla contact points or client routes instead");
+  }
 
   /**
    * Sets the configuration loader to use.
@@ -762,6 +805,10 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
               : defaultConfigLoader(programmaticArguments.getClassLoader());
 
       DriverExecutionProfile defaultConfig = configLoader.getInitialConfig().getDefaultProfile();
+      if (cloudConfigInputStream != null
+          || defaultConfig.isDefined(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE)) {
+        throw unsupportedAstra();
+      }
       List<String> configContactPoints =
           defaultConfig.getStringList(DefaultDriverOption.CONTACT_POINTS, Collections.emptyList());
 

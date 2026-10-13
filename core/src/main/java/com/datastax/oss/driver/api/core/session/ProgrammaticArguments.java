@@ -36,6 +36,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -167,6 +168,17 @@ public class ProgrammaticArguments {
   @Nullable
   public SslEngineFactory getSslEngineFactory() {
     return sslEngineFactory;
+  }
+
+  /**
+   * Returns {@code null} because no cloud proxy is configured.
+   *
+   * @deprecated DataStax Astra cloud proxy support has been removed.
+   */
+  @Deprecated
+  @Nullable
+  public InetSocketAddress getCloudProxyAddress() {
+    return null;
   }
 
   @Nullable
@@ -388,6 +400,14 @@ public class ProgrammaticArguments {
     public Builder withSslEngineFactory(@Nullable SslEngineFactory sslEngineFactory) {
       this.sslEngineFactory = sslEngineFactory;
       return this;
+    }
+
+    /** @deprecated DataStax Astra cloud proxy support has been removed. */
+    @Deprecated
+    @NonNull
+    public Builder withCloudProxyAddress(@Nullable InetSocketAddress cloudAddress) {
+      throw new UnsupportedOperationException(
+          "DataStax Astra cloud proxy support has been removed; use Scylla client routes instead");
     }
 
     @NonNull

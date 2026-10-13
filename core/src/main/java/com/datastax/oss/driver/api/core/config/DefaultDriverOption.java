@@ -886,6 +886,13 @@ public enum DefaultDriverOption implements DriverOption {
   NETTY_DAEMON("advanced.netty.daemon"),
 
   /**
+   * @deprecated DataStax Astra secure connect bundles are no longer supported. Configuring this
+   *     option causes session creation to fail.
+   */
+  @Deprecated
+  CLOUD_SECURE_CONNECT_BUNDLE("basic.cloud.secure-connect-bundle"),
+
+  /**
    * Whether the slow replica avoidance should be enabled in the default LBP.
    *
    * <p>Value-type: boolean
