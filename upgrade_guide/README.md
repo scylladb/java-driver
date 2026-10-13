@@ -99,9 +99,10 @@ path, but rejects the DSE authenticator name at construction. The plaintext prov
 that server name. Custom subclasses can use `(Credentials, EndPoint)` for ordinary plaintext
 authentication.
 
-The DSE-only `authorization-id`, `service`, `login-configuration`, and `sasl-properties`
-authentication settings are rejected at session creation. Remove them from application
-configuration. Custom providers that extended `DsePlainTextAuthProviderBase` can extend
+The legacy `authorization-id`, `service`, `login-configuration`, and `sasl-properties`
+authentication settings are rejected at session creation when using built-in plaintext providers.
+Remove them when using those providers; custom providers may define their own meanings for these
+keys. Custom providers that extended `DsePlainTextAuthProviderBase` can extend
 `PlainTextAuthProviderBase` for standard SASL PLAIN authentication; DSE proxy authorization and
 GSSAPI have no replacement here.
 
