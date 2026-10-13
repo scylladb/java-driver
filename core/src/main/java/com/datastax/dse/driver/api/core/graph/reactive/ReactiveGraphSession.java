@@ -23,8 +23,7 @@ import com.datastax.oss.driver.api.core.session.Session;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 /**
- * A {@link Session} that offers utility methods to issue graph queries using reactive-style
- * programming.
+ * Retained compatibility interface for reactive DSE Graph execution.
  *
  * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
@@ -33,16 +32,12 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 public interface ReactiveGraphSession extends Session {
 
   /**
-   * Returns a {@link ReactiveGraphResultSet} that, once subscribed to, executes the given query and
-   * emits all the results.
+   * Retained signature for reactive graph execution.
    *
-   * <p>See the javadocs of {@link ReactiveGraphResultSet} for important remarks anc caveats
-   * regarding the subscription to and consumption of reactive graph result sets.
+   * <p>This default method throws synchronously without returning a publisher.
    *
-   * @param statement the statement to execute.
-   * @return The {@link ReactiveGraphResultSet} that will publish the returned results.
-   * @see ReactiveGraphResultSet
-   * @see ReactiveGraphNode
+   * @param statement the graph query
+   * @throws UnsupportedOperationException always; use a driver that supports DSE Graph execution
    */
   @NonNull
   default ReactiveGraphResultSet executeReactive(@NonNull GraphStatement<?> statement) {

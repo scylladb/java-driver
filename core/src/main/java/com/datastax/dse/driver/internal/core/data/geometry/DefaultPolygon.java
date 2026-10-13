@@ -28,6 +28,7 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Collections;
 import java.util.List;
 import net.jcip.annotations.Immutable;
+import net.jcip.annotations.NotThreadSafe;
 
 @Immutable
 public class DefaultPolygon extends DefaultGeometry implements Polygon {
@@ -105,6 +106,7 @@ public class DefaultPolygon extends DefaultGeometry implements Polygon {
     return new WkbSerializationProxy(this.asWellKnownBinary());
   }
 
+  @NotThreadSafe
   public static class Builder implements Polygon.Builder {
     private final com.esri.core.geometry.Polygon polygon = new com.esri.core.geometry.Polygon();
 

@@ -18,6 +18,7 @@
 package com.datastax.dse.driver.api.core.graph;
 
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -74,6 +75,7 @@ public interface GraphNode {
    * <p>If the property value has been explicitly set to {@code null}, implementors may return a
    * special "null node" instead of {@code null}.
    */
+  @Nullable
   GraphNode getByKey(Object key);
 
   /** Deserializes and returns this node as a {@link Map}. */
@@ -99,6 +101,7 @@ public interface GraphNode {
    * <p>If the requested element has been explicitly set to {@code null}, implementors may return a
    * special "null node" instead of {@code null}.
    */
+  @Nullable
   GraphNode getByIndex(int index);
 
   /** Deserializes and returns this node as a {@link List}. */
