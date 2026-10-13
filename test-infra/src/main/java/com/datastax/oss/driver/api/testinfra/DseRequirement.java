@@ -1,0 +1,46 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.datastax.oss.driver.api.testinfra;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+/**
+ * Retained annotation for legacy DSE version requirements. A DSE-only requirement skips tests on
+ * supported backends. Another matching backend requirement can still allow the test to run. This
+ * annotation does not enable DSE session creation or CCM setup.
+ *
+ * @deprecated DSE test backends are no longer supported. Use {@link
+ *     com.datastax.oss.driver.api.testinfra.requirement.BackendRequirement} for supported backends.
+ */
+@Deprecated
+@Retention(RetentionPolicy.RUNTIME)
+public @interface DseRequirement {
+
+  /** @return The minimum version required to execute this test, i.e. "5.0.13" */
+  String min() default "";
+
+  /**
+   * @return the maximum exclusive version allowed to execute this test, i.e. "2.2" means only tests
+   *     &lt; "2.2" may execute this test.
+   */
+  String max() default "";
+
+  /** @return The description returned if this version requirement is not met. */
+  String description() default "Does not meet version requirement.";
+}

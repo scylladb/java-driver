@@ -19,6 +19,7 @@ package com.datastax.oss.driver.api.testinfra.requirement;
 
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.testinfra.CassandraRequirement;
+import com.datastax.oss.driver.api.testinfra.DseRequirement;
 import com.datastax.oss.driver.api.testinfra.ScyllaRequirement;
 import com.datastax.oss.driver.api.testinfra.ScyllaSkip;
 import java.util.ArrayList;
@@ -93,6 +94,13 @@ public class VersionRequirement {
         BackendType.CASSANDRA, requirement.min(), requirement.max(), requirement.description());
   }
 
+  /** @deprecated DSE test backends are no longer supported. */
+  @Deprecated
+  public static VersionRequirement fromDseRequirement(DseRequirement requirement) {
+    return new VersionRequirement(
+        BackendType.DSE, requirement.min(), requirement.max(), requirement.description());
+  }
+
   public static VersionRequirement fromScyllaOssRequirement(ScyllaRequirement requirement) {
     return new VersionRequirement(
         BackendType.SCYLLA,
@@ -113,6 +121,7 @@ public class VersionRequirement {
     // collect all requirement annotation types
     CassandraRequirement cassandraRequirement =
         description.getAnnotation(CassandraRequirement.class);
+    DseRequirement dseRequirement = description.getAnnotation(DseRequirement.class);
     ScyllaRequirement scyllaRequirement = description.getAnnotation(ScyllaRequirement.class);
     // matches methods/classes with one @BackendRequirement annotation
     BackendRequirement backendRequirement = description.getAnnotation(BackendRequirement.class);
@@ -124,6 +133,9 @@ public class VersionRequirement {
     Collection<VersionRequirement> requirements = new ArrayList<>();
     if (cassandraRequirement != null) {
       requirements.add(VersionRequirement.fromCassandraRequirement(cassandraRequirement));
+    }
+    if (dseRequirement != null) {
+      requirements.add(VersionRequirement.fromDseRequirement(dseRequirement));
     }
     if (scyllaSkip != null) {
       requirements.add(
