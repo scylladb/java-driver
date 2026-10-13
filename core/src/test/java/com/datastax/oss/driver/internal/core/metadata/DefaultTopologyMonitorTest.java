@@ -21,6 +21,7 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.filter;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
@@ -165,6 +166,7 @@ public class DefaultTopologyMonitorTest {
   @Test
   public void should_limit_missing_broadcast_rpc_port_warning() {
     AdminRow row = mockPeersRow(2, node2.getHostId());
+    when(row.contains("rpc_port")).thenReturn(true);
 
     topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
     topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
@@ -680,6 +682,45 @@ public class DefaultTopologyMonitorTest {
 
     // Then — driver still starts up successfully even though peers are absent
     assertThatStage(futureInfos).isSuccess(infos -> assertThat(infos).hasSize(1));
+  }
+
+  @Test
+  @DataProvider({"true, 9142", "false, 9142", "true, -1", "false, -1"})
+  public void should_not_warn_when_rpc_port_columns_are_absent(boolean peer, int port) {
+    AdminRow row = peer ? mockPeersRow(2, node2.getHostId()) : mockLocalRow(1, node1.getHostId());
+    topologyMonitor.port = port;
+
+    InetSocketAddress address = topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    assertThat(address.getPort()).isEqualTo(port == -1 ? 0 : port);
+    verify(appender, never()).doAppend(any());
+  }
+
+  @Test
+  @DataProvider({"native_port, null", "native_port, 0", "rpc_port, null", "rpc_port, 0"})
+  public void should_warn_when_advertised_rpc_port_is_invalid(String column, Integer value) {
+    AdminRow row = mockPeersRow(2, node2.getHostId());
+    when(row.contains(column)).thenReturn(true);
+    when(row.getInteger(column)).thenReturn(value);
+    topologyMonitor.port = 9142;
+
+    InetSocketAddress address = topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    assertThat(address.getPort()).isEqualTo(9142);
+    assertLog(Level.WARN, "Unable to determine broadcast RPC port");
+  }
+
+  @Test
+  @DataProvider({"native_port", "rpc_port"})
+  public void should_use_advertised_rpc_port_without_warning(String column) {
+    AdminRow row = mockPeersRow(2, node2.getHostId());
+    when(row.contains(column)).thenReturn(true);
+    when(row.getInteger(column)).thenReturn(9142);
+
+    InetSocketAddress address = topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    assertThat(address.getPort()).isEqualTo(9142);
+    verify(appender, never()).doAppend(any());
   }
 
   @DataProvider
