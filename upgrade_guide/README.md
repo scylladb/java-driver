@@ -26,14 +26,18 @@ under the License.
 DSE protocol negotiation, continuous paging, Graph execution, and DSE type codecs are no longer
 supported. Their public types and option constants remain deprecated for source and binary
 compatibility. `DseSession.builder().buildAsync()` fails with migration guidance. Continuous paging
-and Graph execution methods on `CqlSession` throw `UnsupportedOperationException`.
+and Graph execution methods on `CqlSession` fail with `UnsupportedOperationException`: synchronous
+methods throw, asynchronous methods return failed `CompletionStage`s, and reactive methods return
+result publishers that signal the error on subscription. Their metadata publishers signal the same
+error. Handle async failures with stage handlers such as `exceptionally`, and reactive failures with
+subscriber `onError` handlers.
 
 The generic reactive CQL and mapper APIs remain available under their existing
 `com.datastax.dse` package names.
 
 Graph statement, result, session, predicate, and remote-connection signatures remain deprecated
 compatibility stubs. `CqlSession` still exposes the Graph session interfaces, and creating or
-executing Graph requests throws `UnsupportedOperationException` with migration guidance. The Graph
+executing Graph requests fails with `UnsupportedOperationException` with migration guidance. The Graph
 overload of `ProxyAuthentication.executeAs` also fails this way. `gremlin-core` remains an optional
 dependency for the public signatures; no Graph runtime is restored.
 
@@ -161,9 +165,11 @@ asynchronous, and reactive execution. TinkerPop was an optional dependency start
 
 DSE Graph execution is no longer supported. Graph request processors, serializers, and the
 TinkerPop integration were removed. Public Graph API types remain temporarily for binary and source
-compatibility, but are deprecated. Creating or executing Graph requests throws an
-`UnsupportedOperationException` with migration guidance. Applications that still execute DSE Graph
-requests must remain on 4.19.2.2 or migrate that workload before upgrading.
+compatibility, but are deprecated. Creating Graph requests and synchronous execution throw an
+`UnsupportedOperationException` with migration guidance. Async execution returns a failed stage;
+reactive execution returns a result publisher whose node and execution-info subscriptions signal
+the same error. Applications that still execute DSE Graph requests must remain on 4.19.2.2 or
+migrate that workload before upgrading.
 
 The deprecated Graph compatibility APIs have the following limitations:
 

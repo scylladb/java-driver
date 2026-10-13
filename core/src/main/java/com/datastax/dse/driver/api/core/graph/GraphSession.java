@@ -20,6 +20,7 @@ package com.datastax.dse.driver.api.core.graph;
 import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.concurrent.CompletionStage;
 
@@ -27,7 +28,7 @@ import java.util.concurrent.CompletionStage;
  * Retained compatibility interface for DSE Graph execution methods.
  *
  * <p>{@link CqlSession} retains this interface for source and binary compatibility. Its default
- * execution methods throw synchronously because DSE Graph execution is no longer supported.
+ * execution methods fail because DSE Graph execution is no longer supported.
  *
  * @deprecated DSE Graph is not supported starting with driver 4.19.2.3.
  */
@@ -49,14 +50,14 @@ public interface GraphSession extends Session {
   /**
    * Retained signature for asynchronous graph execution.
    *
-   * <p>This default method throws synchronously without returning a {@code CompletionStage}.
+   * <p>Returns a stage that fails with {@link UnsupportedOperationException} and migration
+   * guidance; use a driver that supports DSE Graph execution.
    *
    * @param graphStatement the graph query
-   * @throws UnsupportedOperationException always; use a driver that supports DSE Graph execution
    */
   @NonNull
   default CompletionStage<AsyncGraphResultSet> executeAsync(
       @NonNull GraphStatement<?> graphStatement) {
-    throw GraphSupportRemoved.exception();
+    return CompletableFutures.failedFuture(GraphSupportRemoved.exception());
   }
 }

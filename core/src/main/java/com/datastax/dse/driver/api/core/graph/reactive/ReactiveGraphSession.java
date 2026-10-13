@@ -19,6 +19,7 @@ package com.datastax.dse.driver.api.core.graph.reactive;
 
 import com.datastax.dse.driver.api.core.graph.GraphStatement;
 import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
+import com.datastax.dse.driver.internal.core.graph.reactive.FailedReactiveGraphResultSet;
 import com.datastax.oss.driver.api.core.session.Session;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
@@ -34,13 +35,13 @@ public interface ReactiveGraphSession extends Session {
   /**
    * Retained signature for reactive graph execution.
    *
-   * <p>This default method throws synchronously without returning a publisher.
+   * <p>The result and its execution-info publisher signal {@link UnsupportedOperationException}
+   * with migration guidance on subscription; use a driver that supports DSE Graph execution.
    *
    * @param statement the graph query
-   * @throws UnsupportedOperationException always; use a driver that supports DSE Graph execution
    */
   @NonNull
   default ReactiveGraphResultSet executeReactive(@NonNull GraphStatement<?> statement) {
-    throw GraphSupportRemoved.exception();
+    return new FailedReactiveGraphResultSet(GraphSupportRemoved.exception());
   }
 }

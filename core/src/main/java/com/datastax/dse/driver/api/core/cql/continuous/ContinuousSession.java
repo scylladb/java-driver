@@ -19,14 +19,15 @@ package com.datastax.dse.driver.api.core.cql.continuous;
 
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.session.Session;
+import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.concurrent.CompletionStage;
 
 /**
  * Retained session signatures for DSE continuous paging.
  *
- * @deprecated DSE continuous paging is no longer supported. Default execution methods throw {@link
- *     UnsupportedOperationException}; use ordinary CQL paging through {@code CqlSession}.
+ * @deprecated DSE continuous paging is no longer supported. Default execution methods fail with
+ *     {@link UnsupportedOperationException}; use ordinary CQL paging through {@code CqlSession}.
  */
 @Deprecated
 public interface ContinuousSession extends Session {
@@ -46,13 +47,17 @@ public interface ContinuousSession extends Session {
   /**
    * Retained asynchronous continuous paging signature.
    *
-   * @throws UnsupportedOperationException always, because DSE continuous paging was removed.
+   * <p>Returns a stage that fails with {@link UnsupportedOperationException}; use ordinary CQL
+   * paging through {@code CqlSession}.
+   *
    * @deprecated DSE continuous paging is no longer supported.
    */
   @Deprecated
   @NonNull
   default CompletionStage<ContinuousAsyncResultSet> executeContinuouslyAsync(
       @NonNull Statement<?> statement) {
-    throw new UnsupportedOperationException("DSE continuous paging is no longer supported");
+    return CompletableFutures.failedFuture(
+        new UnsupportedOperationException(
+            "DSE continuous paging is no longer supported; use ordinary CQL paging through CqlSession"));
   }
 }

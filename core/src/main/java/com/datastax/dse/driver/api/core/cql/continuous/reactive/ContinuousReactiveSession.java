@@ -17,6 +17,7 @@
  */
 package com.datastax.dse.driver.api.core.cql.continuous.reactive;
 
+import com.datastax.dse.driver.internal.core.cql.continuous.reactive.FailedContinuousReactiveResultSet;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -25,8 +26,9 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 /**
  * Retained session signatures for reactive DSE continuous paging.
  *
- * @deprecated DSE continuous paging is no longer supported. Default execution methods throw {@link
- *     UnsupportedOperationException}; use ordinary reactive CQL execution instead.
+ * @deprecated DSE continuous paging is no longer supported. Default execution methods return
+ *     publishers that signal {@link UnsupportedOperationException}; use ordinary reactive CQL
+ *     execution instead.
  */
 @Deprecated
 public interface ContinuousReactiveSession extends Session {
@@ -34,7 +36,9 @@ public interface ContinuousReactiveSession extends Session {
   /**
    * Retained reactive continuous paging signature.
    *
-   * @throws UnsupportedOperationException always, because DSE continuous paging was removed.
+   * <p>The result and its metadata publishers signal {@link UnsupportedOperationException} on
+   * subscription; use ordinary reactive CQL execution instead.
+   *
    * @deprecated DSE continuous paging is no longer supported.
    */
   @Deprecated
@@ -46,12 +50,16 @@ public interface ContinuousReactiveSession extends Session {
   /**
    * Retained reactive continuous paging signature.
    *
-   * @throws UnsupportedOperationException always, because DSE continuous paging was removed.
+   * <p>The result and its metadata publishers signal {@link UnsupportedOperationException} on
+   * subscription; use ordinary reactive CQL execution instead.
+   *
    * @deprecated DSE continuous paging is no longer supported.
    */
   @Deprecated
   @NonNull
   default ContinuousReactiveResultSet executeContinuouslyReactive(@NonNull Statement<?> statement) {
-    throw new UnsupportedOperationException("DSE continuous paging is no longer supported");
+    return new FailedContinuousReactiveResultSet(
+        new UnsupportedOperationException(
+            "DSE continuous paging is no longer supported; use ordinary reactive CQL execution"));
   }
 }

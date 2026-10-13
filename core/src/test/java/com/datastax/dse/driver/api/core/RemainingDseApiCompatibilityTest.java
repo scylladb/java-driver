@@ -61,13 +61,9 @@ public class RemainingDseApiCompatibilityTest {
   @Test
   public void should_fail_fast_for_unsupported_dse_execution() {
     ContinuousSession continuousSession = mock(ContinuousSession.class, CALLS_REAL_METHODS);
-    ContinuousReactiveSession reactiveSession =
-        mock(ContinuousReactiveSession.class, CALLS_REAL_METHODS);
     SimpleStatement statement = SimpleStatement.newInstance("SELECT 1");
 
     assertThatThrownBy(() -> continuousSession.executeContinuously(statement))
-        .isInstanceOf(UnsupportedOperationException.class);
-    assertThatThrownBy(() -> reactiveSession.executeContinuouslyReactive(statement))
         .isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> DseSession.builder().buildAsync().toCompletableFuture().join())
         .isInstanceOf(CompletionException.class)

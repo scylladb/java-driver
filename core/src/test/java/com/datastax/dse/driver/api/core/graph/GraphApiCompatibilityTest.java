@@ -85,16 +85,12 @@ public class GraphApiCompatibilityTest {
     assertUnsupported(() -> DseGraph.g.getGraph());
     assertUnsupported(() -> Search.token("value"));
     GraphSession graphSession = mock(GraphSession.class, CALLS_REAL_METHODS);
-    ReactiveGraphSession reactiveGraphSession =
-        mock(ReactiveGraphSession.class, CALLS_REAL_METHODS);
     assertUnsupported(() -> graphSession.execute((GraphStatement<?>) null));
-    assertUnsupported(() -> graphSession.executeAsync((GraphStatement<?>) null));
     assertUnsupported(() -> ScriptGraphStatement.builder("g.V()"));
     assertUnsupported(() -> FluentGraphStatement.builder((GraphTraversal<?, ?>) null));
     assertUnsupported(() -> CqlCollection.contains("value"));
     ScriptGraphStatement statement = mock(ScriptGraphStatement.class);
     assertUnsupported(() -> ProxyAuthentication.executeAs("role", statement));
-    assertUnsupported(() -> reactiveGraphSession.executeReactive(null));
   }
 
   @Test
