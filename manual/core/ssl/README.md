@@ -107,7 +107,10 @@ To enable it, you need to define an engine factory in the [configuration](../con
 The standard JDK handler factory prepares SSL engines on two dedicated worker threads before opening
 connections. Reverse DNS lookup, when enabled, therefore does not block existing connections' I/O.
 Preparation is bounded by `advanced.connection.connect-timeout`; the subsequent TCP connection has
-its own timeout of the same duration. Setting the timeout to zero disables both limits.
+its own timeout of the same duration. The preparation timer starts when work is queued, not when a
+worker begins. If both workers are occupied by slow reverse DNS lookups, queued connections can fail
+with `DriverTimeoutException` before their preparation starts. Setting the timeout to zero disables
+both limits; a lookup that does not respond to interruption can then hold a worker indefinitely.
 
 Reverse DNS remains enabled by default for compatibility. Set
 `advanced.ssl-engine-factory.allow-dns-reverse-lookup-san = false` if certificate matching does not
