@@ -141,6 +141,9 @@ jobs:
           distribution: 'temurin'
           server-id: central
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          # Name the env var the release steps export. Otherwise setup-java defaults it to
+          # GPG_PASSPHRASE, and v6 then makes maven-gpg-plugin read that unset variable
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
           server-username: SONATYPE_TOKEN_USERNAME
           server-password: SONATYPE_TOKEN_PASSWORD
           cache: maven
