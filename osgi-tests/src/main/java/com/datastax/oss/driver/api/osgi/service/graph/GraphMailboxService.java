@@ -22,17 +22,33 @@ import com.datastax.oss.driver.api.osgi.service.MailboxMessage;
 import com.datastax.oss.driver.api.osgi.service.MailboxService;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
-/** @deprecated DSE Graph mailbox services are no longer supported. */
+/**
+ * A compatibility interface for mailbox services that supported DSE Graph.
+ *
+ * @deprecated DSE Graph mailbox services are no longer supported.
+ */
 @Deprecated
 public interface GraphMailboxService extends MailboxService {
 
-  /** @deprecated DSE Graph mailbox services are no longer supported. */
+  /**
+   * Sends a message through a Graph mailbox.
+   *
+   * @throws UnsupportedOperationException always in the default implementation
+   * @deprecated DSE Graph mailbox services are no longer supported. Use {@link
+   *     MailboxService#sendMessage(MailboxMessage)} for non-Graph mailboxes.
+   */
   @Deprecated
   default void sendGraphMessage(@NonNull MailboxMessage message) throws MailboxException {
     throw new UnsupportedOperationException("DSE Graph mailbox services are no longer supported");
   }
 
-  /** @deprecated DSE Graph mailbox services are no longer supported. */
+  /**
+   * Retrieves Graph messages for a recipient.
+   *
+   * @throws UnsupportedOperationException always in the default implementation
+   * @deprecated DSE Graph mailbox services are no longer supported. Use {@link
+   *     MailboxService#getMessages(String)} for non-Graph mailboxes.
+   */
   @Deprecated
   @NonNull
   default Iterable<MailboxMessage> getGraphMessages(@NonNull String recipient)
