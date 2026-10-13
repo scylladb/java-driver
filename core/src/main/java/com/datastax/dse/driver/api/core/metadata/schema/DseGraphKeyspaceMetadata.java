@@ -51,22 +51,26 @@ public interface DseGraphKeyspaceMetadata extends DseKeyspaceMetadata {
         .append("KEYSPACE ")
         .append(getName())
         .append(" WITH replication = { 'class' : '")
-        .append(getReplication().get("class"))
+        .append(String.valueOf(getReplication().get("class")).replace("'", "''"))
         .append("'");
     for (Map.Entry<String, String> entry : getReplication().entrySet()) {
       if (!entry.getKey().equals("class")) {
         builder
             .append(", '")
-            .append(entry.getKey())
+            .append(entry.getKey().replace("'", "''"))
             .append("': '")
-            .append(entry.getValue())
+            .append(String.valueOf(entry.getValue()).replace("'", "''"))
             .append("'");
       }
     }
     builder.append(" } AND durable_writes = ").append(Boolean.toString(isDurableWrites()));
     getGraphEngine()
         .ifPresent(
-            graphEngine -> builder.append(" AND graph_engine ='").append(graphEngine).append("'"));
+            graphEngine ->
+                builder
+                    .append(" AND graph_engine ='")
+                    .append(graphEngine.replace("'", "''"))
+                    .append("'"));
     builder.append(";");
     if (isVirtual()) {
       builder.append(" */");

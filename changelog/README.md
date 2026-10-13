@@ -23,6 +23,8 @@ under the License.
 
 ### 4.19.2.3
 
+- [bug] Escape string literals in function, keyspace, and index metadata descriptions, and handle
+  function bodies containing single quotes and dollar-quote delimiters in schema builders (#1238)
 - [breaking] Remove DSE geometry and DateRange APIs and codecs, including `DseDataTypes`
   and `DseTypeCodecs`, plus the ESRI dependency (#1029)
 - [breaking] Remove DSE metadata and schema runtime support; public metadata and query-builder APIs
