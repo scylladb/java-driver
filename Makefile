@@ -1,3 +1,4 @@
+RELEASE_GUARD ?= scripts/release/guard.py
 SHELL := bash
 .ONESHELL:
 
@@ -12,7 +13,7 @@ CCM_SCYLLA_REPO ?= github.com/scylladb/scylla-ccm
 CCM_SCYLLA_VERSION ?= master
 
 SCYLLA_EXT_OPTS ?= --smp=2 --memory=4G
-MVNCMD ?= mvn -B -X -ntp
+MVNCMD ?= mvn -B -ntp
 
 GET_VERSION_VERSION ?= 0.4.3
 
@@ -339,21 +340,21 @@ download-scylla: .prepare-scylla-ccm resolve-scylla-version
 	rm -rf /tmp/download.ccm
 
 .require-release-prepare-env:
-	@if [[ -z "${MAVEN_GPG_PASSPHRASE}" ]]; then
+	@if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
 		echo "MAVEN_GPG_PASSPHRASE is empty"
 		exit 1
 	fi
 
 .require-release-env:
-	@if [[ -z "${MAVEN_GPG_PASSPHRASE}" ]]; then
+	@if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
 		echo "MAVEN_GPG_PASSPHRASE is empty"
 		exit 1
 	fi
-	if [[ -z "${SONATYPE_TOKEN_USERNAME}" ]]; then
+	if [[ -z "$${SONATYPE_TOKEN_USERNAME}" ]]; then
 		echo "SONATYPE_TOKEN_USERNAME is empty"
 		exit 1
 	fi
-	if [[ -z "${SONATYPE_TOKEN_PASSWORD}" ]]; then
+	if [[ -z "$${SONATYPE_TOKEN_PASSWORD}" ]]; then
 		echo "SONATYPE_TOKEN_PASSWORD is empty"
 		exit 1
 	fi
@@ -363,21 +364,19 @@ release-prepare: .require-release-prepare-env
 		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
 	# maven-release-plugin formats the poms via preparationGoals/completionGoals (pom.xml), so the tag passes xml-check.
-	$(MVNCMD) release:prepare -DpushChanges=false
+	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:prepare -DpushChanges=false
 
 release: .require-release-env
 	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	mkdir /tmp/java-driver-release-logs/ 2>/dev/null || true
-	$(MVNCMD) release:perform -Drelease.autopublish=true > >(tee /tmp/java-driver-release-logs/stdout.log) 2> >(tee /tmp/java-driver-release-logs/stderr.log)
+	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform -Drelease.autopublish=true
 
 release-dry-run: .require-release-env
 	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	mkdir /tmp/java-driver-release-logs/ 2>/dev/null || true
-	$(MVNCMD) release:perform > >(tee /tmp/java-driver-release-logs/stdout.log) 2> >(tee /tmp/java-driver-release-logs/stderr.log)
+	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform
 
 compile-all: .install-guava-shaded
 	mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true

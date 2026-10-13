@@ -122,17 +122,27 @@ jobs:
       issues: read
 
     env:
-      MVNCMD: mvn -B -X -ntp
+      MVNCMD: mvn -B -ntp
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Preserve release guard
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-safety"
+          cp scripts/release/*.py "$RUNNER_TEMP/release-safety/"
+          echo "RELEASE_GUARD=$RUNNER_TEMP/release-safety/guard.py" >> "$GITHUB_ENV"
+          echo "RELEASE_LOG_DIR=$RUNNER_TEMP/release-logs" >> "$GITHUB_ENV"
 
       - name: Checkout Code One Commit Before ${{ inputs.target-tag }}
         if: inputs.target-tag != 'scylla-4.x'
         env:
           RELEASE_TARGET_TAG: ${{ inputs.target-tag }}
         run: make checkout-one-commit-before
+
+      - name: Check release credential safety before importing credentials
+        run: python3 "$RUNNER_TEMP/release-safety/guard.py" check
 
       - name: Set up JDK 11
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
@@ -195,17 +205,19 @@ jobs:
           SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
         run: make release-dry-run
 
-      - name: Upload release logs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: maven-stdout
-          path: /tmp/java-driver-release-logs/*.log
-
       - name: Push changes to SCM
         if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-4.x' }}
         run: |
           git status && git log -3
           git push origin --follow-tags -v
+
+      - name: Upload sanitized release logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: maven-stdout
+          path: ${{ runner.temp }}/release-logs/*.log
+          if-no-files-found: ignore
 
   publish-docs:
     name: Publish docs
