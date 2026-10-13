@@ -117,6 +117,9 @@ public class DefaultTopologyMonitorTest {
 
     when(defaultConfig.getDuration(DefaultDriverOption.CONTROL_CONNECTION_TIMEOUT))
         .thenReturn(Duration.ofSeconds(1));
+    when(defaultConfig.getDuration(DefaultDriverOption.REPEATED_LOG_INTERVAL))
+        .thenReturn(Duration.ofMinutes(1));
+    when(defaultConfig.isDefined(DefaultDriverOption.REPEATED_LOG_INTERVAL)).thenReturn(true);
     when(config.getDefaultProfile()).thenReturn(defaultConfig);
     when(context.getConfig()).thenReturn(config);
 
@@ -157,6 +160,24 @@ public class DefaultTopologyMonitorTest {
 
     // Then
     assertThatStage(futureInfo).isSuccess(maybeInfo -> assertThat(maybeInfo.isPresent()).isFalse());
+  }
+
+  @Test
+  public void should_limit_missing_broadcast_rpc_port_warning() {
+    AdminRow row = mockPeersRow(2, node2.getHostId());
+
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    verify(appender, times(1)).doAppend(loggingEventCaptor.capture());
+    assertThat(loggingEventCaptor.getValue().getFormattedMessage())
+        .contains("Unable to determine broadcast RPC port");
+
+    when(defaultConfig.getDuration(DefaultDriverOption.REPEATED_LOG_INTERVAL))
+        .thenReturn(Duration.ZERO);
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+    verify(appender, times(3)).doAppend(loggingEventCaptor.capture());
   }
 
   @Test

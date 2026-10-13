@@ -41,6 +41,7 @@ import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -123,6 +124,9 @@ public class ChannelFactory {
 
   private final String logPrefix;
   protected final InternalDriverContext context;
+  private final RateLimitedLogger limitedLogger;
+  private final RateLimitedLogger portAllocatorLogger;
+  private final RateLimitedLogger heartbeatLogger;
 
   /** either set from the configuration, or null and will be negotiated */
   @VisibleForTesting volatile ProtocolVersion protocolVersion;
@@ -137,6 +141,10 @@ public class ChannelFactory {
   public ChannelFactory(InternalDriverContext context) {
     this.logPrefix = context.getSessionName();
     this.context = context;
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
+    this.portAllocatorLogger = new RateLimitedLogger(PortAllocator.LOG, context);
+    this.heartbeatLogger =
+        new RateLimitedLogger(LoggerFactory.getLogger(HeartbeatHandler.class), context);
 
     DriverExecutionProfile defaultConfig = context.getConfig().getDefaultProfile();
     if (defaultConfig.isDefined(DefaultDriverOption.PROTOCOL_VERSION)) {
@@ -429,9 +437,10 @@ public class ChannelFactory {
         connectFuture = bootstrap.connect(resolvedAddress);
       } else {
         int localPort =
-            PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
+            PortAllocator.getNextAvailablePort(
+                shardingInfo.getShardsCount(), shardId, context, portAllocatorLogger);
         if (localPort == -1) {
-          LOG.warn(
+          limitedLogger.warn(
               "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
               shardId,
               endPoint);
@@ -568,7 +577,7 @@ public class ChannelFactory {
                 channel.newPromise(),
                 options.eventCallback,
                 options.ownerLogPrefix);
-        HeartbeatHandler heartbeatHandler = new HeartbeatHandler(defaultConfig);
+        HeartbeatHandler heartbeatHandler = new HeartbeatHandler(defaultConfig, heartbeatLogger);
         ProtocolInitHandler initHandler =
             new ProtocolInitHandler(
                 context, protocolVersion, clusterName, endPoint, options, heartbeatHandler, true);
@@ -619,7 +628,8 @@ public class ChannelFactory {
     private static final AtomicInteger lastPort = new AtomicInteger(-1);
     private static final Logger LOG = LoggerFactory.getLogger(PortAllocator.class);
 
-    public static int getNextAvailablePort(int shardCount, int shardId, DriverContext context) {
+    public static int getNextAvailablePort(
+        int shardCount, int shardId, DriverContext context, RateLimitedLogger logger) {
       int lowPort =
           context
               .getConfig()
@@ -631,7 +641,7 @@ public class ChannelFactory {
               .getDefaultProfile()
               .getInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH);
       if (highPort - lowPort < shardCount) {
-        LOG.error(
+        logger.error(
             "There is not enough ports in range [{},{}] for {} shards. Update your configuration.",
             lowPort,
             highPort,

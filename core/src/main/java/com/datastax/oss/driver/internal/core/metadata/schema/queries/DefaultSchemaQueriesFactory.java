@@ -22,6 +22,7 @@ import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +34,12 @@ public class DefaultSchemaQueriesFactory implements SchemaQueriesFactory {
 
   protected final InternalDriverContext context;
   protected final String logPrefix;
+  private final RateLimitedLogger limitedLogger;
 
   public DefaultSchemaQueriesFactory(InternalDriverContext context) {
     this.context = context;
     this.logPrefix = context.getSessionName();
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
   }
 
   @Override
@@ -69,7 +72,7 @@ public class DefaultSchemaQueriesFactory implements SchemaQueriesFactory {
 
     Version cassandraVersion = node.getCassandraVersion();
     if (cassandraVersion == null) {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Cassandra version missing for {}, defaulting to {}",
           logPrefix,
           node,

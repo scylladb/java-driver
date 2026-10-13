@@ -28,6 +28,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.UnexpectedResponseExce
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.control.ControlConnection;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -156,6 +157,8 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
   private final Duration timeout;
   private final boolean reconnectOnInit;
   private final CompletableFuture<Void> closeFuture;
+  private final RateLimitedLogger limitedLogger;
+  private final RateLimitedLogger schemaAgreementLogger;
 
   @VisibleForTesting volatile boolean isSchemaV2;
   @VisibleForTesting volatile int port = -1;
@@ -176,6 +179,9 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     this.timeout = config.getDuration(DefaultDriverOption.CONTROL_CONNECTION_TIMEOUT);
     this.reconnectOnInit = config.getBoolean(DefaultDriverOption.RECONNECT_ON_INIT);
     this.closeFuture = new CompletableFuture<>();
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
+    this.schemaAgreementLogger =
+        new RateLimitedLogger(LoggerFactory.getLogger(SchemaAgreementChecker.class), context);
     // Set this to true initially, after the first refreshNodes is called this will either stay true
     // or be set to false;
     this.isSchemaV2 = true;
@@ -408,7 +414,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
       return CompletableFuture.completedFuture(true);
     }
     DriverChannel channel = controlConnection.channel();
-    return new SchemaAgreementChecker(channel, context, logPrefix).run();
+    return new SchemaAgreementChecker(channel, context, logPrefix, schemaAgreementLogger).run();
   }
 
   @NonNull
@@ -659,7 +665,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
       broadcastRpcInetAddress = row.getInetAddress(addrCandidates.next());
     // This could only happen if system tables are corrupted, but handle gracefully
     if (broadcastRpcInetAddress == null) {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Unable to determine broadcast RPC IP address, returning null.  "
               + "This is likely due to a misconfiguration or invalid system tables.  "
               + "Please validate the contents of system.local and/or {}.",
@@ -685,7 +691,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     // report zero, as advertised in the javadocs of Node and NodeInfo.
     if (broadcastRpcPort == null || broadcastRpcPort == 0) {
 
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Unable to determine broadcast RPC port.  "
               + "Trying to fall back to port used by the control connection.",
           logPrefix);
@@ -697,7 +703,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     if (row.contains("peer") && broadcastRpcAddress.equals(localEndPoint.resolve())) {
       // JAVA-2303: if the peer is actually the control node, ignore that peer as it is likely
       // a misconfiguration problem.
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Control node {} has an entry for itself in {}: this entry will be ignored. "
               + "This is likely due to a misconfiguration; please verify your rpc_address "
               + "configuration in cassandra.yaml on all nodes in your cluster.",
@@ -725,7 +731,7 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
             .getBoolean(DefaultDriverOption.METADATA_ALLOW_ZERO_TOKEN_PEERS))) {
       return true;
     } else {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Found invalid row in {} for peer: {}. "
               + "This is likely a gossip or snitch issue, this node will be ignored.",
           logPrefix,

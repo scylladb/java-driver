@@ -265,6 +265,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_CLASS, "DefaultLoadBalancingPolicy");
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
     map.put(TypedDriverOption.SESSION_LEAK_THRESHOLD, 4);
+    map.put(TypedDriverOption.REPEATED_LOG_INTERVAL, Duration.ofMinutes(1));
     map.put(TypedDriverOption.CONNECTION_CONNECT_TIMEOUT, Duration.ofSeconds(5));
     map.put(TypedDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, initQueryTimeout);
     map.put(TypedDriverOption.CONNECTION_SET_KEYSPACE_TIMEOUT, initQueryTimeout);

@@ -42,7 +42,7 @@ import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import com.datastax.oss.driver.internal.core.util.ArrayUtils;
-import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
@@ -111,6 +111,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   private final String logPrefix;
   private final EventExecutor adminExecutor;
   private final Random random;
+  private final RateLimitedLogger limitedLogger;
   private final SingleThreaded singleThreaded;
 
   // The single channel used by this connection. This field is accessed concurrently, but only
@@ -128,6 +129,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
     this.logPrefix = context.getSessionName();
     this.adminExecutor = context.getNettyOptions().adminEventExecutorGroup().next();
     this.random = random;
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
     this.singleThreaded = new SingleThreaded(context);
   }
 
@@ -215,7 +217,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   @Override
   public void onEvent(Message eventMessage) {
     if (!(eventMessage instanceof Event)) {
-      LOG.warn("[{}] Unsupported event class: {}", logPrefix, eventMessage.getClass().getName());
+      limitedLogger.warn(
+          "[{}] Unsupported event class: {}", logPrefix, eventMessage.getClass().getName());
     } else {
       LOG.debug("[{}] Processing incoming event {}", logPrefix, eventMessage);
       Event event = (Event) eventMessage;
@@ -233,7 +236,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           processClientRoutesChange(event);
           break;
         default:
-          LOG.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
+          limitedLogger.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
       }
     }
   }
@@ -248,7 +251,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         context.getEventBus().fire(TopologyEvent.suggestRemoved(tce.address));
         break;
       default:
-        LOG.warn("[{}] Unsupported topology change type: {}", logPrefix, tce.changeType);
+        limitedLogger.warn("[{}] Unsupported topology change type: {}", logPrefix, tce.changeType);
     }
   }
 
@@ -262,7 +265,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         context.getEventBus().fire(TopologyEvent.suggestDown(sce.address));
         break;
       default:
-        LOG.warn("[{}] Unsupported status change type: {}", logPrefix, sce.changeType);
+        limitedLogger.warn("[{}] Unsupported status change type: {}", logPrefix, sce.changeType);
     }
   }
 
@@ -274,8 +277,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         .whenComplete(
             (metadata, error) -> {
               if (error != null) {
-                Loggers.warnWithException(
-                    LOG,
+                limitedLogger.warnWithException(
                     "[{}] Unexpected error while refreshing schema for a SCHEMA_CHANGE event, "
                         + "keeping previous version",
                     logPrefix,
@@ -316,7 +318,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
               logPrefix,
               adminExecutor,
               () -> reconnectionPolicy.newControlConnectionSchedule(false),
-              this::reconnect);
+              this::reconnect,
+              new RateLimitedLogger(LoggerFactory.getLogger(Reconnection.class), context));
       // In "reconnect-on-init" mode, handle cancellation of the initFuture by user code
       CompletableFutures.whenCancelled(
           this.initFuture,
@@ -364,7 +367,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             () -> initFuture.complete(null),
             error -> {
               if (isAuthFailure(error)) {
-                LOG.warn(
+                limitedLogger.warn(
                     "[{}] Authentication errors encountered on all contact points. Please check your authentication configuration.",
                     logPrefix);
               }
@@ -449,14 +452,13 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                         onSuccess.run(); // abort, we don't really care about the result
                       } else {
                         if (error instanceof AuthenticationException) {
-                          Loggers.warnWithException(
-                              LOG, "[{}] Authentication error", logPrefix, error);
+                          limitedLogger.warnWithException(
+                              "[{}] Authentication error", logPrefix, error);
                         } else {
                           if (config
                               .getDefaultProfile()
                               .getBoolean(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR)) {
-                            Loggers.warnWithException(
-                                LOG,
+                            limitedLogger.warnWithException(
                                 "[{}] Error connecting to {}, trying next node",
                                 logPrefix,
                                 node,
@@ -589,8 +591,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                               adminExecutor);
                     }
                   } catch (Exception e) {
-                    Loggers.warnWithException(
-                        LOG,
+                    limitedLogger.warnWithException(
                         "[{}] Unexpected exception while processing channel init result",
                         logPrefix,
                         e);
@@ -664,8 +665,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                   // has already made, but the round still has to end -- this stage is dropped, so
                   // a throw would leave init() waiting for good and a Reconnection stuck on an
                   // attempt that never completes.
-                  Loggers.warnWithException(
-                      LOG, "[{}] Unexpected error while expanding {}", logPrefix, contactPoint, t);
+                  limitedLogger.warnWithException(
+                      "[{}] Unexpected error while expanding {}", logPrefix, contactPoint, t);
                   List<Entry<Node, Throwable>> newErrors =
                       (errors == null) ? new ArrayList<>() : errors;
                   newErrors.add(new SimpleEntry<>(contactPoint, t));
@@ -695,8 +696,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         // the catch with the same callbacks and an already drained plan.
         candidates = (error == null) ? candidatesFor(contactPoint, name, addresses) : NO_CANDIDATES;
       } catch (Throwable t) {
-        Loggers.warnWithException(
-            LOG, "[{}] Could not build candidates for {}", logPrefix, contactPoint, t);
+        limitedLogger.warnWithException(
+            "[{}] Could not build candidates for {}", logPrefix, contactPoint, t);
         candidates = NO_CANDIDATES;
       }
       if (candidates.length == 0) {
@@ -902,8 +903,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                               .whenComplete(
                                   (metadata, schemaError) -> {
                                     if (schemaError != null) {
-                                      Loggers.warnWithException(
-                                          LOG,
+                                      limitedLogger.warnWithException(
                                           "[{}] Unexpected error while refreshing schema after"
                                               + " a successful reconnection, keeping previous"
                                               + " version",
@@ -912,8 +912,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                                     }
                                   });
                         } catch (Throwable t) {
-                          Loggers.warnWithException(
-                              LOG,
+                          limitedLogger.warnWithException(
                               "[{}] Unexpected error on control connection reconnect",
                               logPrefix,
                               t);

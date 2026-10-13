@@ -169,7 +169,7 @@ public class AdvancedShardAwarenessIT {
           .pollInterval(500, TimeUnit.MILLISECONDS)
           .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
-      assertMatchesAtLeast(shardMismatchPattern, 5, logsCopy);
+      assertMatchesAtLeast(shardMismatchPattern, 1, logsCopy);
     }
   }
 

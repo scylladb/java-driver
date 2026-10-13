@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.channel;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.HeartbeatException;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.request.Options;
 import com.datastax.oss.protocol.internal.response.Supported;
@@ -37,19 +38,28 @@ class HeartbeatHandler extends IdleStateHandler {
   private static final Logger LOG = LoggerFactory.getLogger(HeartbeatHandler.class);
 
   private final DriverExecutionProfile config;
+  private final RateLimitedLogger limitedLogger;
 
   private HeartbeatRequest request;
 
   HeartbeatHandler(DriverExecutionProfile config) {
+    this(
+        config,
+        new RateLimitedLogger(
+            LOG, () -> config.getDuration(DefaultDriverOption.REPEATED_LOG_INTERVAL)));
+  }
+
+  HeartbeatHandler(DriverExecutionProfile config, RateLimitedLogger limitedLogger) {
     super((int) config.getDuration(DefaultDriverOption.HEARTBEAT_INTERVAL).getSeconds(), 0, 0);
     this.config = config;
+    this.limitedLogger = limitedLogger;
   }
 
   @Override
   protected void channelIdle(ChannelHandlerContext ctx, IdleStateEvent evt) throws Exception {
     if (evt.state() == IdleState.READER_IDLE) {
       if (this.request != null) {
-        LOG.warn(
+        limitedLogger.warn(
             "Not sending heartbeat because a previous one is still in progress. "
                 + "Check that {} is not lower than {}.",
             DefaultDriverOption.HEARTBEAT_INTERVAL.getPath(),

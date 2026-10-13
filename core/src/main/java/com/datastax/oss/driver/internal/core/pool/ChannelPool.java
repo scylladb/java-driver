@@ -47,6 +47,7 @@ import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import com.datastax.oss.driver.internal.core.protocol.ShardingInfo;
 import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
@@ -112,6 +113,7 @@ public class ChannelPool implements AsyncAutoCloseable {
   private final String sessionLogPrefix;
   private final String logPrefix;
   private final SingleThreaded singleThreaded;
+  private final RateLimitedLogger limitedLogger;
   private volatile boolean invalidKeyspace;
 
   private ChannelPool(
@@ -125,6 +127,7 @@ public class ChannelPool implements AsyncAutoCloseable {
     this.adminExecutor = context.getNettyOptions().adminEventExecutorGroup().next();
     this.sessionLogPrefix = sessionLogPrefix;
     this.logPrefix = sessionLogPrefix + "|" + node.getEndPoint();
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
     this.singleThreaded = new SingleThreaded(keyspaceName, distance, context);
   }
 
@@ -335,7 +338,8 @@ public class ChannelPool implements AsyncAutoCloseable {
               () -> reconnectionPolicy.newNodeSchedule(node),
               this::reconnect,
               () -> eventBus.fire(ChannelEvent.reconnectionStarted(node)),
-              () -> eventBus.fire(ChannelEvent.reconnectionStopped(node)));
+              () -> eventBus.fire(ChannelEvent.reconnectionStopped(node)),
+              new RateLimitedLogger(LoggerFactory.getLogger(Reconnection.class), context));
       this.configListenerKey =
           eventBus.register(
               ConfigChangeEvent.class, RunOrSchedule.on(adminExecutor, this::onConfigChanged));
@@ -567,14 +571,15 @@ public class ChannelPool implements AsyncAutoCloseable {
         // This will likely be thrown by all channels, but finish the loop cleanly
         onFatal.accept(error);
       } else if (error instanceof AuthenticationException) {
-        // Always warn because this is most likely something the operator needs to fix.
+        // This likely needs operator action; rate-limit repeated warnings from failed channels.
         // Keep going to reconnect if it can be fixed without bouncing the client.
-        Loggers.warnWithException(LOG, "[{}] Authentication error", logPrefix, error);
+        limitedLogger.warnWithException("[{}] Authentication error", logPrefix, error);
       } else if (error instanceof InvalidKeyspaceException) {
         onKeyspaceError.accept(null);
       } else {
         if (config.getDefaultProfile().getBoolean(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR)) {
-          Loggers.warnWithException(LOG, "[{}]  Error while opening new channel", logPrefix, error);
+          limitedLogger.warnWithException(
+              "[{}]  Error while opening new channel", logPrefix, error);
         } else {
           LOG.debug("[{}]  Error while opening new channel", logPrefix, error);
         }
@@ -616,7 +621,7 @@ public class ChannelPool implements AsyncAutoCloseable {
               int actualShard = channel.getShardId();
               int targetShard = port % channel.getShardingInfo().getShardsCount();
               if (actualShard != targetShard) {
-                LOG.warn(
+                limitedLogger.warn(
                     "[{}] New channel {} connected to shard {}, but shard {} was requested. If this is not transient check your driver AND cluster configuration of shard aware port.",
                     logPrefix,
                     channel,
@@ -819,7 +824,7 @@ public class ChannelPool implements AsyncAutoCloseable {
         GenericFutureListener<Future<? super Void>> channelCloseListener =
             f -> {
               if (!f.isSuccess()) {
-                Loggers.warnWithException(LOG, "[{}] Error closing channel", logPrefix, f.cause());
+                limitedLogger.warnWithException("[{}] Error closing channel", logPrefix, f.cause());
               }
               if (remaining.decrementAndGet() == 0) {
                 closeFuture.complete(null);
