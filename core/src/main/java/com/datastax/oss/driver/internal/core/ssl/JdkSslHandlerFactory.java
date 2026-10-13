@@ -26,7 +26,6 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCountUtil;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -114,19 +113,20 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
 
   @Override
   public void close() throws Exception {
-    List<Preparation> preparations;
     synchronized (this) {
       if (closed) {
         return;
       }
       closed = true;
-      preparations = new ArrayList<>(pending);
+      // Keep completion and close mutually exclusive: a worker must not hand an engine to a
+      // connection after the factory has started closing.
+      for (Preparation preparation : new ArrayList<>(pending)) {
+        preparation.completeExceptionally(
+            new IllegalStateException("SSL handler factory is closed"));
+      }
     }
     // DNS lookups are not necessarily interruptible. Finish callers promptly without waiting for
     // workers; any engine produced after cancellation is released by Preparation.
-    for (Preparation preparation : preparations) {
-      preparation.completeExceptionally(new IllegalStateException("SSL handler factory is closed"));
-    }
     executor.shutdownNow();
     sslEngineFactory.close();
   }
@@ -143,7 +143,11 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
                   try {
                     PreparedFactory prepared =
                         new PreparedFactory(sslEngineFactory.newSslEngine(remoteEndpoint));
-                    if (!complete(prepared)) {
+                    boolean delivered;
+                    synchronized (JdkSslHandlerFactory.this) {
+                      delivered = !closed && complete(prepared);
+                    }
+                    if (!delivered) {
                       prepared.close();
                     }
                   } catch (Throwable error) {
