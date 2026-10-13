@@ -19,6 +19,7 @@ package com.datastax.oss.driver.api.core.metadata.schema;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
+import com.datastax.oss.driver.internal.core.util.Strings;
 import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
@@ -75,7 +76,7 @@ public interface IndexMetadata extends Describable {
           .append(getTable())
           .append(String.format(" (%s)", getTarget()))
           .newLine()
-          .append(String.format("USING '%s'", getClassName().get()));
+          .append(String.format("USING %s", Strings.quote(getClassName().get())));
 
       // Some options already appear in the CREATE statement, ignore them
       Map<String, String> describedOptions =
@@ -89,7 +90,11 @@ public interface IndexMetadata extends Describable {
           } else {
             builder.append(",").newLine();
           }
-          builder.append(String.format("'%s' : '%s'", option.getKey(), option.getValue()));
+          builder.append(
+              String.format(
+                  "%s : %s",
+                  Strings.quote(String.valueOf(option.getKey())),
+                  Strings.quote(String.valueOf(option.getValue()))));
         }
         builder.decreaseIndent().append("}");
       }

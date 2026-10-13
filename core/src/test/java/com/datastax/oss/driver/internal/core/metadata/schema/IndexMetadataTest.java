@@ -43,4 +43,21 @@ public class IndexMetadataTest {
             "CREATE CUSTOM INDEX myname ON ks1.mytable (myTarget)\n"
                 + "USING 'com.datastax.MyClass'");
   }
+
+  @Test
+  public void should_escape_custom_index_options_and_preserve_target_expression() {
+    IndexMetadata indexMetadata =
+        new DefaultIndexMetadata(
+            CqlIdentifier.fromCql("ks1"),
+            CqlIdentifier.fromCql("myTable"),
+            CqlIdentifier.fromCql("myName"),
+            IndexKind.CUSTOM,
+            "values(\"CaseSensitive\")",
+            ImmutableMap.of("class_name", "com.datastax.MyClass", "opt'key", "v'alue"));
+
+    assertThat(indexMetadata.describe(false))
+        .contains("(values(\"CaseSensitive\"))")
+        .contains("'opt''key' : 'v''alue'");
+    assertThat(indexMetadata.describe(true)).contains("'opt''key' : 'v''alue'");
+  }
 }
