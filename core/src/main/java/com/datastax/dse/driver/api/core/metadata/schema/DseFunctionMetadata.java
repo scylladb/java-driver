@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionMetadata;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
+import com.datastax.oss.driver.internal.core.util.Strings;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
 import java.util.Optional;
@@ -180,9 +181,9 @@ public interface DseFunctionMetadata extends FunctionMetadata {
         .append("LANGUAGE ")
         .append(getLanguage())
         .newLine()
-        .append("AS '")
-        .append(getBody())
-        .append("';");
+        .append("AS ")
+        .append(Strings.quote(getBody()))
+        .append(";");
     return builder.build();
   }
 }
