@@ -78,11 +78,15 @@ The following APIs remain for deprecated compatibility:
   `ProgrammaticDseGssApiAuthProvider`, and `DsePlainTextAuthProviderBase`
 
 Calls that request DSE proxy authentication or GSSAPI throw `UnsupportedOperationException`.
+The plaintext provider rejects servers announcing the DSE authenticator with
+`AuthenticationException`, identifying the endpoint and unsupported authenticator.
 The authorization-ID overloads and setter accept empty IDs for ordinary plaintext authentication
 and reject nonempty proxy identities. Null IDs remain invalid. The credentials getter returns an
 empty ID. Custom credentials that return a nonempty authorization ID are rejected before encoding
 the authentication response.
-Configuring their old option keys fails session creation before connecting. The
+Configuring their old option keys with built-in plaintext authentication fails session creation
+before connecting. Custom authentication providers may use these names for their own options; a
+programmatic provider takes precedence over the configured provider class. The
 `DsePlainTextAuthProviderBase` alias remains available for ordinary SASL PLAIN authentication.
 The Graph overload of `ProxyAuthentication.executeAs` remains unavailable with the removed Graph
 API.

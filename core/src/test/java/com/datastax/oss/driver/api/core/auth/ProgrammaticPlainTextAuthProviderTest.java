@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.api.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.datastax.oss.driver.api.core.auth.PlainTextAuthProviderBase.Credentials;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
@@ -31,6 +32,20 @@ import org.mockito.junit.MockitoJUnitRunner;
 public class ProgrammaticPlainTextAuthProviderTest {
 
   @Mock private EndPoint endpoint;
+
+  @Test
+  public void should_report_dse_rejection_as_authentication_failure() {
+    String serverAuthenticator = "com.datastax.bdp.cassandra.auth.DseAuthenticator";
+    assertThatThrownBy(
+            () ->
+                new ProgrammaticPlainTextAuthProvider("u", "p")
+                    .newAuthenticator(endpoint, serverAuthenticator))
+        .isInstanceOf(AuthenticationException.class)
+        .hasMessageContaining(serverAuthenticator)
+        .satisfies(
+            error ->
+                assertThat(((AuthenticationException) error).getEndPoint()).isSameAs(endpoint));
+  }
 
   @Test
   public void should_encode_standard_sasl_plain_response() {

@@ -19,15 +19,21 @@ package com.datastax.dse.driver.api.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.auth.AuthProvider;
 import com.datastax.oss.driver.api.core.auth.PlainTextAuthProviderBase;
 import com.datastax.oss.driver.api.core.auth.ProgrammaticPlainTextAuthProvider;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.OptionsMap;
 import com.datastax.oss.driver.api.core.config.TypedDriverOption;
+import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
+import com.datastax.oss.driver.api.core.session.SessionBuilder;
+import java.util.List;
 import java.util.Map;
 import org.junit.Test;
 
@@ -113,17 +119,88 @@ public class DseAuthApiCompatibilityTest {
   }
 
   @Test
-  public void should_reject_legacy_authentication_configuration_before_connecting() {
-    OptionsMap options = OptionsMap.driverDefaults();
-    options.put(TypedDriverOption.AUTH_PROVIDER_SERVICE, "dse");
+  public void should_reject_all_legacy_options_for_builtin_plaintext_providers() {
+    for (String providerClass :
+        List.of(
+            "PlainTextAuthProvider",
+            "com.datastax.oss.driver.internal.core.auth.PlainTextAuthProvider")) {
+      for (OptionsMap options : legacyOptions()) {
+        options.put(TypedDriverOption.AUTH_PROVIDER_CLASS, providerClass);
+        assertThatThrownBy(
+                () ->
+                    new ValidationBuilder()
+                        .withConfigLoader(DriverConfigLoader.fromMap(options))
+                        .buildAsync()
+                        .toCompletableFuture()
+                        .join())
+            .hasCauseInstanceOf(UnsupportedOperationException.class);
+      }
+    }
+    for (OptionsMap options : legacyOptions()) {
+      options.put(TypedDriverOption.AUTH_PROVIDER_CLASS, "custom.Provider");
+      assertThatThrownBy(
+              () ->
+                  new ValidationBuilder()
+                      .withAuthCredentials("u", "p")
+                      .withConfigLoader(DriverConfigLoader.fromMap(options))
+                      .buildAsync()
+                      .toCompletableFuture()
+                      .join())
+          .hasCauseInstanceOf(UnsupportedOperationException.class);
+    }
+  }
 
+  @Test
+  public void should_allow_custom_providers_to_own_legacy_option_names() {
+    for (OptionsMap options : legacyOptions()) {
+      options.put(TypedDriverOption.AUTH_PROVIDER_CLASS, "custom.Provider");
+      assertValidationPasses(new ValidationBuilder(), options);
+      options.put(TypedDriverOption.AUTH_PROVIDER_CLASS, "PlainTextAuthProvider");
+      assertValidationPasses(
+          new ValidationBuilder().withAuthProvider(mock(AuthProvider.class)), options);
+      assertValidationPasses(
+          new ValidationBuilder()
+              .withAuthProvider(new ProgrammaticPlainTextAuthProvider("u", "p") {}),
+          options);
+    }
+  }
+
+  private static List<OptionsMap> legacyOptions() {
+    OptionsMap service = OptionsMap.driverDefaults();
+    service.put(TypedDriverOption.AUTH_PROVIDER_SERVICE, "dse");
+    OptionsMap authorizationId = OptionsMap.driverDefaults();
+    authorizationId.put(TypedDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID, "role");
+    OptionsMap login = OptionsMap.driverDefaults();
+    login.put(TypedDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION, "login");
+    OptionsMap sasl = OptionsMap.driverDefaults();
+    sasl.put(TypedDriverOption.AUTH_PROVIDER_SASL_PROPERTIES, Map.of("qop", "auth"));
+    return List.of(service, authorizationId, login, sasl);
+  }
+
+  private static void assertValidationPasses(ValidationBuilder builder, OptionsMap options) {
     assertThatThrownBy(
             () ->
-                CqlSession.builder()
+                builder
                     .withConfigLoader(DriverConfigLoader.fromMap(options))
                     .buildAsync()
                     .toCompletableFuture()
                     .join())
-        .hasCauseInstanceOf(UnsupportedOperationException.class);
+        .hasCauseInstanceOf(ValidationPassed.class);
+  }
+
+  private static class ValidationPassed extends RuntimeException {}
+
+  private static class ValidationBuilder extends SessionBuilder<ValidationBuilder, CqlSession> {
+    @Override
+    protected DriverContext buildContext(
+        DriverConfigLoader loader, ProgrammaticArguments arguments) {
+      // Stop after configuration validation without allocating resources or opening connections.
+      throw new ValidationPassed();
+    }
+
+    @Override
+    protected CqlSession wrap(CqlSession session) {
+      return session;
+    }
   }
 }

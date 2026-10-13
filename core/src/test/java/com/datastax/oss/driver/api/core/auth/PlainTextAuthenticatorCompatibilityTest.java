@@ -142,7 +142,7 @@ public class PlainTextAuthenticatorCompatibilityTest {
             () ->
                 new ProgrammaticPlainTextAuthProvider("user", "pass")
                     .newAuthenticator(endPoint, DSE_AUTHENTICATOR))
-        .isInstanceOf(UnsupportedOperationException.class);
+        .isInstanceOf(AuthenticationException.class);
     assertThatThrownBy(() -> new PlainTextAuthenticator(credentials, endPoint, null))
         .isInstanceOf(NullPointerException.class);
   }
