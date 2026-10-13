@@ -827,10 +827,21 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
           || defaultConfig.isDefined(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE)) {
         throw unsupportedAstra();
       }
-      if (defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID)
-          || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_SERVICE)
-          || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION)
-          || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES)) {
+      AuthProvider authProvider = programmaticArguments.getAuthProvider();
+      String authProviderClass =
+          authProvider == null
+              ? defaultConfig.getString(DefaultDriverOption.AUTH_PROVIDER_CLASS, "")
+              : authProvider.getClass().getName();
+      boolean builtInPlainText =
+          authProviderClass.equals("PlainTextAuthProvider")
+              || authProviderClass.equals(
+                  "com.datastax.oss.driver.internal.core.auth.PlainTextAuthProvider")
+              || authProviderClass.equals(ProgrammaticPlainTextAuthProvider.class.getName());
+      if (builtInPlainText
+          && (defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID)
+              || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_SERVICE)
+              || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION)
+              || defaultConfig.isDefined(DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES))) {
         throw new UnsupportedOperationException("DSE authentication is no longer supported");
       }
       List<String> configContactPoints =

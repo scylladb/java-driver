@@ -73,6 +73,11 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
   public Authenticator newAuthenticator(
       @NonNull EndPoint endPoint, @NonNull String serverAuthenticator)
       throws AuthenticationException {
+    if ("com.datastax.bdp.cassandra.auth.DseAuthenticator".equals(serverAuthenticator)) {
+      throw new AuthenticationException(
+          endPoint,
+          "DSE authentication negotiation is no longer supported: " + serverAuthenticator);
+    }
     return new PlainTextAuthenticator(
         getCredentials(endPoint, serverAuthenticator), endPoint, serverAuthenticator);
   }
