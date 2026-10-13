@@ -20,6 +20,7 @@ package com.datastax.dse.driver.api.querybuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.datastax.dse.driver.api.querybuilder.schema.CreateDseFunctionWithLanguage;
 import com.datastax.dse.driver.api.querybuilder.schema.DseGraphEdgeSide;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.type.DataTypes;
@@ -27,6 +28,13 @@ import org.junit.Test;
 
 @SuppressWarnings("deprecation")
 public class DseApiCompatibilityTest {
+
+  @Test
+  public void should_escape_legacy_function_body_with_both_delimiters() {
+    CreateDseFunctionWithLanguage builder = functionBody -> () -> functionBody;
+    assertThat(builder.asQuoted("return \"O'Reilly $$\";").asCql())
+        .isEqualTo("'return \"O''Reilly $$\";'");
+  }
 
   @Test
   public void should_keep_dml_alias() {
