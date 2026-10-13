@@ -141,6 +141,40 @@ configuration. Its public constants remain deprecated for source and binary comp
 option now defaults to `false`. If it is set to `true` in an application configuration, the driver
 logs a warning whenever a session is created; remove that setting.
 
+#### DSE Graph before and after 4.19.2.3
+
+##### Before 4.19.2.3
+
+The driver exposed DSE Graph execution APIs through `CqlSession`, including synchronous,
+asynchronous, and reactive execution. TinkerPop was an optional dependency starting with driver
+4.10.0. Applications using those APIs also configured requests through the `basic.graph` and
+`advanced.graph` trees and could enable the `graph-requests`, `graph-client-timeouts`, and
+`graph-messages` metrics.
+
+##### Starting with 4.19.2.3
+
+DSE Graph execution is no longer supported. Graph request processors, serializers, and the
+TinkerPop integration were removed. Public Graph API types remain temporarily for binary and source
+compatibility, but are deprecated. Creating or executing Graph requests throws an
+`UnsupportedOperationException` with migration guidance. Applications that still execute DSE Graph
+requests must remain on 4.19.2.2 or migrate that workload before upgrading.
+
+The deprecated Graph compatibility APIs have the following limitations:
+
+* Graph statement, result, session, predicate, and remote-connection APIs remain available but are
+  deprecated and fail fast when used.
+* `DseGraph.g` remains as a deprecated field for compatibility. With `gremlin-core` present, its
+  traversal methods fail with migration guidance; without it, the field is `null`.
+* `basic.graph` and `advanced.graph` settings no longer affect driver behavior. Graph defaults have
+  been removed from `reference.conf` and `OptionsMap.driverDefaults()`.
+* The `graph-requests`, `graph-client-timeouts`, and `graph-messages` metric names are no longer
+  supported and produce no Graph metrics.
+
+The TinkerPop runtime integration and JavaTuples dependency are removed. `gremlin-core` remains an
+optional, signature-only build dependency while the deprecated API shells exist; it is not supplied
+transitively to applications. Applications compiling against those signatures must continue to
+declare their own TinkerPop dependency.
+
 ### 4.19.2.2
 
 #### The local-DC check no longer inspects contact points
@@ -194,46 +228,10 @@ no longer fails `CqlSession.build()`. What changes:
   (`resolve-contact-points = true`, a programmatic resolved `InetSocketAddress`), custom `EndPoint`s
   and every node discovered from the cluster are tried as they are.
 
-#### DSE Graph before and after 4.19.2.2
+#### Serialized configuration maps remain readable
 
-##### Before 4.19.2.2
-
-The driver exposed DSE Graph execution APIs through `CqlSession`, including synchronous,
-asynchronous, and reactive execution. TinkerPop was an optional dependency starting with driver
-4.10.0. Applications using those APIs also configured requests through the `basic.graph` and
-`advanced.graph` trees and could enable the `graph-requests`, `graph-client-timeouts`, and
-`graph-messages` metrics.
-
-##### Starting with 4.19.2.2
-
-DSE Graph execution is no longer supported. Graph request processors, serializers, and the
-TinkerPop integration were removed. Public Graph API types remain temporarily for binary and source
-compatibility, but are deprecated. Creating or executing Graph requests throws an
-`UnsupportedOperationException` with migration guidance. Applications that still execute DSE Graph
-requests must remain on 4.19.2.1 or migrate that workload before upgrading.
-
-Legacy configuration remains compatible during the transition:
-
-* `DseDriverOption` and `TypedDriverOption` Graph constants remain available but are deprecated.
-* Graph statement, result, session, predicate, and remote-connection APIs remain available but are
-  deprecated and fail fast when used.
-* `DseGraph.g` remains as a deprecated field for compatibility. With `gremlin-core` present, its
-  traversal methods fail with migration guidance; without it, the field is `null`.
-* `basic.graph`, `advanced.graph`, and Graph metric settings are accepted and ignored. The driver
-  logs a deprecation warning when an application explicitly configures them.
-* Legacy Graph defaults remain readable from `reference.conf` and `OptionsMap.driverDefaults()`.
-* Serialized `OptionsMap` instances created by older driver versions remain deserializable in
-  4.19.2.2. See the 4.19.2.3 note above for maps containing removed `DseDriverOption` entries.
-* Graph helpers in `java-driver-test-infra` remain as deprecated signatures. Requests to create a
-  Graph fail fast; Graph engine and protocol settings are ignored.
-* `DseNodeMetric.GRAPH_MESSAGES`, `DseSessionMetric.GRAPH_REQUESTS`, and
-  `DseSessionMetric.GRAPH_CLIENT_TIMEOUTS` remain available but are deprecated. Enabling their metric
-  names produces no metrics.
-
-The TinkerPop runtime integration and JavaTuples dependency are removed. `gremlin-core` remains an
-optional, signature-only build dependency while the deprecated API shells exist; it is not supplied
-transitively to applications. Applications compiling against those signatures must continue to
-declare their own TinkerPop dependency.
+Serialized `OptionsMap` instances created by older driver versions remain deserializable in
+4.19.2.2. See the 4.19.2.3 note above for maps containing removed `DseDriverOption` entries.
 
 ### 4.19.2.1
 
