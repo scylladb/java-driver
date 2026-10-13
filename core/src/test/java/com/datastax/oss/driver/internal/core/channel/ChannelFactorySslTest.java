@@ -54,6 +54,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
@@ -197,7 +198,9 @@ public class ChannelFactorySslTest {
     // Both scheduled work and inbound TCP bytes use the same single I/O thread that would
     // otherwise have been blocked by engine creation in the channel initializer.
     assertThat(ioGroup.submit(() -> true).get(5, TimeUnit.SECONDS)).isTrue();
-    healthyConnection.writeAndFlush(Unpooled.buffer(1).writeByte(42)).sync();
+    ChannelFuture write = healthyConnection.writeAndFlush(Unpooled.buffer(1).writeByte(42));
+    assertThat(write.await(5, TimeUnit.SECONDS)).isTrue();
+    assertThat(write.isSuccess()).isTrue();
     assertThat(echoed.get(5, TimeUnit.SECONDS)).isEqualTo(42);
 
     blockingEngineFactory.releaseLookup.countDown();
