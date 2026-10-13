@@ -691,10 +691,18 @@ public class DefaultTopologyMonitor implements TopologyMonitor {
     // report zero, as advertised in the javadocs of Node and NodeInfo.
     if (broadcastRpcPort == null || broadcastRpcPort == 0) {
 
-      limitedLogger.warn(
-          "[{}] Unable to determine broadcast RPC port.  "
-              + "Trying to fall back to port used by the control connection.",
-          logPrefix);
+      if (row.contains(NATIVE_PORT) || row.contains("rpc_port")) {
+        limitedLogger.warn(
+            "[{}] Unable to determine broadcast RPC port.  "
+                + "Trying to fall back to port used by the control connection.",
+            logPrefix);
+      } else {
+        // ScyllaDB and older Cassandra schemas do not advertise the RPC port.
+        LOG.debug(
+            "[{}] Broadcast RPC port columns are absent.  "
+                + "Trying to fall back to port used by the control connection.",
+            logPrefix);
+      }
       broadcastRpcPort = port == -1 ? 0 : port;
     }
 
