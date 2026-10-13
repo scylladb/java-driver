@@ -83,8 +83,8 @@ standard SASL PLAIN authentication; DSE proxy authorization and GSSAPI have no r
 
 #### DataStax Astra secure-connect-bundle support was removed
 
-This release intentionally removes the DataStax Astra secure-connect-bundle integration and its
-public API. The following members are no longer available:
+This release removes the DataStax Astra secure-connect-bundle integration. The following public
+members remain as deprecated compatibility stubs:
 
 - `SessionBuilder.withCloudSecureConnectBundle(Path)`
 - `SessionBuilder.withCloudSecureConnectBundle(URL)`
@@ -97,16 +97,17 @@ public API. The following members are no longer available:
 - `DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
 - `TypedDriverOption.CLOUD_SECURE_CONNECT_BUNDLE`
 
-The old `datastax-java-driver.basic.cloud.secure-connect-bundle` configuration key is now an
-unknown option and no longer supplies connection information. If that was the only connection
-setting, the resulting configuration contains no contact points, so the driver falls back to its
-default contact point, `127.0.0.1:9042`.
+The builder methods throw `UnsupportedOperationException` when called.
+`ProgrammaticArguments.getCloudProxyAddress()` returns `null`, preserving reads of the absent proxy.
+Setting the protected `cloudConfigInputStream` field or the
+`datastax-java-driver.basic.cloud.secure-connect-bundle` configuration key causes session creation
+to fail before connecting. The constants remain available for source and binary compatibility but
+do not restore Astra support.
 
-This is an intentional binary- and source-compatibility break. This driver no longer has built-in
-support for connecting to DataStax Astra. Plain contact points cannot replace an Astra secure
-connect bundle because the bundle also provides TLS identity and trust material, metadata, and SNI
-proxy routing. Applications that need Astra must use 4.19.2.2 or an earlier release that supports
-secure connect bundles, or migrate to an Astra-compatible driver.
+This driver no longer has built-in support for connecting to DataStax Astra. Plain contact points
+cannot replace an Astra secure connect bundle because the bundle also provides TLS identity and
+trust material, metadata, and SNI proxy routing. Applications that need Astra must use 4.19.2.2 or
+an earlier release that supports secure connect bundles, or migrate to an Astra-compatible driver.
 
 For ScyllaDB deployments, configure explicit `basic.contact-points` or programmatic contact points.
 For supported ScyllaDB private-endpoint deployments, use
