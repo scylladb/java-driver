@@ -43,7 +43,8 @@ class WkbSerializationProxy implements Serializable {
   }
 
   private Object readResolve() {
-    ByteBuffer buffer = ByteBuffer.wrap(wkb).order(ByteOrder.nativeOrder());
+    ByteBuffer buffer = ByteBuffer.wrap(wkb);
+    buffer.order(wkb[0] == 0 ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
     int type = buffer.getInt(1);
 
     if (type == 1) {
