@@ -25,7 +25,9 @@ under the License.
 
 The DSE protocol versions, continuous paging, Graph API shells, geometry and DateRange types,
 DSE metadata extensions, and DSE query builder extensions are no longer available. Remove usages
-of `DseSession`, `DseDriverOption`, and the Graph and continuous paging APIs before upgrading.
+of `DseSession`, unsupported `DseDriverOption` constants, and the Graph and continuous paging APIs
+before upgrading. Deprecated DSE authentication option constants remain available as described
+below.
 The generic reactive CQL and mapper APIs remain available under their existing
 `com.datastax.dse` package names.
 
@@ -36,9 +38,9 @@ If `basic.load-balancing-policy.class` names `DseLoadBalancingPolicy` or
 `DseDcInferringLoadBalancingPolicy`, replace it with `DefaultLoadBalancingPolicy` or
 `DcInferringLoadBalancingPolicy`, respectively. The DSE policy classes have been removed.
 
-Serialized `OptionsMap` instances from 4.19.2.1 or 4.19.2.2 that contain `DseDriverOption` entries
-cannot be deserialized with this release because that enum has been removed. This includes every
-map created with `OptionsMap.driverDefaults()` in those releases, even if the application did not
+Serialized `OptionsMap` instances from 4.19.2.1 or 4.19.2.2 that contain removed
+`DseDriverOption` constants cannot be deserialized with this release. This includes every map
+created with `OptionsMap.driverDefaults()` in those releases, even if the application did not
 configure DSE features. Rebuild those maps with the remaining options before upgrading; the
 serialization compatibility noted under 4.19.2.2 below does not extend to these maps.
 
@@ -53,7 +55,7 @@ execution. Configuring `advanced.auth-provider.class` as `DsePlainTextAuthProvid
 ordinary username and password authentication, use `PlainTextAuthProvider` instead of
 `DsePlainTextAuthProvider`.
 
-The following APIs were removed:
+The following APIs remain for deprecated compatibility:
 
 - `SessionBuilder.withAuthCredentials(username, password, authorizationId)` and the deprecated
   `SessionBuilder.withCredentials(username, password, authorizationId)` alias
@@ -62,24 +64,32 @@ The following APIs were removed:
 - `PlainTextAuthProviderBase.Credentials(username, password, authorizationId)` and
   `getAuthorizationId()`
 - `DseDriverOption.AUTH_PROVIDER_*` and the DSE `TypedDriverOption.AUTH_PROVIDER_*` options
-- `ProxyAuthentication`, `BaseDseAuthenticator`, `DseGssApiAuthProviderBase`,
+- `ProxyAuthentication` for CQL statements, `BaseDseAuthenticator`, `DseGssApiAuthProviderBase`,
   `ProgrammaticDseGssApiAuthProvider`, and `DsePlainTextAuthProviderBase`
 
-Removing these public signatures in 4.19.2.3 is an intentional exception to the
-[public API compatibility convention](../manual/api_conventions/). Applications compiled against
-them must migrate and be recompiled before upgrading.
+Calls that request DSE proxy authentication or GSSAPI throw `UnsupportedOperationException`.
+The authorization-ID overloads and setter accept empty IDs for ordinary plaintext authentication
+and reject nonempty proxy identities. Null IDs remain invalid. The credentials getter returns an
+empty ID. Custom credentials that return a nonempty authorization ID are rejected before encoding
+the authentication response.
+Configuring their old option keys fails session creation before connecting. The
+`DsePlainTextAuthProviderBase` alias remains available for ordinary SASL PLAIN authentication.
+The Graph overload of `ProxyAuthentication.executeAs` remains unavailable with the removed Graph
+API.
 
-`PlainTextAuthProviderBase.PlainTextAuthenticator` now implements `SyncAuthenticator` directly
-instead of extending `BaseDseAuthenticator`. Its three-argument constructor
-`(Credentials, EndPoint, String)` was removed; custom subclasses should use
-`(Credentials, EndPoint)`. The deprecated `(Credentials)` constructor remains for ordinary plaintext
-subclasses, but DSE negotiation methods such as `getMechanism()` and `getInitialServerChallenge()`
-are no longer available.
+`PlainTextAuthProviderBase.PlainTextAuthenticator` retains its `BaseDseAuthenticator` superclass
+and its three-argument constructor `(Credentials, EndPoint, String)` for ordinary authentication.
+The third argument is the server authenticator name. The hooks return `PLAIN` and `PLAIN-START`;
+they do not enable DSE negotiation. `BaseDseAuthenticator` supports its ordinary authentication
+path, but rejects the DSE authenticator name at construction. The plaintext provider also rejects
+that server name. Custom subclasses can use `(Credentials, EndPoint)` for ordinary plaintext
+authentication.
 
 The DSE-only `authorization-id`, `service`, `login-configuration`, and `sasl-properties`
-authentication settings are no longer read. Remove them from application configuration. Custom
-providers that extended `DsePlainTextAuthProviderBase` can extend `PlainTextAuthProviderBase` for
-standard SASL PLAIN authentication; DSE proxy authorization and GSSAPI have no replacement here.
+authentication settings are rejected at session creation. Remove them from application
+configuration. Custom providers that extended `DsePlainTextAuthProviderBase` can extend
+`PlainTextAuthProviderBase` for standard SASL PLAIN authentication; DSE proxy authorization and
+GSSAPI have no replacement here.
 
 #### DataStax Astra secure-connect-bundle support was removed
 
