@@ -53,12 +53,14 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @ThreadSafe
-public class DefaultPreparedStatement implements PreparedStatement, RequestRoutingTypeAccessor {
+public class DefaultPreparedStatement
+    implements PreparedStatement, RequestRoutingTypeAccessor, PrepareCacheAnchor {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultPreparedStatement.class);
   private static final Splitter SPACE_SPLITTER = Splitter.onPattern("\\s+");
   private static final Splitter COMMA_SPLITTER = Splitter.onPattern(",");
@@ -86,6 +88,15 @@ public class DefaultPreparedStatement implements PreparedStatement, RequestRouti
   private final Partitioner partitioner;
   @Nullable private final RequestRoutingType requestRoutingType;
   private volatile boolean skipMetadata;
+
+  /**
+   * Retains the prepare cache entry that produced this statement. Never read: it exists purely so
+   * that the entry, which the cache holds weakly, stays reachable for as long as this statement is.
+   *
+   * @see PrepareCacheAnchor
+   */
+  @SuppressWarnings("unused")
+  private volatile CompletableFuture<PreparedStatement> prepareCacheAnchor;
 
   public DefaultPreparedStatement(
       ByteBuffer id,
@@ -142,6 +153,11 @@ public class DefaultPreparedStatement implements PreparedStatement, RequestRouti
     this.skipMetadata =
         resolveSkipMetadata(
             query, resultMetadataId, resultSetDefinitions, this.executionProfileForBoundStatements);
+  }
+
+  @Override
+  public void setPrepareCacheAnchor(@Nullable CompletableFuture<PreparedStatement> anchor) {
+    this.prepareCacheAnchor = anchor;
   }
 
   @NonNull
