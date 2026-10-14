@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.internal.core.channel;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,20 +26,36 @@ import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.BusyConnectionException;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
+import com.datastax.oss.driver.api.core.connection.HeartbeatException;
+import com.datastax.oss.driver.internal.core.protocol.ByteBufPrimitiveCodec;
+import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameDecodingException;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
+import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.Frame;
+import com.datastax.oss.protocol.internal.FrameCodec;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
+import com.datastax.oss.protocol.internal.ProtocolFeatures;
 import com.datastax.oss.protocol.internal.request.Query;
 import com.datastax.oss.protocol.internal.response.Error;
 import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.response.result.Void;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.codec.DecoderException;
+import io.netty.handler.codec.TooLongFrameException;
+import io.netty.handler.timeout.IdleStateEvent;
 import java.net.InetSocketAddress;
+import java.nio.ByteOrder;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -160,6 +177,233 @@ public class InFlightHandlerTest extends ChannelHandlerTestBase {
     // Then
     assertThat(responseCallback.getFailure()).isSameAs(mockCause);
     verify(streamIds).release(42);
+  }
+
+  @Test
+  public void should_complete_callbacks_once_for_alternating_valid_and_malformed_frames() {
+    addDecoder();
+    addToPipeline();
+    when(streamIds.acquire()).thenReturn(0, 1, 2, 3);
+    ResponseCallback[] callbacks = new ResponseCallback[4];
+    ByteBuf input = channel.alloc().buffer();
+    for (int streamId = 0; streamId < callbacks.length; streamId++) {
+      callbacks[streamId] = mock(ResponseCallback.class);
+      when(callbacks[streamId].isLastResponse(any(Frame.class))).thenReturn(true);
+      sendRequest(callbacks[streamId]);
+      appendResponse(input, streamId, streamId % 2 == 0 ? 0x7f : 0x08);
+    }
+
+    channel.writeInbound(input);
+
+    for (int streamId = 0; streamId < callbacks.length; streamId++) {
+      if (streamId % 2 == 0) {
+        verify(callbacks[streamId]).onFailure(any(IllegalArgumentException.class));
+        verify(callbacks[streamId], never()).onResponse(any(Frame.class));
+      } else {
+        verify(callbacks[streamId]).onResponse(any(Frame.class));
+        verify(callbacks[streamId], never()).onFailure(any(Throwable.class));
+      }
+      verify(streamIds).release(streamId);
+    }
+    assertThat(channel.isActive()).isTrue();
+    assertThat(input.refCnt()).isZero();
+    channel.finishAndReleaseAll();
+  }
+
+  @Test
+  public void should_stop_decoding_when_failure_callback_closes_channel() {
+    addDecoder();
+    addToPipeline();
+    when(streamIds.acquire()).thenReturn(42, 43);
+    MockResponseCallback failed =
+        new MockResponseCallback() {
+          @Override
+          public void onFailure(Throwable error) {
+            super.onFailure(error);
+            channel.close();
+          }
+        };
+    MockResponseCallback pending = new MockResponseCallback();
+    sendRequest(failed);
+    sendRequest(pending);
+    ByteBuf input = channel.alloc().buffer();
+    appendResponse(input, 42, 0x7f);
+    appendResponse(input, 43, 0x08);
+
+    channel.writeInbound(input);
+
+    assertThat(failed.getFailure()).isInstanceOf(IllegalArgumentException.class);
+    assertThat(failed.getFailure()).isNull();
+    assertThat(pending.getFailure()).isInstanceOf(ClosedConnectionException.class);
+    assertThat(pending.getLastResponse()).isNull();
+    assertThat(channel.isOpen()).isFalse();
+    assertThat(input.refCnt()).isZero();
+    channel.finishAndReleaseAll();
+  }
+
+  @Test
+  public void should_stop_decoding_when_failure_callback_removes_decoder() {
+    addDecoder();
+    List<ByteBuf> remainingBytes = new ArrayList<>();
+    channel
+        .pipeline()
+        .addLast(
+            new ChannelInboundHandlerAdapter() {
+              @Override
+              public void channelRead(ChannelHandlerContext context, Object message) {
+                if (message instanceof ByteBuf) {
+                  remainingBytes.add((ByteBuf) message);
+                } else {
+                  context.fireChannelRead(message);
+                }
+              }
+            });
+    addToPipeline();
+    when(streamIds.acquire()).thenReturn(42);
+    MockResponseCallback failed =
+        new MockResponseCallback() {
+          @Override
+          public void onFailure(Throwable error) {
+            super.onFailure(error);
+            channel.pipeline().remove(FrameDecoder.class);
+          }
+        };
+    sendRequest(failed);
+    ByteBuf input = channel.alloc().buffer();
+    appendResponse(input, 42, 0x7f);
+    appendResponse(input, 43, 0x08);
+
+    channel.writeInbound(input);
+
+    assertThat(failed.getFailure()).isInstanceOf(IllegalArgumentException.class);
+    assertThat(failed.getFailure()).isNull();
+    assertThat(remainingBytes).hasSize(1);
+    ByteBuf remaining = remainingBytes.get(0);
+    assertThat(remaining.readableBytes()).isEqualTo(13);
+    assertThat(remaining.getShort(remaining.readerIndex() + 2)).isEqualTo((short) 43);
+    remaining.release();
+    assertThat(channel.isActive()).isTrue();
+    assertThat(input.refCnt()).isZero();
+    channel.finishAndReleaseAll();
+  }
+
+  @Test
+  public void should_close_channel_when_frame_extraction_fails() {
+    assertUnsafeDecodingClosesChannel(new IllegalArgumentException("extraction failed"));
+  }
+
+  @Test
+  public void should_close_channel_when_oversized_error_does_not_consume_frame() {
+    assertUnsafeDecodingClosesChannel(new TooLongFrameException("no discard progress"));
+  }
+
+  @Test
+  public void should_close_channel_when_heartbeat_response_is_malformed() throws Exception {
+    addDecoder();
+    DriverExecutionProfile config = mock(DriverExecutionProfile.class);
+    when(config.getDuration(DefaultDriverOption.HEARTBEAT_INTERVAL))
+        .thenReturn(Duration.ofSeconds(30));
+    when(config.getDuration(DefaultDriverOption.HEARTBEAT_TIMEOUT))
+        .thenReturn(Duration.ofSeconds(5));
+    when(config.getDuration(DefaultDriverOption.REPEATED_LOG_INTERVAL))
+        .thenReturn(Duration.ofSeconds(60));
+    HeartbeatHandler heartbeatHandler = new HeartbeatHandler(config);
+    channel.pipeline().addLast(heartbeatHandler);
+    addToPipeline();
+    when(streamIds.acquire()).thenReturn(42, 43);
+    MockResponseCallback pending = new MockResponseCallback();
+    sendRequest(pending);
+    heartbeatHandler.channelIdle(
+        channel.pipeline().context(heartbeatHandler), IdleStateEvent.FIRST_READER_IDLE_STATE_EVENT);
+    Frame heartbeat = readOutboundFrame();
+    assertThat(heartbeat.streamId).isEqualTo(43);
+    ByteBuf input = channel.alloc().buffer();
+    appendResponse(input, 43, 0x7f);
+    appendResponse(input, 42, 0x08);
+
+    channel.writeInbound(input);
+
+    assertThat(pending.getFailure())
+        .isInstanceOf(HeartbeatException.class)
+        .hasCauseInstanceOf(IllegalArgumentException.class);
+    assertThat(pending.getLastResponse()).isNull();
+    assertThat(channel.isOpen()).isFalse();
+    assertThat(input.refCnt()).isZero();
+    channel.finishAndReleaseAll();
+  }
+
+  private void assertUnsafeDecodingClosesChannel(RuntimeException cause) {
+    FrameCodec<ByteBuf> codec =
+        FrameCodec.defaultClient(new ByteBufPrimitiveCodec(channel.alloc()), Compressor.none());
+    channel
+        .pipeline()
+        .addLast(
+            new FrameDecoder(
+                codec, ProtocolFeatures.EMPTY, cause instanceof TooLongFrameException ? 12 : 1024) {
+              @Override
+              protected long getUnadjustedFrameLength(
+                  ByteBuf buffer, int offset, int length, ByteOrder order) {
+                long frameLength = super.getUnadjustedFrameLength(buffer, offset, length, order);
+                if (cause instanceof TooLongFrameException) {
+                  throw cause;
+                }
+                return frameLength;
+              }
+
+              @Override
+              protected ByteBuf extractFrame(
+                  ChannelHandlerContext context, ByteBuf buffer, int index, int length) {
+                throw cause;
+              }
+            });
+    addToPipeline();
+    when(streamIds.acquire()).thenReturn(42, 43);
+    MockResponseCallback first = new MockResponseCallback();
+    MockResponseCallback second = new MockResponseCallback();
+    sendRequest(first);
+    sendRequest(second);
+    ByteBuf input = channel.alloc().buffer();
+    appendResponse(input, 42, 0x08);
+    appendResponse(input, 43, 0x08);
+
+    channel.writeInbound(input);
+
+    for (MockResponseCallback callback : ImmutableList.of(first, second)) {
+      Throwable failure = callback.getFailure();
+      assertThat(failure).isInstanceOf(ClosedConnectionException.class);
+      assertThat(failure.getCause()).isInstanceOf(DecoderException.class);
+      if (cause instanceof DecoderException) {
+        assertThat(failure.getCause()).isSameAs(cause);
+      } else {
+        assertThat(failure.getCause().getCause()).isSameAs(cause);
+      }
+      assertThat(callback.getFailure()).isNull();
+    }
+    assertThat(channel.isOpen()).isFalse();
+    assertThat(input.refCnt()).isZero();
+    channel.finishAndReleaseAll();
+  }
+
+  private void addDecoder() {
+    FrameCodec<ByteBuf> codec =
+        FrameCodec.defaultClient(new ByteBufPrimitiveCodec(channel.alloc()), Compressor.none());
+    channel.pipeline().addLast(new FrameDecoder(codec, ProtocolFeatures.EMPTY, 1024));
+  }
+
+  private void sendRequest(ResponseCallback callback) {
+    channel.writeAndFlush(
+        new DriverChannel.RequestMessage(QUERY, false, Frame.NO_PAYLOAD, callback));
+    readOutboundFrame();
+  }
+
+  private void appendResponse(ByteBuf input, int streamId, int opcode) {
+    input
+        .writeByte(0x84)
+        .writeByte(0)
+        .writeShort(streamId)
+        .writeByte(opcode)
+        .writeInt(4)
+        .writeInt(1);
   }
 
   @Test
