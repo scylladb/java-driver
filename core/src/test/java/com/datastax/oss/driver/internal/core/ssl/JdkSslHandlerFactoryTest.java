@@ -259,6 +259,51 @@ public class JdkSslHandlerFactoryTest {
     }
   }
 
+  @Test(timeout = 10000)
+  public void should_not_hold_factory_lock_while_running_completion_callbacks() throws Exception {
+    CountDownLatch engineCreationStarted = new CountDownLatch(1);
+    CountDownLatch releaseEngineCreation = new CountDownLatch(1);
+    CountDownLatch callbackStarted = new CountDownLatch(1);
+    CountDownLatch releaseCallback = new CountDownLatch(1);
+    SSLEngine engine = mock(SSLEngine.class);
+    when(engineFactory.newSslEngine(endpoint))
+        .thenAnswer(
+            invocation -> {
+              engineCreationStarted.countDown();
+              awaitUninterruptibly(releaseEngineCreation);
+              return engine;
+            });
+    factory = new JdkSslHandlerFactory(engineFactory);
+    try {
+      CompletableFuture<SslHandlerFactory> preparation =
+          factory.prepare(endpoint).toCompletableFuture();
+      preparation.whenComplete(
+          (prepared, error) -> {
+            callbackStarted.countDown();
+            awaitUninterruptibly(releaseCallback);
+          });
+      assertThat(engineCreationStarted.await(5, TimeUnit.SECONDS)).isTrue();
+      releaseEngineCreation.countDown();
+      assertThat(callbackStarted.await(5, TimeUnit.SECONDS)).isTrue();
+
+      CompletableFuture<Void> closing =
+          CompletableFuture.runAsync(
+              () -> {
+                try {
+                  factory.close();
+                } catch (Exception error) {
+                  throw new RuntimeException(error);
+                }
+              });
+      closing.get(5, TimeUnit.SECONDS);
+      releaseCallback.countDown();
+      preparation.get(5, TimeUnit.SECONDS).close();
+    } finally {
+      releaseEngineCreation.countDown();
+      releaseCallback.countDown();
+    }
+  }
+
   @Test
   public void should_fail_preparation_if_executor_rejects_task() {
     ThreadPoolExecutor executor = newSingleWorkerExecutor();

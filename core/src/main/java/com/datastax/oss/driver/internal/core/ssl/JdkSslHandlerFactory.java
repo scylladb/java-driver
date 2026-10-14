@@ -143,11 +143,14 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
                   try {
                     PreparedFactory prepared =
                         new PreparedFactory(sslEngineFactory.newSslEngine(remoteEndpoint));
-                    boolean delivered;
+                    boolean factoryClosed;
                     synchronized (JdkSslHandlerFactory.this) {
-                      delivered = !closed && complete(prepared);
+                      factoryClosed = closed;
                     }
-                    if (!delivered) {
+                    // Completing may run connection callbacks synchronously. Do not hold the
+                    // factory monitor while they resolve endpoints or initialize bootstraps.
+                    // If close() wins after the check above, it fails this pending preparation.
+                    if (factoryClosed || !complete(prepared)) {
                       prepared.close();
                     }
                   } catch (Throwable error) {
