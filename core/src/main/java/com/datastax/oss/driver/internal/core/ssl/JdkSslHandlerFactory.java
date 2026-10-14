@@ -26,6 +26,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCountUtil;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -41,6 +42,14 @@ import net.jcip.annotations.ThreadSafe;
 /** SSL handler factory used when JDK-based SSL was configured through the driver's public API. */
 @ThreadSafe
 public class JdkSslHandlerFactory implements SslHandlerFactory {
+  private enum Claim {
+    PENDING,
+    SUCCESS,
+    FAILURE,
+    CLOSED,
+    CANCELLED
+  }
+
   private final SslEngineFactory sslEngineFactory;
   private final ThreadPoolExecutor executor;
 
@@ -85,22 +94,27 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
 
   @NonNull
   @Override
-  public synchronized CompletionStage<SslHandlerFactory> prepare(@NonNull EndPoint remoteEndpoint) {
-    if (closed) {
-      CompletableFuture<SslHandlerFactory> result = new CompletableFuture<>();
-      result.completeExceptionally(new IllegalStateException("SSL handler factory is closed"));
-      return result;
+  public CompletionStage<SslHandlerFactory> prepare(@NonNull EndPoint remoteEndpoint) {
+    Preparation preparation;
+    synchronized (this) {
+      if (closed) {
+        CompletableFuture<SslHandlerFactory> result = new CompletableFuture<>();
+        result.completeExceptionally(new IllegalStateException("SSL handler factory is closed"));
+        return result;
+      }
+      // A low-level subclass might override newSslHandler; do not bypass that extension point.
+      if (getClass() != JdkSslHandlerFactory.class) {
+        return SslHandlerFactory.super.prepare(remoteEndpoint);
+      }
+      preparation = new Preparation(remoteEndpoint);
+      pending.add(preparation);
     }
-    // A low-level subclass might override newSslHandler; do not bypass that extension point.
-    if (getClass() != JdkSslHandlerFactory.class) {
-      return SslHandlerFactory.super.prepare(remoteEndpoint);
-    }
-    Preparation preparation = new Preparation(remoteEndpoint);
-    pending.add(preparation);
     try {
       executor.execute(preparation.task);
     } catch (RuntimeException error) {
-      preparation.completeExceptionally(error);
+      if (preparation.claim(Claim.FAILURE)) {
+        preparation.completeExceptionally(error);
+      }
     }
     return preparation;
   }
@@ -113,27 +127,33 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
 
   @Override
   public void close() throws Exception {
+    List<Preparation> preparations;
     synchronized (this) {
       if (closed) {
         return;
       }
       closed = true;
-      // Keep completion and close mutually exclusive: a worker must not hand an engine to a
-      // connection after the factory has started closing.
-      for (Preparation preparation : new ArrayList<>(pending)) {
-        preparation.completeExceptionally(
-            new IllegalStateException("SSL handler factory is closed"));
+      preparations = new ArrayList<>(pending);
+      for (Preparation preparation : preparations) {
+        preparation.claim = Claim.CLOSED;
       }
+      pending.clear();
     }
     // DNS lookups are not necessarily interruptible. Finish callers promptly without waiting for
     // workers; any engine produced after cancellation is released by Preparation.
     executor.shutdownNow();
+    for (Preparation preparation : preparations) {
+      preparation.completeExceptionally(new IllegalStateException("SSL handler factory is closed"));
+    }
     sslEngineFactory.close();
   }
 
   @ThreadSafe
   private final class Preparation extends CompletableFuture<SslHandlerFactory> {
     private final FutureTask<Void> task;
+
+    // Accessed only while holding the enclosing factory's monitor.
+    private Claim claim = Claim.PENDING;
 
     private Preparation(@NonNull EndPoint remoteEndpoint) {
       task =
@@ -143,33 +163,46 @@ public class JdkSslHandlerFactory implements SslHandlerFactory {
                   try {
                     PreparedFactory prepared =
                         new PreparedFactory(sslEngineFactory.newSslEngine(remoteEndpoint));
-                    boolean factoryClosed;
-                    synchronized (JdkSslHandlerFactory.this) {
-                      factoryClosed = closed;
-                    }
                     // Completing may run connection callbacks synchronously. Do not hold the
                     // factory monitor while they resolve endpoints or initialize bootstraps.
-                    // If close() wins after the check above, it fails this pending preparation.
-                    if (factoryClosed || !complete(prepared)) {
+                    if (!claim(Claim.SUCCESS) || !complete(prepared)) {
                       prepared.close();
                     }
                   } catch (Throwable error) {
-                    completeExceptionally(error);
+                    if (claim(Claim.FAILURE)) {
+                      completeExceptionally(error);
+                    }
                   }
                 }
                 return null;
               });
       whenComplete(
           (prepared, error) -> {
-            synchronized (JdkSslHandlerFactory.this) {
-              pending.remove(this);
-            }
             if (error != null) {
               task.cancel(true);
               // FutureTask cancellation alone leaves the task in ThreadPoolExecutor's queue.
               executor.remove(task);
             }
           });
+    }
+
+    private boolean claim(Claim next) {
+      synchronized (JdkSslHandlerFactory.this) {
+        if (claim != Claim.PENDING) {
+          return false;
+        }
+        claim = next;
+        pending.remove(this);
+        return true;
+      }
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      if (!claim(Claim.CANCELLED)) {
+        return false;
+      }
+      return super.cancel(mayInterruptIfRunning);
     }
   }
 

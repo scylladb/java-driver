@@ -265,6 +265,8 @@ public class JdkSslHandlerFactoryTest {
     CountDownLatch releaseEngineCreation = new CountDownLatch(1);
     CountDownLatch callbackStarted = new CountDownLatch(1);
     CountDownLatch releaseCallback = new CountDownLatch(1);
+    CountDownLatch observerFinished = new CountDownLatch(1);
+    AtomicReference<Boolean> observerHeldFactoryLock = new AtomicReference<>();
     SSLEngine engine = mock(SSLEngine.class);
     when(engineFactory.newSslEngine(endpoint))
         .thenAnswer(
@@ -277,6 +279,11 @@ public class JdkSslHandlerFactoryTest {
     try {
       CompletableFuture<SslHandlerFactory> preparation =
           factory.prepare(endpoint).toCompletableFuture();
+      preparation.whenComplete(
+          (prepared, error) -> {
+            observerHeldFactoryLock.set(Thread.holdsLock(factory));
+            observerFinished.countDown();
+          });
       preparation.whenComplete(
           (prepared, error) -> {
             callbackStarted.countDown();
@@ -297,6 +304,8 @@ public class JdkSslHandlerFactoryTest {
               });
       closing.get(5, TimeUnit.SECONDS);
       releaseCallback.countDown();
+      assertThat(observerFinished.await(5, TimeUnit.SECONDS)).isTrue();
+      assertThat(observerHeldFactoryLock.get()).isFalse();
       preparation.get(5, TimeUnit.SECONDS).close();
     } finally {
       releaseEngineCreation.countDown();
