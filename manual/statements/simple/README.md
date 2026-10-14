@@ -40,6 +40,22 @@ If you execute the same query often (or a similar query with different column va
 [prepared statement](../prepared/) instead.
 
 
+### SELECT without FROM
+
+Servers that support SELECT without FROM can evaluate expressions without an application keyspace
+or table. Both simple and prepared statements work with a session opened by `cluster.connect()`:
+
+```java
+int value = session.execute("SELECT 1").one().getInt(0);
+UUID timeUuid = session.execute(session.prepare("SELECT now()").bind()).one().getUUID(0);
+```
+
+Scylla returns column names `1` and `system.now()`, with CQL types `int` and `timeuuid`, respectively.
+The query builder requires a FROM target, so use CQL strings for these queries. Support depends on
+the server; older servers reject this syntax. The `SelectWithoutFromTest` integration test probes
+`SELECT 1` and skips only when that probe receives a syntax error. After a successful probe, errors
+in either expression or the prepared execution paths fail the test.
+
 ### Using values
 
 Instead of sending a raw query string, you can use bind markers and provide values separately:
