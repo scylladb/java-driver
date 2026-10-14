@@ -34,6 +34,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.protocol.ByteBufPrimitiveCodec;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
@@ -250,7 +251,8 @@ public abstract class ChannelFactoryTestBase {
         ProtocolVersion protocolVersion,
         DriverChannelOptions options,
         NodeMetricUpdater nodeMetricUpdater,
-        CompletableFuture<DriverChannel> resultFuture) {
+        CompletableFuture<DriverChannel> resultFuture,
+        SslHandlerFactory sslFactory) {
       return new ChannelInitializer<Channel>() {
         @Override
         protected void initChannel(Channel channel) throws Exception {

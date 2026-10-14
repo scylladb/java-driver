@@ -23,6 +23,7 @@
  */
 package com.datastax.oss.driver.internal.core.channel;
 
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -41,6 +42,8 @@ import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
+import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
@@ -55,6 +58,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.resolver.AddressResolver;
 import io.netty.resolver.AddressResolverGroup;
+import io.netty.util.Timeout;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -62,11 +66,13 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.jcip.annotations.ThreadSafe;
@@ -408,6 +414,137 @@ public class ChannelFactory {
       List<ProtocolVersion> attemptedVersions,
       CompletableFuture<DriverChannel> resultFuture) {
 
+    if (resultFuture.isDone()) {
+      return;
+    }
+    try {
+      Optional<SslHandlerFactory> sslFactory = context.getSslHandlerFactory();
+      if (!sslFactory.isPresent()) {
+        connect(
+            endPoint,
+            shardingInfo,
+            shardId,
+            options,
+            nodeMetricUpdater,
+            currentVersion,
+            isNegotiating,
+            attemptedVersions,
+            resultFuture,
+            null);
+        return;
+      }
+
+      SslHandlerFactory sharedFactory = sslFactory.get();
+      CompletableFuture<SslHandlerFactory> preparation = prepareSsl(sharedFactory, endPoint);
+      resultFuture.whenComplete((channel, error) -> preparation.cancel(true));
+      preparation.whenComplete(
+          (preparedFactory, error) -> {
+            if (error != null) {
+              resultFuture.completeExceptionally(error);
+              return;
+            }
+            // The shared factory owns the executor; a distinct prepared factory owns only the
+            // engine for this attempt. Release it if cancellation wins before installation.
+            resultFuture.whenComplete(
+                (channel, failure) -> closePreparedSsl(sharedFactory, preparedFactory));
+            if (!resultFuture.isDone()) {
+              connect(
+                  endPoint,
+                  shardingInfo,
+                  shardId,
+                  options,
+                  nodeMetricUpdater,
+                  currentVersion,
+                  isNegotiating,
+                  attemptedVersions,
+                  resultFuture,
+                  preparedFactory);
+            }
+          });
+    } catch (Throwable t) {
+      resultFuture.completeExceptionally(t);
+    }
+  }
+
+  private CompletableFuture<SslHandlerFactory> prepareSsl(
+      SslHandlerFactory sharedFactory, EndPoint endPoint) {
+    CompletableFuture<SslHandlerFactory> result = new CompletableFuture<>();
+    CompletableFuture<SslHandlerFactory> source =
+        sharedFactory.prepare(endPoint).toCompletableFuture();
+    source.whenComplete(
+        (preparedFactory, error) -> {
+          if (error != null) {
+            result.completeExceptionally(error);
+          } else if (preparedFactory == null) {
+            result.completeExceptionally(
+                new IllegalStateException("SSL handler preparation returned null"));
+          } else if (!result.complete(preparedFactory)) {
+            closePreparedSsl(sharedFactory, preparedFactory);
+          }
+        });
+    if (result.isDone()) {
+      return result;
+    }
+    Timeout timeout;
+    try {
+      Duration duration =
+          context
+              .getConfig()
+              .getDefaultProfile()
+              .getDuration(DefaultDriverOption.CONNECTION_CONNECT_TIMEOUT);
+      timeout =
+          !duration.isZero()
+              ? context
+                  .getNettyOptions()
+                  .getTimer()
+                  .newTimeout(
+                      ignored ->
+                          result.completeExceptionally(
+                              new DriverTimeoutException(
+                                  "SSL engine preparation timed out after " + duration)),
+                      duration.toNanos(),
+                      TimeUnit.NANOSECONDS)
+              : null;
+    } catch (Throwable t) {
+      result.completeExceptionally(t);
+      source.cancel(true);
+      return result;
+    }
+    result.whenComplete(
+        (preparedFactory, error) -> {
+          if (timeout != null) {
+            timeout.cancel();
+          }
+          if (error != null) {
+            source.cancel(true);
+          }
+        });
+    return result;
+  }
+
+  private void closePreparedSsl(
+      SslHandlerFactory sharedFactory, SslHandlerFactory preparedFactory) {
+    if (preparedFactory != sharedFactory) {
+      try {
+        preparedFactory.close();
+      } catch (Exception e) {
+        Loggers.warnWithException(LOG, "[{}] Error releasing prepared SSL engine", logPrefix, e);
+      }
+    }
+  }
+
+  private void connect(
+      EndPoint endPoint,
+      NodeShardingInfo shardingInfo,
+      Integer shardId,
+      DriverChannelOptions options,
+      NodeMetricUpdater nodeMetricUpdater,
+      ProtocolVersion currentVersion,
+      boolean isNegotiating,
+      List<ProtocolVersion> attemptedVersions,
+      CompletableFuture<DriverChannel> resultFuture,
+      @Nullable SslHandlerFactory sslFactory) {
+
     // Everything a caller sees of a connect is the future, so nothing below may throw at it: the
     // bootstrap hook and the Netty options it reads are user code, and a caller that gets a throw
     // instead of a failed future either loses the attempt or, from a dropped callback, hangs.
@@ -423,7 +560,13 @@ public class ChannelFactory {
               .channel(nettyOptions.channelClass())
               .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
               .handler(
-                  initializer(endPoint, currentVersion, options, nodeMetricUpdater, resultFuture));
+                  initializer(
+                      endPoint,
+                      currentVersion,
+                      options,
+                      nodeMetricUpdater,
+                      resultFuture,
+                      sslFactory));
 
       nettyOptions.afterBootstrapInitialized(bootstrap);
 
@@ -454,8 +597,19 @@ public class ChannelFactory {
       return;
     }
 
+    resultFuture.whenComplete(
+        (channel, error) -> {
+          if (error != null) {
+            connectFuture.cancel(false);
+            connectFuture.channel().close();
+          }
+        });
     connectFuture.addListener(
         cf -> {
+          if (resultFuture.isDone()) {
+            connectFuture.channel().close();
+            return;
+          }
           if (connectFuture.isSuccess()) {
             Channel channel = connectFuture.channel();
             DriverChannel driverChannel =
@@ -468,7 +622,9 @@ public class ChannelFactory {
             if (ChannelFactory.this.clusterName == null) {
               ChannelFactory.this.clusterName = driverChannel.getClusterName();
             }
-            resultFuture.complete(driverChannel);
+            if (!resultFuture.complete(driverChannel)) {
+              driverChannel.forceClose();
+            }
           } else {
             Throwable error = connectFuture.cause();
             if (error instanceof UnsupportedProtocolVersionException && isNegotiating) {
@@ -511,9 +667,10 @@ public class ChannelFactory {
       ProtocolVersion protocolVersion,
       DriverChannelOptions options,
       NodeMetricUpdater nodeMetricUpdater,
-      CompletableFuture<DriverChannel> resultFuture) {
+      CompletableFuture<DriverChannel> resultFuture,
+      @Nullable SslHandlerFactory sslFactory) {
     return new ChannelFactoryInitializer(
-        endPoint, protocolVersion, options, nodeMetricUpdater, resultFuture);
+        endPoint, protocolVersion, options, nodeMetricUpdater, resultFuture, sslFactory);
   }
 
   class ChannelFactoryInitializer extends ChannelInitializer<Channel> {
@@ -523,19 +680,22 @@ public class ChannelFactory {
     private final DriverChannelOptions options;
     private final NodeMetricUpdater nodeMetricUpdater;
     private final CompletableFuture<DriverChannel> resultFuture;
+    @Nullable private final SslHandlerFactory sslFactory;
 
     ChannelFactoryInitializer(
         EndPoint endPoint,
         ProtocolVersion protocolVersion,
         DriverChannelOptions options,
         NodeMetricUpdater nodeMetricUpdater,
-        CompletableFuture<DriverChannel> resultFuture) {
+        CompletableFuture<DriverChannel> resultFuture,
+        @Nullable SslHandlerFactory sslFactory) {
 
       this.endPoint = endPoint;
       this.protocolVersion = protocolVersion;
       this.options = options;
       this.nodeMetricUpdater = nodeMetricUpdater;
       this.resultFuture = resultFuture;
+      this.sslFactory = sslFactory;
     }
 
     @Override
@@ -583,9 +743,9 @@ public class ChannelFactory {
                 context, protocolVersion, clusterName, endPoint, options, heartbeatHandler, true);
 
         ChannelPipeline pipeline = channel.pipeline();
-        context
-            .getSslHandlerFactory()
-            .ifPresent(f -> pipeline.addLast(SSL_HANDLER_NAME, f.newSslHandler(channel, endPoint)));
+        if (sslFactory != null) {
+          pipeline.addLast(SSL_HANDLER_NAME, sslFactory.newSslHandler(channel, endPoint));
+        }
 
         // Only add meter handlers on the pipeline if metrics are enabled.
         SessionMetricUpdater sessionMetricUpdater = context.getMetricsFactory().getSessionUpdater();

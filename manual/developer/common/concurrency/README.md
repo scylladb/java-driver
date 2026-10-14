@@ -129,7 +129,7 @@ could introduce deadlocks.
 Keeping the internals fully asynchronous is another major improvement over driver 3, where internal
 requests were synchronous, and required multiple internal executors to avoid deadlocks.
 
-In driver 4, there are only two executors: `NettyOptions.ioEventLoopGroup()` and
+In driver 4, there are two Netty executors: `NettyOptions.ioEventLoopGroup()` and
 `NettyOptions.adminEventLoopGroup()`, that are guaranteed to never run blocking tasks. They can be
 shared with application code, or across multiple sessions, or can even be one and the same (in
 theory, it's possible to use a single 1-thread executor, although there's probably no practical
@@ -139,7 +139,14 @@ To be exhaustive, `NettyOptions.getTimer()` also uses its own thread; we tried s
 timeouts and speculative executions on I/O threads in early alphas, but that didn't perform as well
 as Netty's `HashedWheelTimer`.
 
-So the total number of threads created by a session is
+Without JDK SSL, the number of threads created by these components is
 ```
 advanced.netty.io-group.size + advanced.netty.admin-group.size + 1
 ```
+
+When JDK SSL is enabled, `JdkSslHandlerFactory` additionally creates up to two daemon workers lazily
+to prepare engines, including any reverse DNS lookup. These workers belong to the session's SSL
+handler factory and are shut down with it. Pending preparations fail promptly on close, even if a
+name-service lookup does not respond to interruption. Custom low-level `SslHandlerFactory`
+implementations keep their existing execution model unless they override its asynchronous
+`prepare` hook.

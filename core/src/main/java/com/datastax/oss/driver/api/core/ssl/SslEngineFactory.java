@@ -32,6 +32,10 @@ public interface SslEngineFactory extends AutoCloseable {
   /**
    * Creates a new SSL engine each time a connection is established.
    *
+   * <p>The driver's standard JDK SSL handler factory invokes this method on dedicated preparation
+   * workers before opening the connection, so blocking work such as reverse DNS does not occupy
+   * network I/O threads. Implementations must support concurrent invocations.
+   *
    * @param remoteEndpoint the remote endpoint we are connecting to (the address of the Cassandra
    *     node).
    */
