@@ -21,15 +21,23 @@ import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -46,6 +54,9 @@ import org.slf4j.LoggerFactory;
 @RunWith(DataProviderRunner.class)
 @Category(IsolatedTests.class)
 public class AdvancedShardAwarenessIT {
+
+  private static final int TEST_SOURCE_PORT_LOW = 2000;
+  private static final int TEST_SOURCE_PORT_HIGH = 9000;
 
   @ClassRule
   public static final CustomCcmRule CCM_RULE =
@@ -103,9 +114,8 @@ public class AdvancedShardAwarenessIT {
         Pattern.compile(".*" + Pattern.quote(node1) + ".*Scheduling next reconnection in.*");
     Pattern reconnectionPattern2 =
         Pattern.compile(".*" + Pattern.quote(node2) + ".*Scheduling next reconnection in.*");
-    // A source port can become occupied between the availability check and the channel bind.
-    // Allow a brief retry, but still reject repeated failures.
-    int toleratedReconnections = 2;
+    Set<Pattern> forbiddenOccurences =
+        ImmutableSet.of(shardMismatchPattern, reconnectionPattern1, reconnectionPattern2);
     Map<Pattern, Integer> expectedOccurences =
         ImmutableMap.of(
             Pattern.compile(
@@ -122,8 +132,8 @@ public class AdvancedShardAwarenessIT {
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, reuseAddress)
             .withBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true)
-            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, 10000)
-            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, 60000)
+            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, TEST_SOURCE_PORT_LOW)
+            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, testSourcePortHigh())
             // Due to rounding up the connections per shard this will result in 6 connections per
             // node
             .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, expectedChannelsPerNode)
@@ -136,16 +146,34 @@ public class AdvancedShardAwarenessIT {
             .build()) {
       List<CqlSession> allSessions = Collections.singletonList(session);
       Awaitility.await()
-          .atMost(15, TimeUnit.SECONDS)
+          .atMost(5, TimeUnit.SECONDS)
           .pollInterval(500, TimeUnit.MILLISECONDS)
           .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
       expectedOccurences.forEach(
           (pattern, times) -> assertMatchesExactly(pattern, times, logsCopy));
-      assertNoLogMatches(shardMismatchPattern, logsCopy);
-      assertMatchesAtMost(reconnectionPattern1, toleratedReconnections, logsCopy);
-      assertMatchesAtMost(reconnectionPattern2, toleratedReconnections, logsCopy);
+      forbiddenOccurences.forEach(pattern -> assertNoLogMatches(pattern, logsCopy));
     }
+  }
+
+  private static int testSourcePortHigh() {
+    // Keep explicitly bound test ports below the host's automatic ephemeral-port range. Otherwise
+    // an unrelated outgoing connection can claim a port after the driver's availability probe.
+    Path ephemeralRange = Paths.get("/proc/sys/net/ipv4/ip_local_port_range");
+    int high = TEST_SOURCE_PORT_HIGH;
+    if (Files.exists(ephemeralRange)) {
+      try {
+        String[] bounds =
+            Files.readString(ephemeralRange, StandardCharsets.US_ASCII).trim().split("\\s+");
+        high = Math.min(high, Integer.parseInt(bounds[0]) - 1);
+      } catch (IOException error) {
+        throw new UncheckedIOException("Could not read the ephemeral port range", error);
+      }
+    }
+    if (high - TEST_SOURCE_PORT_LOW < 100) {
+      throw new IllegalStateException("No non-ephemeral test source ports are available");
+    }
+    return high;
   }
 
   @Test
