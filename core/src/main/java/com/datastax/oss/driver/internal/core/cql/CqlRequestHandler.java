@@ -31,6 +31,7 @@ import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.FrameTooLongException;
@@ -258,7 +259,7 @@ public class CqlRequestHandler implements Throttled {
         // explicit message
         result.completeExceptionally(
             "cannot be started once stopped".equals(e.getMessage())
-                ? new IllegalStateException("Session is closed")
+                ? new SessionClosedException("Session is closed")
                 : e);
       }
     }

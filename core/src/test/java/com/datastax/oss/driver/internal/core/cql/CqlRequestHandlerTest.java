@@ -31,6 +31,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
@@ -137,7 +138,7 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
       assertThatStage(resultSetFuture)
           .isFailed(
               error -> {
-                assertThat(error).isInstanceOf(IllegalStateException.class);
+                assertThat(error).isInstanceOf(SessionClosedException.class);
                 assertThat(error).hasMessage("Session is closed");
               });
     }
@@ -162,7 +163,7 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
       assertThatStage(resultSetFuture)
           .isFailed(
               error -> {
-                assertThat(error).isInstanceOf(IllegalStateException.class);
+                assertThat(error).isInstanceOf(SessionClosedException.class);
                 assertThat(error).hasMessage("Session is closed");
               });
     }
