@@ -122,7 +122,7 @@ jobs:
       issues: read
 
     env:
-      MVNCMD: mvn -B -X -ntp
+      MVNCMD: mvn -B -ntp
 
     steps:
       - name: Checkout Repository
@@ -216,12 +216,6 @@ jobs:
           SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}
           SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
         run: make release-dry-run
-
-      - name: Upload release logs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: maven-stdout
-          path: /tmp/java-driver-release-logs/*.log
 
       - name: Push changes to SCM
         if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
