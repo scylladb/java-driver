@@ -25,13 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
@@ -55,8 +49,9 @@ import org.slf4j.LoggerFactory;
 @Category(IsolatedTests.class)
 public class AdvancedShardAwarenessIT {
 
-  private static final int TEST_SOURCE_PORT_LOW = 2000;
-  private static final int TEST_SOURCE_PORT_HIGH = 9000;
+  // The isolated Scylla CI jobs reserve this range from automatic local port assignment.
+  private static final int TEST_SOURCE_PORT_LOW = 20000;
+  private static final int TEST_SOURCE_PORT_HIGH = 22000;
 
   @ClassRule
   public static final CustomCcmRule CCM_RULE =
@@ -133,7 +128,7 @@ public class AdvancedShardAwarenessIT {
             .withBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, reuseAddress)
             .withBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true)
             .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, TEST_SOURCE_PORT_LOW)
-            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, testSourcePortHigh())
+            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, TEST_SOURCE_PORT_HIGH)
             // Due to rounding up the connections per shard this will result in 6 connections per
             // node
             .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, expectedChannelsPerNode)
@@ -154,26 +149,6 @@ public class AdvancedShardAwarenessIT {
           (pattern, times) -> assertMatchesExactly(pattern, times, logsCopy));
       forbiddenOccurences.forEach(pattern -> assertNoLogMatches(pattern, logsCopy));
     }
-  }
-
-  private static int testSourcePortHigh() {
-    // Keep explicitly bound test ports below the host's automatic ephemeral-port range. Otherwise
-    // an unrelated outgoing connection can claim a port after the driver's availability probe.
-    Path ephemeralRange = Paths.get("/proc/sys/net/ipv4/ip_local_port_range");
-    int high = TEST_SOURCE_PORT_HIGH;
-    if (Files.exists(ephemeralRange)) {
-      try {
-        String[] bounds =
-            Files.readString(ephemeralRange, StandardCharsets.US_ASCII).trim().split("\\s+");
-        high = Math.min(high, Integer.parseInt(bounds[0]) - 1);
-      } catch (IOException error) {
-        throw new UncheckedIOException("Could not read the ephemeral port range", error);
-      }
-    }
-    if (high - TEST_SOURCE_PORT_LOW < 100) {
-      throw new IllegalStateException("No non-ephemeral test source ports are available");
-    }
-    return high;
   }
 
   @Test
