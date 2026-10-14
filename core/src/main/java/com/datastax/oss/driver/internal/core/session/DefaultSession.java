@@ -28,6 +28,7 @@ import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
@@ -101,14 +102,14 @@ public class DefaultSession implements CqlSession {
   }
 
   /**
-   * Returns {@code IllegalStateException("Session is closed")} for an empty plan during shutdown
+   * Returns {@link SessionClosedException} for an empty plan during shutdown
    * (scylladb/java-driver#846); otherwise delegates to {@link AllNodesFailedException#fromErrors}.
    */
   @NonNull
   public static Throwable queryPlanExhaustedError(
       @NonNull DefaultSession session, @Nullable List<Map.Entry<Node, Throwable>> errors) {
     if ((errors == null || errors.isEmpty()) && (session.isClosing() || session.isClosed())) {
-      return new IllegalStateException("Session is closed");
+      return new SessionClosedException("Session is closed");
     }
     return AllNodesFailedException.fromErrors(errors);
   }
@@ -255,7 +256,7 @@ public class DefaultSession implements CqlSession {
     RequestProcessor<RequestT, ResultT> processor =
         processorRegistry.processorFor(request, resultType);
     return isClosed()
-        ? processor.newFailure(new IllegalStateException("Session is closed"))
+        ? processor.newFailure(new SessionClosedException("Session is closed"))
         : processor.process(request, this, context, logPrefix);
   }
 
