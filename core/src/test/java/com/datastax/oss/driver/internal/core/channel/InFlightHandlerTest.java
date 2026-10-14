@@ -39,6 +39,7 @@ import com.datastax.oss.protocol.internal.response.result.Void;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelPromise;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -121,6 +122,61 @@ public class InFlightHandlerTest extends ChannelHandlerTestBase {
     Frame frame = readOutboundFrame();
     assertThat(frame.streamId).isEqualTo(42);
     assertThat(frame.message).isEqualTo(QUERY);
+  }
+
+  @Test
+  public void should_release_stream_id_when_frame_creation_fails() {
+    // Given
+    StreamIdGenerator realStreamIds = new StreamIdGenerator(2);
+    InFlightHandler handler = addToPipeline(realStreamIds);
+    assertThat(handler.preAcquireId()).isTrue();
+
+    // Protocol V3 does not support custom payloads, so frame creation fails after acquire().
+    DriverChannel.RequestMessage message =
+        new DriverChannel.RequestMessage(
+            QUERY,
+            false,
+            Collections.singletonMap("test", ByteBuffer.allocate(0)),
+            new MockResponseCallback(),
+            handler);
+
+    // When
+    ChannelFuture writeFuture = channel.writeAndFlush(message);
+
+    // Then
+    assertThat(writeFuture).isFailed();
+    assertThat(handler.getAvailableIds()).isEqualTo(2);
+    assertNoOutboundFrame();
+  }
+
+  @Test
+  public void should_release_stream_id_when_callback_registration_fails() {
+    // Given
+    StreamIdGenerator realStreamIds = new StreamIdGenerator(2);
+    InFlightHandler handler = addToPipeline(realStreamIds);
+    MockResponseCallback responseCallback = new MockResponseCallback();
+    assertThat(handler.preAcquireId()).isTrue();
+    assertThat(
+            channel.writeAndFlush(
+                new DriverChannel.RequestMessage(
+                    QUERY, false, Frame.NO_PAYLOAD, responseCallback, handler)))
+        .isSuccess();
+    readOutboundFrame();
+    assertThat(handler.getAvailableIds()).isEqualTo(1);
+
+    // Reusing an in-flight callback is rejected by the callback map after acquiring a second id.
+    assertThat(handler.preAcquireId()).isTrue();
+
+    // When
+    ChannelFuture writeFuture =
+        channel.writeAndFlush(
+            new DriverChannel.RequestMessage(
+                QUERY, false, Frame.NO_PAYLOAD, responseCallback, handler));
+
+    // Then
+    assertThat(writeFuture).isFailed();
+    assertThat(handler.getAvailableIds()).isEqualTo(1);
+    assertNoOutboundFrame();
   }
 
   @Test
@@ -663,6 +719,20 @@ public class InFlightHandlerTest extends ChannelHandlerTestBase {
 
   private void addToPipeline() {
     addToPipelineWithEventCallback(null);
+  }
+
+  private InFlightHandler addToPipeline(StreamIdGenerator streamIds) {
+    InFlightHandler handler =
+        new InFlightHandler(
+            DefaultProtocolVersion.V3,
+            streamIds,
+            MAX_ORPHAN_IDS,
+            SET_KEYSPACE_TIMEOUT_MILLIS,
+            channel.newPromise(),
+            null,
+            "test");
+    channel.pipeline().addLast(handler);
+    return handler;
   }
 
   private void addToPipelineWithEventCallback(EventCallback eventCallback) {
