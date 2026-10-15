@@ -22,7 +22,10 @@ import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 /**
  * Specialized column metadata for DSE.
  *
- * <p>This type exists only for future extensibility; currently, it is identical to {@link
- * ColumnMetadata}.
+ * <p>This interface remains for source and binary compatibility.
+ *
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
  */
+@Deprecated
 public interface DseColumnMetadata extends ColumnMetadata {}

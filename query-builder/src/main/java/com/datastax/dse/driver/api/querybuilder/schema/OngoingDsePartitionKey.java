@@ -21,16 +21,22 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
-import com.datastax.oss.driver.api.querybuilder.schema.CreateTable;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface OngoingDsePartitionKey {
 
   /**
    * Adds a partition key column definition.
    *
    * <p>This includes the column declaration (you don't need an additional {@link
-   * CreateTable#withColumn(CqlIdentifier, DataType) addColumn} call).
+   * CreateDseTable#withColumn(CqlIdentifier, DataType) withColumn} call).
    *
    * <p>Partition keys are added in the order of their declaration.
    *
@@ -42,7 +48,7 @@ public interface OngoingDsePartitionKey {
 
   /**
    * Shortcut for {@link #withPartitionKey(CqlIdentifier, DataType)
-   * withPartitionKey(CqlIdentifier.asCql(columnName), dataType)}.
+   * withPartitionKey(CqlIdentifier.fromCql(columnName), dataType)}.
    */
   @NonNull
   default CreateDseTable withPartitionKey(@NonNull String columnName, @NonNull DataType dataType) {

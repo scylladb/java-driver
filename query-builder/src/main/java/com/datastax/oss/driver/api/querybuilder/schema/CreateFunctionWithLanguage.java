@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.api.querybuilder.schema;
 
+import com.datastax.oss.driver.internal.querybuilder.CqlHelper;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
 public interface CreateFunctionWithLanguage {
@@ -33,18 +34,14 @@ public interface CreateFunctionWithLanguage {
   CreateFunctionEnd as(@NonNull String functionBody);
 
   /**
-   * Adds AS to the create function specification and quotes the function body. Assumes that if the
-   * input body contains at least one single quote, to quote the body with two dollar signs, i.e.
-   * <code>$$ myBody $$</code>, otherwise the body is quoted with single quotes, i.e. <code>
-   * ' myBody '</code>. If the function body is already quoted {@link #as(String)} should be used
-   * instead.
+   * Adds AS to the create function specification and quotes the function body. Bodies containing
+   * single quotes use dollar quoting unless they also contain the {@code $$} delimiter. Otherwise,
+   * the body is enclosed in single quotes and embedded single quotes are escaped.
+   *
+   * <p>If the function body is already quoted, use {@link #as(String)} instead.
    */
   @NonNull
   default CreateFunctionEnd asQuoted(@NonNull String functionBody) {
-    if (functionBody.contains("'")) {
-      return as("$$ " + functionBody + " $$");
-    } else {
-      return as('\'' + functionBody + '\'');
-    }
+    return as(CqlHelper.quoteFunctionBody(functionBody));
   }
 }

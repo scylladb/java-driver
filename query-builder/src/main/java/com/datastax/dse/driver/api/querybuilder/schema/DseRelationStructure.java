@@ -23,6 +23,13 @@ import com.datastax.oss.driver.internal.core.CqlIdentifiers;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface DseRelationStructure<SelfT extends DseRelationStructure<SelfT>>
     extends DseRelationOptions<SelfT> {
 
@@ -37,8 +44,8 @@ public interface DseRelationStructure<SelfT extends DseRelationStructure<SelfT>>
   SelfT withClusteringOrderByIds(@NonNull Map<CqlIdentifier, ClusteringOrder> orderings);
 
   /**
-   * Shortcut for {@link #withClusteringOrderByIds(Map)} with the columns specified as
-   * case-insensitive names. They will be wrapped with {@link CqlIdentifier#fromCql(String)}.
+   * Shortcut for {@link #withClusteringOrderByIds(Map)} with the columns specified as CQL-form
+   * names. They will be wrapped with {@link CqlIdentifier#fromCql(String)}.
    *
    * <p>Note that it's possible for two different case-sensitive names to resolve to the same
    * identifier, for example "foo" and "Foo"; if this happens, a runtime exception will be thrown.

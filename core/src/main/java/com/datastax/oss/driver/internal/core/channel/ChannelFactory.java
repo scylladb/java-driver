@@ -23,11 +23,10 @@
  */
 package com.datastax.oss.driver.internal.core.channel;
 
-import com.datastax.oss.driver.api.core.ConsistencyLevel;
+import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.UnsupportedProtocolVersionException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
-import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
@@ -35,7 +34,6 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeShardingInfo;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
-import com.datastax.oss.driver.internal.core.config.typesafe.TypesafeDriverConfig;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
@@ -44,26 +42,37 @@ import com.datastax.oss.driver.internal.core.metrics.NoopNodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.protocol.FrameDecoder;
 import com.datastax.oss.driver.internal.core.protocol.FrameEncoder;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
+import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.ProtocolFeatures;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.resolver.AddressResolver;
+import io.netty.resolver.AddressResolverGroup;
+import io.netty.util.Timeout;
+import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketAddress;
+import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.jcip.annotations.ThreadSafe;
@@ -76,19 +85,14 @@ public class ChannelFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChannelFactory.class);
 
-  /**
-   * A value for {@link #productType} that indicates that we are connected to DataStax Cloud. This
-   * value matches the one defined at DSE DB server side at {@code ProductType.java}.
-   */
-  private static final String DATASTAX_CLOUD_PRODUCT_TYPE = "DATASTAX_APOLLO";
+  /** For a bootstrap that is only ever asked for its configuration, never connected. */
+  private static final ChannelInitializer<Channel> NO_OP_INITIALIZER =
+      new ChannelInitializer<Channel>() {
+        @Override
+        protected void initChannel(Channel channel) {}
+      };
 
   private static final AtomicBoolean LOGGED_ORPHAN_WARNING = new AtomicBoolean();
-
-  /**
-   * A value for {@link #productType} that indicates that the server does not report any product
-   * type.
-   */
-  private static final String UNKNOWN_PRODUCT_TYPE = "UNKNOWN";
 
   // The names of the handlers on the pipeline:
   public static final String SSL_HANDLER_NAME = "ssl";
@@ -126,23 +130,27 @@ public class ChannelFactory {
 
   private final String logPrefix;
   protected final InternalDriverContext context;
+  private final RateLimitedLogger limitedLogger;
+  private final RateLimitedLogger portAllocatorLogger;
+  private final RateLimitedLogger heartbeatLogger;
 
   /** either set from the configuration, or null and will be negotiated */
   @VisibleForTesting volatile ProtocolVersion protocolVersion;
 
   private volatile String clusterName;
 
-  /**
-   * The value of the {@code PRODUCT_TYPE} option reported by the first channel we opened, in
-   * response to a {@code SUPPORTED} request.
-   *
-   * <p>If the server does not return that option, the value will be {@link #UNKNOWN_PRODUCT_TYPE}.
-   */
-  @VisibleForTesting volatile String productType;
+  private final Object resolverLock = new Object();
+
+  /** @see #resolverState() */
+  private volatile ResolverState resolverState;
 
   public ChannelFactory(InternalDriverContext context) {
     this.logPrefix = context.getSessionName();
     this.context = context;
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
+    this.portAllocatorLogger = new RateLimitedLogger(PortAllocator.LOG, context);
+    this.heartbeatLogger =
+        new RateLimitedLogger(LoggerFactory.getLogger(HeartbeatHandler.class), context);
 
     DriverExecutionProfile defaultConfig = context.getConfig().getDefaultProfile();
     if (defaultConfig.isDefined(DefaultDriverOption.PROTOCOL_VERSION)) {
@@ -195,6 +203,173 @@ public class ChannelFactory {
     return connect(node.getEndPoint(), node.getShardingInfo(), shardId, options, nodeMetricUpdater);
   }
 
+  /**
+   * Resolves an address to every address it currently maps to, through the resolver the driver's
+   * bootstrap would use for a connect. An {@code AddressResolverGroup} installed by {@link
+   * NettyOptions#afterBootstrapInitialized(Bootstrap)} is therefore consulted exactly as {@link
+   * #connect(Node, DriverChannelOptions)} lets Netty consult it.
+   *
+   * <p>Mirrors the short-circuits of Netty's own {@code Bootstrap#doResolveAndConnect0}: when the
+   * resolver is disabled ({@code Bootstrap#disableResolver()}), does not support the address, or
+   * reports it already resolved, the address is returned as it is, as the only element. Otherwise
+   * the resolver's {@code resolveAll} answer is returned verbatim, neither filtered nor reordered.
+   * The answer is immutable either way, and a resolver failure fails the stage.
+   *
+   * <p>The lookup runs on one of the driver's I/O event loops, never on the calling thread: {@code
+   * AddressResolver#resolveAll} resolves inline, and Netty's default resolver blocks on the JDK
+   * lookup. A connect pays that on an event loop too (Netty resolves it from the channel's
+   * registration listener), and a {@code DnsAddressResolverGroup} blocks nothing. The stage
+   * completes on that loop, on the calling thread when the answer needs no resolver at all, or on
+   * neither when the loop terminates with the lookup in flight, so a caller that cares hops to its
+   * own executor.
+   *
+   * <p>Nothing here bounds the wait but the resolver itself, exactly as for a connect: a resolver
+   * that never answers leaves the stage pending until its loop goes away. Every path through the
+   * driver completes the stage, that termination included, and none of them throws at the caller.
+   */
+  public CompletionStage<List<SocketAddress>> resolveAll(SocketAddress address) {
+    CompletableFuture<List<SocketAddress>> result = new CompletableFuture<>();
+    try {
+      ResolverState resolver = resolverState();
+      AddressResolverGroup<?> resolverGroup = resolver.group;
+      EventExecutor executor = resolver.executor;
+      if (resolverGroup == null || executor == null) {
+        // disableResolver(): Netty would connect to the address exactly as given.
+        result.complete(ImmutableList.of(address));
+        return result;
+      }
+      executor.execute(() -> resolveAllOnExecutor(resolverGroup, executor, address, result));
+      // Only once the task is accepted: a loop that refuses it answers through the catch below,
+      // and a termination listener added first could beat that rejection to the stage.
+      failWhenExecutorTerminates(executor, address, result);
+    } catch (Throwable t) {
+      // Including the RejectedExecutionException of a loop that is already shutting down.
+      result.completeExceptionally(t);
+    }
+    return result;
+  }
+
+  /** The rest of {@link #resolveAll}, on the loop the lookup runs on. Never throws. */
+  private void resolveAllOnExecutor(
+      AddressResolverGroup<?> resolverGroup,
+      EventExecutor executor,
+      SocketAddress address,
+      CompletableFuture<List<SocketAddress>> result) {
+    try {
+      @SuppressWarnings("unchecked")
+      final AddressResolver<SocketAddress> resolver =
+          (AddressResolver<SocketAddress>) resolverGroup.getResolver(executor);
+      if (!resolver.isSupported(address) || resolver.isResolved(address)) {
+        result.complete(ImmutableList.of(address));
+        return;
+      }
+      resolver
+          .resolveAll(address)
+          .addListener(
+              (Future<List<SocketAddress>> resolved) -> {
+                // Netty only logs a throw from a listener, which would leave the stage incomplete
+                // for good and a caller waiting on it forever: every path here completes it.
+                try {
+                  if (!resolved.isSuccess()) {
+                    result.completeExceptionally(
+                        resolved.cause() != null
+                            ? resolved.cause()
+                            : new IllegalStateException("Resolver " + resolver + " failed"));
+                  } else if (resolved.getNow() == null) {
+                    result.completeExceptionally(
+                        new IllegalStateException("Resolver " + resolver + " answered null"));
+                  } else {
+                    result.complete(ImmutableList.copyOf(resolved.getNow()));
+                  }
+                } catch (Throwable t) {
+                  result.completeExceptionally(t);
+                }
+              });
+    } catch (Throwable t) {
+      // getResolver() throws once the loop is shutting down, and user code may throw at will.
+      result.completeExceptionally(t);
+    }
+  }
+
+  /**
+   * Fails a lookup that its event loop does not outlive. An asynchronous resolver completes its
+   * promise from a response or from a scheduled timeout, and a terminating loop cancels the latter
+   * without running it, which would leave the stage — and whoever waits on it — pending for good.
+   */
+  private static void failWhenExecutorTerminates(
+      EventExecutor executor,
+      SocketAddress address,
+      CompletableFuture<List<SocketAddress>> result) {
+    @SuppressWarnings("unchecked")
+    Future<Object> termination = (Future<Object>) executor.terminationFuture();
+    GenericFutureListener<Future<Object>> onTermination =
+        terminated ->
+            result.completeExceptionally(
+                new IllegalStateException(
+                    "Event loop terminated before " + address + " could be resolved"));
+    // Netty notifies this one off the loop that is dying, and the stage settles the race itself.
+    termination.addListener(onTermination);
+    // After the listener, never before: a stage that is already complete would otherwise run the
+    // removal first and leave a listener on a promise that lives as long as the loop.
+    result.whenComplete((resolved, error) -> termination.removeListener(onTermination));
+  }
+
+  /**
+   * The resolver group the bootstrap hook leaves installed, and the single I/O loop {@link
+   * #resolveAll} runs every lookup on. Discovered together and once: the hook is user code, and one
+   * shaped {@code bootstrap.resolver(new DnsAddressResolverGroup(...))} would otherwise mint a
+   * group, a resolver, a UDP socket and an empty DNS cache on every lookup.
+   */
+  private ResolverState resolverState() {
+    ResolverState state = this.resolverState;
+    if (state == null) {
+      synchronized (resolverLock) {
+        // Re-read under the lock: the null above is only a hint, and two callers that both acted
+        // on it would run the hook twice and pin a loop each.
+        state = this.resolverState;
+        if (state == null) {
+          this.resolverState = state = discoverResolver();
+        }
+      }
+    }
+    return state;
+  }
+
+  /** Only a hook that returned is remembered; one that threw is asked again next time. */
+  private ResolverState discoverResolver() {
+    NettyOptions nettyOptions = context.getNettyOptions();
+    // A resolver is installed on a Bootstrap, and only there: build one the way connect() does
+    // and ask it what it was given. The channel class, allocator and handler are what make this
+    // a connect bootstrap to the hook; none of them affects config().resolver().
+    Bootstrap bootstrap =
+        new Bootstrap()
+            .group(nettyOptions.ioEventLoopGroup())
+            .channel(nettyOptions.channelClass())
+            .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
+            .handler(NO_OP_INITIALIZER);
+    nettyOptions.afterBootstrapInitialized(bootstrap);
+    AddressResolverGroup<?> group = bootstrap.config().resolver();
+    // next() advances the group's round-robin chooser, so take one loop and keep it: a lookup
+    // must not shift which loop the next channel registers on, and the group hands back the
+    // same resolver, with the same DNS cache, for the same executor.
+    return new ResolverState(group, group == null ? null : nettyOptions.ioEventLoopGroup().next());
+  }
+
+  /**
+   * What {@link #resolveAll} needs of the hook, taken in one step so a group can never be paired
+   * with another caller's loop. Both fields are null when the hook disabled resolution, which is
+   * how that is told apart from a hook that has not run: then there is no instance at all.
+   */
+  private static final class ResolverState {
+    @Nullable final AddressResolverGroup<?> group;
+    @Nullable final EventExecutor executor;
+
+    ResolverState(@Nullable AddressResolverGroup<?> group, @Nullable EventExecutor executor) {
+      this.group = group;
+      this.executor = executor;
+    }
+  }
+
   @VisibleForTesting
   CompletionStage<DriverChannel> connect(
       EndPoint endPoint,
@@ -239,51 +414,202 @@ public class ChannelFactory {
       List<ProtocolVersion> attemptedVersions,
       CompletableFuture<DriverChannel> resultFuture) {
 
-    SocketAddress resolvedAddress;
+    if (resultFuture.isDone()) {
+      return;
+    }
     try {
-      resolvedAddress = endPoint.resolve();
-    } catch (Exception e) {
-      resultFuture.completeExceptionally(e);
+      Optional<SslHandlerFactory> sslFactory = context.getSslHandlerFactory();
+      if (!sslFactory.isPresent()) {
+        connect(
+            endPoint,
+            shardingInfo,
+            shardId,
+            options,
+            nodeMetricUpdater,
+            currentVersion,
+            isNegotiating,
+            attemptedVersions,
+            resultFuture,
+            null);
+        return;
+      }
+
+      SslHandlerFactory sharedFactory = sslFactory.get();
+      CompletableFuture<SslHandlerFactory> preparation = prepareSsl(sharedFactory, endPoint);
+      resultFuture.whenComplete((channel, error) -> preparation.cancel(true));
+      preparation.whenComplete(
+          (preparedFactory, error) -> {
+            if (error != null) {
+              resultFuture.completeExceptionally(error);
+              return;
+            }
+            // The shared factory owns the executor; a distinct prepared factory owns only the
+            // engine for this attempt. Release it if cancellation wins before installation.
+            resultFuture.whenComplete(
+                (channel, failure) -> closePreparedSsl(sharedFactory, preparedFactory));
+            if (!resultFuture.isDone()) {
+              connect(
+                  endPoint,
+                  shardingInfo,
+                  shardId,
+                  options,
+                  nodeMetricUpdater,
+                  currentVersion,
+                  isNegotiating,
+                  attemptedVersions,
+                  resultFuture,
+                  preparedFactory);
+            }
+          });
+    } catch (Throwable t) {
+      resultFuture.completeExceptionally(t);
+    }
+  }
+
+  private CompletableFuture<SslHandlerFactory> prepareSsl(
+      SslHandlerFactory sharedFactory, EndPoint endPoint) {
+    CompletableFuture<SslHandlerFactory> result = new CompletableFuture<>();
+    CompletableFuture<SslHandlerFactory> source =
+        sharedFactory.prepare(endPoint).toCompletableFuture();
+    source.whenComplete(
+        (preparedFactory, error) -> {
+          if (error != null) {
+            result.completeExceptionally(error);
+          } else if (preparedFactory == null) {
+            result.completeExceptionally(
+                new IllegalStateException("SSL handler preparation returned null"));
+          } else if (!result.complete(preparedFactory)) {
+            closePreparedSsl(sharedFactory, preparedFactory);
+          }
+        });
+    if (result.isDone()) {
+      return result;
+    }
+    Timeout timeout;
+    try {
+      Duration duration =
+          context
+              .getConfig()
+              .getDefaultProfile()
+              .getDuration(DefaultDriverOption.CONNECTION_CONNECT_TIMEOUT);
+      timeout =
+          !duration.isZero()
+              ? context
+                  .getNettyOptions()
+                  .getTimer()
+                  .newTimeout(
+                      ignored ->
+                          result.completeExceptionally(
+                              new DriverTimeoutException(
+                                  "SSL engine preparation timed out after " + duration)),
+                      duration.toNanos(),
+                      TimeUnit.NANOSECONDS)
+              : null;
+    } catch (Throwable t) {
+      result.completeExceptionally(t);
+      source.cancel(true);
+      return result;
+    }
+    result.whenComplete(
+        (preparedFactory, error) -> {
+          if (timeout != null) {
+            timeout.cancel();
+          }
+          if (error != null) {
+            source.cancel(true);
+          }
+        });
+    return result;
+  }
+
+  private void closePreparedSsl(
+      SslHandlerFactory sharedFactory, SslHandlerFactory preparedFactory) {
+    if (preparedFactory != sharedFactory) {
+      try {
+        preparedFactory.close();
+      } catch (Exception e) {
+        Loggers.warnWithException(LOG, "[{}] Error releasing prepared SSL engine", logPrefix, e);
+      }
+    }
+  }
+
+  private void connect(
+      EndPoint endPoint,
+      NodeShardingInfo shardingInfo,
+      Integer shardId,
+      DriverChannelOptions options,
+      NodeMetricUpdater nodeMetricUpdater,
+      ProtocolVersion currentVersion,
+      boolean isNegotiating,
+      List<ProtocolVersion> attemptedVersions,
+      CompletableFuture<DriverChannel> resultFuture,
+      @Nullable SslHandlerFactory sslFactory) {
+
+    // Everything a caller sees of a connect is the future, so nothing below may throw at it: the
+    // bootstrap hook and the Netty options it reads are user code, and a caller that gets a throw
+    // instead of a failed future either loses the attempt or, from a dropped callback, hangs.
+    ChannelFuture connectFuture;
+    try {
+      SocketAddress resolvedAddress = endPoint.resolve();
+
+      NettyOptions nettyOptions = context.getNettyOptions();
+
+      Bootstrap bootstrap =
+          new Bootstrap()
+              .group(nettyOptions.ioEventLoopGroup())
+              .channel(nettyOptions.channelClass())
+              .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
+              .handler(
+                  initializer(
+                      endPoint,
+                      currentVersion,
+                      options,
+                      nodeMetricUpdater,
+                      resultFuture,
+                      sslFactory));
+
+      nettyOptions.afterBootstrapInitialized(bootstrap);
+
+      if (shardId == null || shardingInfo == null) {
+        if (shardId != null) {
+          LOG.debug(
+              "Requested connection to shard {} but shardingInfo is currently missing for Node at endpoint {}. Falling back to arbitrary local port.",
+              shardId,
+              endPoint);
+        }
+        connectFuture = bootstrap.connect(resolvedAddress);
+      } else {
+        int localPort =
+            PortAllocator.getNextAvailablePort(
+                shardingInfo.getShardsCount(), shardId, context, portAllocatorLogger);
+        if (localPort == -1) {
+          limitedLogger.warn(
+              "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
+              shardId,
+              endPoint);
+          connectFuture = bootstrap.connect(resolvedAddress);
+        } else {
+          connectFuture = bootstrap.connect(resolvedAddress, new InetSocketAddress(localPort));
+        }
+      }
+    } catch (Throwable t) {
+      resultFuture.completeExceptionally(t);
       return;
     }
 
-    NettyOptions nettyOptions = context.getNettyOptions();
-
-    Bootstrap bootstrap =
-        new Bootstrap()
-            .group(nettyOptions.ioEventLoopGroup())
-            .channel(nettyOptions.channelClass())
-            .option(ChannelOption.ALLOCATOR, nettyOptions.allocator())
-            .handler(
-                initializer(endPoint, currentVersion, options, nodeMetricUpdater, resultFuture));
-
-    nettyOptions.afterBootstrapInitialized(bootstrap);
-
-    ChannelFuture connectFuture;
-    if (shardId == null || shardingInfo == null) {
-      if (shardId != null) {
-        LOG.debug(
-            "Requested connection to shard {} but shardingInfo is currently missing for Node at endpoint {}. Falling back to arbitrary local port.",
-            shardId,
-            endPoint);
-      }
-      connectFuture = bootstrap.connect(resolvedAddress);
-    } else {
-      int localPort =
-          PortAllocator.getNextAvailablePort(shardingInfo.getShardsCount(), shardId, context);
-      if (localPort == -1) {
-        LOG.warn(
-            "Could not find free port for shard {} at {}. Falling back to arbitrary local port.",
-            shardId,
-            endPoint);
-        connectFuture = bootstrap.connect(resolvedAddress);
-      } else {
-        connectFuture = bootstrap.connect(resolvedAddress, new InetSocketAddress(localPort));
-      }
-    }
-
+    resultFuture.whenComplete(
+        (channel, error) -> {
+          if (error != null) {
+            connectFuture.cancel(false);
+            connectFuture.channel().close();
+          }
+        });
     connectFuture.addListener(
         cf -> {
+          if (resultFuture.isDone()) {
+            connectFuture.channel().close();
+            return;
+          }
           if (connectFuture.isSuccess()) {
             Channel channel = connectFuture.channel();
             DriverChannel driverChannel =
@@ -296,25 +622,9 @@ public class ChannelFactory {
             if (ChannelFactory.this.clusterName == null) {
               ChannelFactory.this.clusterName = driverChannel.getClusterName();
             }
-            Map<String, List<String>> supportedOptions = driverChannel.getOptions();
-            if (ChannelFactory.this.productType == null && supportedOptions != null) {
-              List<String> productTypes = supportedOptions.get("PRODUCT_TYPE");
-              String productType =
-                  productTypes != null && !productTypes.isEmpty()
-                      ? productTypes.get(0)
-                      : UNKNOWN_PRODUCT_TYPE;
-              ChannelFactory.this.productType = productType;
-              DriverConfig driverConfig = context.getConfig();
-              if (driverConfig instanceof TypesafeDriverConfig
-                  && productType.equals(DATASTAX_CLOUD_PRODUCT_TYPE)) {
-                ((TypesafeDriverConfig) driverConfig)
-                    .overrideDefaults(
-                        ImmutableMap.of(
-                            DefaultDriverOption.REQUEST_CONSISTENCY,
-                            ConsistencyLevel.LOCAL_QUORUM.name()));
-              }
+            if (!resultFuture.complete(driverChannel)) {
+              driverChannel.forceClose();
             }
-            resultFuture.complete(driverChannel);
           } else {
             Throwable error = connectFuture.cause();
             if (error instanceof UnsupportedProtocolVersionException && isNegotiating) {
@@ -357,9 +667,10 @@ public class ChannelFactory {
       ProtocolVersion protocolVersion,
       DriverChannelOptions options,
       NodeMetricUpdater nodeMetricUpdater,
-      CompletableFuture<DriverChannel> resultFuture) {
+      CompletableFuture<DriverChannel> resultFuture,
+      @Nullable SslHandlerFactory sslFactory) {
     return new ChannelFactoryInitializer(
-        endPoint, protocolVersion, options, nodeMetricUpdater, resultFuture);
+        endPoint, protocolVersion, options, nodeMetricUpdater, resultFuture, sslFactory);
   }
 
   class ChannelFactoryInitializer extends ChannelInitializer<Channel> {
@@ -369,19 +680,22 @@ public class ChannelFactory {
     private final DriverChannelOptions options;
     private final NodeMetricUpdater nodeMetricUpdater;
     private final CompletableFuture<DriverChannel> resultFuture;
+    @Nullable private final SslHandlerFactory sslFactory;
 
     ChannelFactoryInitializer(
         EndPoint endPoint,
         ProtocolVersion protocolVersion,
         DriverChannelOptions options,
         NodeMetricUpdater nodeMetricUpdater,
-        CompletableFuture<DriverChannel> resultFuture) {
+        CompletableFuture<DriverChannel> resultFuture,
+        @Nullable SslHandlerFactory sslFactory) {
 
       this.endPoint = endPoint;
       this.protocolVersion = protocolVersion;
       this.options = options;
       this.nodeMetricUpdater = nodeMetricUpdater;
       this.resultFuture = resultFuture;
+      this.sslFactory = sslFactory;
     }
 
     @Override
@@ -423,15 +737,15 @@ public class ChannelFactory {
                 channel.newPromise(),
                 options.eventCallback,
                 options.ownerLogPrefix);
-        HeartbeatHandler heartbeatHandler = new HeartbeatHandler(defaultConfig);
+        HeartbeatHandler heartbeatHandler = new HeartbeatHandler(defaultConfig, heartbeatLogger);
         ProtocolInitHandler initHandler =
             new ProtocolInitHandler(
                 context, protocolVersion, clusterName, endPoint, options, heartbeatHandler, true);
 
         ChannelPipeline pipeline = channel.pipeline();
-        context
-            .getSslHandlerFactory()
-            .ifPresent(f -> pipeline.addLast(SSL_HANDLER_NAME, f.newSslHandler(channel, endPoint)));
+        if (sslFactory != null) {
+          pipeline.addLast(SSL_HANDLER_NAME, sslFactory.newSslHandler(channel, endPoint));
+        }
 
         // Only add meter handlers on the pipeline if metrics are enabled.
         SessionMetricUpdater sessionMetricUpdater = context.getMetricsFactory().getSessionUpdater();
@@ -474,7 +788,8 @@ public class ChannelFactory {
     private static final AtomicInteger lastPort = new AtomicInteger(-1);
     private static final Logger LOG = LoggerFactory.getLogger(PortAllocator.class);
 
-    public static int getNextAvailablePort(int shardCount, int shardId, DriverContext context) {
+    public static int getNextAvailablePort(
+        int shardCount, int shardId, DriverContext context, RateLimitedLogger logger) {
       int lowPort =
           context
               .getConfig()
@@ -486,7 +801,7 @@ public class ChannelFactory {
               .getDefaultProfile()
               .getInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH);
       if (highPort - lowPort < shardCount) {
-        LOG.error(
+        logger.error(
             "There is not enough ports in range [{},{}] for {} shards. Update your configuration.",
             lowPort,
             highPort,

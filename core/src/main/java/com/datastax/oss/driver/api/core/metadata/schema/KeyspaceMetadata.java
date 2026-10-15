@@ -214,15 +214,15 @@ public interface KeyspaceMetadata extends Describable {
         .append("KEYSPACE ")
         .append(getName())
         .append(" WITH replication = { 'class' : '")
-        .append(getReplication().get("class"))
+        .append(String.valueOf(getReplication().get("class")).replace("'", "''"))
         .append("'");
     for (Map.Entry<String, String> entry : getReplication().entrySet()) {
       if (!entry.getKey().equals("class")) {
         builder
             .append(", '")
-            .append(entry.getKey())
+            .append(entry.getKey().replace("'", "''"))
             .append("': '")
-            .append(entry.getValue())
+            .append(String.valueOf(entry.getValue()).replace("'", "''"))
             .append("'");
       }
     }

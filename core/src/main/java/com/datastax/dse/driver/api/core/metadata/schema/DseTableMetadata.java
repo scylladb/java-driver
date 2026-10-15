@@ -17,20 +17,16 @@
  */
 package com.datastax.dse.driver.api.core.metadata.schema;
 
-import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
-import com.datastax.oss.driver.api.core.metadata.schema.IndexMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 
 /**
  * Specialized table metadata for DSE.
  *
- * <p>Notes:
+ * <p>This type remains for source and binary compatibility. The driver no longer produces DSE
+ * metadata.
  *
- * <ul>
- *   <li>this type can always be safely downcast to {@link DseGraphTableMetadata} (the only reason
- *       the two interfaces are separate is for backward compatibility).
- *   <li>all returned {@link ColumnMetadata} can be cast to {@link DseColumnMetadata}, and all
- *       {@link IndexMetadata} to {@link DseIndexMetadata}.
- * </ul>
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
  */
+@Deprecated
 public interface DseTableMetadata extends DseRelationMetadata, TableMetadata {}

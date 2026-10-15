@@ -187,4 +187,17 @@ public class CreateFunctionTest {
         .hasCql(
             "CREATE FUNCTION keyspace1.func6 (param1 int) RETURNS NULL ON NULL INPUT RETURNS text LANGUAGE javascript AS $$ 'hello ' + param1; $$");
   }
+
+  @Test
+  public void should_escape_body_containing_both_quoting_delimiters() {
+    assertThat(
+            createFunction("ks", "fn")
+                .returnsNullOnNull()
+                .returnsType(DataTypes.TEXT)
+                .withJavaLanguage()
+                .asQuoted("return \"O'Reilly $$\";"))
+        .hasCql(
+            "CREATE FUNCTION ks.fn () RETURNS NULL ON NULL INPUT RETURNS text "
+                + "LANGUAGE java AS 'return \"O''Reilly $$\";'");
+  }
 }

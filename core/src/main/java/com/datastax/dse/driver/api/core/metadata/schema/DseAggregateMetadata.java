@@ -27,7 +27,11 @@ import java.util.Optional;
  * Specialized aggregate metadata for DSE.
  *
  * <p>It adds support for the DSE-specific {@link #getDeterministic() DETERMINISTIC} keyword.
+ *
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
  */
+@Deprecated
 public interface DseAggregateMetadata extends AggregateMetadata {
 
   /** @deprecated Use {@link #getDeterministic()} instead. */

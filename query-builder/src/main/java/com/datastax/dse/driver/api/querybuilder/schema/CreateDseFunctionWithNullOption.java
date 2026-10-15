@@ -23,6 +23,13 @@ import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface CreateDseFunctionWithNullOption {
   /**
    * Adds RETURNS to the create function specification. This is used to specify what type is

@@ -31,7 +31,10 @@ When the driver starts, the control connection is established to the first conta
 node goes down, a [reconnection](../reconnection/) is started to find another node; it is governed
 by the same policy as regular connections (`advanced.reconnection-policy` options in the
 [configuration](../configuration/)), and tries the nodes according to a query plan from the
-[load balancing policy](../load_balancing/). 
+[load balancing policy](../load_balancing/). When that plan is exhausted, the original contact points
+are tried again (`advanced.control-connection.reconnection.fallback-to-original-contact-points`, on
+by default), so a contact point given as a hostname is resolved again and a cluster that moved to
+new addresses is found.
 
 The control connection is managed independently from [regular pooled connections](../pooling/), and
 used exclusively for administrative requests. It shows up in [Node.getOpenConnections], as well as

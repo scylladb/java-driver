@@ -21,6 +21,20 @@ under the License.
 
 <!-- Note: contrary to 3.x, insert new entries *first* in their section -->
 
+### 4.19.2.3
+
+- [bug] Escape string literals in function, keyspace, and index metadata descriptions, and handle
+  function bodies containing single quotes and dollar-quote delimiters in schema builders (#1238)
+- [breaking] Remove DSE geometry and DateRange APIs and codecs, including `DseDataTypes`
+  and `DseTypeCodecs`, plus the ESRI dependency (#1029)
+- [breaking] Remove DSE metadata and schema runtime support; public metadata and query-builder APIs
+  remain as deprecated compatibility shells. DSE connections are unsupported (#1031, #1238)
+
+### 4.19.2.2
+
+- [breaking] Remove DSE Graph execution support and TinkerPop integration; deprecated Graph API
+  shells and legacy configuration remain temporarily for migration (#1028)
+
 ### 4.19.2
 
 - [bug] CASSJAVA-116: Retry or Speculative Execution with RequestIdGenerator throws "Duplicate Key"

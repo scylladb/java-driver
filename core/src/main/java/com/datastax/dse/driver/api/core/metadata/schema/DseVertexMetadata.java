@@ -20,7 +20,13 @@ package com.datastax.dse.driver.api.core.metadata.schema;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
-/** Vertex metadata, for a table that was created with CREATE TABLE ... WITH VERTEX LABEL. */
+/**
+ * Vertex metadata, for a table that was created with CREATE TABLE ... WITH VERTEX LABEL.
+ *
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
+ */
+@Deprecated
 public interface DseVertexMetadata {
 
   /** The label of the vertex in graph. */

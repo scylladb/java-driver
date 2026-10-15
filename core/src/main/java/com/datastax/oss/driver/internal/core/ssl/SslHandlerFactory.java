@@ -19,8 +19,11 @@ package com.datastax.oss.driver.internal.core.ssl;
 
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.channel.Channel;
 import io.netty.handler.ssl.SslHandler;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Low-level SSL extension point.
@@ -39,5 +42,20 @@ import io.netty.handler.ssl.SslHandler;
  * @see DefaultDriverContext#buildSslHandlerFactory()
  */
 public interface SslHandlerFactory extends AutoCloseable {
+  /**
+   * Prepares SSL before the connection is initialized on a Netty I/O thread.
+   *
+   * <p>The returned factory belongs to this connection attempt. If it differs from this factory,
+   * the caller closes it when the attempt completes, including when initialization never ran. Its
+   * {@link #newSslHandler} must transfer ownership of any prepared resources to the handler.
+   *
+   * <p>The default preserves existing low-level implementations, which remain responsible for
+   * avoiding blocking work in {@code newSslHandler}.
+   */
+  @NonNull
+  default CompletionStage<SslHandlerFactory> prepare(@NonNull EndPoint remoteEndpoint) {
+    return CompletableFuture.completedFuture(this);
+  }
+
   SslHandler newSslHandler(Channel channel, EndPoint remoteEndpoint);
 }

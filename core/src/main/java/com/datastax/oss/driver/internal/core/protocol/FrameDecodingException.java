@@ -20,7 +20,8 @@ package com.datastax.oss.driver.internal.core.protocol;
 import io.netty.handler.codec.DecoderException;
 
 /**
- * Wraps an error while decoding an incoming protocol frame.
+ * Wraps an error for an incoming protocol frame whose boundary is known and that has been consumed
+ * or is being discarded.
  *
  * <p>This is only used internally, never exposed to the client.
  */

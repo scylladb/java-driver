@@ -57,7 +57,7 @@ public class QueryReactiveIT {
 
   @ClassRule public static TestRule chain = RuleChain.outerRule(ccmRule).around(sessionRule);
 
-  private static DseTestDao dao;
+  private static TestDao dao;
 
   @BeforeClass
   public static void setup() {
@@ -98,12 +98,12 @@ public class QueryReactiveIT {
   public interface TestMapper {
 
     @DaoFactory
-    DseTestDao productDao(@DaoKeyspace CqlIdentifier keyspace);
+    TestDao productDao(@DaoKeyspace CqlIdentifier keyspace);
   }
 
   @Dao
   @DefaultNullSavingStrategy(NullSavingStrategy.SET_TO_NULL)
-  public interface DseTestDao {
+  public interface TestDao {
 
     @Insert
     void insert(TestEntity entity);

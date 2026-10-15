@@ -34,18 +34,24 @@ import com.datastax.oss.driver.internal.core.channel.EventCallback;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.ClientRoutesUpdateEvent;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.DefaultNode;
 import com.datastax.oss.driver.internal.core.metadata.DefaultTopologyMonitor;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.MetadataManager;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
 import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
-import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.ArrayUtils;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
+import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.internal.core.util.concurrent.Reconnection;
 import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.internal.core.util.concurrent.UncaughtExceptions;
+import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
+import com.datastax.oss.driver.shaded.guava.common.net.InetAddresses;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Event;
@@ -55,14 +61,22 @@ import com.datastax.oss.protocol.internal.response.event.StatusChangeEvent;
 import com.datastax.oss.protocol.internal.response.event.TopologyChangeEvent;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import io.netty.util.concurrent.EventExecutor;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
 import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -90,9 +104,14 @@ import org.slf4j.LoggerFactory;
 public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(ControlConnection.class);
 
+  /** No address to expand a contact point into: the caller tries it as it is. */
+  private static final Node[] NO_CANDIDATES = new Node[0];
+
   private final InternalDriverContext context;
   private final String logPrefix;
   private final EventExecutor adminExecutor;
+  private final Random random;
+  private final RateLimitedLogger limitedLogger;
   private final SingleThreaded singleThreaded;
 
   // The single channel used by this connection. This field is accessed concurrently, but only
@@ -100,9 +119,17 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   private volatile DriverChannel channel;
 
   public ControlConnection(InternalDriverContext context) {
+    this(context, new Random());
+  }
+
+  /** {@code random} decides the order in which a contact point's resolved addresses are tried. */
+  @VisibleForTesting
+  ControlConnection(InternalDriverContext context, Random random) {
     this.context = context;
     this.logPrefix = context.getSessionName();
     this.adminExecutor = context.getNettyOptions().adminEventExecutorGroup().next();
+    this.random = random;
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
     this.singleThreaded = new SingleThreaded(context);
   }
 
@@ -190,7 +217,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
   @Override
   public void onEvent(Message eventMessage) {
     if (!(eventMessage instanceof Event)) {
-      LOG.warn("[{}] Unsupported event class: {}", logPrefix, eventMessage.getClass().getName());
+      limitedLogger.warn(
+          "[{}] Unsupported event class: {}", logPrefix, eventMessage.getClass().getName());
     } else {
       LOG.debug("[{}] Processing incoming event {}", logPrefix, eventMessage);
       Event event = (Event) eventMessage;
@@ -208,7 +236,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           processClientRoutesChange(event);
           break;
         default:
-          LOG.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
+          limitedLogger.warn("[{}] Unsupported event type: {}", logPrefix, event.type);
       }
     }
   }
@@ -223,7 +251,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         context.getEventBus().fire(TopologyEvent.suggestRemoved(tce.address));
         break;
       default:
-        LOG.warn("[{}] Unsupported topology change type: {}", logPrefix, tce.changeType);
+        limitedLogger.warn("[{}] Unsupported topology change type: {}", logPrefix, tce.changeType);
     }
   }
 
@@ -237,7 +265,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         context.getEventBus().fire(TopologyEvent.suggestDown(sce.address));
         break;
       default:
-        LOG.warn("[{}] Unsupported status change type: {}", logPrefix, sce.changeType);
+        limitedLogger.warn("[{}] Unsupported status change type: {}", logPrefix, sce.changeType);
     }
   }
 
@@ -249,8 +277,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         .whenComplete(
             (metadata, error) -> {
               if (error != null) {
-                Loggers.warnWithException(
-                    LOG,
+                limitedLogger.warnWithException(
                     "[{}] Unexpected error while refreshing schema for a SCHEMA_CHANGE event, "
                         + "keeping previous version",
                     logPrefix,
@@ -291,7 +318,8 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
               logPrefix,
               adminExecutor,
               () -> reconnectionPolicy.newControlConnectionSchedule(false),
-              this::reconnect);
+              this::reconnect,
+              new RateLimitedLogger(LoggerFactory.getLogger(Reconnection.class), context));
       // In "reconnect-on-init" mode, handle cancellation of the initFuture by user code
       CompletableFutures.whenCancelled(
           this.initFuture,
@@ -339,7 +367,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
             () -> initFuture.complete(null),
             error -> {
               if (isAuthFailure(error)) {
-                LOG.warn(
+                limitedLogger.warn(
                     "[{}] Authentication errors encountered on all contact points. Please check your authentication configuration.",
                     logPrefix);
               }
@@ -387,10 +415,28 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
         List<Entry<Node, Throwable>> errors,
         Runnable onSuccess,
         Consumer<Throwable> onFailure) {
+      connect(nodes, errors, onSuccess, onFailure, true);
+    }
+
+    /**
+     * @param expandContactPoints whether the next node, if it is a contact point given as a
+     *     hostname, is first expanded to every address the name resolves to (see {@link
+     *     #expandContactPoint}). {@code false} only when that expansion was just attempted for it
+     *     and yielded nothing usable: the node is then tried as it is, the way every connect did
+     *     before expansion existed.
+     */
+    private void connect(
+        Queue<Node> nodes,
+        List<Entry<Node, Throwable>> errors,
+        Runnable onSuccess,
+        Consumer<Throwable> onFailure,
+        boolean expandContactPoints) {
       assert adminExecutor.inEventLoop();
       Node node = nodes.poll();
       if (node == null) {
         onFailure.accept(AllNodesFailedException.fromErrors(errors));
+      } else if (expandContactPoints && isExpandableContactPoint(node)) {
+        expandContactPoint(node, nodes, errors, onSuccess, onFailure);
       } else {
         LOG.debug("[{}] Trying to establish a connection to {}", logPrefix, node);
         context
@@ -406,14 +452,13 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                         onSuccess.run(); // abort, we don't really care about the result
                       } else {
                         if (error instanceof AuthenticationException) {
-                          Loggers.warnWithException(
-                              LOG, "[{}] Authentication error", logPrefix, error);
+                          limitedLogger.warnWithException(
+                              "[{}] Authentication error", logPrefix, error);
                         } else {
                           if (config
                               .getDefaultProfile()
                               .getBoolean(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR)) {
-                            Loggers.warnWithException(
-                                LOG,
+                            limitedLogger.warnWithException(
                                 "[{}] Error connecting to {}, trying next node",
                                 logPrefix,
                                 node,
@@ -499,6 +544,34 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                                           node,
                                           new Exception("Channel closed during endpoint resolve")));
                                   connect(nodes, newErrors, onSuccess, onFailure);
+                                } else if (isUnusableForControl(resolvedNode)) {
+                                  // Events name the identified node, not the placeholder we
+                                  // dialled, so isControlNode() cannot match them without a
+                                  // blocking endpoint lookup. Re-checked here instead.
+                                  controlNodeState = ControlNodeState.NONE;
+                                  LOG.debug(
+                                      "[{}] New channel opened ({}) but {} is ignored, removed "
+                                          + "or forced down, closing and trying next node",
+                                      logPrefix,
+                                      channel,
+                                      resolvedNode);
+                                  // Null out before forceClose() so that onChannelClosed() does not
+                                  // start a redundant reconnection on top of the connect() retry
+                                  // below.
+                                  ControlConnection.this.channel = null;
+                                  channel.forceClose();
+                                  // Recorded like every other drop; on init this list is what the
+                                  // user sees. A reconnection discards it, leaving the debug log.
+                                  List<Entry<Node, Throwable>> newErrors =
+                                      (errors == null) ? new ArrayList<>() : errors;
+                                  newErrors.add(
+                                      new SimpleEntry<>(
+                                          node,
+                                          new Exception(
+                                              "Control node "
+                                                  + resolvedNode
+                                                  + " is ignored, removed or forced down")));
+                                  connect(nodes, newErrors, onSuccess, onFailure);
                                 } else {
                                   controlNodeState = new ControlNodeState(resolvedNode, null);
                                   context
@@ -518,8 +591,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                               adminExecutor);
                     }
                   } catch (Exception e) {
-                    Loggers.warnWithException(
-                        LOG,
+                    limitedLogger.warnWithException(
                         "[{}] Unexpected exception while processing channel init result",
                         logPrefix,
                         e);
@@ -527,6 +599,210 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                 },
                 adminExecutor);
       }
+    }
+
+    /**
+     * Whether {@code node} is a contact point given as a hostname, which {@link
+     * #expandContactPoint} expands: not identified yet (no host id: an identified node is one
+     * server at one address, and a translator's hostname on one is re-resolved by Netty on every
+     * connect on purpose), an ordinary {@link DefaultEndPoint} (a custom or SNI endpoint keeps its
+     * own semantics), still unresolved, and not an IP literal (under {@code resolve-contact-points
+     * = false} even those are kept unresolved, and there is nothing to expand in one).
+     */
+    private boolean isExpandableContactPoint(Node node) {
+      if (node.getHostId() != null || !(node.getEndPoint() instanceof DefaultEndPoint)) {
+        return false;
+      }
+      SocketAddress address = node.getEndPoint().resolve();
+      if (!(address instanceof InetSocketAddress)) {
+        return false;
+      }
+      InetSocketAddress inetAddress = (InetSocketAddress) address;
+      return inetAddress.isUnresolved()
+          && !InetAddresses.isInetAddress(inetAddress.getHostString());
+    }
+
+    /**
+     * Resolves a contact point given as a hostname to every address the name currently maps to, and
+     * tries those addresses, each as its own temporary node, before the rest of the plan. So a dead
+     * record no longer costs the whole contact point, and every attempt is reported under the
+     * address it was made at. The resolution goes through the resolver Netty would use for the
+     * connect (see {@link
+     * com.datastax.oss.driver.internal.core.channel.ChannelFactory#resolveAll}), which runs it on
+     * an I/O event loop: this executor stays free while it does, and picks the answer back up here.
+     *
+     * <p>When there is nothing to expand into (the resolver failed, or answered with anything other
+     * than resolved IP addresses), the contact point is tried as it is, exactly as before: Netty
+     * resolves it once more inside the connect, and a failure there is recorded against the contact
+     * point as it always was. So a round that cannot resolve pays the resolver twice per hostname
+     * contact point -- the price of never doing worse than a driver without expansion, since that
+     * second lookup is the one every connect made before.
+     */
+    private void expandContactPoint(
+        Node contactPoint,
+        Queue<Node> nodes,
+        List<Entry<Node, Throwable>> errors,
+        Runnable onSuccess,
+        Consumer<Throwable> onFailure) {
+      InetSocketAddress name = (InetSocketAddress) contactPoint.getEndPoint().resolve();
+      LOG.debug("[{}] Resolving contact point {}", logPrefix, contactPoint);
+      context
+          .getChannelFactory()
+          .resolveAll(name)
+          .whenCompleteAsync(
+              (addresses, error) -> {
+                try {
+                  if (closeWasCalled || initFuture.isCancelled()) {
+                    // Abort the way the connect callback does: the round has to complete, or a
+                    // Reconnection would wait on it forever.
+                    onSuccess.run();
+                  } else {
+                    tryCandidates(
+                        contactPoint, name, addresses, error, nodes, errors, onSuccess, onFailure);
+                  }
+                } catch (Throwable t) {
+                  // Failed, never retried: dialling again here would repeat an attempt the round
+                  // has already made, but the round still has to end -- this stage is dropped, so
+                  // a throw would leave init() waiting for good and a Reconnection stuck on an
+                  // attempt that never completes.
+                  limitedLogger.warnWithException(
+                      "[{}] Unexpected error while expanding {}", logPrefix, contactPoint, t);
+                  List<Entry<Node, Throwable>> newErrors =
+                      (errors == null) ? new ArrayList<>() : errors;
+                  newErrors.add(new SimpleEntry<>(contactPoint, t));
+                  onFailure.accept(AllNodesFailedException.fromErrors(newErrors));
+                }
+              },
+              adminExecutor);
+    }
+
+    /**
+     * Tries the addresses {@code name} resolved into ahead of the rest of the plan -- or, when
+     * there is nothing usable to expand into, the contact point itself, exactly as every connect
+     * did before expansion existed.
+     */
+    private void tryCandidates(
+        Node contactPoint,
+        InetSocketAddress name,
+        List<SocketAddress> addresses,
+        Throwable error,
+        Queue<Node> nodes,
+        List<Entry<Node, Throwable>> errors,
+        Runnable onSuccess,
+        Consumer<Throwable> onFailure) {
+      Node[] candidates;
+      try {
+        // Only the computation is guarded: a connect() inside this try would be re-entered from
+        // the catch with the same callbacks and an already drained plan.
+        candidates = (error == null) ? candidatesFor(contactPoint, name, addresses) : NO_CANDIDATES;
+      } catch (Throwable t) {
+        limitedLogger.warnWithException(
+            "[{}] Could not build candidates for {}", logPrefix, contactPoint, t);
+        candidates = NO_CANDIDATES;
+      }
+      if (candidates.length == 0) {
+        LOG.debug("[{}] Could not expand {}, trying it as is", logPrefix, contactPoint, error);
+        connect(
+            new CompositeQueryPlan(new SimpleQueryPlan(contactPoint), nodes),
+            errors,
+            onSuccess,
+            onFailure,
+            false);
+      } else {
+        LOG.debug(
+            "[{}] {} resolves to {} address(es), trying {}",
+            logPrefix,
+            contactPoint,
+            candidates.length,
+            Arrays.toString(candidates));
+        connect(
+            new CompositeQueryPlan(new SimpleQueryPlan((Object[]) candidates), nodes),
+            errors,
+            onSuccess,
+            onFailure);
+      }
+    }
+
+    /**
+     * One temporary node per distinct address {@code name} resolved to, each labelled with the name
+     * ({@code cluster.example.com/10.0.0.1:9042}): TLS and authentication keep seeing the name the
+     * user configured, and a failure names the address it happened at.
+     *
+     * <p>The resolver's first answer comes first, always: that is the address a connect would have
+     * used on its own, ranked for this client by the platform (RFC 6724 destination selection, then
+     * the JDK's {@code java.net.preferIPv6Addresses} regrouping -- {@code InetAddress.getByName} is
+     * the head of that same array). A resolver that randomises rather than ranks randomises {@code
+     * resolveAll} too, so pinning its first answer costs nothing; either way expanding a name can
+     * never do worse than not expanding it. The rest are shuffled and the list is capped at {@code
+     * advanced.connection.max-candidate-addresses}: the cap bounds what one contact point costs a
+     * round, and the shuffle is what makes a capped set that missed the live nodes a different set
+     * on the next round.
+     *
+     * <p>Empty when any answer is not a resolved IP address, in which case the caller tries the
+     * contact point as it is.
+     */
+    private Node[] candidatesFor(
+        Node contactPoint, InetSocketAddress name, List<SocketAddress> addresses) {
+      // Resolved InetSocketAddresses compare by address bytes and port, and every candidate here
+      // carries the same host string: exact duplicates collapse, nothing else does -- except that
+      // Inet6Address.equals ignores the scope id labelled() kept, so two scope-distinct copies of
+      // one link-local address would collapse as well. No resolver answers one name with those.
+      Set<InetSocketAddress> distinct = new LinkedHashSet<>();
+      for (SocketAddress address : addresses) {
+        if (!(address instanceof InetSocketAddress)
+            || ((InetSocketAddress) address).isUnresolved()) {
+          return NO_CANDIDATES;
+        }
+        InetSocketAddress resolved = (InetSocketAddress) address;
+        try {
+          distinct.add(
+              new InetSocketAddress(
+                  labelled(name.getHostString(), resolved.getAddress()), resolved.getPort()));
+        } catch (UnknownHostException e) {
+          // Only for an address of illegal length, which no resolver produces.
+          return NO_CANDIDATES;
+        }
+      }
+      if (distinct.isEmpty()) {
+        return NO_CANDIDATES;
+      }
+      InetSocketAddress[] all = distinct.toArray(new InetSocketAddress[0]);
+      // Held out of the shuffle, not merely kept: first is where a connect would have gone.
+      InetSocketAddress[] rest = Arrays.copyOfRange(all, 1, all.length);
+      ArrayUtils.shuffleHead(rest, rest.length, random);
+      // Below 1 there is nothing to try, so a smaller value is read as 1 (documented in
+      // reference.conf).
+      int cap =
+          Math.max(
+              1,
+              config
+                  .getDefaultProfile()
+                  .getInt(DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES));
+      int kept = Math.min(cap, all.length);
+      if (kept < all.length) {
+        LOG.debug(
+            "[{}] {} resolves to {} addresses, trying at most {} "
+                + "(advanced.connection.max-candidate-addresses)",
+            logPrefix,
+            contactPoint,
+            all.length,
+            kept);
+      }
+      Node[] candidates = new Node[kept];
+      candidates[0] = DefaultNode.newContactPoint(new DefaultEndPoint(all[0]), context);
+      for (int i = 1; i < kept; i++) {
+        candidates[i] = DefaultNode.newContactPoint(new DefaultEndPoint(rest[i - 1]), context);
+      }
+      return candidates;
+    }
+
+    /** {@code address} relabelled with {@code hostName}, keeping an IPv6 scope id if it has one. */
+    private InetAddress labelled(String hostName, InetAddress address) throws UnknownHostException {
+      if (address instanceof Inet6Address && ((Inet6Address) address).getScopeId() != 0) {
+        return Inet6Address.getByAddress(
+            hostName, address.getAddress(), ((Inet6Address) address).getScopeId());
+      }
+      return InetAddress.getByAddress(hostName, address.getAddress());
     }
 
     /**
@@ -627,8 +903,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                               .whenComplete(
                                   (metadata, schemaError) -> {
                                     if (schemaError != null) {
-                                      Loggers.warnWithException(
-                                          LOG,
+                                      limitedLogger.warnWithException(
                                           "[{}] Unexpected error while refreshing schema after"
                                               + " a successful reconnection, keeping previous"
                                               + " version",
@@ -637,8 +912,7 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
                                     }
                                   });
                         } catch (Throwable t) {
-                          Loggers.warnWithException(
-                              LOG,
+                          limitedLogger.warnWithException(
                               "[{}] Unexpected error on control connection reconnect",
                               logPrefix,
                               t);
@@ -687,12 +961,32 @@ public class ControlConnection implements EventCallback, AsyncAutoCloseable {
           && eventNode.getHostId().equals(state.current.getHostId())) {
         return true;
       }
-      if (state.current == null
-          && state.pending != null
-          && Objects.equals(eventNode.getEndPoint(), state.pending.getEndPoint())) {
-        return true;
-      }
-      return false;
+      // Reference identity, not endpoint equality: with unresolved contact points in the plan,
+      // DefaultEndPoint.equals resolves the unresolved side of a mixed pair -- a blocking lookup on
+      // this admin executor, during the DNS outage the fallback exists for. An event naming the
+      // metadata node for a host still being identified cannot match here at all; connect()
+      // re-checks that node with isUnusableForControl() once the resolve completes.
+      return state.current == null && state.pending != null && eventNode == state.pending;
+    }
+
+    /**
+     * Whether an event has already marked this node unusable for the control connection: ignored by
+     * the load balancing policy, or removed or forced down.
+     *
+     * <p>{@link #connect} runs the same checks on the node it dialled, before adopting the channel;
+     * this one runs a turn later, on the node that channel was identified as.
+     *
+     * <p>Keyed by node instance, so it cannot see a node {@code MetadataManager#registerNode}
+     * minted fresh for an unknown host id: that host is resurrected, not rejected. Detecting it
+     * would need a removal record keyed by host id -- rejecting host ids absent from the metadata
+     * would also reject the new nodes of a cluster that moved, which is what the fallback exists to
+     * recover.
+     */
+    private boolean isUnusableForControl(Node node) {
+      NodeState state = lastNodeState.get(node);
+      return lastNodeDistance.get(node) == NodeDistance.IGNORED
+          || (lastNodeState.containsKey(node)
+              && (state == null /*(removed)*/ || state == NodeState.FORCED_DOWN));
     }
 
     private void onDistanceEvent(DistanceEvent event) {

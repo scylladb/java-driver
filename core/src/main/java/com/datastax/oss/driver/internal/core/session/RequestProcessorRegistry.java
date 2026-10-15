@@ -38,6 +38,7 @@ public class RequestProcessorRegistry {
     this.processors = processors;
   }
 
+  @SuppressWarnings("deprecation")
   public <RequestT extends Request, ResultT> RequestProcessor<RequestT, ResultT> processorFor(
       RequestT request, GenericType<ResultT> resultType) {
 

@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.mapper.entity.naming.NameConverter;
 import com.datastax.oss.driver.api.mapper.entity.naming.NamingConvention;
 import com.datastax.oss.driver.internal.core.util.Strings;
 import com.datastax.oss.driver.shaded.guava.common.base.CaseFormat;
+import java.util.Locale;
 
 /**
  * Handles the {@link NamingConvention built-in naming conventions}.
@@ -49,7 +50,12 @@ public class BuiltInNameConversions {
         return Strings.doubleQuote(
             CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_UNDERSCORE, javaName));
       case UPPER_CASE:
-        return Strings.doubleQuote(javaName.toUpperCase());
+        // ROOT, not the default locale: in a Turkish JVM a property named id would upper-case to a
+        // dotted capital I, and the generated code would reference a column that does not exist.
+        // This is the only branch that folds case itself: CASE_INSENSITIVE and EXACT_CASE fold
+        // nothing, and the camel and snake ones delegate to Guava's CaseFormat, which is ASCII-only
+        // and locale-neutral.
+        return Strings.doubleQuote(javaName.toUpperCase(Locale.ROOT));
       default:
         throw new AssertionError("Unsupported convention: " + convention);
     }

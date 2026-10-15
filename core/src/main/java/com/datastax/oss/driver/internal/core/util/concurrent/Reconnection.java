@@ -18,7 +18,7 @@
 package com.datastax.oss.driver.internal.core.util.concurrent;
 
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy.ReconnectionSchedule;
-import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.ScheduledFuture;
@@ -57,6 +57,7 @@ public class Reconnection {
   private final Callable<CompletionStage<Boolean>> reconnectionTask;
   private final Runnable onStart;
   private final Runnable onStop;
+  private final RateLimitedLogger limitedLogger;
 
   private State state = State.STOPPED;
   private ReconnectionSchedule reconnectionSchedule;
@@ -72,21 +73,25 @@ public class Reconnection {
       Supplier<ReconnectionSchedule> scheduleSupplier,
       Callable<CompletionStage<Boolean>> reconnectionTask,
       Runnable onStart,
-      Runnable onStop) {
+      Runnable onStop,
+      RateLimitedLogger limitedLogger) {
     this.logPrefix = logPrefix;
     this.executor = executor;
     this.scheduleSupplier = scheduleSupplier;
     this.reconnectionTask = reconnectionTask;
     this.onStart = onStart;
     this.onStop = onStop;
+    this.limitedLogger = limitedLogger;
   }
 
   public Reconnection(
       String logPrefix,
       EventExecutor executor,
       Supplier<ReconnectionSchedule> scheduleSupplier,
-      Callable<CompletionStage<Boolean>> reconnectionTask) {
-    this(logPrefix, executor, scheduleSupplier, reconnectionTask, () -> {}, () -> {});
+      Callable<CompletionStage<Boolean>> reconnectionTask,
+      RateLimitedLogger limitedLogger) {
+    this(
+        logPrefix, executor, scheduleSupplier, reconnectionTask, () -> {}, () -> {}, limitedLogger);
   }
 
   /**
@@ -150,8 +155,8 @@ public class Reconnection {
       try {
         onNextAttemptStarted(reconnectionTask.call());
       } catch (Exception e) {
-        Loggers.warnWithException(
-            LOG, "[{}] Uncaught error while starting reconnection attempt", logPrefix, e);
+        limitedLogger.warnWithException(
+            "[{}] Uncaught error while starting reconnection attempt", logPrefix, e);
         scheduleNextAttempt();
       }
     }
@@ -197,11 +202,8 @@ public class Reconnection {
           if (f.isSuccess()) {
             onNextAttemptStarted(f.getNow());
           } else if (!f.isCancelled()) {
-            Loggers.warnWithException(
-                LOG,
-                "[{}] Uncaught error while starting reconnection attempt",
-                logPrefix,
-                f.cause());
+            limitedLogger.warnWithException(
+                "[{}] Uncaught error while starting reconnection attempt", logPrefix, f.cause());
             scheduleNextAttempt();
           }
         });
@@ -224,8 +226,8 @@ public class Reconnection {
       reallyStop();
     } else {
       if (error != null && !(error instanceof CancellationException)) {
-        Loggers.warnWithException(
-            LOG, "[{}] Uncaught error while starting reconnection attempt", logPrefix, error);
+        limitedLogger.warnWithException(
+            "[{}] Uncaught error while starting reconnection attempt", logPrefix, error);
       }
       if (state == State.STOP_AFTER_CURRENT) {
         reallyStop();

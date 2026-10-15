@@ -22,6 +22,13 @@ import com.datastax.oss.driver.api.querybuilder.schema.KeyspaceReplicationOption
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface AlterDseKeyspaceStart
     extends KeyspaceOptions<AlterDseKeyspace>, KeyspaceReplicationOptions<AlterDseKeyspace> {
 

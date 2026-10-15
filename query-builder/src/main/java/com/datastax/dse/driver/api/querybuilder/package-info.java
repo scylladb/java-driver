@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 /**
- * This package effectively mirrors the Cassandra OSS Query Builder package to allow DSE extended
- * schema and query building for the DSE driver. In general, a class in this package should simply
- * extend the equivalent class in the OSS driver and add extended functionality.
+ * Deprecated query builder aliases retained for source and binary compatibility. Ordinary Cassandra
+ * queries remain supported; DSE schema construction is unsupported.
  */
 package com.datastax.dse.driver.api.querybuilder;

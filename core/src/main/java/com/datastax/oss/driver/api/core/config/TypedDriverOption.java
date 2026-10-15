@@ -172,6 +172,13 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Integer> CONNECTION_MAX_ORPHAN_REQUESTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS, GenericType.INTEGER);
+  /**
+   * The maximum number of addresses tried for a contact point given as a hostname that resolves to
+   * several, each time the control connection reaches it.
+   */
+  public static final TypedDriverOption<Integer> CONNECTION_MAX_CANDIDATE_ADDRESSES =
+      new TypedDriverOption<>(
+          DefaultDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES, GenericType.INTEGER);
   /** Whether to log non-fatal errors when the driver tries to open a new connection. */
   public static final TypedDriverOption<Boolean> CONNECTION_WARN_INIT_ERROR =
       new TypedDriverOption<>(DefaultDriverOption.CONNECTION_WARN_INIT_ERROR, GenericType.BOOLEAN);
@@ -600,7 +607,13 @@ public class TypedDriverOption<ValueT> {
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_AGREEMENT_WARN =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, GenericType.BOOLEAN);
-  /** Whether to forcibly try original contacts if no live nodes are available */
+  /**
+   * Whether to append the original contact points to the control connection's reconnection plan,
+   * after the live nodes reported by the load balancing policy (defaults to {@code true}).
+   *
+   * <p>A contact point given as a hostname is kept unresolved and looked up again on each connect,
+   * so this is how the driver picks up changed DNS records once the live nodes are exhausted.
+   */
   public static final TypedDriverOption<Boolean> CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS =
       new TypedDriverOption<>(
           DefaultDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, GenericType.BOOLEAN);
@@ -685,10 +698,8 @@ public class TypedDriverOption<ValueT> {
   /** Whether the threads created by the driver should be daemon threads. */
   public static final TypedDriverOption<Boolean> NETTY_DAEMON =
       new TypedDriverOption<>(DefaultDriverOption.NETTY_DAEMON, GenericType.BOOLEAN);
-  /**
-   * The location of the cloud secure bundle used to connect to DataStax Apache Cassandra as a
-   * service.
-   */
+  /** @deprecated DataStax Astra secure connect bundles are no longer supported. */
+  @Deprecated
   public static final TypedDriverOption<String> CLOUD_SECURE_CONNECT_BUNDLE =
       new TypedDriverOption<>(DefaultDriverOption.CLOUD_SECURE_CONNECT_BUNDLE, GenericType.STRING);
   /** Whether the slow replica avoidance should be enabled in the default LBP. */
@@ -701,207 +712,35 @@ public class TypedDriverOption<ValueT> {
   /** The maximum number of live sessions that are allowed to coexist in a given VM. */
   public static final TypedDriverOption<Integer> SESSION_LEAK_THRESHOLD =
       new TypedDriverOption<>(DefaultDriverOption.SESSION_LEAK_THRESHOLD, GenericType.INTEGER);
+  /** Minimum time between repeated driver warnings and errors. */
+  public static final TypedDriverOption<Duration> REPEATED_LOG_INTERVAL =
+      new TypedDriverOption<>(DefaultDriverOption.REPEATED_LOG_INTERVAL, GenericType.DURATION);
 
   /** The name of the application using the session. */
   public static final TypedDriverOption<String> APPLICATION_NAME =
-      new TypedDriverOption<>(DseDriverOption.APPLICATION_NAME, GenericType.STRING);
+      new TypedDriverOption<>(DefaultDriverOption.APPLICATION_NAME, GenericType.STRING);
   /** The version of the application using the session. */
   public static final TypedDriverOption<String> APPLICATION_VERSION =
-      new TypedDriverOption<>(DseDriverOption.APPLICATION_VERSION, GenericType.STRING);
-  /** Proxy authentication for GSSAPI authentication: allows to login as another user or role. */
+      new TypedDriverOption<>(DefaultDriverOption.APPLICATION_VERSION, GenericType.STRING);
+  /** @deprecated DSE proxy authentication is no longer supported. */
+  @Deprecated
   public static final TypedDriverOption<String> AUTH_PROVIDER_AUTHORIZATION_ID =
       new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_AUTHORIZATION_ID, GenericType.STRING);
-  /** Service name for GSSAPI authentication. */
+  /** @deprecated DSE GSSAPI authentication is no longer supported. */
+  @Deprecated
   public static final TypedDriverOption<String> AUTH_PROVIDER_SERVICE =
       new TypedDriverOption<>(DseDriverOption.AUTH_PROVIDER_SERVICE, GenericType.STRING);
-  /** Login configuration for GSSAPI authentication. */
+  /** @deprecated DSE GSSAPI authentication is no longer supported. */
+  @Deprecated
   public static final TypedDriverOption<String> AUTH_PROVIDER_LOGIN_CONFIGURATION =
       new TypedDriverOption<>(
           DseDriverOption.AUTH_PROVIDER_LOGIN_CONFIGURATION, GenericType.STRING);
-  /** Internal SASL properties, if any, such as QOP, for GSSAPI authentication. */
+  /** @deprecated DSE GSSAPI authentication is no longer supported. */
+  @Deprecated
   public static final TypedDriverOption<Map<String, String>> AUTH_PROVIDER_SASL_PROPERTIES =
       new TypedDriverOption<>(
           DseDriverOption.AUTH_PROVIDER_SASL_PROPERTIES,
           GenericType.mapOf(GenericType.STRING, GenericType.STRING));
-  /** The page size for continuous paging. */
-  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_PAGE_SIZE =
-      new TypedDriverOption<>(DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE, GenericType.INTEGER);
-  /**
-   * Whether {@link #CONTINUOUS_PAGING_PAGE_SIZE} should be interpreted in number of rows or bytes.
-   */
-  public static final TypedDriverOption<Boolean> CONTINUOUS_PAGING_PAGE_SIZE_BYTES =
-      new TypedDriverOption<>(
-          DseDriverOption.CONTINUOUS_PAGING_PAGE_SIZE_BYTES, GenericType.BOOLEAN);
-  /** The maximum number of continuous pages to return. */
-  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_MAX_PAGES =
-      new TypedDriverOption<>(DseDriverOption.CONTINUOUS_PAGING_MAX_PAGES, GenericType.INTEGER);
-  /** The maximum number of continuous pages per second. */
-  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND =
-      new TypedDriverOption<>(
-          DseDriverOption.CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, GenericType.INTEGER);
-  /** The maximum number of continuous pages that can be stored in the local queue. */
-  public static final TypedDriverOption<Integer> CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES =
-      new TypedDriverOption<>(
-          DseDriverOption.CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, GenericType.INTEGER);
-  /** How long to wait for the coordinator to send the first continuous page. */
-  public static final TypedDriverOption<Duration> CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE =
-      new TypedDriverOption<>(
-          DseDriverOption.CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE, GenericType.DURATION);
-  /** How long to wait for the coordinator to send subsequent continuous pages. */
-  public static final TypedDriverOption<Duration> CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES =
-      new TypedDriverOption<>(
-          DseDriverOption.CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES, GenericType.DURATION);
-  /** The largest latency that we expect to record for continuous requests. */
-  public static final TypedDriverOption<Duration>
-      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST =
-          new TypedDriverOption<>(
-              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST,
-              GenericType.DURATION);
-  /** The shortest latency that we expect to record for continuous requests. */
-  public static final TypedDriverOption<Duration>
-      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST =
-          new TypedDriverOption<>(
-              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST,
-              GenericType.DURATION);
-  /** Optional service-level objectives to meet, as a list of latencies to track. */
-  public static final TypedDriverOption<List<Duration>>
-      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_SLO =
-          new TypedDriverOption<>(
-              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_SLO,
-              GenericType.listOf(GenericType.DURATION));
-  /**
-   * Optional pre-defined percentile of continuous paging cql requests to publish, as a list of
-   * percentiles .
-   */
-  public static final TypedDriverOption<List<Double>>
-      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES =
-          new TypedDriverOption<>(
-              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_PUBLISH_PERCENTILES,
-              GenericType.listOf(GenericType.DOUBLE));
-  /**
-   * The number of significant decimal digits to which internal structures will maintain for
-   * continuous requests.
-   */
-  public static final TypedDriverOption<Integer>
-      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS =
-          new TypedDriverOption<>(
-              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS,
-              GenericType.INTEGER);
-  /** The interval at which percentile data is refreshed for continuous requests. */
-  public static final TypedDriverOption<Duration>
-      CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL =
-          new TypedDriverOption<>(
-              DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL,
-              GenericType.DURATION);
-  /** The read consistency level to use for graph statements. */
-  public static final TypedDriverOption<String> GRAPH_READ_CONSISTENCY_LEVEL =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_READ_CONSISTENCY_LEVEL, GenericType.STRING);
-  /** The write consistency level to use for graph statements. */
-  public static final TypedDriverOption<String> GRAPH_WRITE_CONSISTENCY_LEVEL =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_WRITE_CONSISTENCY_LEVEL, GenericType.STRING);
-  /** The traversal source to use for graph statements. */
-  public static final TypedDriverOption<String> GRAPH_TRAVERSAL_SOURCE =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_TRAVERSAL_SOURCE, GenericType.STRING);
-  /**
-   * The sub-protocol the driver will use to communicate with DSE Graph, on top of the Cassandra
-   * native protocol.
-   */
-  public static final TypedDriverOption<String> GRAPH_SUB_PROTOCOL =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_SUB_PROTOCOL, GenericType.STRING);
-  /** Whether a script statement represents a system query. */
-  public static final TypedDriverOption<Boolean> GRAPH_IS_SYSTEM_QUERY =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_IS_SYSTEM_QUERY, GenericType.BOOLEAN);
-  /** The name of the graph targeted by graph statements. */
-  public static final TypedDriverOption<String> GRAPH_NAME =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_NAME, GenericType.STRING);
-  /** How long the driver waits for a graph request to complete. */
-  public static final TypedDriverOption<Duration> GRAPH_TIMEOUT =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_TIMEOUT, GenericType.DURATION);
-  /** Whether to send events for Insights monitoring. */
-  public static final TypedDriverOption<Boolean> MONITOR_REPORTING_ENABLED =
-      new TypedDriverOption<>(DseDriverOption.MONITOR_REPORTING_ENABLED, GenericType.BOOLEAN);
-  /** Whether to enable paging for Graph queries. */
-  public static final TypedDriverOption<String> GRAPH_PAGING_ENABLED =
-      new TypedDriverOption<>(DseDriverOption.GRAPH_PAGING_ENABLED, GenericType.STRING);
-  /** The page size for Graph continuous paging. */
-  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_PAGE_SIZE =
-      new TypedDriverOption<>(
-          DseDriverOption.GRAPH_CONTINUOUS_PAGING_PAGE_SIZE, GenericType.INTEGER);
-  /** The maximum number of Graph continuous pages to return. */
-  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_PAGES =
-      new TypedDriverOption<>(
-          DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES, GenericType.INTEGER);
-  /** The maximum number of Graph continuous pages per second. */
-  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND =
-      new TypedDriverOption<>(
-          DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, GenericType.INTEGER);
-  /** The maximum number of Graph continuous pages that can be stored in the local queue. */
-  public static final TypedDriverOption<Integer> GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES =
-      new TypedDriverOption<>(
-          DseDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, GenericType.INTEGER);
-  /** The largest latency that we expect to record for graph requests. */
-  public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_HIGHEST =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_HIGHEST, GenericType.DURATION);
-  /** The shortest latency that we expect to record for graph requests. */
-  public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_LOWEST =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_LOWEST, GenericType.DURATION);
-  /** Optional service-level objectives to meet, as a list of latencies to track. */
-  public static final TypedDriverOption<List<Duration>> METRICS_SESSION_GRAPH_REQUESTS_SLO =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_SLO,
-          GenericType.listOf(GenericType.DURATION));
-  /** Optional pre-defined percentile of graph requests to publish, as a list of percentiles . */
-  public static final TypedDriverOption<List<Double>>
-      METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES =
-          new TypedDriverOption<>(
-              DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_PUBLISH_PERCENTILES,
-              GenericType.listOf(GenericType.DOUBLE));
-  /**
-   * The number of significant decimal digits to which internal structures will maintain for graph
-   * requests.
-   */
-  public static final TypedDriverOption<Integer> METRICS_SESSION_GRAPH_REQUESTS_DIGITS =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS, GenericType.INTEGER);
-  /** The interval at which percentile data is refreshed for graph requests. */
-  public static final TypedDriverOption<Duration> METRICS_SESSION_GRAPH_REQUESTS_INTERVAL =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_INTERVAL, GenericType.DURATION);
-  /** The largest latency that we expect to record for graph requests. */
-  public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_HIGHEST =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST, GenericType.DURATION);
-  /** The shortest latency that we expect to record for graph requests. */
-  public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_LOWEST =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_LOWEST, GenericType.DURATION);
-  /** Optional service-level objectives to meet, as a list of latencies to track. */
-  public static final TypedDriverOption<List<Duration>> METRICS_NODE_GRAPH_MESSAGES_SLO =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_SLO,
-          GenericType.listOf(GenericType.DURATION));
-  /**
-   * Optional pre-defined percentile of node graph requests to publish, as a list of percentiles .
-   */
-  public static final TypedDriverOption<List<Double>>
-      METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES =
-          new TypedDriverOption<>(
-              DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_PUBLISH_PERCENTILES,
-              GenericType.listOf(GenericType.DOUBLE));
-  /**
-   * The number of significant decimal digits to which internal structures will maintain for graph
-   * requests.
-   */
-  public static final TypedDriverOption<Integer> METRICS_NODE_GRAPH_MESSAGES_DIGITS =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS, GenericType.INTEGER);
-  /** The interval at which percentile data is refreshed for graph requests. */
-  public static final TypedDriverOption<Duration> METRICS_NODE_GRAPH_MESSAGES_INTERVAL =
-      new TypedDriverOption<>(
-          DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_INTERVAL, GenericType.DURATION);
-
   /** The time after which the node level metrics will be evicted. */
   public static final TypedDriverOption<Duration> METRICS_NODE_EXPIRE_AFTER =
       new TypedDriverOption<>(DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER, GenericType.DURATION);

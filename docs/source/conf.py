@@ -9,32 +9,26 @@ from redirects_cli import cli as redirects_cli
 
 # -- General configuration
 
-# Build documentation for the following tags and branches
-TAGS = []
+# Build documentation for the following release lines and branches.
+# RELEASE_LINES are line names: each builds from its newest X.Y.Z.N release through a
+# local alias tag of the same name (docs/_utils/alias-tags.py). BRANCHES build from their
+# branch.
+RELEASE_LINES = [
+    'scylla-4.19.2.x',
+    'scylla-3.11.5.x'
+]
 BRANCHES = [
-    'scylla-3.7.2.x',
-    'scylla-3.10.2.x',
-    'scylla-3.11.0.x',
-    'scylla-3.11.2.x',
-    'scylla-3.11.4.x',
-    'scylla-3.11.5.x',
-    'scylla-4.7.2.x',
-    'scylla-4.10.0.x',
-    'scylla-4.11.1.x',
-    'scylla-4.12.0.x',
-    'scylla-4.13.0.x',
-    'scylla-4.14.1.x',
-    'scylla-4.15.0.x',
-    'scylla-4.17.0.x',
     'scylla-4.18.1.x',
     'scylla-4.19.0.x'
 ]
 # Set the latest version.
-LATEST_VERSION = 'scylla-4.19.0.x'
+LATEST_VERSION = 'scylla-4.19.2.x'
 # Set which versions are not released yet.
 UNSTABLE_VERSIONS = []
 # Set which versions are deprecated
-DEPRECATED_VERSIONS = []
+DEPRECATED_VERSIONS = [
+    'scylla-3.11.5.x'
+]
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -90,20 +84,6 @@ notfound_urls_prefix = ''
 # -- Options for markdown extension
 scylladb_markdown_enable = True
 scylladb_markdown_recommonmark_versions = [
-    'scylla-3.7.2.x',
-    'scylla-3.10.2.x',
-    'scylla-3.11.0.x',
-    'scylla-3.11.2.x',
-    'scylla-3.11.4.x',
-    'scylla-3.11.5.x',
-    'scylla-4.7.2.x',
-    'scylla-4.10.0.x',
-    'scylla-4.11.1.x',
-    'scylla-4.12.0.x',
-    'scylla-4.13.0.x',
-    'scylla-4.14.1.x',
-    'scylla-4.15.0.x',
-    'scylla-4.17.0.x',
     'scylla-4.18.1.x',
     'scylla-4.19.0.x'
 ]
@@ -111,8 +91,8 @@ suppress_warnings = ["ref.any", "myst.header","myst.xref_missing","autosectionla
 
 # -- Options for multiversion extension
 
-# Whitelist pattern for tags
-smv_tag_whitelist = multiversion_regex_builder(TAGS)
+# Whitelist pattern for tags: the local aliases alias-tags.py creates for RELEASE_LINES
+smv_tag_whitelist = multiversion_regex_builder(RELEASE_LINES)
 # Whitelist pattern for branches
 smv_branch_whitelist = multiversion_regex_builder(BRANCHES)
 # Defines which version is considered to be the latest stable version.
@@ -144,6 +124,7 @@ html_theme = 'sphinx_scylladb_theme'
 html_theme_options = {
     'conf_py_path': 'docs/source/',
     'branch_substring_removed': 'scylla-',
+    'tag_substring_removed': 'scylla-',
     'github_repository': 'scylladb/java-driver',
     'default_branch': 'scylla-4.x',
     'github_issues_repository': 'scylladb/java-driver',
@@ -151,7 +132,6 @@ html_theme_options = {
     'hide_feedback_buttons': 'false',
     'versions_unstable': UNSTABLE_VERSIONS,
     'versions_deprecated': DEPRECATED_VERSIONS,
-    'hide_version_dropdown': ['scylla-3.x'],
     'skip_warnings': 'document_has_underscores'
 }
 
@@ -172,12 +152,48 @@ htmlhelp_basename = 'ScyllaDocumentationdoc'
 html_baseurl = 'https://java-driver.docs.scylladb.com'
 
 # Dictionary of values to pass into the template engine’s context for all pages
-html_context = {'html_baseurl': html_baseurl}
+# version_order: the dropdown lists RELEASE_LINES and BRANCHES as one list, newest first
+# (_templates/versions.html).
+html_context = {
+    'html_baseurl': html_baseurl,
+    'version_order': sorted(
+        RELEASE_LINES + BRANCHES,
+        key=lambda name: [int(part) for part in re.findall(r'\d+', name)],
+        reverse=True),
+}
 def replace_relative_links(app, docname, source):
     result = source[0]
     for key in app.config.replacements:
         result = re.sub(key, app.config.replacements[key], result)
     source[0] = result
+
+# MyST resolves links against the staged tree, where every README.md is
+# index.md, and turns `../x/` into a dead `#../x/` fragment (#1132). Point
+# directory and README.md links at index.md; the sources stay GitHub-correct.
+MYST_INLINE_LINK = re.compile(r'(\]\()([^\s)#]+)(#[^\s)]*)?(?=[\s)])')
+MYST_LINK_DEFINITION = re.compile(r'^([ \t]*\[[^\]]+\]:[ \t]*)([^\s#]+)(#\S*)?', re.MULTILINE)
+
+def myst_link_target(target, docdir):
+    if re.match(r'[a-zA-Z][\w+.-]*:|/', target):
+        return target
+    if target.endswith('README.md'):
+        return target[:-len('README.md')] + 'index.md'
+    last = target.rsplit('/', 1)[-1]
+    if last and last not in ('.', '..') and '.' in last:
+        return target
+    directory = target.rstrip('/')
+    index = 'index.rst' if os.path.exists(os.path.join(docdir, directory, 'index.rst')) else 'index.md'
+    return directory + '/' + index
+
+def rewrite_links_for_myst(app, docname, source):
+    if os.getenv("SPHINX_MULTIVERSION_NAME", "stable") in scylladb_markdown_recommonmark_versions:
+        return
+    path = str(app.env.doc2path(docname))
+    if not path.endswith('.md'):
+        return
+    docdir = os.path.dirname(path)
+    link = lambda m: m.group(1) + myst_link_target(m.group(2), docdir) + (m.group(3) or '')
+    source[0] = MYST_LINK_DEFINITION.sub(link, MYST_INLINE_LINK.sub(link, source[0]))
 
 def redirect_api_page_to_javadoc(app, exception):
     version_name = os.getenv("SPHINX_MULTIVERSION_NAME", "")
@@ -191,7 +207,8 @@ def setup(app):
     current_slug = os.getenv("SPHINX_MULTIVERSION_NAME", "stable")
     replacements = {
         r'docs.datastax.com/en/drivers/java\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/api/",
-        r'java-driver.docs.scylladb.com\/(.*?)\/': "java-driver.docs.scylladb.com/" + current_slug + "/",
+        # Pin only version-slug links; /stable/ and unversioned links are deliberate
+        r'java-driver\.docs\.scylladb\.com/scylla-[\w.-]+/': "java-driver.docs.scylladb.com/" + current_slug + "/",
         r'github.com\/apache\/cassandra-java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
         r'github.com\/apache\/cassandra-java-driver\/tree\/4.x\/': "github.com/scylladb/java-driver/tree/scylla-4.x/",
         r'github.com\/datastax\/java-driver\/blob\/4.x\/': "github.com/scylladb/java-driver/blob/scylla-4.x/",
@@ -199,4 +216,5 @@ def setup(app):
     }
     app.add_config_value('replacements', replacements, True)
     app.connect('source-read', replace_relative_links)
+    app.connect('source-read', rewrite_links_for_myst)
     app.connect('build-finished', redirect_api_page_to_javadoc)

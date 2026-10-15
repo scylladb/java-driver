@@ -22,13 +22,14 @@ import com.datastax.oss.driver.api.querybuilder.QueryBuilder;
 /**
  * A DSE extension of the Cassandra driver's {@linkplain QueryBuilder query builder}.
  *
- * <p>Note that, at this time, this class acts a simple pass-through: there is no DSE-specific
+ * <p>Note that, at this time, this class acts as a simple pass-through: there is no DSE-specific
  * syntax for DML queries, therefore it just inherits all of {@link QueryBuilder}'s methods, without
  * adding any of its own.
  *
- * <p>However, it is a good idea to use it as the entry point to the DSL in your DSE application, to
- * avoid changing all your imports if specialized methods get added here in the future.
+ * @deprecated This class remains as an alias for the ordinary {@link QueryBuilder} methods. Use
+ *     {@link QueryBuilder} directly.
  */
+@Deprecated
 public class DseQueryBuilder extends QueryBuilder {
   // nothing to do
 }

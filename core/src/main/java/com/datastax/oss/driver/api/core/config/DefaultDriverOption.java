@@ -136,6 +136,13 @@ public enum DefaultDriverOption implements DriverOption {
    */
   CONNECTION_MAX_ORPHAN_REQUESTS("advanced.connection.max-orphan-requests"),
   /**
+   * The maximum number of addresses tried for a contact point given as a hostname that resolves to
+   * several, each time the control connection reaches it.
+   *
+   * <p>Value-type: int
+   */
+  CONNECTION_MAX_CANDIDATE_ADDRESSES("advanced.connection.max-candidate-addresses"),
+  /**
    * Whether to log non-fatal errors when the driver tries to open a new connection.
    *
    * <p>Value-type: boolean
@@ -701,8 +708,17 @@ public enum DefaultDriverOption implements DriverOption {
   CONTROL_CONNECTION_AGREEMENT_WARN("advanced.control-connection.schema-agreement.warn-on-failure"),
 
   /**
-   * Whether to forcibly add original contact points held by MetadataManager to the reconnection
-   * plan, in case there is no live nodes available according to LBP. Experimental.
+   * Whether to append the original contact points held by MetadataManager to the control
+   * connection's reconnection plan, after the live nodes reported by the load balancing policy.
+   * Defaults to {@code true}.
+   *
+   * <p>This is the driver's DNS re-resolution path. A metadata node discovered from the peers table
+   * holds an address resolved once and never re-resolved; a contact point given as a hostname is
+   * kept unresolved (the default) and looked up again through Netty's resolver on each connect, so
+   * once the live nodes are exhausted the contact points find a cluster that moved to new
+   * addresses, as soon as the JVM's DNS cache ({@code networkaddress.cache.ttl}) has expired. A
+   * resolved contact point ({@code advanced.resolve-contact-points = true}, or a programmatic
+   * resolved address) is appended as it is and never re-resolved.
    *
    * <p>Value-type: boolean
    */
@@ -870,11 +886,10 @@ public enum DefaultDriverOption implements DriverOption {
   NETTY_DAEMON("advanced.netty.daemon"),
 
   /**
-   * The location of the cloud secure bundle used to connect to DataStax Apache Cassandra as a
-   * service.
-   *
-   * <p>Value-type: {@link String}
+   * @deprecated DataStax Astra secure connect bundles are no longer supported. Configuring this
+   *     option causes session creation to fail.
    */
+  @Deprecated
   CLOUD_SECURE_CONNECT_BUNDLE("basic.cloud.secure-connect-bundle"),
 
   /**
@@ -897,6 +912,14 @@ public enum DefaultDriverOption implements DriverOption {
    * <p>Value-type: int
    */
   SESSION_LEAK_THRESHOLD("advanced.session-leak.threshold"),
+  /**
+   * Minimum time between repeated WARN and ERROR messages at driver call sites that can run
+   * frequently. The next emitted message reports how many occurrences were suppressed. Zero logs
+   * every occurrence.
+   *
+   * <p>Value-type: {@link java.time.Duration Duration}
+   */
+  REPEATED_LOG_INTERVAL("advanced.repeated-log-interval"),
   /**
    * The period of inactivity after which the node level metrics will be evicted. The eviction will
    * happen only if none of the enabled node-level metrics is updated for a given node within this
@@ -1198,7 +1221,19 @@ public enum DefaultDriverOption implements DriverOption {
    *
    * <p>Value type: boolean
    */
-  DRIVER_CONFIG_REPORTING_ENABLED("advanced.driver-config-reporting.enabled");
+  DRIVER_CONFIG_REPORTING_ENABLED("advanced.driver-config-reporting.enabled"),
+  /**
+   * The name of the application using the session.
+   *
+   * <p>Value-type: {@link String}
+   */
+  APPLICATION_NAME("basic.application.name"),
+  /**
+   * The version of the application using the session.
+   *
+   * <p>Value-type: {@link String}
+   */
+  APPLICATION_VERSION("basic.application.version");
 
   private final String path;
 

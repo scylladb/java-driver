@@ -27,6 +27,7 @@ import com.datastax.oss.protocol.internal.request.Query;
 import com.datastax.oss.simulacron.common.cluster.ClusterSpec;
 import com.datastax.oss.simulacron.common.cluster.QueryLog;
 import com.datastax.oss.simulacron.server.BoundCluster;
+import com.datastax.oss.simulacron.server.NodePerPortResolver;
 import com.datastax.oss.simulacron.server.Server;
 import java.util.concurrent.ExecutionException;
 import org.junit.AfterClass;
@@ -36,12 +37,19 @@ import org.junit.Test;
 /** Test for JAVA-2654. */
 public class PeersV2NodeRefreshIT {
 
+  // Keep Simulacron's listener ports below the CI runner's ephemeral port range.
+  private static final int SIMULACRON_START_PORT = 19042;
+
   private static Server peersV2Server;
   private static BoundCluster cluster;
 
   @BeforeClass
   public static void setup() {
-    peersV2Server = Server.builder().withMultipleNodesPerIp(true).build();
+    peersV2Server =
+        Server.builder()
+            .withMultipleNodesPerIp(true)
+            .withAddressResolver(new NodePerPortResolver(SIMULACRON_START_PORT))
+            .build();
     cluster = peersV2Server.register(ClusterSpec.builder().withNodes(2));
   }
 

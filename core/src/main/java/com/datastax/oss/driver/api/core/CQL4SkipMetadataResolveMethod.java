@@ -1,6 +1,7 @@
 package com.datastax.oss.driver.api.core;
 
 import edu.umd.cs.findbugs.annotations.NonNull;
+import java.util.Locale;
 
 public enum CQL4SkipMetadataResolveMethod {
   // SMART (Default) - Disables the skip metadata flag only for wildcard selects (`SELECT * FROM`)
@@ -28,7 +29,9 @@ public enum CQL4SkipMetadataResolveMethod {
   @NonNull
   public static CQL4SkipMetadataResolveMethod fromValue(@NonNull String value)
       throws IllegalArgumentException {
-    switch (value.toLowerCase()) {
+    // ROOT, not the default locale: in a Turkish JVM the I of "DISABLED" folds to a dotless
+    // small letter, which matches no case below and rejects a valid configuration.
+    switch (value.toLowerCase(Locale.ROOT)) {
       case "smart":
         return SMART;
       case "enabled":

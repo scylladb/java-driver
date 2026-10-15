@@ -20,6 +20,7 @@ package com.datastax.oss.driver.api.core.metadata.schema;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
+import com.datastax.oss.driver.internal.core.util.Strings;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
 
@@ -83,9 +84,9 @@ public interface FunctionMetadata extends Describable {
         .append("LANGUAGE ")
         .append(getLanguage())
         .newLine()
-        .append("AS '")
-        .append(getBody())
-        .append("';")
+        .append("AS ")
+        .append(Strings.quote(getBody()))
+        .append(";")
         .build();
   }
 

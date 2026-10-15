@@ -26,8 +26,6 @@ package com.datastax.oss.driver.core.metadata;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-import com.datastax.dse.driver.internal.core.metadata.schema.DefaultDseKeyspaceMetadata;
-import com.datastax.dse.driver.internal.core.metadata.schema.DefaultDseTableMetadata;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
@@ -68,7 +66,6 @@ import org.slf4j.LoggerFactory;
 @Category(ParallelizableTests.class)
 @ScyllaSkip(description = "scylladb/java-driver#566 - needs to be adopted to scylla")
 @BackendRequirement(type = BackendType.CASSANDRA)
-@BackendRequirement(type = BackendType.DSE)
 public class DescribeIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(DescribeIT.class);
@@ -97,7 +94,6 @@ public class DescribeIT {
   private static final Map<BackendType, String> scriptFileForBackend =
       ImmutableMap.<BackendType, String>builder()
           .put(BackendType.CASSANDRA, "DescribeIT/oss")
-          .put(BackendType.DSE, "DescribeIT/dse")
           .put(BackendType.HCD, "DescribeIT/hcd")
           .build();
 
@@ -138,9 +134,8 @@ public class DescribeIT {
         .isEqualTo(scriptContents);
   }
 
-  private boolean atLeastVersion(Version dseVersion, Version ossVersion) {
-    Version comparison = CCM_RULE.isDistributionOf(BackendType.DSE) ? dseVersion : ossVersion;
-    return serverVersion.compareTo(comparison) >= 0;
+  private boolean atLeastVersion(Version version) {
+    return serverVersion.compareTo(version) >= 0;
   }
 
   @Test
@@ -152,15 +147,15 @@ public class DescribeIT {
         session.getMetadata().getKeyspace(session.getKeyspace().get());
     assertThat(ksOption).isPresent();
     KeyspaceMetadata ks = ksOption.get();
-    assertThat(ks).isInstanceOfAny(DefaultKeyspaceMetadata.class, DefaultDseKeyspaceMetadata.class);
+    assertThat(ks).isInstanceOf(DefaultKeyspaceMetadata.class);
 
     /* Validate that the keyspace metadata is fully populated */
     assertThat(ks.getUserDefinedTypes()).isNotEmpty();
     assertThat(ks.getTables()).isNotEmpty();
-    if (atLeastVersion(Version.V5_0_0, Version.V3_0_0)) {
+    if (atLeastVersion(Version.V3_0_0)) {
       assertThat(ks.getViews()).isNotEmpty();
     }
-    if (atLeastVersion(Version.V5_0_0, Version.V2_2_0)) {
+    if (atLeastVersion(Version.V2_2_0)) {
       assertThat(ks.getFunctions()).isNotEmpty();
       assertThat(ks.getAggregates()).isNotEmpty();
     }
@@ -169,7 +164,7 @@ public class DescribeIT {
     Optional<TableMetadata> tableOption = ks.getTable("rank_by_year_and_name");
     assertThat(tableOption).isPresent();
     TableMetadata table = tableOption.get();
-    assertThat(table).isInstanceOfAny(DefaultTableMetadata.class, DefaultDseTableMetadata.class);
+    assertThat(table).isInstanceOf(DefaultTableMetadata.class);
 
     /* Validate that the table metadata is fully populated */
     assertThat(table.getPartitionKey()).isNotEmpty();

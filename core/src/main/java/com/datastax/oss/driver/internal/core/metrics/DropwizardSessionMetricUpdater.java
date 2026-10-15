@@ -18,8 +18,6 @@
 package com.datastax.oss.driver.internal.core.metrics;
 
 import com.codahale.metrics.MetricRegistry;
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.api.core.metrics.DseSessionMetric;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
@@ -45,7 +43,6 @@ public class DropwizardSessionMetricUpdater extends DropwizardMetricUpdater<Sess
 
     initializeCounter(DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, profile);
     initializeCounter(DefaultSessionMetric.THROTTLING_ERRORS, profile);
-    initializeCounter(DseSessionMetric.GRAPH_CLIENT_TIMEOUTS, profile);
 
     initializeHdrTimer(
         DefaultSessionMetric.CQL_REQUESTS,
@@ -59,18 +56,6 @@ public class DropwizardSessionMetricUpdater extends DropwizardMetricUpdater<Sess
         DefaultDriverOption.METRICS_SESSION_THROTTLING_HIGHEST,
         DefaultDriverOption.METRICS_SESSION_THROTTLING_DIGITS,
         DefaultDriverOption.METRICS_SESSION_THROTTLING_INTERVAL);
-    initializeHdrTimer(
-        DseSessionMetric.CONTINUOUS_CQL_REQUESTS,
-        profile,
-        DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST,
-        DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS,
-        DseDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL);
-    initializeHdrTimer(
-        DseSessionMetric.GRAPH_REQUESTS,
-        profile,
-        DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_HIGHEST,
-        DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS,
-        DseDriverOption.METRICS_SESSION_GRAPH_REQUESTS_INTERVAL);
   }
 
   @Override

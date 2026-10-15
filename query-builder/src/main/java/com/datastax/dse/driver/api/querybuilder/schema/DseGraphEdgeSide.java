@@ -17,20 +17,38 @@
  */
 package com.datastax.dse.driver.api.querybuilder.schema;
 
-import com.datastax.dse.driver.internal.querybuilder.schema.DefaultDseGraphEdgeSide;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
 
+/**
+ * Defines one side of a legacy DSE graph edge.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
+@SuppressWarnings("DoNotCallSuggester")
 public interface DseGraphEdgeSide {
 
-  /** Starts the definition of a graph edge side by designating the from/to table. */
+  /**
+   * Starts the definition of a graph edge side by designating the from/to table.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
   @NonNull
   static DseGraphEdgeSide table(@NonNull CqlIdentifier tableId) {
-    return new DefaultDseGraphEdgeSide(tableId);
+    throw new UnsupportedOperationException(
+        "DSE graph schema query building is no longer supported");
   }
 
-  /** Shortcut for {@link #table(CqlIdentifier) table(CqlIdentifier.fromCql(tableName))}. */
+  /**
+   * Shortcut for {@link #table(CqlIdentifier) table(CqlIdentifier.fromCql(tableName))}.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
   @NonNull
   static DseGraphEdgeSide table(@NonNull String tableName) {
     return table(CqlIdentifier.fromCql(tableName));

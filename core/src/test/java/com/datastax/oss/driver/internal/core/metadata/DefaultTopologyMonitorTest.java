@@ -21,6 +21,7 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.filter;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
@@ -51,11 +52,10 @@ import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
-import com.datastax.oss.driver.shaded.guava.common.collect.Maps;
+import com.datastax.oss.driver.shaded.guava.common.collect.Streams;
 import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Error;
-import com.google.common.collect.Streams;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
@@ -118,6 +118,9 @@ public class DefaultTopologyMonitorTest {
 
     when(defaultConfig.getDuration(DefaultDriverOption.CONTROL_CONNECTION_TIMEOUT))
         .thenReturn(Duration.ofSeconds(1));
+    when(defaultConfig.getDuration(DefaultDriverOption.REPEATED_LOG_INTERVAL))
+        .thenReturn(Duration.ofMinutes(1));
+    when(defaultConfig.isDefined(DefaultDriverOption.REPEATED_LOG_INTERVAL)).thenReturn(true);
     when(config.getDefaultProfile()).thenReturn(defaultConfig);
     when(context.getConfig()).thenReturn(config);
 
@@ -158,6 +161,25 @@ public class DefaultTopologyMonitorTest {
 
     // Then
     assertThatStage(futureInfo).isSuccess(maybeInfo -> assertThat(maybeInfo.isPresent()).isFalse());
+  }
+
+  @Test
+  public void should_limit_missing_broadcast_rpc_port_warning() {
+    AdminRow row = mockPeersRow(2, node2.getHostId());
+    when(row.contains("rpc_port")).thenReturn(true);
+
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    verify(appender, times(1)).doAppend(loggingEventCaptor.capture());
+    assertThat(loggingEventCaptor.getValue().getFormattedMessage())
+        .contains("Unable to determine broadcast RPC port");
+
+    when(defaultConfig.getDuration(DefaultDriverOption.REPEATED_LOG_INTERVAL))
+        .thenReturn(Duration.ZERO);
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+    topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+    verify(appender, times(3)).doAppend(loggingEventCaptor.capture());
   }
 
   @Test
@@ -549,72 +571,6 @@ public class DefaultTopologyMonitorTest {
             });
   }
 
-  // Confirm the base case of extracting peer info from DSE peers table, no SSL involved
-  @Test
-  public void should_get_peer_address_info_peers_dse() {
-    // Given
-    AdminRow local = mockLocalRow(1, node1.getHostId());
-    AdminRow peer2 = mockPeersRowDse(3, node2.getHostId());
-    AdminRow peer1 = mockPeersRowDse(2, node1.getHostId());
-    topologyMonitor.isSchemaV2 = true;
-    topologyMonitor.stubQueries(
-        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult(local)),
-        new StubbedQuery("SELECT * FROM system.peers_v2", Maps.newHashMap(), null, true),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(peer2, peer1)));
-    when(context.getSslEngineFactory()).thenReturn(Optional.empty());
-
-    // When
-    CompletionStage<Iterable<NodeInfo>> futureInfos = topologyMonitor.refreshNodeList();
-
-    // Then
-    assertThatStage(futureInfos)
-        .isSuccess(
-            infos -> {
-              Iterator<NodeInfo> iterator = infos.iterator();
-              // First NodeInfo is for local, skip past that
-              iterator.next();
-              NodeInfo peer2nodeInfo = iterator.next();
-              assertThat(peer2nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.3", 9042));
-              NodeInfo peer1nodeInfo = iterator.next();
-              assertThat(peer1nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.2", 9042));
-            });
-  }
-
-  // Confirm the base case of extracting peer info from DSE peers table, this time with SSL
-  @Test
-  public void should_get_peer_address_info_peers_dse_with_ssl() {
-    // Given
-    AdminRow local = mockLocalRow(1, node1.getHostId());
-    AdminRow peer2 = mockPeersRowDseWithSsl(3, node2.getHostId());
-    AdminRow peer1 = mockPeersRowDseWithSsl(2, node1.getHostId());
-    topologyMonitor.isSchemaV2 = true;
-    topologyMonitor.stubQueries(
-        new StubbedQuery("SELECT * FROM system.local WHERE key='local'", mockResult(local)),
-        new StubbedQuery("SELECT * FROM system.peers_v2", Maps.newHashMap(), null, true),
-        new StubbedQuery("SELECT * FROM system.peers", mockResult(peer2, peer1)));
-    when(context.getSslEngineFactory()).thenReturn(Optional.of(sslEngineFactory));
-
-    // When
-    CompletionStage<Iterable<NodeInfo>> futureInfos = topologyMonitor.refreshNodeList();
-
-    // Then
-    assertThatStage(futureInfos)
-        .isSuccess(
-            infos -> {
-              Iterator<NodeInfo> iterator = infos.iterator();
-              // First NodeInfo is for local, skip past that
-              iterator.next();
-              NodeInfo peer2nodeInfo = iterator.next();
-              assertThat(peer2nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.3", 9043));
-              NodeInfo peer1nodeInfo = iterator.next();
-              assertThat(peer1nodeInfo.getEndPoint().resolve())
-                  .isEqualTo(new InetSocketAddress("127.0.0.2", 9043));
-            });
-  }
-
   @Test
   public void should_use_projected_query_on_second_refresh_node_list_call() {
     // Given — first call uses SELECT * and teaches the monitor the available columns
@@ -728,6 +684,49 @@ public class DefaultTopologyMonitorTest {
     assertThatStage(futureInfos).isSuccess(infos -> assertThat(infos).hasSize(1));
   }
 
+  @Test
+  @DataProvider({"true, 9142", "false, 9142", "true, -1", "false, -1"})
+  public void should_not_warn_when_rpc_port_columns_are_absent(boolean peer, int port) {
+    AdminRow row = peer ? mockPeersRow(2, node2.getHostId()) : mockLocalRow(1, node1.getHostId());
+    topologyMonitor.port = port;
+    logger.setLevel(Level.DEBUG);
+
+    InetSocketAddress address = topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    assertThat(address.getPort()).isEqualTo(port == -1 ? 0 : port);
+    verify(appender, times(1)).doAppend(loggingEventCaptor.capture());
+    assertThat(loggingEventCaptor.getValue().getLevel()).isEqualTo(Level.DEBUG);
+    assertThat(loggingEventCaptor.getValue().getFormattedMessage())
+        .contains("Broadcast RPC port columns are absent");
+  }
+
+  @Test
+  @DataProvider({"native_port, null", "native_port, 0", "rpc_port, null", "rpc_port, 0"})
+  public void should_warn_when_advertised_rpc_port_is_invalid(String column, Integer value) {
+    AdminRow row = mockPeersRow(2, node2.getHostId());
+    when(row.contains(column)).thenReturn(true);
+    when(row.getInteger(column)).thenReturn(value);
+    topologyMonitor.port = 9142;
+
+    InetSocketAddress address = topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    assertThat(address.getPort()).isEqualTo(9142);
+    assertLog(Level.WARN, "Unable to determine broadcast RPC port");
+  }
+
+  @Test
+  @DataProvider({"native_port", "rpc_port"})
+  public void should_use_advertised_rpc_port_without_warning(String column) {
+    AdminRow row = mockPeersRow(2, node2.getHostId());
+    when(row.contains(column)).thenReturn(true);
+    when(row.getInteger(column)).thenReturn(9142);
+
+    InetSocketAddress address = topologyMonitor.getBroadcastRpcAddress(row, node1.getEndPoint());
+
+    assertThat(address.getPort()).isEqualTo(9142);
+    verify(appender, never()).doAppend(any());
+  }
+
   @DataProvider
   public static Object[][] columnsToCheckV1() {
     return new Object[][] {{"rpc_address"}, {"host_id"}, {"data_center"}, {"rack"}, {"tokens"}};
@@ -763,9 +762,7 @@ public class DefaultTopologyMonitorTest {
       assertThat(nextQuery.parameters).isEqualTo(parameters);
       if (nextQuery.error) {
         Message error =
-            new Error(
-                ProtocolConstants.ErrorCode.SERVER_ERROR,
-                "Unknown keyspace/cf pair (system.peers_v2)");
+            new Error(ProtocolConstants.ErrorCode.INVALID, "Unknown table system.peers_v2");
         return CompletableFutures.failedFuture(new UnexpectedResponseException(queryString, error));
       }
       return CompletableFuture.completedFuture(nextQuery.result);
@@ -879,43 +876,6 @@ public class DefaultTopologyMonitorTest {
       fail("unexpected", e);
       return null;
     }
-  }
-
-  // Mock row for DSE ~6.8
-  private AdminRow mockPeersRowDse(int i, UUID hostId) {
-    try {
-      AdminRow row = mock(AdminRow.class);
-      when(row.contains("peer")).thenReturn(true);
-      when(row.isNull("data_center")).thenReturn(false);
-      when(row.getString("data_center")).thenReturn("dc" + i);
-      when(row.getString("dse_version")).thenReturn("6.8.30");
-      when(row.contains("graph")).thenReturn(true);
-      when(row.isNull("host_id")).thenReturn(hostId == null);
-      when(row.getUuid("host_id")).thenReturn(hostId);
-      when(row.getInetAddress("peer")).thenReturn(InetAddress.getByName("127.0.0." + i));
-      when(row.isNull("rack")).thenReturn(false);
-      when(row.getString("rack")).thenReturn("rack" + i);
-      when(row.isNull("native_transport_address")).thenReturn(false);
-      when(row.getInetAddress("native_transport_address"))
-          .thenReturn(InetAddress.getByName("127.0.0." + i));
-      when(row.isNull("native_transport_port")).thenReturn(false);
-      when(row.getInteger("native_transport_port")).thenReturn(9042);
-      when(row.isNull("tokens")).thenReturn(false);
-      when(row.getSetOfString("tokens")).thenReturn(ImmutableSet.of("token" + i));
-      when(row.isNull("rpc_address")).thenReturn(false);
-
-      return row;
-    } catch (UnknownHostException e) {
-      fail("unexpected", e);
-      return null;
-    }
-  }
-
-  private AdminRow mockPeersRowDseWithSsl(int i, UUID hostId) {
-    AdminRow row = mockPeersRowDse(i, hostId);
-    when(row.isNull("native_transport_port_ssl")).thenReturn(false);
-    when(row.getInteger("native_transport_port_ssl")).thenReturn(9043);
-    return row;
   }
 
   private AdminResult mockResult(AdminRow... rows) {

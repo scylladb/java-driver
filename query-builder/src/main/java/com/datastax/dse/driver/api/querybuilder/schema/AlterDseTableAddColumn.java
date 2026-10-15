@@ -23,6 +23,13 @@ import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface AlterDseTableAddColumn {
   /**
    * Adds a column definition in the ALTER TABLE statement.
@@ -36,7 +43,7 @@ public interface AlterDseTableAddColumn {
 
   /**
    * Shortcut for {@link #addColumn(CqlIdentifier, DataType)
-   * addColumn(CqlIdentifier.asCql(columnName), dataType)}.
+   * addColumn(CqlIdentifier.fromCql(columnName), dataType)}.
    */
   @NonNull
   default AlterDseTableAddColumnEnd addColumn(
@@ -56,7 +63,7 @@ public interface AlterDseTableAddColumn {
 
   /**
    * Shortcut for {@link #addStaticColumn(CqlIdentifier, DataType)
-   * addStaticColumn(CqlIdentifier.asCql(columnName), dataType)}.
+   * addStaticColumn(CqlIdentifier.fromCql(columnName), dataType)}.
    */
   @NonNull
   default AlterDseTableAddColumnEnd addStaticColumn(

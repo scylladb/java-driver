@@ -23,12 +23,6 @@ import com.datastax.dse.driver.api.querybuilder.schema.CreateDseAggregateStart;
 import com.datastax.dse.driver.api.querybuilder.schema.CreateDseFunctionStart;
 import com.datastax.dse.driver.api.querybuilder.schema.CreateDseKeyspaceStart;
 import com.datastax.dse.driver.api.querybuilder.schema.CreateDseTableStart;
-import com.datastax.dse.driver.internal.querybuilder.schema.DefaultAlterDseKeyspace;
-import com.datastax.dse.driver.internal.querybuilder.schema.DefaultAlterDseTable;
-import com.datastax.dse.driver.internal.querybuilder.schema.DefaultCreateDseAggregate;
-import com.datastax.dse.driver.internal.querybuilder.schema.DefaultCreateDseFunction;
-import com.datastax.dse.driver.internal.querybuilder.schema.DefaultCreateDseKeyspace;
-import com.datastax.dse.driver.internal.querybuilder.schema.DefaultCreateDseTable;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import com.datastax.oss.driver.api.querybuilder.schema.CreateAggregateStart;
@@ -37,55 +31,68 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 
 /**
- * An extension of {@link com.datastax.oss.driver.api.querybuilder.SchemaBuilder} for building
- * schema entities that have DSE specific functionality.
+ * A compatibility shell for the former DSE schema builder. Ordinary Cassandra schema methods
+ * delegate to {@link SchemaBuilder}.
+ *
+ * @deprecated DSE-specific schema builders are no longer supported. Their entry points throw {@link
+ *     UnsupportedOperationException}. Use {@link SchemaBuilder} for ordinary Cassandra schemas.
  */
+@Deprecated
+@SuppressWarnings("DoNotCallSuggester")
 public class DseSchemaBuilder extends SchemaBuilder {
 
   /**
    * Starts a CREATE AGGREGATE query with the given aggregate name. This assumes the keyspace name
    * is already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(@NonNull CqlIdentifier aggregateId) {
-    return new DefaultCreateDseAggregate(aggregateId);
+    throw unsupported();
   }
 
-  /** Starts a CREATE AGGREGATE query with the given aggregate name for the given keyspace name. */
+  /**
+   * Starts a CREATE AGGREGATE query with the given aggregate name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(
       @Nullable CqlIdentifier keyspaceId, @NonNull CqlIdentifier aggregateId) {
-    return new DefaultCreateDseAggregate(keyspaceId, aggregateId);
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #createDseAggregate(CqlIdentifier)
-   * createDseAggregate(CqlIdentifier.fromCql(aggregateName))}.
+   * Shortcut for {@link #createDseAggregate(CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(@NonNull String aggregateName) {
-    return new DefaultCreateDseAggregate(CqlIdentifier.fromCql(aggregateName));
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #createAggregate(CqlIdentifier, CqlIdentifier)
-   * createDseAggregate(CqlIdentifier.fromCql(keyspaceName), CqlIdentifier.fromCql(aggregateName))}.
+   * Shortcut for {@link #createDseAggregate(CqlIdentifier, CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseAggregateStart createDseAggregate(
       @Nullable String keyspaceName, @NonNull String aggregateName) {
-    return new DefaultCreateDseAggregate(
-        keyspaceName == null ? null : CqlIdentifier.fromCql(keyspaceName),
-        CqlIdentifier.fromCql(aggregateName));
+    throw unsupported();
   }
 
   /**
    * Starts a CREATE AGGREGATE query with the given aggregate name. This assumes the keyspace name
    * is already qualified for the Session or Statement.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code DETERMINISTIC} keyword, use {@link
-   * #createDseAggregate(CqlIdentifier)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateAggregateStart createAggregate(@NonNull CqlIdentifier aggregateName) {
@@ -95,9 +102,7 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts a CREATE AGGREGATE query with the given aggregate name for the given keyspace name.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code DETERMINISTIC} keyword, use {@link
-   * #createDseAggregate(CqlIdentifier, CqlIdentifier)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateAggregateStart createAggregate(
@@ -106,12 +111,9 @@ public class DseSchemaBuilder extends SchemaBuilder {
   }
 
   /**
-   * Shortcut for {@link #createAggregate(CqlIdentifier)
-   * createAggregate(CqlIdentifier.fromCql(aggregateName)}.
+   * Shortcut for {@link #createAggregate(CqlIdentifier)} using CQL-form names.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code DETERMINISTIC} keyword, use {@link
-   * #createDseAggregate(String)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateAggregateStart createAggregate(@NonNull String aggregateName) {
@@ -119,12 +121,9 @@ public class DseSchemaBuilder extends SchemaBuilder {
   }
 
   /**
-   * Shortcut for {@link #createAggregate(CqlIdentifier, CqlIdentifier)
-   * createAggregate(CqlIdentifier.fromCql(keyspace), CqlIdentifier.fromCql(aggregateName)}.
+   * Shortcut for {@link #createAggregate(CqlIdentifier, CqlIdentifier)} using CQL-form names.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code DETERMINISTIC} keyword, use {@link
-   * #createDseAggregate(String, String)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateAggregateStart createAggregate(
@@ -135,47 +134,55 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts a CREATE FUNCTION query with the given function name. This assumes the keyspace name is
    * already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(@NonNull CqlIdentifier functionId) {
-    return new DefaultCreateDseFunction(functionId);
+    throw unsupported();
   }
 
-  /** Starts a CREATE FUNCTION query with the given function name for the given keyspace name. */
+  /**
+   * Starts a CREATE FUNCTION query with the given function name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(
       @Nullable CqlIdentifier keyspaceId, @NonNull CqlIdentifier functionId) {
-    return new DefaultCreateDseFunction(keyspaceId, functionId);
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #createFunction(CqlIdentifier)
-   * createFunction(CqlIdentifier.fromCql(functionName)}
+   * Shortcut for {@link #createDseFunction(CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(@NonNull String functionName) {
-    return new DefaultCreateDseFunction(CqlIdentifier.fromCql(functionName));
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #createFunction(CqlIdentifier, CqlIdentifier)
-   * createFunction(CqlIdentifier.fromCql(keyspaceName), CqlIdentifier.fromCql(functionName)}
+   * Shortcut for {@link #createDseFunction(CqlIdentifier, CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseFunctionStart createDseFunction(
       @Nullable String keyspaceName, @NonNull String functionName) {
-    return new DefaultCreateDseFunction(
-        keyspaceName == null ? null : CqlIdentifier.fromCql(keyspaceName),
-        CqlIdentifier.fromCql(functionName));
+    throw unsupported();
   }
 
   /**
    * Starts a CREATE FUNCTION query with the given function name. This assumes the keyspace name is
    * already qualified for the Session or Statement.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code MONOTONIC} or {@code DETERMINISTIC} keywords, use
-   * {@link #createDseFunction(CqlIdentifier)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateFunctionStart createFunction(@NonNull CqlIdentifier functionName) {
@@ -185,9 +192,7 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts a CREATE FUNCTION query with the given function name for the given keyspace name.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code MONOTONIC} or {@code DETERMINISTIC} keywords, use
-   * {@link #createDseFunction(CqlIdentifier,CqlIdentifier)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateFunctionStart createFunction(
@@ -196,12 +201,9 @@ public class DseSchemaBuilder extends SchemaBuilder {
   }
 
   /**
-   * Shortcut for {@link #createFunction(CqlIdentifier, CqlIdentifier)
-   * createFunction(CqlIdentifier.fromCql(keyspace, functionName)}
+   * Shortcut for {@link #createFunction(CqlIdentifier)} using CQL-form names.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code MONOTONIC} or {@code DETERMINISTIC} keywords, use
-   * {@link #createDseFunction(String)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateFunctionStart createFunction(@NonNull String functionName) {
@@ -209,12 +211,9 @@ public class DseSchemaBuilder extends SchemaBuilder {
   }
 
   /**
-   * Shortcut for {@link #createFunction(CqlIdentifier)
-   * createFunction(CqlIdentifier.fromCql(keyspaceName),CqlIdentifier.fromCql(functionName)}.
+   * Shortcut for {@link #createFunction(CqlIdentifier, CqlIdentifier)} using CQL-form names.
    *
-   * <p>Note that this method only covers open-source Cassandra syntax. If you want to use
-   * DSE-specific features, such as the {@code MONOTONIC} or {@code DETERMINISTIC} keywords, use
-   * {@link #createDseFunction(String, String)}.
+   * <p>This method only covers open-source Cassandra syntax. DSE-specific features are unsupported.
    */
   @NonNull
   public static CreateFunctionStart createFunction(
@@ -222,30 +221,44 @@ public class DseSchemaBuilder extends SchemaBuilder {
     return SchemaBuilder.createFunction(keyspace, functionName);
   }
 
-  /** Starts a CREATE KEYSPACE query. */
+  /**
+   * Starts a CREATE KEYSPACE query.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
   @NonNull
   public static CreateDseKeyspaceStart createDseKeyspace(@NonNull CqlIdentifier keyspaceName) {
-    return new DefaultCreateDseKeyspace(keyspaceName);
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #createDseKeyspace(CqlIdentifier)
-   * createKeyspace(CqlIdentifier.fromCql(keyspaceName))}
+   * Shortcut for {@link #createDseKeyspace(CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseKeyspaceStart createDseKeyspace(@NonNull String keyspaceName) {
     return createDseKeyspace(CqlIdentifier.fromCql(keyspaceName));
   }
 
-  /** Starts an ALTER KEYSPACE query. */
+  /**
+   * Starts an ALTER KEYSPACE query.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
   @NonNull
   public static AlterDseKeyspaceStart alterDseKeyspace(@NonNull CqlIdentifier keyspaceName) {
-    return new DefaultAlterDseKeyspace(keyspaceName);
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #alterDseKeyspace(CqlIdentifier)
-   * alterKeyspace(CqlIdentifier.fromCql(keyspaceName)}.
+   * Shortcut for {@link #alterDseKeyspace(CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static AlterDseKeyspaceStart alterDseKeyspace(@NonNull String keyspaceName) {
@@ -255,22 +268,32 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts a CREATE TABLE query with the given table name. This assumes the keyspace name is
    * already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseTableStart createDseTable(@NonNull CqlIdentifier tableName) {
     return createDseTable(null, tableName);
   }
 
-  /** Starts a CREATE TABLE query with the given table name for the given keyspace name. */
+  /**
+   * Starts a CREATE TABLE query with the given table name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
   @NonNull
   public static CreateDseTableStart createDseTable(
       @Nullable CqlIdentifier keyspace, @NonNull CqlIdentifier tableName) {
-    return new DefaultCreateDseTable(keyspace, tableName);
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #createDseTable(CqlIdentifier)
-   * createDseTable(CqlIdentifier.fromCql(tableName)}
+   * Shortcut for {@link #createDseTable(CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseTableStart createDseTable(@NonNull String tableName) {
@@ -278,8 +301,10 @@ public class DseSchemaBuilder extends SchemaBuilder {
   }
 
   /**
-   * Shortcut for {@link #createDseTable(CqlIdentifier,CqlIdentifier)
-   * createDseTable(CqlIdentifier.fromCql(keyspaceName),CqlIdentifier.fromCql(tableName)}
+   * Shortcut for {@link #createDseTable(CqlIdentifier, CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static CreateDseTableStart createDseTable(
@@ -292,22 +317,32 @@ public class DseSchemaBuilder extends SchemaBuilder {
   /**
    * Starts an ALTER TABLE query with the given table name. This assumes the keyspace name is
    * already qualified for the Session or Statement.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static AlterDseTableStart alterDseTable(@NonNull CqlIdentifier tableName) {
-    return new DefaultAlterDseTable(tableName);
-  }
-
-  /** Starts an ALTER TABLE query with the given table name for the given keyspace name. */
-  @NonNull
-  public static AlterDseTableStart alterDseTable(
-      @Nullable CqlIdentifier keyspace, @NonNull CqlIdentifier tableName) {
-    return new DefaultAlterDseTable(keyspace, tableName);
+    throw unsupported();
   }
 
   /**
-   * Shortcut for {@link #alterDseTable(CqlIdentifier)
-   * alterDseTable(CqlIdentifier.fromCql(tableName)}
+   * Starts an ALTER TABLE query with the given table name for the given keyspace name.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
+   */
+  @NonNull
+  public static AlterDseTableStart alterDseTable(
+      @Nullable CqlIdentifier keyspace, @NonNull CqlIdentifier tableName) {
+    throw unsupported();
+  }
+
+  /**
+   * Shortcut for {@link #alterDseTable(CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static AlterDseTableStart alterDseTable(@NonNull String tableName) {
@@ -315,8 +350,10 @@ public class DseSchemaBuilder extends SchemaBuilder {
   }
 
   /**
-   * Shortcut for {@link #alterDseTable(CqlIdentifier,CqlIdentifier)
-   * alterDseTable(CqlIdentifier.fromCql(keyspaceName),CqlIdentifier.fromCql(tableName)}
+   * Shortcut for {@link #alterDseTable(CqlIdentifier, CqlIdentifier)} using CQL-form names.
+   *
+   * @throws UnsupportedOperationException if called with valid arguments; DSE schema construction
+   *     is unsupported
    */
   @NonNull
   public static AlterDseTableStart alterDseTable(
@@ -324,5 +361,9 @@ public class DseSchemaBuilder extends SchemaBuilder {
     return alterDseTable(
         keyspace == null ? null : CqlIdentifier.fromCql(keyspace),
         CqlIdentifier.fromCql(tableName));
+  }
+
+  private static UnsupportedOperationException unsupported() {
+    return new UnsupportedOperationException("DSE schema query building is no longer supported");
   }
 }

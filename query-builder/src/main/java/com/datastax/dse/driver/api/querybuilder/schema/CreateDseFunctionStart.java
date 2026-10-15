@@ -23,6 +23,13 @@ import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface CreateDseFunctionStart {
 
   /**
@@ -53,7 +60,7 @@ public interface CreateDseFunctionStart {
 
   /**
    * Shortcut for {@link #withParameter(CqlIdentifier, DataType)
-   * withParameter(CqlIdentifier.asCql(paramName), dataType)}.
+   * withParameter(CqlIdentifier.fromCql(paramName), paramType)}.
    */
   @NonNull
   default CreateDseFunctionStart withParameter(
@@ -70,7 +77,7 @@ public interface CreateDseFunctionStart {
 
   /**
    * Adds CALLED ON NULL to the create function specification. This indicates that the body of the
-   * function not be skipped when null input is provided.
+   * function should not be skipped when null input is provided.
    */
   @NonNull
   CreateDseFunctionWithNullOption calledOnNull();

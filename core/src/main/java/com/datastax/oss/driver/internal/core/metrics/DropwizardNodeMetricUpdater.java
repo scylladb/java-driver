@@ -18,8 +18,6 @@
 package com.datastax.oss.driver.internal.core.metrics;
 
 import com.codahale.metrics.MetricRegistry;
-import com.datastax.dse.driver.api.core.config.DseDriverOption;
-import com.datastax.dse.driver.api.core.metrics.DseNodeMetric;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -78,12 +76,6 @@ public class DropwizardNodeMetricUpdater extends DropwizardMetricUpdater<NodeMet
         DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_HIGHEST,
         DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_DIGITS,
         DefaultDriverOption.METRICS_NODE_CQL_MESSAGES_INTERVAL);
-    initializeHdrTimer(
-        DseNodeMetric.GRAPH_MESSAGES,
-        profile,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS,
-        DseDriverOption.METRICS_NODE_GRAPH_MESSAGES_INTERVAL);
   }
 
   @Override

@@ -64,8 +64,8 @@ public class OptionsMap implements Serializable {
    * Creates a new instance that contains the driver's default configuration.
    *
    * <p>This will produce a configuration that is equivalent to the {@code reference.conf} file
-   * bundled with the driver (however, this method does not load any file, and doesn't require
-   * Typesafe config in the classpath).
+   * bundled with the driver. This method does not load any file and does not require Typesafe
+   * config in the classpath.
    */
   @NonNull
   public static OptionsMap driverDefaults() {
@@ -245,13 +245,11 @@ public class OptionsMap implements Serializable {
     throw new InvalidObjectException("Proxy required");
   }
 
+  @SuppressWarnings("deprecation")
   protected static void fillWithDriverDefaults(OptionsMap map) {
     Duration initQueryTimeout = Duration.ofSeconds(5);
-    Duration requestTimeout = Duration.ofSeconds(2);
+    Duration requestTimeout = Duration.ofSeconds(11);
     int requestPageSize = 5000;
-    int continuousMaxPages = 0;
-    int continuousMaxPagesPerSecond = 0;
-    int continuousMaxEnqueuedPages = 4;
 
     // Sorted by order of appearance in reference.conf:
 
@@ -264,10 +262,10 @@ public class OptionsMap implements Serializable {
         CQL4SkipMetadataResolveMethod.SMART.toString());
     map.put(TypedDriverOption.REQUEST_SERIAL_CONSISTENCY, "SERIAL");
     map.put(TypedDriverOption.REQUEST_DEFAULT_IDEMPOTENCE, false);
-    map.put(TypedDriverOption.GRAPH_TRAVERSAL_SOURCE, "g");
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_CLASS, "DefaultLoadBalancingPolicy");
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
     map.put(TypedDriverOption.SESSION_LEAK_THRESHOLD, 4);
+    map.put(TypedDriverOption.REPEATED_LOG_INTERVAL, Duration.ofMinutes(1));
     map.put(TypedDriverOption.CONNECTION_CONNECT_TIMEOUT, Duration.ofSeconds(5));
     map.put(TypedDriverOption.CONNECTION_INIT_QUERY_TIMEOUT, initQueryTimeout);
     map.put(TypedDriverOption.CONNECTION_SET_KEYSPACE_TIMEOUT, initQueryTimeout);
@@ -276,6 +274,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONNECTION_POOL_INIT_BATCH_SIZE, 0);
     map.put(TypedDriverOption.CONNECTION_MAX_REQUESTS, 1024);
     map.put(TypedDriverOption.CONNECTION_MAX_ORPHAN_REQUESTS, 256);
+    map.put(TypedDriverOption.CONNECTION_MAX_CANDIDATE_ADDRESSES, 5);
     map.put(TypedDriverOption.CONNECTION_WARN_INIT_ERROR, true);
     map.put(TypedDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true);
     map.put(TypedDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, 10000);
@@ -299,56 +298,22 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.REQUEST_TRACE_INTERVAL, Duration.ofMillis(3));
     map.put(TypedDriverOption.REQUEST_TRACE_CONSISTENCY, "ONE");
     map.put(TypedDriverOption.REQUEST_LOG_WARNINGS, true);
-    map.put(TypedDriverOption.GRAPH_PAGING_ENABLED, "AUTO");
-    map.put(TypedDriverOption.GRAPH_CONTINUOUS_PAGING_PAGE_SIZE, requestPageSize);
-    map.put(TypedDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES, continuousMaxPages);
-    map.put(
-        TypedDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND,
-        continuousMaxPagesPerSecond);
-    map.put(
-        TypedDriverOption.GRAPH_CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, continuousMaxEnqueuedPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_PAGE_SIZE, requestPageSize);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_PAGE_SIZE_BYTES, false);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_PAGES, continuousMaxPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_PAGES_PER_SECOND, continuousMaxPagesPerSecond);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_MAX_ENQUEUED_PAGES, continuousMaxEnqueuedPages);
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_FIRST_PAGE, Duration.ofSeconds(2));
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_TIMEOUT_OTHER_PAGES, Duration.ofSeconds(1));
-    map.put(TypedDriverOption.MONITOR_REPORTING_ENABLED, true);
     map.put(TypedDriverOption.METRICS_SESSION_ENABLED, Collections.emptyList());
-    map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST, Duration.ofSeconds(3));
+    map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_SESSION_CQL_REQUESTS_INTERVAL, Duration.ofMinutes(5));
-    map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_HIGHEST, Duration.ofSeconds(3));
+    map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_SESSION_THROTTLING_INTERVAL, Duration.ofMinutes(5));
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_HIGHEST,
-        Duration.ofMinutes(2));
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_LOWEST,
-        Duration.ofMillis(10));
-    map.put(TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_DIGITS, 3);
-    map.put(
-        TypedDriverOption.CONTINUOUS_PAGING_METRICS_SESSION_CQL_REQUESTS_INTERVAL,
-        Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_FACTORY_CLASS, "DefaultMetricsFactory");
     map.put(TypedDriverOption.METRICS_ID_GENERATOR_CLASS, "DefaultMetricIdGenerator");
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_HIGHEST, Duration.ofSeconds(12));
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_LOWEST, Duration.ofMillis(1));
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_DIGITS, 3);
-    map.put(TypedDriverOption.METRICS_SESSION_GRAPH_REQUESTS_INTERVAL, Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_NODE_ENABLED, Collections.emptyList());
-    map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_HIGHEST, Duration.ofSeconds(3));
+    map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_HIGHEST, Duration.ofSeconds(12));
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_LOWEST, Duration.ofMillis(1));
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_DIGITS, 3);
     map.put(TypedDriverOption.METRICS_NODE_CQL_MESSAGES_INTERVAL, Duration.ofMinutes(5));
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_HIGHEST, Duration.ofSeconds(3));
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_LOWEST, Duration.ofMillis(1));
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_DIGITS, 3);
-    map.put(TypedDriverOption.METRICS_NODE_GRAPH_MESSAGES_INTERVAL, Duration.ofMinutes(5));
     map.put(TypedDriverOption.METRICS_NODE_EXPIRE_AFTER, Duration.ofHours(1));
     map.put(TypedDriverOption.SOCKET_TCP_NODELAY, true);
     map.put(TypedDriverOption.HEARTBEAT_INTERVAL, Duration.ofSeconds(30));
@@ -359,7 +324,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.METADATA_SCHEMA_ENABLED, true);
     map.put(
         TypedDriverOption.METADATA_SCHEMA_REFRESHED_KEYSPACES,
-        ImmutableList.of("!system", "!/^system_.*/", "!/^dse_.*/", "!solr_admin", "!OpsCenter"));
+        ImmutableList.of("!system", "!/^system_.*/"));
     map.put(TypedDriverOption.METADATA_SCHEMA_REQUEST_TIMEOUT, Duration.ofSeconds(20));
     map.put(TypedDriverOption.METADATA_SCHEMA_REQUEST_PAGE_SIZE, requestPageSize);
     map.put(TypedDriverOption.METADATA_SCHEMA_WINDOW, Duration.ofSeconds(1));
@@ -369,7 +334,7 @@ public class OptionsMap implements Serializable {
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_INTERVAL, Duration.ofMillis(200));
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_TIMEOUT, Duration.ofSeconds(10));
     map.put(TypedDriverOption.CONTROL_CONNECTION_AGREEMENT_WARN, true);
-    map.put(TypedDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, false);
+    map.put(TypedDriverOption.CONTROL_CONNECTION_RECONNECT_CONTACT_POINTS, true);
     map.put(TypedDriverOption.PREPARE_ON_ALL_NODES, true);
     map.put(TypedDriverOption.REPREPARE_ENABLED, true);
     map.put(TypedDriverOption.REPREPARE_CHECK_SYSTEM_TABLE, false);

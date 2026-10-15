@@ -21,6 +21,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.schema.FunctionMetadata;
 import com.datastax.oss.driver.api.core.type.DataType;
 import com.datastax.oss.driver.internal.core.metadata.schema.ScriptBuilder;
+import com.datastax.oss.driver.internal.core.util.Strings;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +31,11 @@ import java.util.Optional;
  *
  * <p>It adds support for the DSE-specific {@link #getDeterministic() DETERMINISTIC} and {@link
  * #getMonotonicity() MONOTONIC} keywords.
+ *
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
  */
+@Deprecated
 public interface DseFunctionMetadata extends FunctionMetadata {
 
   /** The monotonicity of a function. */
@@ -45,7 +50,7 @@ public interface DseFunctionMetadata extends FunctionMetadata {
 
     /**
      * Indicates that the function is partially monotonic, meaning that partial application over
-     * some of the its arguments is monotonic. Currently (DSE 6.0.0), CQL only allows partial
+     * some of its arguments is monotonic. Currently (DSE 6.0.0), CQL only allows partial
      * monotonicity on <em>exactly one argument</em>. This may change in a future CQL version.
      */
     PARTIALLY_MONOTONIC,
@@ -90,7 +95,7 @@ public interface DseFunctionMetadata extends FunctionMetadata {
    *       argument</em>. This may change in a future CQL version. In that case, this method returns
    *       {@link Monotonicity#PARTIALLY_MONOTONIC}, and {@link #getMonotonicArgumentNames()}
    *       returns a singleton list;
-   *   <li>not monotonic. In that case, this method return {@link Monotonicity#NOT_MONOTONIC} and
+   *   <li>not monotonic. In that case, this method returns {@link Monotonicity#NOT_MONOTONIC} and
    *       {@link #getMonotonicArgumentNames()} returns an empty list.
    * </ul>
    *
@@ -176,9 +181,9 @@ public interface DseFunctionMetadata extends FunctionMetadata {
         .append("LANGUAGE ")
         .append(getLanguage())
         .newLine()
-        .append("AS '")
-        .append(getBody())
-        .append("';");
+        .append("AS ")
+        .append(Strings.quote(getBody()))
+        .append(";");
     return builder.build();
   }
 }

@@ -20,7 +20,9 @@ package com.datastax.oss.driver.api.core.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.oss.driver.internal.SerializationHelper;
+import java.io.ObjectInputStream;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.function.Consumer;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -44,9 +46,25 @@ public class OptionsMapTest {
 
     // Then
     assertThat(deserialized.get(TypedDriverOption.REQUEST_TIMEOUT))
-        .isEqualTo(Duration.ofSeconds(2));
+        .isEqualTo(Duration.ofSeconds(11));
     assertThat(deserialized.get("slow", TypedDriverOption.REQUEST_TIMEOUT)).isEqualTo(slowTimeout);
     // Listeners are transient
     assertThat(deserialized.removeChangeListener(mockListener)).isFalse();
+  }
+
+  @Test
+  public void should_deserialize_proxy_with_removed_provenance_fields() throws Exception {
+    // Captured from the previous SerializationProxy, which had explicitOptions and legacyUnknown.
+    try (ObjectInputStream stream =
+        new ObjectInputStream(
+            Base64.getMimeDecoder()
+                .wrap(
+                    OptionsMapTest.class.getResourceAsStream(
+                        "/config/options-map-with-provenance.base64")))) {
+      OptionsMap deserialized = (OptionsMap) stream.readObject();
+      deserialized.put(TypedDriverOption.REQUEST_TIMEOUT, Duration.ofSeconds(17));
+      assertThat(deserialized.get(TypedDriverOption.REQUEST_TIMEOUT))
+          .isEqualTo(Duration.ofSeconds(17));
+    }
   }
 }

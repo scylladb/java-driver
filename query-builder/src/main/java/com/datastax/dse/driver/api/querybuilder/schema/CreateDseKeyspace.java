@@ -21,6 +21,13 @@ import com.datastax.oss.driver.api.querybuilder.BuildableQuery;
 import com.datastax.oss.driver.api.querybuilder.schema.KeyspaceOptions;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface CreateDseKeyspace extends BuildableQuery, KeyspaceOptions<CreateDseKeyspace> {
 
   @NonNull

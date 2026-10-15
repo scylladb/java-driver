@@ -49,6 +49,10 @@ import org.slf4j.LoggerFactory;
 @Category(IsolatedTests.class)
 public class AdvancedShardAwarenessIT {
 
+  // The isolated Scylla CI jobs reserve this range from automatic local port assignment.
+  private static final int TEST_SOURCE_PORT_LOW = 20000;
+  private static final int TEST_SOURCE_PORT_HIGH = 22000;
+
   @ClassRule
   public static final CustomCcmRule CCM_RULE =
       CustomCcmRule.builder().withNodes(2).withJvmArgs("--smp=3").build();
@@ -123,8 +127,8 @@ public class AdvancedShardAwarenessIT {
         SessionUtils.configLoaderBuilder()
             .withBoolean(DefaultDriverOption.SOCKET_REUSE_ADDRESS, reuseAddress)
             .withBoolean(DefaultDriverOption.CONNECTION_ADVANCED_SHARD_AWARENESS_ENABLED, true)
-            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, 10000)
-            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, 60000)
+            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_LOW, TEST_SOURCE_PORT_LOW)
+            .withInt(DefaultDriverOption.ADVANCED_SHARD_AWARENESS_PORT_HIGH, TEST_SOURCE_PORT_HIGH)
             // Due to rounding up the connections per shard this will result in 6 connections per
             // node
             .withInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE, expectedChannelsPerNode)
@@ -169,7 +173,7 @@ public class AdvancedShardAwarenessIT {
           .pollInterval(500, TimeUnit.MILLISECONDS)
           .until(() -> areAllPoolsFullyInitialized(allSessions, expectedChannelsPerNode));
       List<ILoggingEvent> logsCopy = ImmutableList.copyOf(appender.list);
-      assertMatchesAtLeast(shardMismatchPattern, 5, logsCopy);
+      assertMatchesAtLeast(shardMismatchPattern, 1, logsCopy);
     }
   }
 

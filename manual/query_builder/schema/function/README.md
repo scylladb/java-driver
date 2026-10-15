@@ -74,15 +74,14 @@ createFunction("cycling", "log")
     .withJavaLanguage()
     .asQuoted("return Double.valueOf(Math.log(input.doubleValue()));");
 
-// CREATE FUNCTION cycling.log (columnname text,num int) CALLED ON NULL INPUT RETURNS double LANGUAGE java
+// CREATE FUNCTION cycling.log (input double) CALLED ON NULL INPUT RETURNS double LANGUAGE java
 // AS 'return Double.valueOf(Math.log(input.doubleValue()));'
 ```
 
-Note that when providing a function body, the `as` method does not implicitly quote your function
-body.  If you would like to have the API handle this for you, use `asQuoted`.  This will surround
-your function body in single quotes if the body itself does not contain a single quote, otherwise it
-will surround your function body in two dollar signs mimicking a postgres-style string
-literal, i.e.:
+The `as` method expects an already quoted function body. Use `asQuoted` to quote it automatically.
+Bodies containing single quotes use the `$$` delimiter, as long as the body does not also contain
+`$$`. Otherwise, the builder surrounds the body with single quotes and escapes each embedded single
+quote by doubling it. For example:
 
 ```java
 createFunction("sayhi")
@@ -91,8 +90,12 @@ createFunction("sayhi")
     .returnsType(DataTypes.TEXT)
     .withJavaScriptLanguage()
     .asQuoted("'hi ' + input;");
-// CREATE FUNCTION sayhi (input text) RETURNS NULL ON NULL INPUT RETURNS text LANGUAGE javascript AS $$ 'hi ' + input; $$
+// CREATE FUNCTION sayhi (input text) RETURNS NULL ON NULL INPUT RETURNS text
+// LANGUAGE javascript AS $$ 'hi ' + input; $$
 ```
+
+For a body containing both delimiters, such as `return "O'Reilly $$";`, `asQuoted` produces
+`'return "O''Reilly $$";'`.
 
 
 ### Dropping a Function (DROP FUNCTION)

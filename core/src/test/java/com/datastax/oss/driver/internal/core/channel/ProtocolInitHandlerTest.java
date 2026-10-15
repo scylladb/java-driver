@@ -33,6 +33,7 @@ import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.InvalidKeyspaceException;
 import com.datastax.oss.driver.api.core.auth.AuthProvider;
 import com.datastax.oss.driver.api.core.auth.AuthenticationException;
+import com.datastax.oss.driver.api.core.auth.ProgrammaticPlainTextAuthProvider;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -69,7 +70,6 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.ConcurrentModificationException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
@@ -270,15 +270,16 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     assertThat(connectFuture).isNotDone();
 
     // Simulate the SUPPORTED response
-    writeInboundFrame(requestFrame, TestResponses.supportedResponse("mock_key", "mock_value"));
-
-    Map<String, List<String>> supportedOptions = channel.attr(DriverChannel.OPTIONS_KEY).get();
-    assertThat(supportedOptions).containsKey("mock_key");
-    assertThat(supportedOptions.get("mock_key")).containsOnly("mock_value");
+    writeInboundFrame(
+        requestFrame,
+        TestResponses.supportedResponse(
+            "SCYLLA_LWT_ADD_METADATA_MARK", "LWT_OPTIMIZATION_META_BIT_MASK=1"));
 
     // It should send a STARTUP message
     requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Startup.class);
+    assertThat(((Startup) requestFrame.message).options)
+        .containsEntry("SCYLLA_LWT_ADD_METADATA_MARK", "1");
     assertThat(connectFuture).isNotDone();
 
     // Simulate a READY response
@@ -458,6 +459,34 @@ public class ProtocolInitHandlerTest extends ChannelHandlerTestBase {
     assertThat(requestFrame.message).isInstanceOf(Query.class);
     writeInboundFrame(requestFrame, TestResponses.clusterNameResponse("someClusterName"));
     assertThat(connectFuture).isSuccess();
+  }
+
+  @Test
+  public void should_preserve_plaintext_dse_rejection_as_authentication_error() {
+    channel
+        .pipeline()
+        .addLast(
+            ChannelFactory.INIT_HANDLER_NAME,
+            new ProtocolInitHandler(
+                internalDriverContext,
+                DefaultProtocolVersion.V4,
+                null,
+                END_POINT,
+                DriverChannelOptions.DEFAULT,
+                heartbeatHandler,
+                false));
+    when(internalDriverContext.getAuthProvider())
+        .thenReturn(Optional.of(new ProgrammaticPlainTextAuthProvider("u", "p")));
+    ChannelFuture connectFuture = channel.connect(new InetSocketAddress("localhost", 9042));
+    Frame requestFrame = readOutboundFrame();
+    String serverAuthenticator = "com.datastax.bdp.cassandra.auth.DseAuthenticator";
+    writeInboundFrame(requestFrame, new Authenticate(serverAuthenticator));
+    assertThat(connectFuture)
+        .isFailed(
+            error ->
+                assertThat(error)
+                    .isInstanceOf(AuthenticationException.class)
+                    .hasMessageContaining(serverAuthenticator));
   }
 
   @Test

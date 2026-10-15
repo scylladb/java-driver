@@ -28,9 +28,6 @@ under the License.
   * When using [Jackson](../integration#Jackson);
   * When using LZ4 [compression](../compression/);
   * Depending on the [logging backend](../logging) in use.
-* DSE-specific features:
-  * Geospatial types are supported.
-  * DSE Graph is not officially supported, although it may work.
 * The [shaded jar](../shaded_jar) is not officially supported, although it may work.
 
 -----
@@ -250,83 +247,6 @@ The driver performs a few [native calls](../integration#native-libraries) using
 
 Starting with driver 4.7.0, native calls are also possible in a GraalVM native image, without any
 extra configuration.
-
-### Using DataStax Enterprise (DSE) features
-
-#### DSE Geospatial types
-
-DSE [Geospatial types](../dse/geotypes) are supported on GraalVM native images; the following
-configurations must be added:
-
-1. Create the following reflection.json file, or add the entry to an existing file:
-
-```json
-[
-  { "name": "com.esri.core.geometry.ogc.OGCGeometry" }
-]
-```
-
-**Important**: when using the shaded jar – which is not officially supported on GraalVM native 
-images, as stated above – replace the above entry with the below one:
-
-```json
-[
-  { "name": "com.datastax.oss.driver.shaded.esri.core.geometry.ogc.OGCGeometry" }
-]
-```
-
-2. When invoking the native image builder, add a `-H:ReflectionConfigurationFiles=reflection.json`
-   flag and point it to the file created above.
-
-#### DSE Graph
-
-**[DSE Graph](../dse/graph) is not officially supported on GraalVM native images.**
-
-The following configuration can be used as a starting point for users wishing to build a native
-image for a DSE Graph application. DataStax does not guarantee however that the below configuration
-will work in all cases. If the native image build fails, a good option is to use GraalVM's
-[Tracing Agent](https://www.graalvm.org/reference-manual/native-image/Agent/) to understand why.
-
-1. Create the following reflection.json file, or add these entries to an existing file:
-
-```json
-[
-  { "name": "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0" },
-  { "name": "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal" },
-  { "name": "org.apache.tinkerpop.gremlin.structure.Graph",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  },
-  { "name": "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  },
-  { "name": " org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  },
-  { "name": "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource",
-    "allDeclaredConstructors": true,
-    "allPublicConstructors": true,
-    "allDeclaredMethods": true,
-    "allPublicMethods": true
-  }
-]
-```
-
-2. When invoking the native image builder, add the following flags:
-
-```
--H:ReflectionConfigurationFiles=reflection.json
---initialize-at-build-time=org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0
---initialize-at-build-time=org.apache.tinkerpop.shaded.jackson.databind.deser.std.StdDeserializer
-```
 
 ### Using the shaded jar
 

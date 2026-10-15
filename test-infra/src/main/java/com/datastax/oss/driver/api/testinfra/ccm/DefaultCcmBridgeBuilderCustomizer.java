@@ -31,12 +31,8 @@ import com.datastax.oss.driver.api.testinfra.requirement.BackendType;
 public class DefaultCcmBridgeBuilderCustomizer {
 
   public static CcmBridge.Builder configureBuilder(CcmBridge.Builder builder) {
-    if (!CcmBridge.isDistributionOf(
-            BackendType.DSE, (dist, cass) -> dist.nextStable().compareTo(Version.V4_0_0) >= 0)
-        || CcmBridge.isDistributionOf(BackendType.HCD)) {
-      builder.withCassandraConfiguration("enable_materialized_views", true);
-      builder.withCassandraConfiguration("enable_sasi_indexes", true);
-    }
+    builder.withCassandraConfiguration("enable_materialized_views", true);
+    builder.withCassandraConfiguration("enable_sasi_indexes", true);
     if (CcmBridge.getDistributionVersion().nextStable().compareTo(Version.V3_0_0) >= 0) {
       if (!CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
         builder.withJvmArgs("-Dcassandra.superuser_setup_delay_ms=0");

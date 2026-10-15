@@ -17,15 +17,16 @@
  */
 package com.datastax.dse.driver.api.core.metadata.schema;
 
-import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.RelationMetadata;
 
 /**
  * Specialized table or materialized view metadata for DSE.
  *
- * <p>This type exists only for future extensibility; currently, it is identical to {@link
- * RelationMetadata}.
+ * <p>This type remains for source and binary compatibility. The driver no longer produces DSE
+ * metadata.
  *
- * <p>Note that all returned {@link ColumnMetadata} can be cast to {@link DseColumnMetadata}.
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
  */
+@Deprecated
 public interface DseRelationMetadata extends RelationMetadata {}

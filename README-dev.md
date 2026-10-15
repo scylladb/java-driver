@@ -15,6 +15,22 @@ Once you have installed the above software, you can build and preview the docume
 
 To generate the reference documentation of the driver, run the command `make javadoc`. This command generates the reference documentation using the Javadoc tool in the `_build/dirhtml/<VERSION>/api` directory.
 
+## Multiversion build
+
+`make -C docs multiversion` builds the documentation site and javadoc for every version in `RELEASE_LINES` and `BRANCHES` (`docs/source/conf.py`):
+
+- A `RELEASE_LINES` version (`scylla-X.Y.Z.x`) builds from the newest `X.Y.Z.N` release tag. `docs/_utils/alias-tags.py` points a local, never-pushed tag of that name at it for the build. A patch release needs no change, and moving the `scylla-X.Y.Z.x` branch does not change the site.
+- A `BRANCHES` version builds from its branch. These are lines whose docs no longer follow releases.
+
+`docs/_utils/javadoc-multiversion.sh` selects the JDK per version: versions up to `scylla-4.19.0.x` need JDK 8, newer ones JDK 11.
+
+To add a new documented version:
+
+1. Release the line first: a `RELEASE_LINES` version with no `X.Y.Z.N` tag fails the build.
+2. Add it to `RELEASE_LINES` in `docs/source/conf.py`, and update `LATEST_VERSION` if it is the new latest. New versions build with JDK 11 by default.
+3. Only if the version needs a different JDK, map it in `docs/_utils/javadoc-multiversion.sh`.
+4. Only if that JDK is not installed by the workflow yet, add it to the `setup-java` step in `.github/workflows/docs-pages.yml`.
+
 ## Using the Makefile
 
 Most day-to-day tasks are wrapped in the top-level `Makefile` so you do not have to remember long Maven invocations. Common targets include:
@@ -26,5 +42,81 @@ Most day-to-day tasks are wrapped in the top-level `Makefile` so you do not have
 - `make check` executes `mvn verify -DskipTests` for static analysis, while `make fix` applies code formatters via `mvn fmt:format`.
 - `make fix` executes `mvn fmt:format` to format the code.
 - `make clean` removes Maven targets, shaded artifacts, and release backups to reset the tree.
+
+### Measuring code coverage
+
+Coverage is measured with [JaCoCo](https://www.jacoco.org/jacoco/) and is off by default: the agent
+slows every forked test JVM down, so it is opt-in through the `coverage` Maven profile. Pass
+`COVERAGE=true` to any of the `test-*` Make targets to enable it, then aggregate:
+
+```
+make test-unit COVERAGE=true
+make coverage-report
+```
+
+`make coverage-report` reads whatever execution data is already on disk, so several lanes can be
+combined into one number -- which is the point of the separate `coverage-report` module: it
+attributes the coverage `core` gets *through* the integration suite back to `core`'s own source,
+which each module's own report cannot see. A `COVERAGE=true` run truncates `jacoco.exec` before it
+starts, so rename the previous lane's data out of the way to keep it:
+
+```
+make test-unit COVERAGE=true
+find . -name jacoco.exec -execdir mv jacoco.exec jacoco-unit.exec \;
+make test-integration-scylla COVERAGE=true
+make coverage-report
+```
+
+The report lands in `coverage-report/target/site/jacoco-aggregate` (HTML, XML and CSV), and
+`make clean-coverage` removes it along with the execution data. `make coverage-report` fails rather
+than rendering a confident-looking but empty report if it finds no execution data, or if the data
+matches none of the classes.
+
+`COVERAGE` accepts `true`/`1`/`yes`/`on` and `false`/`0`/`no`/`off`, in any case; anything else is
+an error rather than a silent "off", because a run that quietly skipped the agent only shows up
+much later, when `make coverage-report` finds nothing to aggregate.
+
+In CI, the unit and integration lanes in `tests@v1.yml` run with `COVERAGE=true` and upload their
+execution data; the "Coverage report" job aggregates it and writes both the lanes it actually
+received data from and the resulting percentage to its job summary, then attaches the HTML report
+as an artifact. That job is `continue-on-error`, so a flaky integration test costs the metric some
+data rather than adding a second failure to the pull request. Collecting from the existing lanes
+rather than a dedicated workflow keeps the Scylla suite from being run twice.
+
+When every test lane passed and handed over execution data, the next job uploads that `jacoco.xml`
+to [Codecov](https://codecov.io/gh/scylladb/java-driver), which comments the coverage delta on the
+pull request. Its statuses are informational, so a drop never blocks a merge. The upload runs only
+in scylladb/java-driver; a fork's push runs skip it.
+
+Only the lanes on `COVERAGE_JAVA_VERSION` (a workflow-level variable, JDK 17) are instrumented.
+javac 11 and javac 17 do not emit the same bytes for the same source even under `--release 11` --
+they order the constant pool differently -- so the class ids differ, and a report rendered against
+one compiler's classes cannot see the other's execution data. Instrumenting the JDK 11 lanes would
+not have added anything to the number; it would only have slowed them down. Each lane records the
+JDK it ran on alongside its execution data and the aggregating job refuses anything that does not
+match its own, so a future matrix change cannot quietly reintroduce the mismatch.
+
+JaCoCo matches execution data to classes by an id derived from the compiled bytes, so the data has
+to come from the same build of the classes the report is rendered against. When they diverge it
+drops that class's data and the report renders happily, just short, so `make coverage-report` greps
+its own Maven log for `Execution data for class ... does not match` and fails on it. The usual
+cause is stale execution data from before a recompile, which `make clean-coverage` clears.
+
+That warning only covers the case where JaCoCo finds no data at all under a class's id. When two
+builds of the same class are represented -- one matching, one not -- the matching one wins and the
+other is dropped in silence, which is why the JDK the data was recorded on is checked separately
+rather than left to the warning.
+
+Note: the surefire/failsafe configs in `core` and `integration-tests` previously set `<argLine>` to
+just their own JVM flags (e.g. `${mockitoopens.argline}`), which silently discarded the
+`-javaagent` flag `jacoco:prepare-agent` injects into the `argLine` property -- coverage was being
+collected for every *other* module, but not these two. They now combine both via Maven's
+deferred-property syntax: `<argLine>@{argLine} ${mockitoopens.argline}</argLine>` (`@{...}` is
+necessary rather than `${...}` because `jacoco:prepare-agent` sets `argLine` at build-execution
+time, after the POM's own `${...}` references would already have been resolved). `argLine` itself
+is declared, empty, as a root `pom.xml` property so that combination resolves to something even
+outside the `coverage` profile, where `jacoco:prepare-agent` never runs to give it a real value.
+(`distribution-tests` has no `src` of its own, so surefire never forks there either way; it was
+left out of this.)
 
 The Makefile automatically installs the shaded Guava dependency and, for integration tests, bootstraps the appropriate CCM toolchain and raises kernel `aio-max-nr` when required. If a target fails because the toolchain is missing, rerun after installing the prerequisites highlighted in the target output.

@@ -20,6 +20,13 @@ package com.datastax.dse.driver.api.querybuilder.schema;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface AlterDseTableRenameColumn {
 
   /**
@@ -31,7 +38,7 @@ public interface AlterDseTableRenameColumn {
 
   /**
    * Shortcut for {@link #renameColumn(CqlIdentifier, CqlIdentifier)
-   * renameField(CqlIdentifier.fromCql(from),CqlIdentifier.fromCql(to))}.
+   * renameColumn(CqlIdentifier.fromCql(from), CqlIdentifier.fromCql(to))}.
    */
   @NonNull
   default AlterDseTableRenameColumnEnd renameColumn(@NonNull String from, @NonNull String to) {

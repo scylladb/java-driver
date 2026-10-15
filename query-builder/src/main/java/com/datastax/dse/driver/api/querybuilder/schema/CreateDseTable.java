@@ -24,6 +24,13 @@ import com.datastax.oss.driver.api.querybuilder.BuildableQuery;
 import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface CreateDseTable
     extends BuildableQuery, OngoingDsePartitionKey, CreateDseTableWithOptions {
 
@@ -31,7 +38,7 @@ public interface CreateDseTable
    * Adds a clustering column definition in the CREATE TABLE statement.
    *
    * <p>This includes the column declaration (you don't need an additional {@link
-   * #withColumn(CqlIdentifier, DataType) addColumn} call).
+   * #withColumn(CqlIdentifier, DataType) withColumn} call).
    *
    * <p>Clustering key columns are added in the order of their declaration.
    *
@@ -44,7 +51,7 @@ public interface CreateDseTable
 
   /**
    * Shortcut for {@link #withClusteringColumn(CqlIdentifier, DataType)
-   * withClusteringColumn(CqlIdentifier.asCql(columnName), dataType)}.
+   * withClusteringColumn(CqlIdentifier.fromCql(columnName), dataType)}.
    */
   @NonNull
   default CreateDseTable withClusteringColumn(
@@ -63,7 +70,7 @@ public interface CreateDseTable
 
   /**
    * Shortcut for {@link #withColumn(CqlIdentifier, DataType)
-   * withColumn(CqlIdentifier.asCql(columnName), dataType)}.
+   * withColumn(CqlIdentifier.fromCql(columnName), dataType)}.
    */
   @NonNull
   default CreateDseTable withColumn(@NonNull String columnName, @NonNull DataType dataType) {
@@ -74,7 +81,7 @@ public interface CreateDseTable
    * Adds a static column definition in the CREATE TABLE statement.
    *
    * <p>This includes the column declaration (you don't need an additional {@link
-   * #withColumn(CqlIdentifier, DataType) addColumn} call).
+   * #withColumn(CqlIdentifier, DataType) withColumn} call).
    *
    * <p>To create the data type, use the constants and static methods in {@link DataTypes}, or
    * {@link SchemaBuilder#udt(CqlIdentifier, boolean)}.
@@ -84,7 +91,7 @@ public interface CreateDseTable
 
   /**
    * Shortcut for {@link #withStaticColumn(CqlIdentifier, DataType)
-   * withStaticColumn(CqlIdentifier.asCql(columnName), dataType)}.
+   * withStaticColumn(CqlIdentifier.fromCql(columnName), dataType)}.
    */
   @NonNull
   default CreateDseTable withStaticColumn(@NonNull String columnName, @NonNull DataType dataType) {

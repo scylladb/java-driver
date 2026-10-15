@@ -22,7 +22,10 @@ import com.datastax.oss.driver.api.core.metadata.schema.IndexMetadata;
 /**
  * Specialized index metadata for DSE.
  *
- * <p>This type exists only for future extensibility; currently, it is identical to {@link
- * IndexMetadata}.
+ * <p>This interface remains for source and binary compatibility.
+ *
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
  */
+@Deprecated
 public interface DseIndexMetadata extends IndexMetadata {}

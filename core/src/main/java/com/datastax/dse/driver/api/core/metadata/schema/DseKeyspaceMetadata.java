@@ -18,18 +18,15 @@
 package com.datastax.dse.driver.api.core.metadata.schema;
 
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
-import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 
 /**
  * Specialized keyspace metadata for DSE.
  *
- * <p>Notes:
+ * <p>This type remains for source and binary compatibility. The driver no longer produces DSE
+ * metadata.
  *
- * <ul>
- *   <li>this type can always be safely downcast to {@link DseGraphKeyspaceMetadata} (the only
- *       reason the two interfaces are separate is for backward compatibility).
- *   <li>all returned elements can be cast to their DSE counterparts, for example {@link
- *       TableMetadata} to {@link DseTableMetadata}.
- * </ul>
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
  */
+@Deprecated
 public interface DseKeyspaceMetadata extends KeyspaceMetadata {}

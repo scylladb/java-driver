@@ -19,23 +19,23 @@ package com.datastax.oss.driver.internal.core.config.typesafe;
 
 import static com.typesafe.config.ConfigValueType.OBJECT;
 
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.DriverOption;
-import com.datastax.oss.driver.internal.core.util.Loggers;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigObject;
 import com.typesafe.config.ConfigOrigin;
-import com.typesafe.config.ConfigOriginFactory;
 import com.typesafe.config.ConfigValue;
-import com.typesafe.config.ConfigValueFactory;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,16 +44,13 @@ import org.slf4j.LoggerFactory;
 public class TypesafeDriverConfig implements DriverConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(TypesafeDriverConfig.class);
-  private static final ConfigOrigin DEFAULT_OVERRIDES_ORIGIN =
-      ConfigOriginFactory.newSimple("default was overridden programmatically");
-
+  @Nullable private static final URL DRIVER_REFERENCE_CONF_URL = driverReferenceConfigUrl();
   private final ImmutableMap<String, TypesafeDriverExecutionProfile.Base> profiles;
   // Only used to detect if reload saw any change
   private volatile Config lastLoadedConfig;
 
-  private final Map<DriverOption, Object> defaultOverrides = new ConcurrentHashMap<>();
-
   private final TypesafeDriverExecutionProfile.Base defaultProfile;
+  private final RateLimitedLogger limitedLogger;
 
   public TypesafeDriverConfig(Config config) {
     this.lastLoadedConfig = config;
@@ -68,11 +65,16 @@ public class TypesafeDriverConfig implements DriverConfig {
     }
     this.profiles = builder.build();
     this.defaultProfile = profiles.get(DriverExecutionProfile.DEFAULT_NAME);
+    this.limitedLogger =
+        new RateLimitedLogger(
+            LOG,
+            () ->
+                defaultProfile.getDuration(
+                    DefaultDriverOption.REPEATED_LOG_INTERVAL, Duration.ofMinutes(1)));
   }
 
   /** @return whether the configuration changed */
   public boolean reload(Config config) {
-    config = applyDefaultOverrides(config);
     if (config.equals(lastLoadedConfig)) {
       return false;
     } else {
@@ -83,7 +85,7 @@ public class TypesafeDriverConfig implements DriverConfig {
           String profileName = entry.getKey();
           TypesafeDriverExecutionProfile.Base profile = this.profiles.get(profileName);
           if (profile == null) {
-            LOG.warn(
+            limitedLogger.warn(
                 "Unknown profile '{}' while reloading configuration. "
                     + "Adding profiles at runtime is not supported.",
                 profileName);
@@ -93,7 +95,7 @@ public class TypesafeDriverConfig implements DriverConfig {
         }
         return true;
       } catch (Throwable t) {
-        Loggers.warnWithException(LOG, "Error reloading configuration, keeping previous one", t);
+        limitedLogger.warnWithException("Error reloading configuration, keeping previous one", t);
         return false;
       }
     }
@@ -184,49 +186,42 @@ public class TypesafeDriverConfig implements DriverConfig {
     return null;
   }
 
-  /**
-   * Replace the given options, <em>only if the original values came from {@code
-   * reference.conf}</em>: if the option was set explicitly in {@code application.conf}, then the
-   * override is ignored.
-   *
-   * <p>The overrides are also taken into account in profiles, and survive reloads. If this method
-   * is invoked multiple times, the last value for each option will be used. Note that it is
-   * currently not possible to use {@code null} as a value.
-   */
-  public void overrideDefaults(@NonNull Map<DriverOption, Object> overrides) {
-    defaultOverrides.putAll(overrides);
-    reload(lastLoadedConfig);
-  }
-
-  private Config applyDefaultOverrides(Config source) {
-    Config result = source;
-    for (Map.Entry<DriverOption, Object> entry : defaultOverrides.entrySet()) {
-      String path = entry.getKey().getPath();
-      Object value = entry.getValue();
-      if (isDefault(source, path)) {
-        LOG.debug("Replacing default value for {} by {}", path, value);
-        result =
-            result.withValue(
-                path, ConfigValueFactory.fromAnyRef(value).withOrigin(DEFAULT_OVERRIDES_ORIGIN));
-      } else {
-        LOG.debug(
-            "Ignoring default override for {} because the user has overridden the value", path);
-      }
-    }
-    return result;
-  }
-
-  // Whether the value in the given path comes from the reference.conf in the driver JAR.
-  private static boolean isDefault(Config config, String path) {
-    if (!config.hasPath(path)) {
+  /** Returns whether an option's effective value comes from the driver's reference.conf. */
+  public static boolean isDefault(
+      @NonNull DriverExecutionProfile profile, @NonNull DriverOption option) {
+    Config config = getRawConfig(profile);
+    if (config == null || !config.hasPath(option.getPath())) {
       return false;
     }
-    ConfigOrigin origin = config.getValue(path).origin();
-    if (origin.equals(DEFAULT_OVERRIDES_ORIGIN)) {
-      // Same default was overridden twice, should use the last value
-      return true;
-    }
+    ConfigOrigin origin = config.getValue(option.getPath()).origin();
+    return isDriverDefaultOrigin(origin, DRIVER_REFERENCE_CONF_URL);
+  }
+
+  static boolean isDriverDefaultOrigin(ConfigOrigin origin, @Nullable URL driverReferenceUrl) {
     URL url = origin.url();
-    return url != null && url.toString().endsWith("reference.conf");
+    if (url != null && driverReferenceUrl != null) {
+      return url.sameFile(driverReferenceUrl);
+    }
+    // In native images, class resources may not have URLs. Typesafe Config still records the
+    // resource name for values loaded from the driver's reference.conf.
+    return "reference.conf".equals(origin.resource());
+  }
+
+  @Nullable
+  private static URL driverReferenceConfigUrl() {
+    String classPath = TypesafeDriverConfig.class.getName().replace('.', '/') + ".class";
+    URL classUrl = TypesafeDriverConfig.class.getResource("TypesafeDriverConfig.class");
+    if (classUrl == null) {
+      return null;
+    }
+    String url = classUrl.toExternalForm();
+    if (!url.endsWith(classPath)) {
+      return null;
+    }
+    try {
+      return new URL(url.substring(0, url.length() - classPath.length()) + "reference.conf");
+    } catch (MalformedURLException ignored) {
+      return null;
+    }
   }
 }

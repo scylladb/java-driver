@@ -19,11 +19,21 @@ package com.datastax.oss.driver.internal.querybuilder;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.querybuilder.CqlSnippet;
+import com.datastax.oss.driver.internal.core.util.Strings;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Collection;
 
 public class CqlHelper {
+
+  @NonNull
+  public static String quoteFunctionBody(@NonNull String functionBody) {
+    if (functionBody.contains("'") && !functionBody.contains("$$")) {
+      return "$$ " + functionBody + " $$";
+    } else {
+      return Strings.quote(functionBody);
+    }
+  }
 
   public static void appendIds(
       @NonNull Iterable<CqlIdentifier> ids,

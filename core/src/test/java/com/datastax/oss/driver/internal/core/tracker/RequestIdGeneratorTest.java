@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -69,12 +68,5 @@ public class RequestIdGeneratorTest {
     W3CContextRequestIdGenerator w3cGenerator = new W3CContextRequestIdGenerator(context);
     assertThat(w3cGenerator.getCustomPayloadKey())
         .isEqualTo(RequestIdGenerator.DEFAULT_PAYLOAD_KEY);
-  }
-
-  @Test
-  public void w3c_generator_provided_payloadkey() {
-    String someString = RandomStringUtils.random(12);
-    W3CContextRequestIdGenerator w3cGenerator = new W3CContextRequestIdGenerator(someString);
-    assertThat(w3cGenerator.getCustomPayloadKey()).isEqualTo(someString);
   }
 }

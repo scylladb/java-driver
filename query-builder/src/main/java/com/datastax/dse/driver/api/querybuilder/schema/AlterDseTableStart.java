@@ -25,6 +25,13 @@ import com.datastax.oss.driver.api.querybuilder.SchemaBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface AlterDseTableStart
     extends AlterDseTableWithOptions,
         AlterDseTableAddColumn,
@@ -37,7 +44,7 @@ public interface AlterDseTableStart
   BuildableQuery dropCompactStorage();
 
   /**
-   * Completes ALTER TABLE specifying the the type of a column should be changed.
+   * Completes ALTER TABLE specifying that the type of a column should be changed.
    *
    * <p>To create the data type, use the constants and static methods in {@link DataTypes}, or
    * {@link SchemaBuilder#udt(CqlIdentifier, boolean)}.
@@ -47,7 +54,7 @@ public interface AlterDseTableStart
 
   /**
    * Shortcut for {@link #alterColumn(CqlIdentifier, DataType)
-   * alterColumn(CqlIdentifier.fromCql(columnName,dataType)}.
+   * alterColumn(CqlIdentifier.fromCql(columnName), dataType)}.
    */
   @NonNull
   default BuildableQuery alterColumn(@NonNull String columnName, @NonNull DataType dataType) {
@@ -93,7 +100,7 @@ public interface AlterDseTableStart
   /**
    * Removes the anonymous edge label from this table.
    *
-   * <p>This is a shortcut for {@link #withoutVertexLabel(CqlIdentifier) withoutEdgeLabel(null)}.
+   * <p>This is a shortcut for {@link #withoutEdgeLabel(CqlIdentifier) withoutEdgeLabel(null)}.
    */
   @NonNull
   default BuildableQuery withoutEdgeLabel() {

@@ -36,12 +36,6 @@ import java.util.List;
 public enum Dependency {
   SNAPPY("org.xerial.snappy.Snappy"),
   LZ4("net.jpountz.lz4.LZ4Compressor"),
-  ESRI("com.esri.core.geometry.ogc.OGCGeometry"),
-  TINKERPOP(
-      // gremlin-core
-      "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal",
-      // tinkergraph-gremlin
-      "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0"),
   REACTIVE_STREAMS("org.reactivestreams.Publisher"),
   JACKSON(
       // jackson-core

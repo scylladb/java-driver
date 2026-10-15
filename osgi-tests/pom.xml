@@ -28,7 +28,7 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.2.2-SNAPSHOT</version>
+    <version>4.19.2.3-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-osgi-tests</artifactId>
   <packaging>jar</packaging>
@@ -84,18 +84,6 @@
     <dependency>
       <groupId>org.reactivestreams</groupId>
       <artifactId>reactive-streams</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.esri.geometry</groupId>
-      <artifactId>esri-geometry-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>gremlin-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>tinkergraph-gremlin</artifactId>
     </dependency>
     <dependency>
       <groupId>org.osgi</groupId>
@@ -227,7 +215,7 @@
             <Bundle-Activator>com.datastax.oss.driver.internal.osgi.MailboxActivator</Bundle-Activator>
             <Export-Package>com.datastax.oss.driver.api.osgi.*</Export-Package>
             <Private-Package>com.datastax.oss.driver.internal.osgi.*</Private-Package>
-            <Import-Package>!net.jcip.annotations.*,!edu.umd.cs.findbugs.annotations.*,org.apache.tinkerpop.*;resolution:=optional,*</Import-Package>
+            <Import-Package>!net.jcip.annotations.*,!edu.umd.cs.findbugs.annotations.*,*</Import-Package>
             <_include>-osgi.bnd</_include>
           </instructions>
         </configuration>

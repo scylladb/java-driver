@@ -17,4 +17,11 @@
  */
 package com.datastax.dse.driver.api.querybuilder.schema;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface AlterDseTableWithOptions extends DseRelationOptions<AlterDseTableWithOptionsEnd> {}

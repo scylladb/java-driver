@@ -71,8 +71,7 @@ public class MapBasedDriverConfigLoaderTest {
             .getInitialConfig()
             .getDefaultProfile();
 
-    // Make sure we're not missing any options. -1 is for CONFIG_RELOAD_INTERVAL, which is not
-    // defined by OptionsMap because it is irrelevant for the map-based config.
+    // CONFIG_RELOAD_INTERVAL exists only in the file.
     assertThat(mapBasedConfig.entrySet()).hasSize(fileBasedConfig.entrySet().size() - 1);
 
     for (TypedDriverOption<?> option : TypedDriverOption.builtInValues()) {

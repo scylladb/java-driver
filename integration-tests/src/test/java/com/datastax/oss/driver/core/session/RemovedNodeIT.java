@@ -40,8 +40,7 @@ public class RemovedNodeIT {
   @ClassRule
   public static final CustomCcmRule CCM_RULE =
       CustomCcmRule.builder()
-          // We need 4 nodes to run this test against DSE, because it requires at least 3 nodes to
-          // maintain RF=3 for keyspace system_distributed
+          // Keep at least 3 nodes available to maintain RF=3 for keyspace system_distributed.
           .withNodes(4)
           .build();
 

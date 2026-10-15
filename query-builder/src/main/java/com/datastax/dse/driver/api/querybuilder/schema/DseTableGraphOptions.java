@@ -21,6 +21,13 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface DseTableGraphOptions<NextT> {
 
   /** Adds a vertex label to this table. */
@@ -29,7 +36,7 @@ public interface DseTableGraphOptions<NextT> {
 
   /**
    * Shortcut for {@link #withVertexLabel(CqlIdentifier)
-   * withVertexLabel(CqlIdentifier.fromCql(vertexLabel))}.
+   * withVertexLabel(CqlIdentifier.fromCql(vertexLabelName))}.
    */
   @NonNull
   default NextT withVertexLabel(@NonNull String vertexLabelName) {
@@ -49,18 +56,8 @@ public interface DseTableGraphOptions<NextT> {
   /**
    * Adds an edge label to this table.
    *
-   * <p>Use {@link DseGraphEdgeSide#table(CqlIdentifier)} to build the definitions of both sides,
-   * for example:
-   *
-   * <pre>{@code
-   * withEdgeLabel("contrib",
-   *               table("person")
-   *                 .withPartitionKey("contributor"),
-   *               table("soft")
-   *                 .withPartitionKey("company_name"),
-   *                 .withPartitionKey("software_name"),
-   *                 .withClusteringColumn("software_version"))
-   * }</pre>
+   * <p>The driver no longer constructs DSE graph edges. The legacy {@link
+   * DseGraphEdgeSide#table(CqlIdentifier)} factory throws {@link UnsupportedOperationException}.
    */
   @NonNull
   NextT withEdgeLabel(

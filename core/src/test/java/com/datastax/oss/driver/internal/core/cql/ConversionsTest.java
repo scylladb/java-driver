@@ -18,14 +18,29 @@
 package com.datastax.oss.driver.internal.core.cql;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinition;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
+import com.datastax.oss.driver.api.core.time.TimestampGenerator;
+import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
+import com.datastax.oss.driver.internal.core.DefaultConsistencyLevelRegistry;
+import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
+import com.datastax.oss.protocol.internal.Message;
+import com.datastax.oss.protocol.internal.request.Execute;
+import java.nio.ByteBuffer;
 import java.util.List;
 import org.junit.Test;
 
@@ -86,5 +101,61 @@ public class ConversionsTest {
       columns.add(column);
     }
     return DefaultColumnDefinitions.valueOf(columns.build());
+  }
+
+  /**
+   * The invariant that makes the driver immune to CUSTOMER-583: an EXECUTE carries its values
+   * positionally, so the name the server synthesized for an anonymous marker never travels back to
+   * the coordinator and cannot be re-resolved there. Everything else in this area only guards the
+   * local name-to-index lookup; if this branch ever started sending named values, that lookup would
+   * be bypassed and a server that respelled a marker between PREPARE and EXECUTE would break
+   * applications again.
+   */
+  @Test
+  public void should_send_bound_statement_values_positionally() {
+    List<ByteBuffer> values =
+        ImmutableList.of(ByteBuffer.allocate(1), ByteBuffer.allocate(2), ByteBuffer.allocate(3));
+
+    Message message = Conversions.toMessage(boundStatement(values), profile(), context());
+
+    assertThat(message).isInstanceOf(Execute.class);
+    Execute execute = (Execute) message;
+    assertThat(execute.options.namedValues).isEmpty();
+    assertThat(execute.options.positionalValues).isEqualTo(values);
+  }
+
+  private BoundStatement boundStatement(List<ByteBuffer> values) {
+    // Built before the stubbing below: variables() mocks in turn, and nesting that inside a when()
+    // argument leaves Mockito with an unfinished stubbing.
+    ColumnDefinitions resultSetDefinitions = variables("v");
+    PreparedStatement preparedStatement = mock(PreparedStatement.class);
+    when(preparedStatement.getId()).thenReturn(ByteBuffer.allocate(4));
+    when(preparedStatement.getResultSetDefinitions()).thenReturn(resultSetDefinitions);
+    BoundStatement boundStatement = mock(BoundStatement.class);
+    when(boundStatement.getPreparedStatement()).thenReturn(preparedStatement);
+    when(boundStatement.getValues()).thenReturn(values);
+    when(boundStatement.getQueryTimestamp()).thenReturn(Statement.NO_DEFAULT_TIMESTAMP);
+    when(boundStatement.getNowInSeconds()).thenReturn(Statement.NO_NOW_IN_SECONDS);
+    return boundStatement;
+  }
+
+  private DriverExecutionProfile profile() {
+    DriverExecutionProfile profile = mock(DriverExecutionProfile.class);
+    when(profile.getString(DefaultDriverOption.REQUEST_CONSISTENCY)).thenReturn("LOCAL_ONE");
+    when(profile.getInt(DefaultDriverOption.REQUEST_PAGE_SIZE)).thenReturn(5000);
+    when(profile.getString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY)).thenReturn("SERIAL");
+    return profile;
+  }
+
+  private InternalDriverContext context() {
+    ProtocolVersionRegistry protocolVersionRegistry = mock(ProtocolVersionRegistry.class);
+    when(protocolVersionRegistry.supports(any(), any())).thenReturn(true);
+    InternalDriverContext context = mock(InternalDriverContext.class);
+    when(context.getConsistencyLevelRegistry()).thenReturn(new DefaultConsistencyLevelRegistry());
+    when(context.getTimestampGenerator()).thenReturn(mock(TimestampGenerator.class));
+    when(context.getCodecRegistry()).thenReturn(CodecRegistry.DEFAULT);
+    when(context.getProtocolVersion()).thenReturn(DefaultProtocolVersion.V4);
+    when(context.getProtocolVersionRegistry()).thenReturn(protocolVersionRegistry);
+    return context;
   }
 }

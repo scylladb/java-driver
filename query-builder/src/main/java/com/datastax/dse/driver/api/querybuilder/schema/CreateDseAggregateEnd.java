@@ -22,6 +22,13 @@ import com.datastax.oss.driver.api.querybuilder.BuildableQuery;
 import com.datastax.oss.driver.api.querybuilder.term.Term;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface CreateDseAggregateEnd extends BuildableQuery {
 
   /**
@@ -32,8 +39,8 @@ public interface CreateDseAggregateEnd extends BuildableQuery {
   CreateDseAggregateEnd withInitCond(@NonNull Term term);
 
   /**
-   * Adds FINALFUNC to the create aggregate query. This is used to specify what type is returned
-   * from the state function.
+   * Adds FINALFUNC to the create aggregate query, naming the function applied to the final
+   * aggregate state.
    */
   @NonNull
   CreateDseAggregateEnd withFinalFunc(@NonNull CqlIdentifier finalFunc);

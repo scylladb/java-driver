@@ -18,7 +18,6 @@
 package com.datastax.oss.driver.internal.core.protocol;
 
 import com.datastax.oss.driver.api.core.connection.FrameTooLongException;
-import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
@@ -28,22 +27,27 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.TooLongFrameException;
+import java.nio.ByteOrder;
 import java.util.Collections;
 import net.jcip.annotations.NotThreadSafe;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+/**
+ * Decodes legacy frames, reporting recoverable failures downstream without interrupting decoding of
+ * subsequent buffered frames. Extraction failures with unknown frame boundaries are propagated as
+ * decoder exceptions so that the connection can be closed.
+ */
 @NotThreadSafe
 public class FrameDecoder extends LengthFieldBasedFrameDecoder {
-  private static final Logger LOG = LoggerFactory.getLogger(FrameDecoder.class);
-
   // Where the length of the frame is located in the payload
   private static final int LENGTH_FIELD_OFFSET = 5;
   private static final int LENGTH_FIELD_LENGTH = 4;
 
   private final FrameCodec<ByteBuf> frameCodec;
   private final ProtocolFeatures protocolFeatures;
+  private final int maxFrameLengthInBytes;
   private boolean isFirstResponse;
+  private int frameStreamId;
+  private boolean oversizedFrameHeaderRead;
 
   public FrameDecoder(
       FrameCodec<ByteBuf> frameCodec,
@@ -52,10 +56,15 @@ public class FrameDecoder extends LengthFieldBasedFrameDecoder {
     super(maxFrameLengthInBytes, LENGTH_FIELD_OFFSET, LENGTH_FIELD_LENGTH, 0, 0, true);
     this.frameCodec = frameCodec;
     this.protocolFeatures = protocolFeatures;
+    this.maxFrameLengthInBytes = maxFrameLengthInBytes;
   }
 
   @Override
   protected Object decode(ChannelHandlerContext ctx, ByteBuf in) throws Exception {
+    if (!ctx.channel().isOpen()) {
+      in.skipBytes(in.readableBytes());
+      return null;
+    }
     int startIndex = in.readerIndex();
     if (isFirstResponse) {
       isFirstResponse = false;
@@ -89,30 +98,40 @@ public class FrameDecoder extends LengthFieldBasedFrameDecoder {
       }
     }
 
+    ByteBuf buffer;
+    oversizedFrameHeaderRead = false;
     try {
-      ByteBuf buffer = (ByteBuf) super.decode(ctx, in);
-      return (buffer == null)
-          ? null // did not receive whole frame yet, keep reading
-          : frameCodec.decode(buffer, protocolFeatures);
-    } catch (Exception e) {
-      // If decoding failed, try to read at least the stream id, so that the error can be
-      // propagated to the client request matching that id (otherwise we have to fail all
-      // pending requests on this channel)
-      int streamId;
-      try {
-        streamId = in.getShort(startIndex + 2);
-      } catch (Exception e1) {
-        // Should never happen, super.decode does not return a non-null buffer until the length
-        // field has been read, and the stream id comes before
-        Loggers.warnWithException(LOG, "Unexpected error while reading stream id", e1);
-        streamId = -1;
+      buffer = (ByteBuf) super.decode(ctx, in);
+    } catch (TooLongFrameException exception) {
+      if (!oversizedFrameHeaderRead || in.readerIndex() <= startIndex) {
+        throw exception;
       }
-      if (e instanceof TooLongFrameException) {
-        // Translate the Netty error to our own type
-        e = new FrameTooLongException(ctx.channel().remoteAddress(), e.getMessage());
-      }
-      throw new FrameDecodingException(streamId, e);
+      ctx.fireExceptionCaught(
+          new FrameDecodingException(
+              frameStreamId,
+              new FrameTooLongException(ctx.channel().remoteAddress(), exception.getMessage())));
+      return null;
     }
+    if (buffer == null) {
+      return null;
+    }
+    int streamId = buffer.getShort(buffer.readerIndex() + 2);
+    try {
+      return frameCodec.decode(buffer, protocolFeatures);
+    } catch (Exception exception) {
+      ctx.fireExceptionCaught(new FrameDecodingException(streamId, exception));
+      return null;
+    }
+  }
+
+  @Override
+  protected long getUnadjustedFrameLength(ByteBuf buffer, int offset, int length, ByteOrder order) {
+    long frameLength = super.getUnadjustedFrameLength(buffer, offset, length, order);
+    if (frameLength + LENGTH_FIELD_OFFSET + LENGTH_FIELD_LENGTH > maxFrameLengthInBytes) {
+      frameStreamId = buffer.getShort(offset - LENGTH_FIELD_OFFSET + 2);
+      oversizedFrameHeaderRead = true;
+    }
+    return frameLength;
   }
 
   @Override

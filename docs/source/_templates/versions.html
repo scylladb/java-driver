@@ -1,0 +1,20 @@
+{# The theme lists branches before tags, which would sink tag-built versions to the
+   bottom; this lists both in html_context's version_order instead. #}
+<ul class="dropdown menu scylla-dropdown scylla-dropdown--versions" data-dropdown-menu>
+    <li class="scylla-dropdown__item">
+        <a class="scylla-dropdown__title" href="#">
+            {{ current_version.name | replace(theme_branch_substring_removed, '') }}
+            <i class="chevron scylla-icon scylla-icon--chevron-right"></i>
+        </a>
+        <ul class="menu scylla-dropdown__content">
+            {% for name in version_order %}
+                {% set item = versions[name] %}
+                {% if item and item.name not in theme_hide_version_dropdown %}
+                    <li>
+                        <a href="{{ item.url }}">{{ item.name | replace(theme_branch_substring_removed, '') }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+    </li>
+</ul>

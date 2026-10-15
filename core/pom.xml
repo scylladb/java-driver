@@ -28,7 +28,7 @@
   <parent>
     <groupId>com.scylladb</groupId>
     <artifactId>java-driver-parent</artifactId>
-    <version>4.19.2.2-SNAPSHOT</version>
+    <version>4.19.2.3-SNAPSHOT</version>
   </parent>
   <artifactId>java-driver-core</artifactId>
   <packaging>bundle</packaging>
@@ -82,21 +82,6 @@
     <dependency>
       <groupId>org.hdrhistogram</groupId>
       <artifactId>HdrHistogram</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.esri.geometry</groupId>
-      <artifactId>esri-geometry-api</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>gremlin-core</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tinkerpop</groupId>
-      <artifactId>tinkergraph-gremlin</artifactId>
-      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -185,11 +170,6 @@
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>com.github.tomakehurst</groupId>
-      <artifactId>wiremock</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
   <build>
     <resources>
@@ -217,22 +197,6 @@
         <targetPath>META-INF</targetPath>
       </resource>
     </resources>
-    <testResources>
-      <testResource>
-        <directory>src/test/resources</directory>
-        <includes>
-          <include>project.properties</include>
-        </includes>
-        <filtering>true</filtering>
-      </testResource>
-      <testResource>
-        <directory>src/test/resources</directory>
-        <excludes>
-          <exclude>project.properties</exclude>
-        </excludes>
-        <filtering>false</filtering>
-      </testResource>
-    </testResources>
     <plugins>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
@@ -261,7 +225,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <jvm>${testing.jvm}/bin/java</jvm>
-          <argLine>${mockitoopens.argline}</argLine>
+          <argLine>@{argLine} ${mockitoopens.argline}</argLine>
           <threadCount>1</threadCount>
           <properties>
             <property>
@@ -324,28 +288,11 @@
                   Note: dependencies marked as optional are by default included with optional
                   resolution in the manifest; we only need to manually set the resolution to
                   optional for dependencies declared as non-optional in the pom files.
-                  -->jnr.*;resolution:=optional, com.esri.core.geometry.*;resolution:=optional, org.reactivestreams.*;resolution:=optional, org.apache.tinkerpop.*;resolution:=optional, org.javatuples.*;resolution:=optional, reactor.blockhound.*;resolution:=optional, *
+                  -->jnr.*;resolution:=optional, org.reactivestreams.*;resolution:=optional, reactor.blockhound.*;resolution:=optional, *
                 </Import-Package>
-                <Export-Package>com.datastax.oss.driver.*.core.*, com.datastax.dse.driver.*.core.*</Export-Package>
+                <!-- The DSE-namespaced packages below contain APIs retained for compatibility. -->
+                <Export-Package>com.datastax.oss.driver.*.core.*, com.datastax.dse.driver.api.core.auth, com.datastax.dse.driver.api.core.config, com.datastax.dse.driver.api.core.cql.reactive, com.datastax.dse.driver.api.core.metadata.*, com.datastax.dse.driver.internal.core.cql.reactive, com.datastax.dse.driver.internal.core.util.concurrent</Export-Package>
               </instructions>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>generate-dependency-list</id>
-            <goals>
-              <goal>list</goal>
-            </goals>
-            <phase>generate-resources</phase>
-            <configuration>
-              <includeScope>runtime</includeScope>
-              <outputScope>true</outputScope>
-              <excludeGroupIds>com.datastax.cassandra,com.datastax.dse</excludeGroupIds>
-              <outputFile>${project.build.outputDirectory}/com/datastax/dse/driver/internal/deps.txt</outputFile>
             </configuration>
           </execution>
         </executions>

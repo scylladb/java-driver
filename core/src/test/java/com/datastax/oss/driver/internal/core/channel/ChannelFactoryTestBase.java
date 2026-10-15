@@ -34,6 +34,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.protocol.ByteBufPrimitiveCodec;
+import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.protocol.internal.Compressor;
 import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
@@ -41,6 +42,7 @@ import com.datastax.oss.protocol.internal.Message;
 import com.datastax.oss.protocol.internal.request.Options;
 import com.datastax.oss.protocol.internal.request.Startup;
 import com.datastax.oss.protocol.internal.response.Ready;
+import com.datastax.oss.protocol.internal.response.Supported;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -208,16 +210,26 @@ public abstract class ChannelFactoryTestBase {
    * keyspace (avoids repeating it in subclasses).
    */
   protected void completeSimpleChannelInit() {
+    completeSimpleChannelInit(
+        TestResponses.supportedResponse("mock_key", "mock_value"), "mockClusterName");
+  }
+
+  protected void completeSimpleChannelInit(String clusterName) {
+    completeSimpleChannelInit(
+        TestResponses.supportedResponse("mock_key", "mock_value"), clusterName);
+  }
+
+  protected void completeSimpleChannelInit(Supported supportedResponse, String clusterName) {
     Frame requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Options.class);
-    writeInboundFrame(requestFrame, TestResponses.supportedResponse("mock_key", "mock_value"));
+    writeInboundFrame(requestFrame, supportedResponse);
 
     requestFrame = readOutboundFrame();
     assertThat(requestFrame.message).isInstanceOf(Startup.class);
     writeInboundFrame(requestFrame, new Ready());
 
     requestFrame = readOutboundFrame();
-    writeInboundFrame(requestFrame, TestResponses.clusterNameResponse("mockClusterName"));
+    writeInboundFrame(requestFrame, TestResponses.clusterNameResponse(clusterName));
   }
 
   ChannelFactory newChannelFactory() {
@@ -239,7 +251,8 @@ public abstract class ChannelFactoryTestBase {
         ProtocolVersion protocolVersion,
         DriverChannelOptions options,
         NodeMetricUpdater nodeMetricUpdater,
-        CompletableFuture<DriverChannel> resultFuture) {
+        CompletableFuture<DriverChannel> resultFuture,
+        SslHandlerFactory sslFactory) {
       return new ChannelInitializer<Channel>() {
         @Override
         protected void initChannel(Channel channel) throws Exception {
@@ -272,7 +285,7 @@ public abstract class ChannelFactoryTestBase {
                     endPoint,
                     options,
                     heartbeatHandler,
-                    productType == null);
+                    true);
             channel
                 .pipeline()
                 .addLast(ChannelFactory.INFLIGHT_HANDLER_NAME, inFlightHandler)

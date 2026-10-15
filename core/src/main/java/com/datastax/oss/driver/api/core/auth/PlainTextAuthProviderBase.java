@@ -27,7 +27,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
 import net.jcip.annotations.ThreadSafe;
@@ -74,6 +73,11 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
   public Authenticator newAuthenticator(
       @NonNull EndPoint endPoint, @NonNull String serverAuthenticator)
       throws AuthenticationException {
+    if ("com.datastax.bdp.cassandra.auth.DseAuthenticator".equals(serverAuthenticator)) {
+      throw new AuthenticationException(
+          endPoint,
+          "DSE authentication negotiation is no longer supported: " + serverAuthenticator);
+    }
     return new PlainTextAuthenticator(
         getCredentials(endPoint, serverAuthenticator), endPoint, serverAuthenticator);
   }
@@ -96,25 +100,21 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
 
     private final char[] username;
     private final char[] password;
-    private final char[] authorizationId;
 
-    /**
-     * Builds an instance for username/password authentication, and proxy authentication with the
-     * given authorizationId.
-     *
-     * <p>This feature is only available with DataStax Enterprise. If the target server is Apache
-     * Cassandra, the authorizationId will be ignored.
-     */
-    public Credentials(
-        @NonNull char[] username, @NonNull char[] password, @NonNull char[] authorizationId) {
+    /** Builds an instance for username/password authentication. */
+    public Credentials(@NonNull char[] username, @NonNull char[] password) {
       this.username = Objects.requireNonNull(username);
       this.password = Objects.requireNonNull(password);
-      this.authorizationId = Objects.requireNonNull(authorizationId);
     }
 
-    /** Builds an instance for simple username/password authentication. */
-    public Credentials(@NonNull char[] username, @NonNull char[] password) {
-      this(username, password, new char[0]);
+    /** @deprecated Only an empty authorization ID is supported for ordinary authentication. */
+    @Deprecated
+    public Credentials(
+        @NonNull char[] username, @NonNull char[] password, @NonNull char[] authorizationId) {
+      this(username, password);
+      if (Objects.requireNonNull(authorizationId).length != 0) {
+        throw new UnsupportedOperationException("DSE proxy authentication is no longer supported");
+      }
     }
 
     @NonNull
@@ -137,9 +137,15 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       return password;
     }
 
+    /**
+     * Returns an empty authorization ID for ordinary authentication.
+     *
+     * @deprecated DSE proxy authentication is no longer supported.
+     */
+    @Deprecated
     @NonNull
     public char[] getAuthorizationId() {
-      return authorizationId;
+      return new char[0];
     }
 
     /** Clears the credentials from memory when they're no longer needed. */
@@ -149,19 +155,13 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       // retrieves the credentials from a different source.
       Arrays.fill(getUsername(), (char) 0);
       Arrays.fill(getPassword(), (char) 0);
-      Arrays.fill(getAuthorizationId(), (char) 0);
     }
   }
 
-  // Implementation note: BaseDseAuthenticator is backward compatible with Cassandra authenticators.
-  // This will work with both Cassandra (as long as no authorizationId is set) and DSE.
   protected static class PlainTextAuthenticator extends BaseDseAuthenticator {
 
-    private static final ByteBuffer MECHANISM =
-        ByteBuffer.wrap("PLAIN".getBytes(StandardCharsets.UTF_8)).asReadOnlyBuffer();
-
     private static final ByteBuffer SERVER_INITIAL_CHALLENGE =
-        ByteBuffer.wrap("PLAIN-START".getBytes(StandardCharsets.UTF_8)).asReadOnlyBuffer();
+        ByteBuffer.wrap("PLAIN-START".getBytes(Charsets.UTF_8)).asReadOnlyBuffer();
 
     private static final EndPoint DUMMY_END_POINT =
         new EndPoint() {
@@ -174,37 +174,46 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
           @NonNull
           @Override
           public String asMetricPrefix() {
-            return ""; // will never be used
+            return "";
           }
         };
 
     private final ByteBuffer encodedCredentials;
     private final EndPoint endPoint;
 
+    protected PlainTextAuthenticator(@NonNull Credentials credentials, @NonNull EndPoint endPoint) {
+      this(credentials, endPoint, "org.apache.cassandra.auth.PasswordAuthenticator");
+    }
+
+    /**
+     * Builds an authenticator for ordinary SASL PLAIN authentication.
+     *
+     * @deprecated DSE authentication negotiation is no longer supported. Ordinary server
+     *     authenticators remain supported.
+     */
+    @Deprecated
     protected PlainTextAuthenticator(
         @NonNull Credentials credentials,
         @NonNull EndPoint endPoint,
         @NonNull String serverAuthenticator) {
       super(serverAuthenticator);
-
       Objects.requireNonNull(credentials);
       Objects.requireNonNull(endPoint);
+      if (Objects.requireNonNull(credentials.getAuthorizationId()).length != 0) {
+        throw new UnsupportedOperationException("DSE proxy authentication is no longer supported");
+      }
 
-      ByteBuffer authorizationId = toUtf8Bytes(credentials.getAuthorizationId());
       ByteBuffer username = toUtf8Bytes(credentials.getUsername());
       ByteBuffer password = toUtf8Bytes(credentials.getPassword());
 
       this.encodedCredentials =
-          ByteBuffer.allocate(
-              authorizationId.remaining() + username.remaining() + password.remaining() + 2);
-      encodedCredentials.put(authorizationId);
+          ByteBuffer.allocate(username.remaining() + password.remaining() + 2);
       encodedCredentials.put((byte) 0);
       encodedCredentials.put(username);
       encodedCredentials.put((byte) 0);
       encodedCredentials.put(password);
       encodedCredentials.flip();
 
-      clear(authorizationId);
       clear(username);
       clear(password);
 
@@ -212,20 +221,12 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
     }
 
     /**
-     * @deprecated Preserved for backward compatibility, implementors should use the 3-arg
-     *     constructor {@code PlainTextAuthenticator(Credentials, EndPoint, String)} instead.
+     * @deprecated Preserved for existing plaintext subclasses. Use {@link
+     *     #PlainTextAuthenticator(Credentials, EndPoint)} instead.
      */
     @Deprecated
     protected PlainTextAuthenticator(@NonNull Credentials credentials) {
-      this(
-          credentials,
-          // It's unlikely that this class was ever extended by third parties, but if it was, assume
-          // that it was not written for DSE:
-          // - dummy end point because we should never need to build an auth exception
-          DUMMY_END_POINT,
-          // - default OSS authenticator name (the only thing that matters is how this string
-          //   compares to "DseAuthenticator")
-          "org.apache.cassandra.auth.PasswordAuthenticator");
+      this(credentials, DUMMY_END_POINT);
     }
 
     private static ByteBuffer toUtf8Bytes(char[] charArray) {
@@ -240,16 +241,26 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       }
     }
 
+    /** @deprecated DSE authentication negotiation is no longer supported. */
+    @Deprecated
     @NonNull
     @Override
     public ByteBuffer getMechanism() {
-      return MECHANISM;
+      return ByteBuffer.wrap("PLAIN".getBytes(Charsets.UTF_8)).asReadOnlyBuffer();
     }
 
+    /** @deprecated DSE authentication negotiation is no longer supported. */
+    @Deprecated
     @NonNull
     @Override
     public ByteBuffer getInitialServerChallenge() {
-      return SERVER_INITIAL_CHALLENGE;
+      return SERVER_INITIAL_CHALLENGE.asReadOnlyBuffer();
+    }
+
+    @Nullable
+    @Override
+    public ByteBuffer initialResponseSync() {
+      return super.initialResponseSync();
     }
 
     @Nullable
@@ -260,5 +271,8 @@ public abstract class PlainTextAuthProviderBase implements AuthProvider {
       }
       throw new AuthenticationException(endPoint, "Incorrect challenge from server");
     }
+
+    @Override
+    public void onAuthenticationSuccessSync(@Nullable ByteBuffer token) {}
   }
 }

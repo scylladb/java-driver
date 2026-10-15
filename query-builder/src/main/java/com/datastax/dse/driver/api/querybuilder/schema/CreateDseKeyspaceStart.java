@@ -22,10 +22,17 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
+/**
+ * Legacy DSE schema builder stage retained for compatibility.
+ *
+ * @deprecated DSE schema construction is no longer supported. This type remains for source and
+ *     binary compatibility.
+ */
+@Deprecated
 public interface CreateDseKeyspaceStart extends KeyspaceReplicationOptions<CreateDseKeyspace> {
   /**
    * Adds IF NOT EXISTS to the create keyspace specification. This indicates that the keyspace
-   * should not be created it already exists.
+   * should not be created if it already exists.
    */
   @NonNull
   CreateDseKeyspaceStart ifNotExists();

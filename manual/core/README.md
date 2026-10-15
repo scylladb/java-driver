@@ -361,6 +361,7 @@ for (ColumnDefinitions.Definition definition : row.getColumnDefinitions()) {
    authentication/*
    bom/*
    compression/*
+   connectivity/*
    configuration/*
    control_connection/*
    custom_codecs/*

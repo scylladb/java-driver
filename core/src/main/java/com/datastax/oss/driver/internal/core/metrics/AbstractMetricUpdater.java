@@ -29,6 +29,7 @@ import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.throttling.ConcurrencyLimitingRequestThrottler;
 import com.datastax.oss.driver.internal.core.session.throttling.RateLimitingRequestThrottler;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.cache.Cache;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.util.Timeout;
@@ -47,6 +48,7 @@ public abstract class AbstractMetricUpdater<MetricT> implements MetricUpdater<Me
   public static Duration MIN_EXPIRE_AFTER = Duration.ofMinutes(5);
 
   protected final InternalDriverContext context;
+  private final RateLimitedLogger limitedLogger;
   protected final Set<MetricT> enabledMetrics;
 
   private final AtomicReference<Timeout> metricsExpirationTimeoutRef = new AtomicReference<>();
@@ -54,11 +56,12 @@ public abstract class AbstractMetricUpdater<MetricT> implements MetricUpdater<Me
 
   protected AbstractMetricUpdater(InternalDriverContext context, Set<MetricT> enabledMetrics) {
     this.context = context;
+    this.limitedLogger = new RateLimitedLogger(LOG, context);
     this.enabledMetrics = enabledMetrics;
     DriverExecutionProfile config = context.getConfig().getDefaultProfile();
     Duration expireAfter = config.getDuration(DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER);
     if (expireAfter.compareTo(MIN_EXPIRE_AFTER) < 0) {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Value too low for {}: {}. Forcing to {} instead.",
           context.getSessionName(),
           DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER.getPath(),
@@ -96,7 +99,7 @@ public abstract class AbstractMetricUpdater<MetricT> implements MetricUpdater<Me
     if (requestThrottler instanceof RateLimitingRequestThrottler) {
       return ((RateLimitingRequestThrottler) requestThrottler).getQueueSize();
     }
-    LOG.warn(
+    limitedLogger.warn(
         "[{}] Metric {} does not support {}, it will always return 0",
         context.getSessionName(),
         DefaultSessionMetric.THROTTLING_QUEUE_SIZE.getPath(),
@@ -107,7 +110,7 @@ public abstract class AbstractMetricUpdater<MetricT> implements MetricUpdater<Me
   protected long preparedStatementCacheSize() {
     Cache<?, ?> cache = getPreparedStatementCache();
     if (cache == null) {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Metric {} is enabled in the config, "
               + "but it looks like no CQL prepare processor is registered. "
               + "The gauge will always return 0",

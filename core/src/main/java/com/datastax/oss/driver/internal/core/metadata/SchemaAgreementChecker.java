@@ -27,6 +27,7 @@ import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.util.NanoTime;
+import com.datastax.oss.driver.internal.core.util.RateLimitedLogger;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.net.InetAddress;
@@ -62,6 +63,7 @@ class SchemaAgreementChecker {
   private final DriverChannel channel;
   private final InternalDriverContext context;
   private final String logPrefix;
+  private final RateLimitedLogger limitedLogger;
   private final Duration queryTimeout;
   private final long intervalNs;
   private final long timeoutNs;
@@ -70,9 +72,18 @@ class SchemaAgreementChecker {
   private final CompletableFuture<Boolean> result = new CompletableFuture<>();
 
   SchemaAgreementChecker(DriverChannel channel, InternalDriverContext context, String logPrefix) {
+    this(channel, context, logPrefix, new RateLimitedLogger(LOG, context));
+  }
+
+  SchemaAgreementChecker(
+      DriverChannel channel,
+      InternalDriverContext context,
+      String logPrefix,
+      RateLimitedLogger limitedLogger) {
     this.channel = channel;
     this.context = context;
     this.logPrefix = logPrefix;
+    this.limitedLogger = limitedLogger;
     DriverExecutionProfile config = context.getConfig().getDefaultProfile();
     this.queryTimeout = config.getDuration(DefaultDriverOption.CONTROL_CONNECTION_TIMEOUT);
     this.intervalNs =
@@ -96,13 +107,12 @@ class SchemaAgreementChecker {
   private void sendQueries() {
     long elapsedNs = System.nanoTime() - start;
     if (elapsedNs > timeoutNs) {
-      String message =
-          String.format(
-              "[%s] Schema agreement not reached after %s", logPrefix, NanoTime.format(elapsedNs));
       if (warnOnFailure) {
-        LOG.warn(message);
+        limitedLogger.warn(
+            "[{}] Schema agreement not reached after {}", logPrefix, NanoTime.format(elapsedNs));
       } else {
-        LOG.debug(message);
+        LOG.debug(
+            "[{}] Schema agreement not reached after {}", logPrefix, NanoTime.format(elapsedNs));
       }
       result.complete(false);
     } else {
@@ -130,7 +140,7 @@ class SchemaAgreementChecker {
       AdminRow localRow = iterator.next();
       UUID schemaVersion = localRow.getUuid("schema_version");
       if (schemaVersion == null) {
-        LOG.warn(
+        limitedLogger.warn(
             "[{}] Missing schema_version for control node {}, "
                 + "excluding from schema agreement check",
             logPrefix,
@@ -139,7 +149,7 @@ class SchemaAgreementChecker {
         schemaVersions.add(schemaVersion);
       }
     } else {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Missing system.local row for control node {}, "
               + "excluding from schema agreement check",
           logPrefix,
@@ -209,7 +219,8 @@ class SchemaAgreementChecker {
       UUID hostId = peerRow.getUuid("host_id");
       Node node = nodes.get(hostId);
       if (node == null) {
-        LOG.warn("[{}] Unknown peer {}, excluding from schema agreement check", logPrefix, hostId);
+        limitedLogger.warn(
+            "[{}] Unknown peer {}, excluding from schema agreement check", logPrefix, hostId);
         return false;
       } else if (node.getState() != NodeState.UP) {
         LOG.debug("[{}] Peer {} is down, excluding from schema agreement check", logPrefix, hostId);
@@ -226,7 +237,7 @@ class SchemaAgreementChecker {
 
       return !((DefaultNode) node).getRawTokens().isEmpty();
     } else {
-      LOG.warn(
+      limitedLogger.warn(
           "[{}] Found invalid system.peers row for peer: {}, excluding from schema agreement check.",
           logPrefix,
           peerRow.getInetAddress("peer"));

@@ -21,7 +21,13 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
 
-/** Edge metadata, for a table that was created with CREATE TABLE ... WITH EDGE LABEL. */
+/**
+ * Edge metadata, for a table that was created with CREATE TABLE ... WITH EDGE LABEL.
+ *
+ * @deprecated The driver no longer produces DSE metadata. This type remains for source and binary
+ *     compatibility.
+ */
+@Deprecated
 public interface DseEdgeMetadata {
 
   /** The label of the edge in graph. */

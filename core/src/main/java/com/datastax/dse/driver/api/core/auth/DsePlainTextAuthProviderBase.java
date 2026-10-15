@@ -22,12 +22,11 @@ import edu.umd.cs.findbugs.annotations.NonNull;
 import net.jcip.annotations.ThreadSafe;
 
 /**
- * @deprecated The driver's default plain text providers now support both Apache Cassandra and DSE.
- *     This type was preserved for backward compatibility, but implementors should now extend {@link
- *     PlainTextAuthProviderBase} instead.
+ * @deprecated Retained for source and binary compatibility. Use {@link PlainTextAuthProviderBase}
+ *     for standard plaintext authentication.
  */
-@ThreadSafe
 @Deprecated
+@ThreadSafe
 public abstract class DsePlainTextAuthProviderBase extends PlainTextAuthProviderBase {
 
   protected DsePlainTextAuthProviderBase(@NonNull String logPrefix) {
