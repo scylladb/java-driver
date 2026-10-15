@@ -151,6 +151,9 @@ jobs:
           distribution: 'temurin'
           server-id: central
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          # Name the env var the release steps export. Otherwise v6 writes
+          # gpg.passphraseEnvName=GPG_PASSPHRASE and signing fails with "No pinentry"
+          gpg-passphrase-env-var: MAVEN_GPG_PASSPHRASE
           server-username: SONATYPE_TOKEN_USERNAME
           server-password: SONATYPE_TOKEN_PASSWORD
           cache: maven
