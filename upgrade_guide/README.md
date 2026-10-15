@@ -56,8 +56,16 @@ not restored. Applications using these helpers, such as `Point.fromWellKnownText
 `com.esri.geometry:esri-geometry-api` themselves: this optional dependency is not propagated to
 downstream applications.
 
-DateRange value types also remain available for local construction and parsing. The deprecated
-`DseTypeCodecs` fields retain their signatures but throw when encoding or decoding DSE values.
+DateRange value types also remain available for local construction and parsing. `DateRangeBound`
+factories retain the input time zone, while text formatting and parsing use UTC. Non-UTC bounds can
+therefore change when formatted and parsed. This historical repair remains deferred to preserve
+factory behavior and reconstruction of older bounded serialized ranges. If UTC calendar intervals
+are intended, convert the input with `timestamp.withZoneSameInstant(ZoneOffset.UTC)` before
+construction; this workaround does not preserve arbitrary local-calendar intervals. The separate
+historical repair for serializing unbounded DateRange values also remains deferred.
+
+The deprecated `DseTypeCodecs` fields retain their signatures but throw when encoding or decoding
+DSE values.
 
 Deprecated DSE test-infra and OSGi service signatures remain available. DSE CCM setup, tooling,
 and Graph fixture requests throw when used; generic test infrastructure continues to work.

@@ -109,6 +109,11 @@ public class DateRangeBound {
   /**
    * Creates a date range lower bound from the given date and precision. Temporal fields smaller
    * than the precision will be rounded down.
+   *
+   * <p>Rounding retains the input time zone, but text formatting and parsing use UTC. A non-UTC
+   * bound may therefore change when formatted and parsed. If UTC calendar intervals are intended,
+   * convert the input with {@code timestamp.withZoneSameInstant(ZoneOffset.UTC)} before calling
+   * this method. This workaround does not preserve arbitrary local-calendar intervals.
    */
   @NonNull
   public static DateRangeBound lowerBound(
@@ -119,6 +124,11 @@ public class DateRangeBound {
   /**
    * Creates a date range upper bound from the given date and precision. Temporal fields smaller
    * than the precision will be rounded up.
+   *
+   * <p>Rounding retains the input time zone, but text formatting and parsing use UTC. A non-UTC
+   * bound may therefore change when formatted and parsed. If UTC calendar intervals are intended,
+   * convert the input with {@code timestamp.withZoneSameInstant(ZoneOffset.UTC)} before calling
+   * this method. This workaround does not preserve arbitrary local-calendar intervals.
    */
   @NonNull
   public static DateRangeBound upperBound(
