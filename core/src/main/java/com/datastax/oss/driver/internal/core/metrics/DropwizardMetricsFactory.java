@@ -118,15 +118,20 @@ public class DropwizardMetricsFactory implements MetricsFactory {
   }
 
   protected void processNodeStateEvent(NodeStateEvent event) {
+    NodeMetricUpdater updater = event.node.getMetricUpdater();
+    if (!(updater instanceof DropwizardNodeMetricUpdater)) {
+      // Contact points have no registered node metrics to expire.
+      return;
+    }
+    DropwizardNodeMetricUpdater dropwizardUpdater = (DropwizardNodeMetricUpdater) updater;
     if (event.newState == NodeState.DOWN
         || event.newState == NodeState.FORCED_DOWN
         || event.newState == null) {
       // node is DOWN or REMOVED
-      ((DropwizardNodeMetricUpdater) event.node.getMetricUpdater()).startMetricsExpirationTimeout();
+      dropwizardUpdater.startMetricsExpirationTimeout();
     } else if (event.newState == NodeState.UP || event.newState == NodeState.UNKNOWN) {
       // node is UP or ADDED
-      ((DropwizardNodeMetricUpdater) event.node.getMetricUpdater())
-          .cancelMetricsExpirationTimeout();
+      dropwizardUpdater.cancelMetricsExpirationTimeout();
     }
   }
 }
