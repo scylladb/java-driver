@@ -593,3 +593,22 @@ version has a known vulnerability or when a new feature is needed.
 6. Update the repository allowlist under
    `Settings -> Actions -> General -> Allow or block specified actions and reusable workflows`
    to include the new SHA.
+
+## Release blockers
+
+An open issue labelled `release-blocker` fails every non-dry-run `Release` workflow it applies to.
+Use the label only for a defect that must not ship. Never put it on work that a release itself
+resolves, such as publishing docs for a new version: that issue would block the release that
+fixes it.
+
+`scylla-4.x` and `scylla-3.x` release from the same repository, so the issue's line `area/` label
+decides which releases it blocks:
+
+| Labels besides `release-blocker`                             | Blocks 4.x | Blocks 3.x |
+|--------------------------------------------------------------|------------|------------|
+| `area/Driver_-_java-driver-4.x`                              | yes        | no         |
+| `area/Driver_-_java-driver-3.x`                              | no         | yes        |
+| both line labels, or neither (other `area/` labels ignored)  | yes        | yes        |
+
+A line's gate lifts when the issue is closed, loses `release-blocker`, or carries only the other
+line's label. Removing an issue's only line label widens it to both lines.
