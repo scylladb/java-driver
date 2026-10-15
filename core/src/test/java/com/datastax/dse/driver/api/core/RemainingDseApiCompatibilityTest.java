@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import com.datastax.dse.driver.api.core.config.DseDriverOption;
 import com.datastax.dse.driver.api.core.cql.continuous.ContinuousSession;
 import com.datastax.dse.driver.api.core.cql.continuous.reactive.ContinuousReactiveSession;
+import com.datastax.dse.driver.api.core.data.time.DateRange;
 import com.datastax.dse.driver.api.core.data.time.DateRangeBound;
 import com.datastax.dse.driver.api.core.type.codec.DseTypeCodecs;
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -41,6 +42,7 @@ import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.SerializationHelper;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.util.Base64;
 import java.util.concurrent.CompletionException;
 import org.junit.Test;
@@ -56,6 +58,31 @@ public class RemainingDseApiCompatibilityTest {
     assertThat(TypedDriverOption.GRAPH_NAME.getRawOption()).isSameAs(DseDriverOption.GRAPH_NAME);
     assertThat(Version.parse("4.19.2.3").getDSEPatch()).isEqualTo(3);
     assertThat(DateRangeBound.parseLowerBound("2020-01-01")).isNotNull();
+  }
+
+  @Test
+  public void should_accept_equal_inclusive_date_range_bounds() throws Exception {
+    String timestamp = "2001-01-01T00:00:00.001Z";
+    DateRangeBound lowerBound = DateRangeBound.parseLowerBound(timestamp);
+    DateRangeBound upperBound = DateRangeBound.parseUpperBound(timestamp);
+
+    DateRange range = new DateRange(lowerBound, upperBound);
+
+    assertThat(range.getLowerBound()).isEqualTo(lowerBound);
+    assertThat(range.getUpperBound()).contains(upperBound);
+    assertThat(DateRange.parse("[" + timestamp + " TO " + timestamp + "]")).isEqualTo(range);
+  }
+
+  @Test
+  public void should_report_reversed_date_range_as_parse_exception() throws Exception {
+    assertThatThrownBy(() -> DateRange.parse("[2002 TO 2001]"))
+        .isInstanceOf(ParseException.class)
+        .hasCauseInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(
+            () ->
+                new DateRange(
+                    DateRangeBound.parseLowerBound("2002"), DateRangeBound.parseUpperBound("2001")))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test

@@ -100,7 +100,11 @@ public class DateRange implements Serializable {
         throw newParseException(
             "Cannot parse date range upper bound: " + source, upperBoundStart, e);
       }
-      return new DateRange(lowerBound, upperBound);
+      try {
+        return new DateRange(lowerBound, upperBound);
+      } catch (IllegalArgumentException e) {
+        throw newParseException("Cannot parse date range: " + source, 0, e);
+      }
     } else {
       try {
         return new DateRange(DateRangeBound.parseLowerBound(source));
@@ -136,7 +140,7 @@ public class DateRange implements Serializable {
     Preconditions.checkNotNull(upperBound, "upperBound cannot be null");
     if (!lowerBound.isUnbounded()
         && !upperBound.isUnbounded()
-        && lowerBound.getTimestamp().compareTo(upperBound.getTimestamp()) >= 0) {
+        && lowerBound.getTimestamp().compareTo(upperBound.getTimestamp()) > 0) {
       throw new IllegalArgumentException(
           String.format(
               "Lower bound of a date range should be before upper bound, got: [%s TO %s]",
