@@ -1,0 +1,55 @@
+name: Release blocker scope reminder
+
+on:
+  issues:
+    types: [opened, reopened, labeled, unlabeled]
+
+permissions: {}
+
+concurrency:
+  group: release-blocker-scope-${{ github.event.issue.number }}
+
+jobs:
+  remind:
+    name: Remind to scope release blockers
+    if: >-
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'release-blocker')
+    runs-on: ubuntu-latest
+
+    permissions:
+      issues: write
+
+    steps:
+      - name: Comment on release blockers that block both lines
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          # Re-read the labels: the event payload can be stale by the time the job runs.
+          scoped="$(
+            gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json state,labels \
+              --jq '.state != "OPEN"
+                or ([.labels[].name] | index("release-blocker") | not)
+                or any(.labels[].name;
+                  IN("area/Driver_-_java-driver-3.x", "area/Driver_-_java-driver-4.x"))'
+          )"
+          if [[ "$scoped" == true ]]; then
+            echo "Nothing to remind about."
+            exit 0
+          fi
+
+          marker='<!-- release-blocker-scope -->'
+          bodies="$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --jq '.[].body')"
+          if grep -qF "$marker" <<<"$bodies"; then
+            echo "Already reminded."
+            exit 0
+          fi
+
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file - <<EOF
+          $marker
+          This issue is labelled \`release-blocker\` but names no driver line, so it blocks **both** \`scylla-4.x\` and \`scylla-3.x\` releases.
+          If it affects only one line, add \`area/Driver_-_java-driver-4.x\` or \`area/Driver_-_java-driver-3.x\`.
+          See [Release blockers](https://github.com/$GITHUB_REPOSITORY/blob/scylla-4.x/CONTRIBUTING.md#release-blockers).
+          EOF
