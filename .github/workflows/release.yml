@@ -23,6 +23,12 @@ on:
         description: 'skip-integration-matrix: do not run the driver matrix integration tests before releasing'
         default: false
 
+env:
+  # The driver line this branch releases; scopes release-blocker issues.
+  RELEASE_LINE: 3.x
+  # The other line released from this repository.
+  OTHER_LINE: 4.x
+
 jobs:
   release-target:
     name: Resolve release target
@@ -43,20 +49,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          blocker="$(
+          # Only a blocker scoped solely to the other line is skipped.
+          blockers="$(
             gh issue list \
               --repo "$GITHUB_REPOSITORY" \
               --state open \
               --label release-blocker \
-              --limit 1 \
-              --json title,url \
-              --jq '.[0] | select(.) | "\(.url) — \(.title)"'
+              --limit 100 \
+              --json labels,title,url |
+            jq -r \
+              --arg line "area/Driver_-_java-driver-$RELEASE_LINE" \
+              --arg other "area/Driver_-_java-driver-$OTHER_LINE" '
+              .[]
+              | [.labels[].name] as $names
+              | select((any($names[]; . == $other) | not) or any($names[]; . == $line))
+              | "\(.url) — \(.title)"'
           )"
-          if [[ -n "$blocker" ]]; then
-            echo "::error::Release blocked by open issue: $blocker"
+          if [[ -n "$blockers" ]]; then
+            while IFS= read -r blocker; do
+              echo "::error::Release blocked by open issue: $blocker"
+            done <<<"$blockers"
             exit 1
           fi
-          echo "No open release blockers."
+          echo "No open release blockers for $RELEASE_LINE."
 
       - name: Checkout Repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -184,20 +199,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          blocker="$(
+          # Only a blocker scoped solely to the other line is skipped.
+          blockers="$(
             gh issue list \
               --repo "$GITHUB_REPOSITORY" \
               --state open \
               --label release-blocker \
-              --limit 1 \
-              --json title,url \
-              --jq '.[0] | select(.) | "\(.url) — \(.title)"'
+              --limit 100 \
+              --json labels,title,url |
+            jq -r \
+              --arg line "area/Driver_-_java-driver-$RELEASE_LINE" \
+              --arg other "area/Driver_-_java-driver-$OTHER_LINE" '
+              .[]
+              | [.labels[].name] as $names
+              | select((any($names[]; . == $other) | not) or any($names[]; . == $line))
+              | "\(.url) — \(.title)"'
           )"
-          if [[ -n "$blocker" ]]; then
-            echo "::error::Release blocked by open issue: $blocker"
+          if [[ -n "$blockers" ]]; then
+            while IFS= read -r blocker; do
+              echo "::error::Release blocked by open issue: $blocker"
+            done <<<"$blockers"
             exit 1
           fi
-          echo "No open release blockers."
+          echo "No open release blockers for $RELEASE_LINE."
 
       - name: Perform release
         if: inputs.dry-run == false
