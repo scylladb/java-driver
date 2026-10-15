@@ -46,14 +46,17 @@ import com.datastax.oss.driver.internal.core.metadata.DefaultNodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.DistanceEvent;
 import com.datastax.oss.driver.internal.core.metadata.NodeInfo;
 import com.datastax.oss.driver.internal.core.metadata.NodeStateEvent;
+import com.datastax.oss.driver.internal.core.metadata.NodeStateManager;
 import com.datastax.oss.driver.internal.core.metadata.TestNodeFactory;
 import com.datastax.oss.driver.internal.core.metadata.TopologyMonitor;
+import com.datastax.oss.driver.internal.core.metrics.DropwizardMetricsFactory;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -164,6 +167,39 @@ public class ControlConnectionTest extends ControlConnectionTestBase {
     verify(reconnectionPolicy, never()).newNodeSchedule(any(Node.class));
 
     factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_fail_to_init_with_dropwizard_metrics_and_one_admin_thread() {
+    // The base fixture uses a single admin thread, so state listeners run inline.
+    when(defaultProfile.getStringList(DefaultDriverOption.METRICS_NODE_ENABLED))
+        .thenReturn(Collections.singletonList("pool.open-connections"));
+    when(defaultProfile.getDuration(DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER))
+        .thenReturn(Duration.ofHours(1));
+    when(defaultProfile.getDuration(DefaultDriverOption.METADATA_TOPOLOGY_WINDOW))
+        .thenReturn(Duration.ZERO);
+    when(defaultProfile.getInt(DefaultDriverOption.METADATA_TOPOLOGY_MAX_EVENTS)).thenReturn(1);
+    DropwizardMetricsFactory metricsFactory = new DropwizardMetricsFactory(context);
+    when(context.getMetricsFactory()).thenReturn(metricsFactory);
+    NodeStateManager nodeStateManager = new NodeStateManager(context);
+    DefaultNode contactPoint = DefaultNode.newContactPoint(new DefaultEndPoint(ADDRESS1), context);
+    mockQueryPlan(contactPoint);
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory)
+            .failure(contactPoint, "mock failure")
+            .build();
+
+    try {
+      CompletionStage<Void> initFuture = controlConnection.init(false, false, false);
+      factoryHelper.waitForCall(contactPoint);
+
+      assertThatStage(initFuture)
+          .isFailed(error -> assertThat(error).isInstanceOf(AllNodesFailedException.class));
+      assertThat(contactPoint.getState()).isEqualTo(NodeState.DOWN);
+      factoryHelper.verifyNoMoreCalls();
+    } finally {
+      assertThatStage(nodeStateManager.closeAsync()).isSuccess();
+    }
   }
 
   @Test
