@@ -26,7 +26,7 @@ CENTRAL_VERSION = re.compile(
 def with_central_version(pom, version):
     # Locate the pin by plugin, not by its current value, so dependency bumps can't
     # turn these tests into silent no-ops.
-    updated, count = CENTRAL_VERSION.subn(rf"\g<1>{version}\g<2>", pom)
+    updated, count = CENTRAL_VERSION.subn(lambda match: match[1] + version + match[2], pom)
     if count != 1:
         raise AssertionError(f"expected one central-publishing version pin, found {count}")
     return updated
@@ -198,14 +198,17 @@ class ReleaseTests(unittest.TestCase):
     def test_old_release_target(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
             pom = (ROOT / "pom.xml").read_text()
-            for old, text in (
-                ("bestPractices", pom.replace("<gpg.bestPractices>true</gpg.bestPractices>",
-                                              "<version>0.8.0</version>")),
-                ("central", with_central_version(pom, "0.8.0")),
+            for case, text, message in (
+                ("bestPractices", pom.replace("<gpg.bestPractices>true</gpg.bestPractices>", ""),
+                 "enable GPG best practices"),
+                ("central 0.8.0", with_central_version(pom, "0.8.0"), "update Central publishing"),
+                ("central 0.10.0", with_central_version(pom, "0.10.0"),
+                 "update Central publishing"),
             ):
                 (root / "pom.xml").write_text(text)
-                with self.subTest(old=old), self.assertRaises(guard.Unsafe):
+                with self.subTest(case=case), self.assertRaisesRegex(guard.Unsafe, message):
                     guard.check_policy(root)
 
     def test_disabled_gpg_configuration(self):
