@@ -5,6 +5,10 @@
   3.x versions get published.
 -->
 
+### Unreleased
+
+- [improvement] DRIVER-787: Validate simple and prepared SELECT without FROM queries without a keyspace or table.
+
 ### 3.11.5
 - [improvement] JAVA-3114: Shade io.dropwizard.metrics:metrics-core in shaded driver
 - [improvement] JAVA-3115: SchemaChangeListener#onKeyspaceChanged can fire when keyspace has not changed if using SimpleStrategy replication
