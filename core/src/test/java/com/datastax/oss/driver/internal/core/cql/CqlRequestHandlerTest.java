@@ -19,8 +19,8 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -61,6 +61,28 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
 public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_fail_future_if_throttled_request_setup_throws() {
+    RuntimeException expected = new RuntimeException("mock query plan failure");
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness
+              .getContext()
+              .getLoadBalancingPolicyWrapper()
+              .newQueryPlan(any(), anyString(), any()))
+          .thenThrow(expected);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(expected));
+    }
+  }
 
   @Test
   public void should_complete_result_if_first_node_replies_immediately() {
@@ -169,16 +191,15 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
     PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
 
     try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
-      // This only verifies stream-id cleanup; the other failure-path leaks are tracked in #980.
-      assertThatThrownBy(
-              () ->
-                  new CqlRequestHandler(
-                      UNDEFINED_IDEMPOTENCE_STATEMENT,
-                      harness.getSession(),
-                      harness.getContext(),
-                      "test"))
-          .isSameAs(failure);
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
 
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(failure));
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
     }

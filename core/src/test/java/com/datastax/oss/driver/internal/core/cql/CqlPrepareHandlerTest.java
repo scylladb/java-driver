@@ -20,7 +20,6 @@ package com.datastax.oss.driver.internal.core.cql;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static com.datastax.oss.driver.internal.core.cql.CqlRequestHandlerTestBase.defaultFrameOf;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -368,12 +367,11 @@ public class CqlPrepareHandlerTest {
     PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
 
     try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
-      assertThatThrownBy(
-              () ->
-                  new CqlPrepareHandler(
-                      prepareRequest, harness.getSession(), harness.getContext(), "test"))
-          .isSameAs(failure);
+      CompletionStage<PreparedStatement> prepareFuture =
+          new CqlPrepareHandler(prepareRequest, harness.getSession(), harness.getContext(), "test")
+              .handle();
 
+      assertThatStage(prepareFuture).isFailed(error -> assertThat(error).isSameAs(failure));
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
     }

@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.session.throttling;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
+import static com.datastax.oss.driver.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
@@ -28,8 +29,10 @@ import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
@@ -152,6 +155,110 @@ public class ConcurrencyLimitingRequestThrottlerTest {
   @Test
   public void should_dequeue_when_active_times_out() {
     should_dequeue_when_active_completes(throttler::signalTimeout);
+  }
+
+  @Test
+  public void should_not_overflow_stack_when_dequeued_requests_fail_synchronously() {
+    // Given
+    int requestCount = 10_000;
+    when(defaultProfile.getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_CONCURRENT_REQUESTS))
+        .thenReturn(1);
+    when(defaultProfile.getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_QUEUE_SIZE))
+        .thenReturn(requestCount);
+    ConcurrencyLimitingRequestThrottler throttler =
+        new ConcurrencyLimitingRequestThrottler(context);
+    MockThrottled active = new MockThrottled();
+    throttler.register(active);
+
+    AtomicInteger failedCount = new AtomicInteger();
+    RuntimeException failure = new RuntimeException("mock failure");
+    for (int i = 0; i < requestCount; i++) {
+      throttler.register(
+          new Throttled() {
+            @Override
+            public void onThrottleReady(boolean wasDelayed) {
+              if (!wasDelayed) {
+                throw new AssertionError("Queued request should be delayed");
+              }
+              failedCount.incrementAndGet();
+              throttler.signalError(this, failure);
+            }
+
+            @Override
+            public void onThrottleFailure(@NonNull RequestThrottlingException error) {
+              throw new AssertionError("Request should not be rejected", error);
+            }
+          });
+    }
+
+    // When
+    throttler.signalSuccess(active);
+
+    // Then
+    assertThat(failedCount).hasValue(requestCount);
+    assertThat(throttler.getConcurrentRequests()).isZero();
+    assertThat(throttler.getQueue()).isEmpty();
+  }
+
+  @Test
+  public void should_finish_draining_when_dequeued_requests_throw_same_failure() {
+    // Given
+    when(defaultProfile.getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_CONCURRENT_REQUESTS))
+        .thenReturn(1);
+    ConcurrencyLimitingRequestThrottler throttler =
+        new ConcurrencyLimitingRequestThrottler(context);
+    MockThrottled active = new MockThrottled();
+    throttler.register(active);
+
+    RuntimeException failure = new RuntimeException("mock failure");
+    AtomicInteger startedCount = new AtomicInteger();
+    throttler.register(
+        new Throttled() {
+          @Override
+          public void onThrottleReady(boolean wasDelayed) {
+            startedCount.incrementAndGet();
+            throttler.signalError(this, failure);
+            throw failure;
+          }
+
+          @Override
+          public void onThrottleFailure(@NonNull RequestThrottlingException error) {
+            throw new AssertionError("Request should not be rejected", error);
+          }
+        });
+    throttler.register(
+        new Throttled() {
+          @Override
+          public void onThrottleReady(boolean wasDelayed) {
+            startedCount.incrementAndGet();
+            throttler.signalError(this, failure);
+            throw failure;
+          }
+
+          @Override
+          public void onThrottleFailure(@NonNull RequestThrottlingException error) {
+            throw new AssertionError("Request should not be rejected", error);
+          }
+        });
+    throttler.register(
+        new Throttled() {
+          @Override
+          public void onThrottleReady(boolean wasDelayed) {
+            startedCount.incrementAndGet();
+            throttler.signalSuccess(this);
+          }
+
+          @Override
+          public void onThrottleFailure(@NonNull RequestThrottlingException error) {
+            throw new AssertionError("Request should not be rejected", error);
+          }
+        });
+
+    // When / Then
+    assertThatThrownBy(() -> throttler.signalSuccess(active)).isSameAs(failure);
+    assertThat(startedCount).hasValue(3);
+    assertThat(throttler.getConcurrentRequests()).isZero();
+    assertThat(throttler.getQueue()).isEmpty();
   }
 
   private void should_dequeue_when_active_completes(Consumer<Throttled> completeCallback) {
