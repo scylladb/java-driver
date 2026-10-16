@@ -65,6 +65,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
   // the size of the queue explicitly.
   private final Deque<Throttled> queue = new ConcurrentLinkedDeque<>();
   private final AtomicInteger queueSize = new AtomicInteger(0);
+  private final ThreadLocal<DrainState> drainState = ThreadLocal.withInitial(DrainState::new);
   private volatile boolean closed = false;
 
   public ConcurrencyLimitingRequestThrottler(DriverContext context) {
@@ -137,10 +138,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @Override
   public void signalSuccess(@NonNull Throttled request) {
-    Throttled nextRequest = onRequestDoneAndDequeNext();
-    if (nextRequest != null) {
-      nextRequest.onThrottleReady(true);
-    }
+    onActiveRequestDone();
   }
 
   @Override
@@ -150,35 +148,47 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @Override
   public void signalTimeout(@NonNull Throttled request) {
-    Throttled nextRequest = null;
     if (!closed) {
       if (queue.remove(request)) { // The request timed out before it was active
         queueSize.decrementAndGet();
         LOG.trace("[{}] Removing timed out request from the queue", logPrefix);
       } else {
-        nextRequest = onRequestDoneAndDequeNext();
+        onActiveRequestDone();
       }
-    }
-
-    if (nextRequest != null) {
-      nextRequest.onThrottleReady(true);
     }
   }
 
   @Override
   public void signalCancel(@NonNull Throttled request) {
-    Throttled nextRequest = null;
     if (!closed) {
       if (queue.remove(request)) { // The request has been cancelled before it was active
         queueSize.decrementAndGet();
         LOG.trace("[{}] Removing cancelled request from the queue", logPrefix);
       } else {
-        nextRequest = onRequestDoneAndDequeNext();
+        onActiveRequestDone();
       }
     }
+  }
 
-    if (nextRequest != null) {
-      nextRequest.onThrottleReady(true);
+  private void onActiveRequestDone() {
+    DrainState state = drainState.get();
+    state.pendingCompletions++;
+    if (state.draining) {
+      return;
+    }
+
+    state.draining = true;
+    try {
+      while (state.pendingCompletions > 0) {
+        state.pendingCompletions--;
+        Throttled nextRequest = onRequestDoneAndDequeNext();
+        if (nextRequest != null) {
+          nextRequest.onThrottleReady(true);
+        }
+      }
+    } finally {
+      state.draining = false;
+      drainState.remove();
     }
   }
 
@@ -227,5 +237,10 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   private static void fail(Throttled request, String message) {
     request.onThrottleFailure(new RequestThrottlingException(message));
+  }
+
+  private static final class DrainState {
+    private int pendingCompletions;
+    private boolean draining;
   }
 }
