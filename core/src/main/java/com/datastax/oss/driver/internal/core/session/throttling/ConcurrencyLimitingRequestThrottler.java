@@ -24,6 +24,7 @@ import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
+import com.datastax.oss.driver.shaded.guava.common.base.Throwables;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.Deque;
@@ -178,17 +179,31 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
     }
 
     state.draining = true;
+    Throwable callbackFailure = null;
     try {
       while (state.pendingCompletions > 0) {
         state.pendingCompletions--;
         Throttled nextRequest = onRequestDoneAndDequeNext();
         if (nextRequest != null) {
-          nextRequest.onThrottleReady(true);
+          try {
+            nextRequest.onThrottleReady(true);
+          } catch (Throwable failure) {
+            if (callbackFailure == null) {
+              callbackFailure = failure;
+            } else {
+              callbackFailure.addSuppressed(failure);
+            }
+          }
         }
       }
     } finally {
       state.draining = false;
       drainState.remove();
+    }
+
+    if (callbackFailure != null) {
+      Throwables.throwIfUnchecked(callbackFailure);
+      throw new RuntimeException(callbackFailure);
     }
   }
 
