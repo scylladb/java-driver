@@ -15,7 +15,7 @@ on:
 
       target-tag:
         type: string
-        description: 'target-tag: tag or branch name to release. Use to re-release tagged releases'
+        description: 'target-tag: scylla-3.x, or a tag whose preceding commit passes release credential safety checks. Other branches and unsafe historical targets are unsupported.'
         default: scylla-3.x
 
       skip-integration-matrix:
@@ -90,6 +90,12 @@ jobs:
           ref="$GITHUB_SHA"
           if [[ "$TARGET_TAG" == 3.* ]]; then
             ref="$(git rev-parse "refs/tags/$TARGET_TAG~1")"
+          elif [[ "$TARGET_TAG" != 'scylla-3.x' ]]; then
+            echo "::error::Use scylla-3.x or a safe 3.x release tag. Other branches are unsupported."
+            exit 1
+          elif [[ "$GITHUB_REF" != 'refs/heads/scylla-3.x' ]]; then
+            echo "::error::Dispatch the scylla-3.x target from refs/heads/scylla-3.x."
+            exit 1
           fi
           version="$(git show "$ref:pom.xml" | python3 -c 'import sys, xml.etree.ElementTree as ET; print(ET.parse(sys.stdin).getroot().findtext("{http://maven.apache.org/POM/4.0.0}version"))')"
           version="${version%-SNAPSHOT}"
@@ -143,14 +149,24 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Preserve release guard
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-safety"
+          cp scripts/release/*.py "$RUNNER_TEMP/release-safety/"
+          echo "RELEASE_GUARD=$RUNNER_TEMP/release-safety/guard.py" >> "$GITHUB_ENV"
+          echo "RELEASE_LOG_DIR=$RUNNER_TEMP/release-logs" >> "$GITHUB_ENV"
+
       - name: Checkout Code One Commit Before ${{ inputs.target-tag }}
         if: inputs.target-tag != 'scylla-3.x'
         env:
           RELEASE_TARGET_TAG: ${{ inputs.target-tag }}
         run: make checkout-one-commit-before
 
+      - name: Check release credential safety before importing credentials
+        run: python3 "$RELEASE_GUARD" check
+
       - name: Set up Java
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '11'
           distribution: 'temurin'
@@ -158,9 +174,9 @@ jobs:
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           # Name the env var the release steps export. Otherwise setup-java defaults it to
           # GPG_PASSPHRASE, and v6 then makes maven-gpg-plugin read that unset variable
-          gpg-passphrase: MAVEN_GPG_PASSPHRASE
-          server-username: SONATYPE_TOKEN_USERNAME
-          server-password: SONATYPE_TOKEN_PASSWORD
+          gpg-passphrase-env-var: MAVEN_GPG_PASSPHRASE
+          server-username-env-var: SONATYPE_TOKEN_USERNAME
+          server-password-env-var: SONATYPE_TOKEN_PASSWORD
           cache: maven
 
       - name: Configure Git user
@@ -175,7 +191,7 @@ jobs:
       - name: Stamp the README with the release version
         run: |
           set -euo pipefail
-          version="$(mvn -B -q -ntp help:evaluate -Dexpression=project.version -DforceStdout)"
+          version="$(python3 "$RELEASE_GUARD" run mvn -B -q -ntp help:evaluate -Dexpression=project.version -DforceStdout)"
           version="${version%-SNAPSHOT}"
           line="${version%.*}"
           sed -i -E "s/${line//./\\.}\.[0-9]+/${version}/g" README.md
@@ -246,6 +262,14 @@ jobs:
         run: |
           git status && git log -3
           git push origin --follow-tags -v
+
+      - name: Upload sanitized release logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: maven-stdout
+          path: ${{ runner.temp }}/release-logs/*.log
+          if-no-files-found: ignore
 
   publish-docs:
     name: Publish docs

@@ -1,3 +1,4 @@
+RELEASE_GUARD ?= scripts/release/guard.py
 SHELL := bash
 .ONESHELL:
 
@@ -12,7 +13,7 @@ CCM_SCYLLA_REPO ?= github.com/scylladb/scylla-ccm
 CCM_SCYLLA_VERSION ?= master
 
 SCYLLA_EXT_OPTS ?= --smp=2 --memory=4G
-MVNCMD ?= mvn -B -X -ntp
+MVNCMD ?= mvn -B -ntp
 MAVEN_GPG_PASSPHRASE ?=
 MAVEN_OPTS ?=
 
@@ -328,54 +329,60 @@ download-scylla: .prepare-scylla-ccm resolve-scylla-version
 	rm -rf /tmp/download.ccm
 
 .require-release-prepare-env:
-	@if [[ -z "${MAVEN_GPG_PASSPHRASE}" ]]; then
+	@if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
 		echo "MAVEN_GPG_PASSPHRASE is empty"
 		exit 1
 	fi
 
 .require-release-env:
-	@if [[ -z "${MAVEN_GPG_PASSPHRASE}" ]]; then
+	@if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
 		echo "MAVEN_GPG_PASSPHRASE is empty"
 		exit 1
 	fi
-	if [[ -z "${SONATYPE_TOKEN_USERNAME}" ]]; then
+	if [[ -z "$${SONATYPE_TOKEN_USERNAME}" ]]; then
 		echo "SONATYPE_TOKEN_USERNAME is empty"
 		exit 1
 	fi
-	if [[ -z "${SONATYPE_TOKEN_PASSWORD}" ]]; then
+	if [[ -z "$${SONATYPE_TOKEN_PASSWORD}" ]]; then
 		echo "SONATYPE_TOKEN_PASSWORD is empty"
 		exit 1
 	fi
 
 checkout-one-commit-before:
-	@if [[ "${RELEASE_TARGET_TAG}" == 3.* ]]; then
-		echo "Checking out one commit before ${RELEASE_TARGET_TAG}"
-		cp -f Makefile /tmp/tmp-Makefile
-		git fetch --prune --unshallow || git fetch --prune || true
-		git checkout ${RELEASE_TARGET_TAG}~1
-		git tag -d ${RELEASE_TARGET_TAG}
-		mv -f /tmp/tmp-Makefile ./Makefile
+	@if [[ "$${RELEASE_TARGET_TAG}" == 'scylla-3.x' ]]; then
+		exit 0
 	fi
+	if [[ "$${RELEASE_TARGET_TAG}" != 3.* ]]; then
+		echo "Use scylla-3.x or a safe 3.x release tag. Other branches are unsupported."
+		exit 1
+	fi
+	set -e
+	echo "Checking out one commit before $${RELEASE_TARGET_TAG}"
+	release_makefile=$$(mktemp)
+	trap 'rm -f "$${release_makefile}"' EXIT
+	cp -f Makefile "$${release_makefile}"
+	git fetch --prune --unshallow || git fetch --prune
+	git checkout "refs/tags/$${RELEASE_TARGET_TAG}~1"
+	git tag -d "$${RELEASE_TARGET_TAG}"
+	cp -f "$${release_makefile}" ./Makefile
 
 release-prepare: .require-release-prepare-env
-	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
-		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
+	@if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
+		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	$(MVNCMD) release:prepare -DpushChanges=false -DcheckModificationExcludeList=README.md
+	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:prepare -DpushChanges=false -DcheckModificationExcludeList=README.md
 
 release: .require-release-env
-	@if [[ "${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "${RELEASE_SKIP_TESTS}" == "1" ]]; then
-		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
+	@if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
+		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	mkdir /tmp/java-driver-release-logs/ 2>/dev/null || true
-	$(MVNCMD) release:perform -Drelease.autopublish=true > >(tee /tmp/java-driver-release-logs/stdout.log) 2> >(tee /tmp/java-driver-release-logs/stderr.log)
+	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform -Drelease.autopublish=true
 
 release-dry-run: .require-release-env
-	@if [[ -n "${RELEASE_SKIP_TESTS}" ]]; then
-		export MAVEN_OPTS="${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
+	@if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
+		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	mkdir /tmp/java-driver-release-logs/ 2>/dev/null || true
-	$(MVNCMD) release:perform > >(tee /tmp/java-driver-release-logs/stdout.log) 2> >(tee /tmp/java-driver-release-logs/stderr.log)
+	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform
 
 compile-all:
 	mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
@@ -428,8 +435,8 @@ test-integration-cassandra: .prepare-scylla-ccm resolve-cassandra-version
 # driver-core's test-jar, which driver-mapping and driver-extras resolve at test scope, and
 # nothing in this build or in CI installs that jar for them to fall back on.
 #
-# mvn is called directly rather than through MVNCMD, whose -X default would tee a debug log
-# measured in hundreds of megabytes into the temp file this target then greps.
+# Maven runs at normal verbosity, teeing combined output to the console and a temp file.
+# The mismatch count below greps WARN lines, which quiet output would suppress.
 coverage-report:
 	@set -eo pipefail
 	exec_files=$$(find $(COVERAGE_EXEC_DIRS) -maxdepth 1 -name '*.exec' 2>/dev/null | sort || true)
