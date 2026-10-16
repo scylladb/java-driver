@@ -77,6 +77,9 @@ public class CcmBridge implements AutoCloseable {
 
   public static final String BRANCH = System.getProperty("ccm.branch");
 
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated public static final Boolean DSE_ENABLEMENT = Boolean.getBoolean("ccm.dse");
+
   public static final Boolean SCYLLA_ENTERPRISE =
       String.valueOf(VERSION.getMajor()).matches("\\d{4}");
 
@@ -134,6 +137,19 @@ public class CcmBridge implements AutoCloseable {
 
   // mapped C* versions from HCD versions
   public static final Version V4_0_11 = Version.parse("4.0.11");
+
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated public static final Version V6_0_0 = Version.parse("6.0.0");
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated public static final Version V5_1_0 = Version.parse("5.1.0");
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated public static final Version V5_0_0 = Version.parse("5.0.0");
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated public static final Version V4_0_0 = Version.parse("4.0.0");
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated public static final Version V3_10 = Version.parse("3.10");
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated public static final Version V2_1_19 = Version.parse("2.1.19");
 
   private static final Map<String, String> ENVIRONMENT_MAP;
 
@@ -225,6 +241,9 @@ public class CcmBridge implements AutoCloseable {
   }
 
   private static Version parseCcmVersion() {
+    if (DISTRIBUTION == BackendType.DSE || Boolean.getBoolean("ccm.dse")) {
+      throw new UnsupportedOperationException("DSE CCM backends are no longer supported");
+    }
     String versionString = CCM_VERSION_PROPERTY;
     Version result = null;
     try {
@@ -268,6 +287,15 @@ public class CcmBridge implements AutoCloseable {
 
   public static Optional<Version> getScyllaVersion() {
     return isDistributionOf(BackendType.SCYLLA) ? Optional.of(VERSION) : Optional.empty();
+  }
+
+  /** @deprecated DSE CCM backends are no longer supported. */
+  @Deprecated
+  public Optional<Version> getDseVersion() {
+    if (DSE_ENABLEMENT || DISTRIBUTION == BackendType.DSE) {
+      throw new UnsupportedOperationException("DSE CCM backends are no longer supported");
+    }
+    return Optional.empty();
   }
 
   public Optional<String> getScyllaUnparsedVersion() {
@@ -388,6 +416,18 @@ public class CcmBridge implements AutoCloseable {
 
   public void nodetool(int node, String... args) {
     execute(String.format("node%d nodetool %s", node, Joiner.on(" ").join(args)));
+  }
+
+  /** @deprecated DSE CCM tools are no longer supported. */
+  @Deprecated
+  public void dsetool(int node, String... args) {
+    throw new UnsupportedOperationException("DSE CCM tools are no longer supported");
+  }
+
+  /** @deprecated DSE CCM tools are no longer supported. */
+  @Deprecated
+  public void reloadCore(int node, String keyspace, String table, boolean reindex) {
+    throw new UnsupportedOperationException("DSE CCM tools are no longer supported");
   }
 
   public void start() {
@@ -664,6 +704,24 @@ public class CcmBridge implements AutoCloseable {
       return this;
     }
 
+    /** @deprecated DSE CCM configuration is no longer supported. */
+    @Deprecated
+    public Builder withDseConfiguration(String key, Object value) {
+      throw new UnsupportedOperationException("DSE CCM configuration is no longer supported");
+    }
+
+    /** @deprecated DSE CCM configuration is no longer supported. */
+    @Deprecated
+    public Builder withDseConfiguration(String rawYaml) {
+      throw new UnsupportedOperationException("DSE CCM configuration is no longer supported");
+    }
+
+    /** @deprecated DSE CCM workloads are no longer supported. */
+    @Deprecated
+    public Builder withDseWorkloads(String... workloads) {
+      throw new UnsupportedOperationException("DSE CCM workloads are no longer supported");
+    }
+
     public Builder withJvmArgs(String... jvmArgs) {
       Collections.addAll(this.jvmArgs, jvmArgs);
       return this;
@@ -736,6 +794,9 @@ public class CcmBridge implements AutoCloseable {
     }
 
     public CcmBridge build() {
+      if (DISTRIBUTION == BackendType.DSE) {
+        throw new UnsupportedOperationException("DSE CCM backends are no longer supported");
+      }
       return new CcmBridge(
           configDirectory, nodes, ipPrefix, cassandraConfiguration, createOptions, jvmArgs);
     }

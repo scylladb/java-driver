@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.session;
 import static com.datastax.oss.driver.internal.core.util.Dependency.REACTIVE_STREAMS;
 
 import com.datastax.dse.driver.internal.core.cql.reactive.CqlRequestReactiveProcessor;
+import com.datastax.dse.driver.internal.core.graph.UnsupportedGraphRequestProcessor;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareSyncProcessor;
@@ -45,6 +46,7 @@ public class BuiltInRequestProcessors {
       LOG.debug(
           "Reactive Streams was not found on the classpath: reactive extensions will not be available");
     }
+    processors.add(new UnsupportedGraphRequestProcessor());
     return processors;
   }
 

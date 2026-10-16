@@ -17,7 +17,11 @@
  */
 package com.datastax.oss.driver.api.core;
 
+import com.datastax.dse.driver.api.core.cql.continuous.ContinuousSession;
+import com.datastax.dse.driver.api.core.cql.continuous.reactive.ContinuousReactiveSession;
 import com.datastax.dse.driver.api.core.cql.reactive.ReactiveSession;
+import com.datastax.dse.driver.api.core.graph.GraphSession;
+import com.datastax.dse.driver.api.core.graph.reactive.ReactiveGraphSession;
 import com.datastax.oss.driver.api.core.cql.AsyncCqlSession;
 import com.datastax.oss.driver.api.core.cql.SyncCqlSession;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -28,8 +32,20 @@ import edu.umd.cs.findbugs.annotations.NonNull;
  *
  * <p>It provides user-friendly execution methods for synchronous, asynchronous, and reactive CQL
  * requests.
+ *
+ * <p>Deprecated DSE Graph and continuous-paging interfaces remain for compatibility. Their
+ * synchronous execution methods throw {@link UnsupportedOperationException}, asynchronous methods
+ * return failed stages, and reactive methods signal the error on subscription.
  */
-public interface CqlSession extends Session, SyncCqlSession, AsyncCqlSession, ReactiveSession {
+public interface CqlSession
+    extends Session,
+        SyncCqlSession,
+        AsyncCqlSession,
+        ReactiveSession,
+        ContinuousSession,
+        ContinuousReactiveSession,
+        GraphSession,
+        ReactiveGraphSession {
 
   /**
    * Returns a builder to create a new instance.

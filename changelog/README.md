@@ -25,15 +25,15 @@ under the License.
 
 - [bug] Escape string literals in function, keyspace, and index metadata descriptions, and handle
   function bodies containing single quotes and dollar-quote delimiters in schema builders (#1238)
-- [breaking] Remove DSE geometry and DateRange APIs and codecs, including `DseDataTypes`
-  and `DseTypeCodecs`, plus the ESRI dependency (#1029)
+- [breaking] Remove DSE Graph execution support and TinkerPop integration (#1028). Restore
+  deprecated Graph API stubs; Graph construction and execution throw
+  `UnsupportedOperationException` with migration guidance.
+- [breaking] Remove DSE geometry and DateRange codec support (#1029). Retain deprecated geometry
+  and DateRange value types for local operations, with the optional ESRI dependency for geometry.
+  `DseDataTypes` and `DseTypeCodecs` retain compatibility signatures; DSE codec operations throw
+  `UnsupportedOperationException`.
 - [breaking] Remove DSE metadata and schema runtime support; public metadata and query-builder APIs
   remain as deprecated compatibility shells. DSE connections are unsupported (#1031, #1238)
-
-### 4.19.2.2
-
-- [breaking] Remove DSE Graph execution support and TinkerPop integration; deprecated Graph API
-  shells and legacy configuration remain temporarily for migration (#1028)
 
 ### 4.19.2
 

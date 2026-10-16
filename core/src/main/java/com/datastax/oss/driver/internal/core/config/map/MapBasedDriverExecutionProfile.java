@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.config.map;
 
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.config.DriverOption;
+import com.datastax.oss.driver.internal.core.config.DriverOptionAliases;
 import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSortedSet;
@@ -70,7 +71,8 @@ public class MapBasedDriverExecutionProfile implements DriverExecutionProfile {
 
   @Override
   public boolean isDefined(@NonNull DriverOption option) {
-    return profile.containsKey(option) || defaultProfile.containsKey(option);
+    return profile.containsKey(DriverOptionAliases.resolveKey(profile, option))
+        || defaultProfile.containsKey(DriverOptionAliases.resolveKey(defaultProfile, option));
   }
 
   // Driver options don't encode the type, everything relies on the user putting the right types in
@@ -78,7 +80,10 @@ public class MapBasedDriverExecutionProfile implements DriverExecutionProfile {
   @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
   @NonNull
   private <T> T get(@NonNull DriverOption option) {
-    Object value = profile.getOrDefault(option, defaultProfile.get(option));
+    Object value =
+        profile.getOrDefault(
+            DriverOptionAliases.resolveKey(profile, option),
+            defaultProfile.get(DriverOptionAliases.resolveKey(defaultProfile, option)));
     if (value == null) {
       throw new IllegalArgumentException("Missing configuration option " + option.getPath());
     }
@@ -179,7 +184,9 @@ public class MapBasedDriverExecutionProfile implements DriverExecutionProfile {
         // builder.add() ignores duplicates, so process higher precedence backing maps first
         ImmutableList.of(profile, defaultProfile)) {
       for (Map.Entry<DriverOption, Object> entry : backingMap.entrySet()) {
-        builder.add(new AbstractMap.SimpleEntry<>(entry.getKey().getPath(), entry.getValue()));
+        if (DriverOptionAliases.resolveKey(backingMap, entry.getKey()).equals(entry.getKey())) {
+          builder.add(new AbstractMap.SimpleEntry<>(entry.getKey().getPath(), entry.getValue()));
+        }
       }
     }
     return builder.build();
