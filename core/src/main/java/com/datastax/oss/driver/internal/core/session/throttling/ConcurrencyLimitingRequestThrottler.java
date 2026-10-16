@@ -190,7 +190,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
           } catch (Throwable failure) {
             if (callbackFailure == null) {
               callbackFailure = failure;
-            } else {
+            } else if (callbackFailure != failure) {
               callbackFailure.addSuppressed(failure);
             }
           }

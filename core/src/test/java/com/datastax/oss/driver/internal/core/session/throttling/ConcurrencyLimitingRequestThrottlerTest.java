@@ -201,7 +201,7 @@ public class ConcurrencyLimitingRequestThrottlerTest {
   }
 
   @Test
-  public void should_finish_draining_when_dequeued_request_signals_error_and_throws() {
+  public void should_finish_draining_when_dequeued_requests_throw_same_failure() {
     // Given
     when(defaultProfile.getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_CONCURRENT_REQUESTS))
         .thenReturn(1);
@@ -212,6 +212,20 @@ public class ConcurrencyLimitingRequestThrottlerTest {
 
     RuntimeException failure = new RuntimeException("mock failure");
     AtomicInteger startedCount = new AtomicInteger();
+    throttler.register(
+        new Throttled() {
+          @Override
+          public void onThrottleReady(boolean wasDelayed) {
+            startedCount.incrementAndGet();
+            throttler.signalError(this, failure);
+            throw failure;
+          }
+
+          @Override
+          public void onThrottleFailure(@NonNull RequestThrottlingException error) {
+            throw new AssertionError("Request should not be rejected", error);
+          }
+        });
     throttler.register(
         new Throttled() {
           @Override
@@ -242,7 +256,7 @@ public class ConcurrencyLimitingRequestThrottlerTest {
 
     // When / Then
     assertThatThrownBy(() -> throttler.signalSuccess(active)).isSameAs(failure);
-    assertThat(startedCount).hasValue(2);
+    assertThat(startedCount).hasValue(3);
     assertThat(throttler.getConcurrentRequests()).isZero();
     assertThat(throttler.getQueue()).isEmpty();
   }
