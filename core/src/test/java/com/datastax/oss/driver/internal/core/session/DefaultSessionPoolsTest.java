@@ -748,6 +748,7 @@ public class DefaultSessionPoolsTest {
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
     CompletionStage<Void> closeFuture = session.closeAsync();
+    assertThat(((DefaultSession) session).isClosing()).isTrue();
     assertThatStage(closeFuture).isSuccess();
 
     verify(pool1, VERIFY_TIMEOUT).closeAsync();
@@ -776,6 +777,7 @@ public class DefaultSessionPoolsTest {
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
     CompletionStage<Void> closeFuture = session.forceCloseAsync();
+    assertThat(((DefaultSession) session).isClosing()).isTrue();
     assertThatStage(closeFuture).isSuccess();
 
     verify(pool1, VERIFY_TIMEOUT).forceCloseAsync();

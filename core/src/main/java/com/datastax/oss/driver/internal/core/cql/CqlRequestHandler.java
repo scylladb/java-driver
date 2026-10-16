@@ -25,13 +25,13 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
 
-import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.FrameTooLongException;
@@ -259,7 +259,7 @@ public class CqlRequestHandler implements Throttled {
         // explicit message
         result.completeExceptionally(
             "cannot be started once stopped".equals(e.getMessage())
-                ? new IllegalStateException("Session is closed")
+                ? new SessionClosedException("Session is closed")
                 : e);
       }
     }
@@ -406,7 +406,8 @@ public class CqlRequestHandler implements Throttled {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
         // We're the last execution so fail the result
-        setFinalError(statement, AllNodesFailedException.fromErrors(this.errors), null, -1);
+        setFinalError(
+            statement, DefaultSession.queryPlanExhaustedError(session, this.errors), null, -1);
       }
     } else {
       boolean writeSubmitted = false;
