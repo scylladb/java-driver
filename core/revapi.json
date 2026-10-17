@@ -7262,6 +7262,188 @@
         "code": "java.method.addedToInterface",
         "new": "method java.util.Optional<com.datastax.oss.driver.api.core.tracker.RequestIdGenerator> com.datastax.oss.driver.api.core.context.DriverContext::getRequestIdGenerator()",
         "justification": "CASSJAVA-97: Let users inject an ID for each request and write to the custom payload"
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter void com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator::<init>(===com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions===, com.datastax.oss.driver.api.core.metadata.EndPoint, java.lang.String)",
+        "new": "parameter void com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator::<init>(===com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions===, com.datastax.oss.driver.api.core.metadata.EndPoint, java.lang.String)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Unsupported GSSAPI stubs ignore null arguments and reject use."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter void com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator::<init>(com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions, ===com.datastax.oss.driver.api.core.metadata.EndPoint===, java.lang.String)",
+        "new": "parameter void com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator::<init>(com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions, ===com.datastax.oss.driver.api.core.metadata.EndPoint===, java.lang.String)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Unsupported GSSAPI stubs ignore null arguments and reject use."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter void com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator::<init>(com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions, com.datastax.oss.driver.api.core.metadata.EndPoint, ===java.lang.String===)",
+        "new": "parameter void com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator::<init>(com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions, com.datastax.oss.driver.api.core.metadata.EndPoint, ===java.lang.String===)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Unsupported GSSAPI stubs ignore null arguments and reject use."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "class com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator",
+        "new": "class com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiAuthenticator",
+        "annotation": "@net.jcip.annotations.ThreadSafe",
+        "justification": "The unsupported GSSAPI stubs have no mutable state."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter javax.security.auth.login.Configuration com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions.Builder::fetchLoginConfiguration(===java.util.Map<java.lang.String, java.lang.String>===)",
+        "new": "parameter javax.security.auth.login.Configuration com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions.Builder::fetchLoginConfiguration(===java.util.Map<java.lang.String, java.lang.String>===)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Unsupported GSSAPI stubs ignore null arguments and reject use."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter void com.datastax.dse.driver.api.core.auth.ProgrammaticDseGssApiAuthProvider::<init>(===com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions===)",
+        "new": "parameter void com.datastax.dse.driver.api.core.auth.ProgrammaticDseGssApiAuthProvider::<init>(===com.datastax.dse.driver.api.core.auth.DseGssApiAuthProviderBase.GssApiOptions===)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Unsupported GSSAPI stubs ignore null arguments and reject use."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "class com.datastax.dse.driver.api.core.auth.ProgrammaticDseGssApiAuthProvider",
+        "new": "class com.datastax.dse.driver.api.core.auth.ProgrammaticDseGssApiAuthProvider",
+        "annotation": "@net.jcip.annotations.ThreadSafe",
+        "justification": "The unsupported GSSAPI stubs have no mutable state."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "class com.datastax.dse.driver.api.core.data.time.DateRange",
+        "new": "class com.datastax.dse.driver.api.core.data.time.DateRange",
+        "annotation": "@net.jcip.annotations.Immutable",
+        "justification": "Document the existing immutability of the restored date-range value type."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::lowerBound(===java.time.ZonedDateTime===, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "new": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::lowerBound(===java.time.ZonedDateTime===, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::lowerBound(java.time.ZonedDateTime, ===com.datastax.dse.driver.api.core.data.time.DateRangePrecision===)",
+        "new": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::lowerBound(java.time.ZonedDateTime, ===com.datastax.dse.driver.api.core.data.time.DateRangePrecision===)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::lowerBound(java.time.ZonedDateTime, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "new": "method com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::lowerBound(java.time.ZonedDateTime, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::parseUpperBound(===java.lang.String===) throws java.text.ParseException",
+        "new": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::parseUpperBound(===java.lang.String===) throws java.text.ParseException",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::parseUpperBound(java.lang.String) throws java.text.ParseException",
+        "new": "method com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::parseUpperBound(java.lang.String) throws java.text.ParseException",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::upperBound(===java.time.ZonedDateTime===, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "new": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::upperBound(===java.time.ZonedDateTime===, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::upperBound(java.time.ZonedDateTime, ===com.datastax.dse.driver.api.core.data.time.DateRangePrecision===)",
+        "new": "parameter com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::upperBound(java.time.ZonedDateTime, ===com.datastax.dse.driver.api.core.data.time.DateRangePrecision===)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::upperBound(java.time.ZonedDateTime, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "new": "method com.datastax.dse.driver.api.core.data.time.DateRangeBound com.datastax.dse.driver.api.core.data.time.DateRangeBound::upperBound(java.time.ZonedDateTime, com.datastax.dse.driver.api.core.data.time.DateRangePrecision)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "class com.datastax.dse.driver.api.core.data.time.DateRangeBound",
+        "new": "class com.datastax.dse.driver.api.core.data.time.DateRangeBound",
+        "annotation": "@net.jcip.annotations.Immutable",
+        "justification": "Document the existing immutability of the restored date-range value type."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "parameter java.lang.String com.datastax.dse.driver.api.core.data.time.DateRangePrecision::format(===java.time.ZonedDateTime===)",
+        "new": "parameter java.lang.String com.datastax.dse.driver.api.core.data.time.DateRangePrecision::format(===java.time.ZonedDateTime===)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method java.lang.String com.datastax.dse.driver.api.core.data.time.DateRangePrecision::format(java.time.ZonedDateTime)",
+        "new": "method java.lang.String com.datastax.dse.driver.api.core.data.time.DateRangePrecision::format(java.time.ZonedDateTime)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.data.time.DateRangePrecision com.datastax.dse.driver.api.core.data.time.DateRangePrecision::fromEncoding(byte)",
+        "new": "method com.datastax.dse.driver.api.core.data.time.DateRangePrecision com.datastax.dse.driver.api.core.data.time.DateRangePrecision::fromEncoding(byte)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.NonNull",
+        "justification": "Date and precision inputs and successful results are non-null."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "field com.datastax.dse.driver.api.core.graph.DseGraph.g",
+        "new": "field com.datastax.dse.driver.api.core.graph.DseGraph.g",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Null without optional Gremlin; Graph execution remains unsupported."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByIndex(int)",
+        "new": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByIndex(int)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Graph-node lookups may return null for missing properties or elements."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByKey(java.lang.Object)",
+        "new": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByKey(java.lang.Object)",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Graph-node lookups may return null for missing properties or elements."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByIndex(int) @ com.datastax.dse.driver.api.core.graph.reactive.ReactiveGraphNode",
+        "new": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByIndex(int) @ com.datastax.dse.driver.api.core.graph.reactive.ReactiveGraphNode",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Graph-node lookups may return null for missing properties or elements."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByKey(java.lang.Object) @ com.datastax.dse.driver.api.core.graph.reactive.ReactiveGraphNode",
+        "new": "method com.datastax.dse.driver.api.core.graph.GraphNode com.datastax.dse.driver.api.core.graph.GraphNode::getByKey(java.lang.Object) @ com.datastax.dse.driver.api.core.graph.reactive.ReactiveGraphNode",
+        "annotation": "@edu.umd.cs.findbugs.annotations.Nullable",
+        "justification": "Graph-node lookups may return null for missing properties or elements."
+      },
+      {
+        "code": "java.annotation.added",
+        "old": "class com.datastax.dse.driver.api.core.servererrors.UnfitClientException",
+        "new": "class com.datastax.dse.driver.api.core.servererrors.UnfitClientException",
+        "annotation": "@net.jcip.annotations.ThreadSafe",
+        "justification": "The restored exception adds no mutable state to CoordinatorException."
       }
     ]
   }
