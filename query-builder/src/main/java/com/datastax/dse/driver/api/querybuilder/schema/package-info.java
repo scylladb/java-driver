@@ -16,7 +16,12 @@
  * limitations under the License.
  */
 /**
- * Deprecated DSE schema builder interfaces retained for source and binary compatibility. DSE schema
- * construction is no longer supported.
+ * Legacy DSE schema query interfaces retained for source and binary compatibility.
+ *
+ * <p>DSE-specific schema query building is no longer supported. DSE-specific factories in {@link
+ * com.datastax.dse.driver.api.querybuilder.DseSchemaBuilder} and {@link DseGraphEdgeSide#table}
+ * throw {@link UnsupportedOperationException} for valid arguments. Ordinary Cassandra schema
+ * factories still delegate to {@link com.datastax.oss.driver.api.querybuilder.SchemaBuilder}; use
+ * that class directly for supported CQL schema queries.
  */
 package com.datastax.dse.driver.api.querybuilder.schema;
