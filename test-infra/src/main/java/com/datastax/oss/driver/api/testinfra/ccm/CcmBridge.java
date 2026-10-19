@@ -737,6 +737,16 @@ public class CcmBridge implements AutoCloseable {
       return this;
     }
 
+    /**
+     * Sets a numeric cluster ID prefix used by {@link CustomCcmRule} to avoid IP collisions.
+     *
+     * @deprecated Use {@link #withIpPrefix(String)} to specify the complete IP prefix.
+     */
+    @Deprecated
+    public Builder withIdPrefix(String idPrefix) {
+      return withIpPrefix("127.0." + idPrefix + ".");
+    }
+
     /** Adds an option to the {@code ccm create} command. */
     public Builder withCreateOption(String option) {
       this.createOptions.add(option);
