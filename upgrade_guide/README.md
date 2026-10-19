@@ -40,9 +40,10 @@ The generic reactive CQL and mapper APIs remain available under their existing
 Cassandra schema methods still delegate to
 `SchemaBuilder`. `DseQueryBuilder` remains a working alias for ordinary DML queries. DSE metadata
 interfaces and `DseNodeProperties` constants remain available for compatibility, but the driver no
-longer produces DSE metadata or node extras. The `DseGraphTableMetadata.describe` compatibility
-method, and description methods that delegate to it such as `describeWithChildren`, throw because
-Graph schema support has been removed.
+longer produces DSE metadata or node extras. `DseGraphTableMetadata.describe` and description
+methods that delegate to it, such as `describeWithChildren`, still render graph table descriptions
+for custom metadata implementations. This local rendering does not restore DSE metadata discovery
+or Graph runtime support.
 
 Graph statement, result, session, predicate, and remote-connection signatures remain deprecated
 compatibility stubs. `CqlSession` still exposes the Graph session interfaces, and creating or
