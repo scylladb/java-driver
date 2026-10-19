@@ -137,6 +137,17 @@ public class CustomCcmRule extends BaseCcmRule {
       return this;
     }
 
+    /**
+     * Sets a numeric cluster ID prefix to avoid IP collisions.
+     *
+     * @deprecated Retained for compatibility with legacy numeric cluster ID prefixes.
+     */
+    @Deprecated
+    public Builder withIdPrefix(String idPrefix) {
+      bridgeBuilder.withIdPrefix(idPrefix);
+      return this;
+    }
+
     public CustomCcmRule build() {
       return new CustomCcmRule(bridgeBuilder.build());
     }
