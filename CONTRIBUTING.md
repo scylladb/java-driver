@@ -628,10 +628,12 @@ instead of replaying commits that are already merged.
 * The line's ruleset requires linear history. Once CI is green, a repository admin or maintainer
   merges the pull request with **Create a merge commit**, ticking "Merge without waiting for
   requirements to be met (bypass rules)". Leave the rule enabled.
-* After the merge, fetch the line from scylladb/java-driver and check that
+* The `upstream-sync-ancestry` workflow reminds a sync pull request of this before the merge.
+  After the merge, it fails and posts the repair if the tag didn't become an ancestor. To check by
+  hand, fetch the line from scylladb/java-driver and check that
   `git merge-base --is-ancestor <tag> <scylladb-remote>/<line>` exits 0. If it doesn't because the
   pull request was squashed or rebased, its content is on the line and only the ancestry is
   missing: restore it with a pull request that holds only `git merge -s ours <tag>`, merged the
   same way, as [#1281](https://github.com/scylladb/java-driver/pull/1281) did. Otherwise merge the
-  tag normally; `-s ours` would hide its changes from every later sync. Squashing such a pull
-  request lands an empty commit without warning.
+  tag normally; `-s ours` would hide its changes from every later sync. GitHub doesn't flag a
+  squashed repair, which lands an empty commit; the workflow does.
