@@ -216,3 +216,19 @@ decides which releases it blocks:
 
 A line's gate lifts when the issue is closed, loses `release-blocker`, or carries only the other
 line's label. Removing an issue's only line label widens it to both lines.
+
+## Merging upstream releases
+
+`scylla-3.x` and `scylla-4.x` track
+[apache/cassandra-java-driver](https://github.com/apache/cassandra-java-driver). A pull request
+that merges an upstream release must land as a **merge commit**, never squashed or rebased. That
+keeps the upstream tags ancestors of the branch, so `git merge-base` and `git describe` stay
+correct and the next sync conflicts only on genuine changes. #467 (4.19.0) and #895 (4.19.2)
+were squashed, and `git merge-base` still places `scylla-4.x` at 4.18.1.
+
+* Merge the upstream tag with `git merge --no-ff <tag>` on a branch cut from the line. To pick up
+  later changes, merge the line into the pull request branch; don't rebase it.
+* The line's ruleset requires linear history. A repository admin or maintainer merges the pull
+  request with **Create a merge commit**, ticking "Merge without waiting for requirements to be
+  met (bypass rules)". Leave the rule enabled.
+* After the merge, `git merge-base --is-ancestor <tag> origin/<line>` must exit 0.
