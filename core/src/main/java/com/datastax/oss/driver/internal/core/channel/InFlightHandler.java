@@ -141,23 +141,36 @@ public class InFlightHandler extends ChannelDuplexHandler {
       return;
     }
 
-    if (inFlight.containsKey(streamId)) {
-      promise.setFailure(
-          new IllegalStateException("Found pending callback for stream id " + streamId));
-      streamIds.cancelPreAcquire();
-      return;
+    Frame frame;
+    boolean ownedByCallback = false;
+    try {
+      if (inFlight.containsKey(streamId)) {
+        // Preserve the callback that already owns this id.
+        ownedByCallback = true;
+        promise.setFailure(
+            new IllegalStateException("Found pending callback for stream id " + streamId));
+        streamIds.cancelPreAcquire();
+        return;
+      }
+
+      LOG.trace("[{}] Writing {} on stream id {}", logPrefix, message.responseCallback, streamId);
+      frame =
+          Frame.forRequest(
+              protocolVersion.getCode(),
+              streamId,
+              message.tracing,
+              message.customPayload,
+              message.request);
+
+      inFlight.put(streamId, message.responseCallback);
+      ownedByCallback = true;
+    } finally {
+      // acquire() consumed the caller's reservation. Release the concrete id only if no registered
+      // callback owns it, whether from this request or an earlier one.
+      if (!ownedByCallback) {
+        streamIds.release(streamId);
+      }
     }
-
-    LOG.trace("[{}] Writing {} on stream id {}", logPrefix, message.responseCallback, streamId);
-    Frame frame =
-        Frame.forRequest(
-            protocolVersion.getCode(),
-            streamId,
-            message.tracing,
-            message.customPayload,
-            message.request);
-
-    inFlight.put(streamId, message.responseCallback);
     ChannelFuture writeFuture = ctx.write(frame, promise);
     writeFuture.addListener(
         future -> {
