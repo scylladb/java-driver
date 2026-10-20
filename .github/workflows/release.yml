@@ -152,7 +152,7 @@ jobs:
       - name: Preserve release guard
         run: |
           mkdir -p "$RUNNER_TEMP/release-safety"
-          cp scripts/release/*.py "$RUNNER_TEMP/release-safety/"
+          cp scripts/release/*.py scripts/release/publisher.asc "$RUNNER_TEMP/release-safety/"
           echo "RELEASE_GUARD=$RUNNER_TEMP/release-safety/guard.py" >> "$GITHUB_ENV"
           echo "RELEASE_LOG_DIR=$RUNNER_TEMP/release-logs" >> "$GITHUB_ENV"
 
@@ -179,10 +179,10 @@ jobs:
           server-password-env-var: SONATYPE_TOKEN_PASSWORD
           cache: maven
 
-      - name: Configure Git user
-        run: |
-          git config user.name "ScyllaDB Promoter"
-          git config user.email "github-promoter@scylladb.com"
+      - name: Configure and check protected release signing
+        env:
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: python3 "$RUNNER_TEMP/release-safety/signing.py" configure
 
       # The release plugin rewrites only poms, so the README's version went stale between
       # releases. Its commit takes the whole index, so a README staged here lands in the
@@ -208,6 +208,11 @@ jobs:
           RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
         run: |
           make release-prepare
+
+      - name: Verify release commit and tag signatures
+        env:
+          RELEASE_VERSION: ${{ needs.release-target.outputs.version }}
+        run: python3 "$RUNNER_TEMP/release-safety/signing.py" verify-release "$RELEASE_VERSION"
 
       - name: Recheck for open release blockers
         if: inputs.dry-run == false
@@ -262,6 +267,10 @@ jobs:
         run: |
           git status && git log -3
           git push origin --follow-tags -v
+
+      - name: Remove release signing passphrase and configuration
+        if: always()
+        run: python3 "$RUNNER_TEMP/release-safety/signing.py" cleanup
 
       - name: Upload sanitized release logs
         if: always()
