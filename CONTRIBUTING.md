@@ -612,3 +612,26 @@ decides which releases it blocks:
 
 A line's gate lifts when the issue is closed, loses `release-blocker`, or carries only the other
 line's label. Removing an issue's only line label widens it to both lines.
+
+## Merging upstream releases
+
+`scylla-4.x` and `scylla-3.x` track
+[apache/cassandra-java-driver](https://github.com/apache/cassandra-java-driver). A pull request
+that merges an upstream release must land as a **merge commit**, never squashed or rebased. That
+keeps the upstream tags ancestors of the line, so the next sync conflicts only on genuine changes
+instead of replaying commits that are already merged.
+
+* Fetch the tag from apache and merge it with `git merge --no-ff <tag>` on a branch cut from the
+  line. To pick up later changes, merge the line into the pull request branch; don't rebase it,
+  and don't squash review fixups. These pull requests are the exception to the rebase, squash and
+  "don't push a merge commit" rules above.
+* The line's ruleset requires linear history. Once CI is green, a repository admin or maintainer
+  merges the pull request with **Create a merge commit**, ticking "Merge without waiting for
+  requirements to be met (bypass rules)". Leave the rule enabled.
+* After the merge, fetch the line from scylladb/java-driver and check that
+  `git merge-base --is-ancestor <tag> <scylladb-remote>/<line>` exits 0. If it doesn't because the
+  pull request was squashed or rebased, its content is on the line and only the ancestry is
+  missing: restore it with a pull request that holds only `git merge -s ours <tag>`, merged the
+  same way, as [#1281](https://github.com/scylladb/java-driver/pull/1281) did. Otherwise merge the
+  tag normally; `-s ours` would hide its changes from every later sync. Squashing such a pull
+  request lands an empty commit without warning.
