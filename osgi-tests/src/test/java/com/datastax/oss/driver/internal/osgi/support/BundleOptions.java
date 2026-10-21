@@ -34,7 +34,7 @@ public class BundleOptions {
   public static CompositeOption commonBundles() {
     return () ->
         options(
-            mavenBundle("org.apache.cassandra", "java-driver-guava-shaded")
+            mavenBundle("com.scylladb", "java-driver-guava-shaded")
                 .versionAsInProject()
                 .startLevel(1),
             mavenBundle("io.dropwizard.metrics", "metrics-core").versionAsInProject().startLevel(1),
@@ -119,6 +119,9 @@ public class BundleOptions {
     return () ->
         options(
             mavenBundle("at.yawk.lz4", "lz4-java").versionAsInProject(),
+            // at.yawk.lz4 requires sun.misc package
+            mavenBundle("com.diffplug.osgi", "com.diffplug.osgi.extension.sun.misc")
+                .version("0.0.0"),
             systemProperty("cassandra.compression").value("LZ4"));
   }
 
