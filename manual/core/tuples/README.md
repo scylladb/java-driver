@@ -32,7 +32,7 @@ Ordered set of anonymous, typed fields, e.g. `tuple<int, text, float>`, `(1, 'a'
 -----
 
 [CQL tuples][cql_doc] are ordered sets of anonymous, typed fields. They can be used as a column type
-in tables, or a field type in [user-defined types](../udts/README.md):
+in tables, or a field type in [user-defined types](../udts/):
 
 ```
 CREATE TABLE ks.collect_things (
@@ -77,7 +77,7 @@ ways to get it:
     TupleType tupleType = (TupleType) ps.getVariableDefinitions().get("v").getType();
     ```
 
-* from the driver's [schema metadata](../metadata/schema/README.md):
+* from the driver's [schema metadata](../metadata/schema/):
 
     ```java
     TupleType tupleType =
@@ -102,7 +102,7 @@ ways to get it:
     TupleType tupleType = DataTypes.tupleOf(DataTypes.INT, DataTypes.TEXT, DataTypes.FLOAT);
     ```
 
-    Note that the resulting type is [detached](../detachable_types/README.md).
+    Note that the resulting type is [detached](../detachable_types).
   
 Once you have the type, call `newValue()` and set the fields:
 

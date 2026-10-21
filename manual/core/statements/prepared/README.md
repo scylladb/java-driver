@@ -101,11 +101,11 @@ the `PREPARED` response also contains useful metadata about the CQL query:
 * the CQL types of the bound variables. This allows bound statements' `set` methods to perform
   better checks, and fail fast (without a server round-trip) if the types are wrong.
 * which bound variables are part of the partition key. This allows bound statements to automatically
-  compute their [routing key](../../load_balancing/README.md#token-aware).
+  compute their [routing key](../../load_balancing/#token-aware).
 * more optimizations might get added in the future. For example, [CASSANDRA-10813] suggests adding
-  an "[idempotent](../../idempotence/README.md)" flag to the response.
+  an "[idempotent](../../idempotence)" flag to the response.
 
-If you have a unique query that is executed only once, a [simple statement](../simple/README.md) will be more
+If you have a unique query that is executed only once, a [simple statement](../simple/) will be more
 efficient. But note that this should be pretty rare: most client applications typically repeat the
 same queries over and over, and a parameterized version can be extracted and prepared.  
 
@@ -150,7 +150,7 @@ Note that caching is based on:
   but different consistency levels will yield two distinct prepared statements (that each produce
   bound statements with their respective consistency level).
 
-The size of the cache is exposed as a session-level [metric](../../metrics/README.md)
+The size of the cache is exposed as a session-level [metric](../../metrics/)
 `cql-prepared-cache-size`. The cache uses [weak values][guava eviction] eviction, so this
 represents the number of `PreparedStatement` instances that your application has created, and is
 still holding a reference to.
@@ -353,14 +353,14 @@ achieve this:
       |<------------------------------|                              |
     ```
 
-You can customize these strategies through the [configuration](../../configuration/README.md):
+You can customize these strategies through the [configuration](../../configuration/):
 
 * `datastax-java-driver.advanced.prepared-statements.prepare-on-all-nodes` controls whether
   statements are initially re-prepared on other hosts (step 1 above);
 * `datastax-java-driver.advanced.prepared-statements.reprepare-on-up` controls how statements are
   re-prepared on a node that comes back up (step 2 above).
 
-Read the [reference configuration](../../configuration/reference/README.md) for a detailed description of each
+Read the [reference configuration](../../configuration/reference/) for a detailed description of each
 of those options.
 
 ### Prepared statements and schema changes 
@@ -383,7 +383,7 @@ To avoid this, do not create prepared statements for `SELECT *` queries if you p
 changes involving adding or dropping columns. Instead, always list all columns of interest in your
 statement, i.e.: `SELECT b, c FROM foo`.
 
-With Cassandra 4 and [native protocol](../../native_protocol/README.md) v5, this issue is fixed
+With Cassandra 4 and [native protocol](../../native_protocol/) v5, this issue is fixed
 ([CASSANDRA-10786]): the server detects that the driver is operating on stale metadata and sends the
 new version with the response; the driver updates its local cache transparently, and the client can
 observe the new columns in the result set.

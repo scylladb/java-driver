@@ -36,7 +36,7 @@ This can be done in two ways:
 
 ### In the configuration
 
-Define an `auth-provider` section in the [configuration](../configuration/README.md):
+Define an `auth-provider` section in the [configuration](../configuration/):
 
 ```
 datastax-java-driver {
@@ -128,4 +128,4 @@ GSSAPI, including `BaseDseAuthenticator`, were removed; see the
 [ProgrammaticPlainTextAuthProvider]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/auth/ProgrammaticPlainTextAuthProvider.html
 [SessionBuilder.withAuthCredentials]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/SessionBuilder.html#withAuthCredentials-java.lang.String-java.lang.String-
 [SessionBuilder.withAuthProvider]: https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/session/SessionBuilder.html#withAuthProvider-com.datastax.oss.driver.api.core.auth.AuthProvider-
-[reference.conf]: ../configuration/reference/README.md
+[reference.conf]: ../configuration/reference/

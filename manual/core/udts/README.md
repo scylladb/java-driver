@@ -93,7 +93,7 @@ various ways to get it:
     UserDefinedType udt = (UserDefinedType) ps.getVariableDefinitions().get("v").getType();
     ```
 
-* from the driver's [schema metadata](../metadata/schema/README.md):
+* from the driver's [schema metadata](../metadata/schema/):
 
     ```java
     UserDefinedType udt =
@@ -113,7 +113,7 @@ Note that the driver's official API does not expose a way to build [UserDefinedT
 manually. This is because the type's internal definition must precisely match the database schema;
 if it doesn't (for example if the fields are not in the same order), you run the risk of inserting
 corrupt data, that you won't be able to read back. There is still a way to do it with the driver,
-but it's part of the [internal API](../../api_conventions/README.md):
+but it's part of the [internal API](../../api_conventions/):
 
 ```java
 // Advanced usage: make sure you understand the risks
@@ -127,7 +127,7 @@ UserDefinedType udt =
         .build();
 ```
 
-Note that a manually created type is [detached](../detachable_types/README.md).
+Note that a manually created type is [detached](../detachable_types).
 
  
 Once you have the type, call `newValue()` and set the fields:

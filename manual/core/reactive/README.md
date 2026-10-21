@@ -33,7 +33,7 @@ Notes:
 * Reactive-related driver types keep their historical `dse` package prefix for API compatibility;
   they are generic and supported with Cassandra and Scylla.
 * The reactive execution model is implemented in a non-blocking fashion: see the manual page on 
-  [non-blocking programming](../non_blocking/README.md) for details.
+  [non-blocking programming](../non_blocking) for details.
 
 ### Overview
 
@@ -399,8 +399,8 @@ more fine-grained control of what should be retried, and how, is required.
 [ReactiveRow.getExecutionInfo]:     https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/reactive/ReactiveRow.html#getExecutionInfo--
 [ReactiveRow.wasApplied]:           https://docs.datastax.com/en/drivers/java/4.17/com/datastax/dse/driver/api/core/cql/reactive/ReactiveRow.html#wasApplied--
 
-[built-in retry mechanism]: ../retries/README.md
-[request throttling]: ../throttling/README.md
+[built-in retry mechanism]: ../retries/
+[request throttling]: ../throttling/
 
 [Managing concurrency in asynchronous query execution]: https://docs.datastax.com/en/devapp/doc/devapp/driverManagingConcurrency.html
 [Publisher]: https://www.reactive-streams.org/reactive-streams-1.0.2-javadoc/org/reactivestreams/Publisher.html

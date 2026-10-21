@@ -20,7 +20,7 @@ under the License.
 ## Using the shaded JAR
 
 The default `java-driver-core` JAR depends on a number of [third party
-libraries](../integration/README.md#driver-dependencies). This can create conflicts if your application
+libraries](../integration/#driver-dependencies). This can create conflicts if your application
 already uses other versions of those same dependencies.
 
 To avoid this, we provide an alternative core artifact that shades [Netty](../integration/#netty)

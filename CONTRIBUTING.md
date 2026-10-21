@@ -625,6 +625,11 @@ instead of replaying commits that are already merged.
   line. To pick up later changes, merge the line into the pull request branch; don't rebase it,
   and don't squash review fixups. These pull requests are the exception to the rebase, squash and
   "don't push a merge commit" rules above.
+* Upstream's docs build is mkdocs and writes manual links as `dir/README.md`; ours is Sphinx and
+  writes them as `../dir/` with `#fragment` anchors. Lines that merge without conflict take
+  upstream's form and nothing catches it: the docs hook rewrites both forms and GitHub renders
+  both. After the merge put them back so the sources stay in one form;
+  `git grep -n '](.*README\.md' manual upgrade_guide faq` must print nothing.
 * The line's ruleset requires linear history. Once CI is green, a repository admin or maintainer
   merges the pull request with **Create a merge commit**, ticking "Merge without waiting for
   requirements to be met (bypass rules)". Leave the rule enabled.

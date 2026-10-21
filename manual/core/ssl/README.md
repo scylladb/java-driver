@@ -102,7 +102,7 @@ already be the case if you've followed the steps for inter-node encryption).
 By default, the driver's SSL support is based on the JDK's built-in implementation: JSSE (Java
 Secure Socket Extension).
 
-To enable it, you need to define an engine factory in the [configuration](../configuration/README.md).
+To enable it, you need to define an engine factory in the [configuration](../configuration/).
 
 The standard JDK handler factory prepares SSL engines on two dedicated worker threads before opening
 connections. Reverse DNS lookup, when enabled, therefore does not block existing connections' I/O.
@@ -238,7 +238,7 @@ CqlSession session = CqlSession.builder()
 
 Netty supports native integration with OpenSSL / boringssl. The driver does not provide this out of
 the box, but with a bit of custom development it is fairly easy to add. See
-[SslHandlerFactory](../../developer/netty_pipeline/README.md#sslhandlerfactory) in the developer docs.
+[SslHandlerFactory](../../developer/netty_pipeline/#sslhandlerfactory) in the developer docs.
 
 
 [dsClientToNode]: https://docs.datastax.com/en/cassandra/3.0/cassandra/configuration/secureSSLClientToNode.html

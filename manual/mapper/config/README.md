@@ -74,7 +74,7 @@ configuration (make sure you use version 3.5 or higher):
 </build>
 ```
 
-Alternatively (e.g. if you are using the [BOM](../../core/bom/README.md)), you may also declare the processor
+Alternatively (e.g. if you are using the [BOM](../../core/bom/)), you may also declare the processor
 as a regular dependency in the "provided" scope:
 
 ```xml
