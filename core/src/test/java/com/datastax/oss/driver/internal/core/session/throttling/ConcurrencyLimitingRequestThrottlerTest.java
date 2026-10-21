@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core.session.throttling;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
-import static com.datastax.oss.driver.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
@@ -201,7 +200,7 @@ public class ConcurrencyLimitingRequestThrottlerTest {
   }
 
   @Test
-  public void should_finish_draining_when_dequeued_requests_throw_same_failure() {
+  public void should_contain_callback_failures_and_finish_draining() {
     // Given
     when(defaultProfile.getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_CONCURRENT_REQUESTS))
         .thenReturn(1);
@@ -254,8 +253,10 @@ public class ConcurrencyLimitingRequestThrottlerTest {
           }
         });
 
-    // When / Then
-    assertThatThrownBy(() -> throttler.signalSuccess(active)).isSameAs(failure);
+    // When
+    throttler.signalSuccess(active);
+
+    // Then
     assertThat(startedCount).hasValue(3);
     assertThat(throttler.getConcurrentRequests()).isZero();
     assertThat(throttler.getQueue()).isEmpty();

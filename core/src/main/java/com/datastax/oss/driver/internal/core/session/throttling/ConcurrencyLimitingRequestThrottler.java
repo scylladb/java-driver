@@ -23,10 +23,11 @@ import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.session.throttling.Throttled;
+import com.datastax.oss.driver.internal.core.util.Loggers;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
-import com.datastax.oss.driver.shaded.guava.common.base.Throwables;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -57,6 +58,9 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ConcurrencyLimitingRequestThrottler.class);
+  // Completion can synchronously admit another request. Trampoline those callbacks to keep queue
+  // draining iterative instead of growing the call stack once per failed request.
+  private static final ThreadLocal<ReadyCallbackState> READY_CALLBACKS = new ThreadLocal<>();
 
   private final String logPrefix;
   private final int maxConcurrentRequests;
@@ -66,7 +70,6 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
   // the size of the queue explicitly.
   private final Deque<Throttled> queue = new ConcurrentLinkedDeque<>();
   private final AtomicInteger queueSize = new AtomicInteger(0);
-  private final ThreadLocal<DrainState> drainState = ThreadLocal.withInitial(DrainState::new);
   private volatile boolean closed = false;
 
   public ConcurrencyLimitingRequestThrottler(DriverContext context) {
@@ -101,7 +104,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
       int newConcurrent = concurrentRequests.incrementAndGet();
       if (newConcurrent <= maxConcurrentRequests) {
         LOG.trace("[{}] Starting newly registered request", logPrefix);
-        request.onThrottleReady(false);
+        notifyReady(request, false);
         return;
       } else {
         // We exceeded the limit, decrement the count and fall through to the queuing logic
@@ -139,7 +142,10 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @Override
   public void signalSuccess(@NonNull Throttled request) {
-    onActiveRequestDone();
+    Throttled nextRequest = onRequestDoneAndDequeNext();
+    if (nextRequest != null) {
+      notifyReady(nextRequest, true);
+    }
   }
 
   @Override
@@ -149,61 +155,68 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @Override
   public void signalTimeout(@NonNull Throttled request) {
+    Throttled nextRequest = null;
     if (!closed) {
       if (queue.remove(request)) { // The request timed out before it was active
         queueSize.decrementAndGet();
         LOG.trace("[{}] Removing timed out request from the queue", logPrefix);
       } else {
-        onActiveRequestDone();
+        nextRequest = onRequestDoneAndDequeNext();
       }
+    }
+    if (nextRequest != null) {
+      notifyReady(nextRequest, true);
     }
   }
 
   @Override
   public void signalCancel(@NonNull Throttled request) {
+    Throttled nextRequest = null;
     if (!closed) {
       if (queue.remove(request)) { // The request has been cancelled before it was active
         queueSize.decrementAndGet();
         LOG.trace("[{}] Removing cancelled request from the queue", logPrefix);
       } else {
-        onActiveRequestDone();
+        nextRequest = onRequestDoneAndDequeNext();
+      }
+    }
+    if (nextRequest != null) {
+      notifyReady(nextRequest, true);
+    }
+  }
+
+  private void notifyReady(Throttled request, boolean wasDelayed) {
+    ReadyCallbackState previous = READY_CALLBACKS.get();
+    for (ReadyCallbackState state = previous; state != null; state = state.previous) {
+      if (state.throttler == this) {
+        state.add(request, wasDelayed);
+        return;
+      }
+    }
+
+    ReadyCallbackState state = new ReadyCallbackState(this, previous);
+    READY_CALLBACKS.set(state);
+    try {
+      invokeReady(request, wasDelayed);
+      ReadyCallback callback;
+      while ((callback = state.poll()) != null) {
+        invokeReady(callback.request, callback.wasDelayed);
+      }
+    } finally {
+      if (previous == null) {
+        READY_CALLBACKS.remove();
+      } else {
+        READY_CALLBACKS.set(previous);
       }
     }
   }
 
-  private void onActiveRequestDone() {
-    DrainState state = drainState.get();
-    state.pendingCompletions++;
-    if (state.draining) {
-      return;
-    }
-
-    state.draining = true;
-    Throwable callbackFailure = null;
+  private void invokeReady(Throttled request, boolean wasDelayed) {
     try {
-      while (state.pendingCompletions > 0) {
-        state.pendingCompletions--;
-        Throttled nextRequest = onRequestDoneAndDequeNext();
-        if (nextRequest != null) {
-          try {
-            nextRequest.onThrottleReady(true);
-          } catch (Throwable failure) {
-            if (callbackFailure == null) {
-              callbackFailure = failure;
-            } else if (callbackFailure != failure) {
-              callbackFailure.addSuppressed(failure);
-            }
-          }
-        }
-      }
-    } finally {
-      state.draining = false;
-      drainState.remove();
-    }
-
-    if (callbackFailure != null) {
-      Throwables.throwIfUnchecked(callbackFailure);
-      throw new RuntimeException(callbackFailure);
+      request.onThrottleReady(wasDelayed);
+    } catch (Throwable failure) {
+      Loggers.warnWithException(
+          LOG, "[{}] Uncaught exception in throttled request callback", logPrefix, failure);
     }
   }
 
@@ -254,8 +267,37 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
     request.onThrottleFailure(new RequestThrottlingException(message));
   }
 
-  private static final class DrainState {
-    private int pendingCompletions;
-    private boolean draining;
+  private static final class ReadyCallback {
+    private final Throttled request;
+    private final boolean wasDelayed;
+
+    private ReadyCallback(Throttled request, boolean wasDelayed) {
+      this.request = request;
+      this.wasDelayed = wasDelayed;
+    }
+  }
+
+  private static final class ReadyCallbackState {
+    private final ConcurrencyLimitingRequestThrottler throttler;
+    @Nullable private final ReadyCallbackState previous;
+    @Nullable private Deque<ReadyCallback> callbacks;
+
+    private ReadyCallbackState(
+        ConcurrencyLimitingRequestThrottler throttler, @Nullable ReadyCallbackState previous) {
+      this.throttler = throttler;
+      this.previous = previous;
+    }
+
+    private void add(Throttled request, boolean wasDelayed) {
+      if (callbacks == null) {
+        callbacks = new ArrayDeque<>();
+      }
+      callbacks.addLast(new ReadyCallback(request, wasDelayed));
+    }
+
+    @Nullable
+    private ReadyCallback poll() {
+      return callbacks == null ? null : callbacks.pollFirst();
+    }
   }
 }

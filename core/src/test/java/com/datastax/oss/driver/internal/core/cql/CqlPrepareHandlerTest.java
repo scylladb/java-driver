@@ -25,6 +25,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,7 +42,9 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
+import com.datastax.oss.driver.internal.core.session.throttling.ConcurrencyLimitingRequestThrottler;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.protocol.internal.Message;
@@ -374,6 +378,58 @@ public class CqlPrepareHandlerTest {
       assertThatStage(prepareFuture).isFailed(error -> assertThat(error).isSameAs(failure));
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
+    }
+  }
+
+  @Test
+  public void should_release_delayed_prepare_slot_once_when_setup_fails() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    DefaultPrepareRequest prepareRequest = spy(new DefaultPrepareRequest("mock query"));
+    doThrow(failure).when(prepareRequest).getCustomPayload();
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness
+              .getContext()
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_CONCURRENT_REQUESTS))
+          .thenReturn(1);
+      when(harness
+              .getContext()
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_QUEUE_SIZE))
+          .thenReturn(10);
+      ConcurrencyLimitingRequestThrottler throttler =
+          new ConcurrencyLimitingRequestThrottler(harness.getContext());
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+
+      Throttled blocker = mock(Throttled.class);
+      throttler.register(blocker);
+      CqlPrepareHandler handler =
+          new CqlPrepareHandler(prepareRequest, harness.getSession(), harness.getContext(), "test");
+
+      throttler.signalSuccess(blocker);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+
+      Throttled firstProbe = mock(Throttled.class);
+      Throttled secondProbe = mock(Throttled.class);
+      throttler.register(firstProbe);
+      throttler.register(secondProbe);
+      verify(firstProbe).onThrottleReady(false);
+      verify(secondProbe, never()).onThrottleReady(anyBoolean());
+      assertThat(throttler.getQueueSize()).isEqualTo(1);
+
+      throttler.signalSuccess(firstProbe);
+      verify(secondProbe).onThrottleReady(true);
+      throttler.signalSuccess(secondProbe);
+      assertThat(throttler.getQueueSize()).isZero();
     }
   }
 

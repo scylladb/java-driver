@@ -20,9 +20,11 @@ package com.datastax.oss.driver.internal.core.cql;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,8 +42,10 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
+import com.datastax.oss.driver.internal.core.session.throttling.ConcurrencyLimitingRequestThrottler;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.protocol.internal.request.Prepare;
 import com.datastax.oss.protocol.internal.response.error.Unprepared;
@@ -202,6 +206,64 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
       assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(failure));
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+    }
+  }
+
+  @Test
+  public void should_release_delayed_request_slot_once_when_setup_fails() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RuntimeException failure = new RuntimeException("mock failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness
+              .getContext()
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_CONCURRENT_REQUESTS))
+          .thenReturn(1);
+      when(harness
+              .getContext()
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_QUEUE_SIZE))
+          .thenReturn(10);
+      ConcurrencyLimitingRequestThrottler throttler =
+          new ConcurrencyLimitingRequestThrottler(harness.getContext());
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+
+      Throttled blocker = mock(Throttled.class);
+      throttler.register(blocker);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      throttler.signalSuccess(blocker);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+
+      Throttled firstProbe = mock(Throttled.class);
+      Throttled secondProbe = mock(Throttled.class);
+      throttler.register(firstProbe);
+      throttler.register(secondProbe);
+      verify(firstProbe).onThrottleReady(false);
+      verify(secondProbe, never()).onThrottleReady(anyBoolean());
+      assertThat(throttler.getQueueSize()).isEqualTo(1);
+
+      throttler.signalSuccess(firstProbe);
+      verify(secondProbe).onThrottleReady(true);
+      throttler.signalSuccess(secondProbe);
+      assertThat(throttler.getQueueSize()).isZero();
     }
   }
 
