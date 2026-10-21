@@ -120,6 +120,16 @@ public class DefaultPointTest {
   }
 
   @Test
+  public void should_not_be_equal_with_a_different_spatial_reference() {
+    Point point3857 =
+        Point.fromGeoJson(
+            "{\"type\":\"Point\",\"coordinates\":[1.1,2.2],"
+                + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:3857\"}}}");
+    assertThat(Point.fromGeoJson(json)).isEqualTo(point);
+    assertThat(point3857).isNotEqualTo(point);
+  }
+
+  @Test
   public void should_encode_and_decode() throws Exception {
     assertThat(SerializationUtils.serializeAndDeserialize(point)).isEqualTo(point);
   }

@@ -30,6 +30,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import net.jcip.annotations.Immutable;
 
 @Immutable
@@ -176,16 +177,17 @@ public abstract class DefaultGeometry implements Geometry, Serializable {
       return false;
     }
     DefaultGeometry that = (DefaultGeometry) o;
-    return this.getOgcGeometry().equals((Object) that.getOgcGeometry());
+    // Compare what OGCGeometry.equals(Object) compares in ESRI 2.x, the wrapped
+    // com.esri.core.geometry.Geometry and the spatial reference, through methods ESRI 1.x also
+    // has; 1.x lacks equals(Object), so binding to it would fall back to identity there.
+    return getEsriGeometry().equals(that.getEsriGeometry())
+        && Objects.equals(
+            getOgcGeometry().getEsriSpatialReference(),
+            that.getOgcGeometry().getEsriSpatialReference());
   }
 
   @Override
   public int hashCode() {
-    // OGCGeometry subclasses do not overwrite Object.hashCode()
-    // while com.esri.core.geometry.Geometry subclasses usually do,
-    // so use these instead; this is consistent with equals
-    // because OGCGeometry.equals() actually compare between
-    // com.esri.core.geometry.Geometry objects
     return getEsriGeometry().hashCode();
   }
 
