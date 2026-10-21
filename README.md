@@ -42,8 +42,8 @@ are multiple modules, all prefixed with `java-driver-`.
 Note that the query builder is now published as a separate artifact, you'll need to add the
 dependency if you plan to use it.
 
-Refer to each module's manual for more details ([core](manual/core/), [query
-builder](manual/query_builder/), [mapper](manual/mapper)).
+Refer to each module's manual for more details ([core](manual/core/README.md), [query
+builder](manual/query_builder/README.md), [mapper](manual/mapper/README.md)).
 
 [com.scylladb]: https://central.sonatype.com/namespace/com.scylladb
 
@@ -62,7 +62,7 @@ See the [upgrade guide](upgrade_guide/) for details.
 
 ## Useful links
 
-* [Manual](manual/)
+* [Manual](manual/README.md)
 * [API docs]
 * Training: [Scylla University]
 * [Changelog]

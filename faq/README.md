@@ -65,7 +65,7 @@ At any rate, `CompletionStage` has a `toCompletableFuture()` method. In current 
 ### Where is `DowngradingConsistencyRetryPolicy` from driver 3?
 
 **As of driver 4.10, this retry policy was made available again as a built-in alternative to the 
-default retry policy**: see the [manual](../manual/core/retries) to understand how to use it. 
+default retry policy**: see the [manual](../manual//core/retries/README.md) to understand how to use it. 
 For versions between 4.0 and 4.9 inclusive, there is no built-in equivalent of driver 3 
 `DowngradingConsistencyRetryPolicy`.
 
@@ -109,7 +109,7 @@ available.
 The driver now uses the JDK's improved date and time API. CQL type `timestamp` is mapped to
 `java.time.Instant`, and the corresponding getter and setter are `getInstant` and `setInstant`.
 
-See [Temporal types](../manual/core/temporal_types/) for more details.
+See [Temporal types](../manual//core/temporal_types/README.md) for more details.
 
 ### Why do DDL queries have a higher latency than driver 3?
 
@@ -119,6 +119,6 @@ noticeably higher latency than driver 3 (about 1 second).
 This is because those queries are now *debounced*: the driver adds a short wait in an attempt to
 group multiple schema changes into a single metadata refresh. If you want to mitigate this, you can
 either adjust the debouncing settings, or group your schema updates while temporarily disabling the
-metadata; see the [performance](../manual/core/performance/#debouncing) page.
+metadata; see the [performance](../manual//core/performance/README.md#debouncing) page.
 
 This only applies to DDL queries; DML statements (`SELECT`, `INSERT`...) are not debounced.

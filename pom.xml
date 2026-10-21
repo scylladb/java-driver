@@ -70,7 +70,7 @@
     <hdrhistogram.version>2.2.2</hdrhistogram.version>
     <metrics.version>4.2.40</metrics.version>
     <netty.version>4.1.138.Final</netty.version>
-    <esri.version>1.2.1</esri.version>
+    <esri.version>2.2.4</esri.version>
     <!-- Needed only to compile deprecated Graph compatibility signatures. -->
     <tinkerpop.version>3.5.6</tinkerpop.version>
     <!-- when changing version also update version in LICENSE_binary  -->

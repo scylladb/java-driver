@@ -19,6 +19,15 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.3
+
+#### Ordering of points in DefaultPolygon
+
+This version includes an update to the ESRI dependency which appears to be more strict about following the OGC
+requirement that points of a polygon should be returned in counter-clockwise order.  It's possible that
+previous versions of the driver could have returned these points in a different order so if your application
+relies on the ordering of points in a polygon make sure to test this behaviour when upgrading.
+
 ### 4.19.2.3
 
 #### DSE runtime was removed; deprecated API shells remain
@@ -433,7 +442,7 @@ session.execute(preparedInsert.bind(3, vector));
 
 In some cases, it makes sense to access the vector directly as an array of some numerical type. This version
 supports such use cases by providing a codec which translates a CQL vector to and from a primitive array. Only float arrays are supported. 
-You can find more information about this codec in the manual documentation on [custom codecs](../manual/core/custom_codecs/)
+You can find more information about this codec in the manual documentation on [custom codecs](../manual/core/custom_codecs/README.md)
 
 ### 4.15.0
 
@@ -502,7 +511,7 @@ explicitly declare a dependency on the Esri library:
 </dependency>
 ```
 
-See the [integration](../manual/core/integration/#esri) section in the manual for more details.
+See the [integration](../manual/core/integration/README.md#esri) section in the manual for more details.
 
 ### 4.13.0
 
@@ -515,7 +524,7 @@ If you were building a native image for your application, please verify your nat
 configuration. Most of the extra configuration required until now is likely to not be necessary
 anymore.
 
-Refer to this [manual page](../manual/core/graalvm) for details.
+Refer to this [manual page](../manual/core/graalvm/README.md) for details.
 
 #### Registration of multiple listeners and trackers
 
@@ -610,8 +619,8 @@ row or in the target statement, *leaving unmatched properties untouched*.
 This new, lenient behavior allows to achieve the equivalent of driver 3.x 
 [lenient mapping](https://docs.datastax.com/en/developer/java-driver/3.10/manual/object_mapper/using/#manual-mapping).
 
-Read the manual pages on [@GetEntity](../manual/mapper/daos/getentity) methods and
-[@SetEntity](../manual/mapper/daos/setentity) methods for more details and examples of lenient mode.
+Read the manual pages on [@GetEntity](../manual/mapper/daos/getentity/README.md) methods and
+[@SetEntity](../manual/mapper/daos/setentity/README.md) methods for more details and examples of lenient mode.
 
 ### 4.11.0
 
@@ -628,9 +637,9 @@ transparently selected as the protocol version to use.
 
 [JAVA-2872](https://datastax-oss.atlassian.net/browse/JAVA-2872) introduced the ability to configure
 how metric identifiers are generated. Metric names can now be configured, but most importantly,
-metric tags are now supported. See the [metrics](../manual/core/metrics/) section of the online
+metric tags are now supported. See the [metrics](../manual/core/metrics/README.md) section of the online
 manual, or the `advanced.metrics.id-generator` section in the
-[reference.conf](../manual/core/configuration/reference/) file for details.
+[reference.conf](../manual/core/configuration/reference/README.md) file for details.
 
 Users should not experience any disruption. However, those using metrics libraries that support tags
 are encouraged to try out the new `TaggingMetricIdGenerator`, as it generates metric names and tags
@@ -781,7 +790,7 @@ separate DSE driver.
 
 #### For Apache Cassandra® users
 
-The great news is that [reactive execution](../manual/core/reactive/) is now available for everyone.
+The great news is that [reactive execution](../manual/core/reactive/README.md) is now available for everyone.
 See the `CqlSession.executeReactive` methods.
 
 The main visible change is the Reactive Streams dependency. If you want to keep your classpath
@@ -873,7 +882,7 @@ a few notable differences:
 * the "mapper" and "accessor" concepts have been unified into a single "DAO" component, that handles
   both pre-defined CRUD patterns, and user-provided queries.
 
-Refer to the [mapper manual](../manual/mapper/) for all the details.
+Refer to the [mapper manual](../manual/mapper/README.md) for all the details.
 
 #### Internal API
 
