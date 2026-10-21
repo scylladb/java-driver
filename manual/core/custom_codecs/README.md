@@ -25,18 +25,17 @@ Define custom Java to CQL mappings.
 
 * implement the [TypeCodec] interface, or use one of the alternative codecs in `ExtraTypeCodecs`.
 * registering a codec:
-    * at init time: [CqlSession.builder().addTypeCodecs()][SessionBuilder.addTypeCodecs]
-    * at runtime:
+  * at init time: [CqlSession.builder().addTypeCodecs()][SessionBuilder.addTypeCodecs]
+  * at runtime:
   
     ```java
     MutableCodecRegistry registry =
         (MutableCodecRegistry) session.getContext().getCodecRegistry();    
     registry.register(myCodec);
     ```
-
 * using a codec:
-    * if already registered: `row.get("columnName", MyCustomType.class)`
-    * otherwise: `row.get("columnName", myCodec)`
+  * if already registered: `row.get("columnName", MyCustomType.class)`
+  * otherwise: `row.get("columnName", myCodec)`
 
 -----
 
