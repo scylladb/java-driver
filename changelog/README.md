@@ -24,11 +24,6 @@ under the License.
   3.x versions get published.
 -->
 
-### Unreleased
-
-- [improvement] Protect Maven publishing credentials and retain sanitized release logs on success and failure.
-- [improvement] DRIVER-787: Validate simple and prepared SELECT without FROM queries without a keyspace or table.
-
 ### 3.12.1
 - [improvement] CASSJAVA-55: Remove setting "Host" header for metadata requests.
 - [bug] JAVA-3125: Match broadcast RPC for control connection and Astra events
