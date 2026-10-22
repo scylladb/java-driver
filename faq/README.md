@@ -1,3 +1,22 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 ## Frequently Asked Questions
 
 ### How do I implement paging?
@@ -157,6 +176,9 @@ and we've had many reports where the problem turned out to be in user code.
 
 See [Blobs.java] in the `driver-examples` module for some examples and explanations.
 
+[Blobs.java]: https://github.com/apache/cassandra-java-driver/tree/3.x/driver-examples/src/main/java/com/datastax/driver/examples/datatypes/Blobs.java
+
+
 ### How do I use the driver in an OSGi application?
 
 Read our [OSGi-specific FAQ section](osgi/) to find out.
@@ -286,7 +308,7 @@ version is available, you may want to reach out to the maintainer of that tool t
 an update with compatibility to this driver version.
 
 
-[Blobs.java]: https://github.com/datastax/java-driver/tree/3.11.5/driver-examples/src/main/java/com/datastax/driver/examples/datatypes/Blobs.java
+[Blobs.java]: https://github.com/apache/cassandra-java-driver/tree/3.12.1/driver-examples/src/main/java/com/datastax/driver/examples/datatypes/Blobs.java
 [CASSANDRA-7304]: https://issues.apache.org/jira/browse/CASSANDRA-7304
 [Parameters and Binding]: ../manual/statements/prepared/#parameters-and-binding
 [Mapper options]: ../manual/object_mapper/using/#mapper-options

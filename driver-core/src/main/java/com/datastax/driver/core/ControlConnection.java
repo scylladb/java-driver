@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -687,7 +689,11 @@ class ControlConnection implements Connection.Owner {
       broadcastRpcAddress = new InetSocketAddress(nativeAddress, nativePort);
     } else if (row.getColumnDefinitions().contains("rpc_address")) {
       InetAddress rpcAddress = row.getInet("rpc_address");
-      broadcastRpcAddress = new InetSocketAddress(rpcAddress, cluster.connectionFactory.getPort());
+      int nativePort = cluster.connectionFactory.getPort();
+      if (row.getColumnDefinitions().contains("rpc_port")) {
+        nativePort = row.getInt("rpc_port");
+      }
+      broadcastRpcAddress = new InetSocketAddress(rpcAddress, nativePort);
     }
     // Before CASSANDRA-9436, system.local doesn't have rpc_address, so this might be null. It's not
     // a big deal because we only use this for server events, and the control node doesn't receive
@@ -928,8 +934,11 @@ class ControlConnection implements Connection.Owner {
         broadcastRpcAddress = new InetSocketAddress(nativeAddress, nativePort);
       } else {
         InetAddress rpcAddress = row.getInet("rpc_address");
-        broadcastRpcAddress =
-            new InetSocketAddress(rpcAddress, cluster.connectionFactory.getPort());
+        int nativePort = cluster.connectionFactory.getPort();
+        if (row.getColumnDefinitions().contains("rpc_port")) {
+          nativePort = row.getInt("rpc_port");
+        }
+        broadcastRpcAddress = new InetSocketAddress(rpcAddress, nativePort);
       }
       broadcastRpcAddresses.add(broadcastRpcAddress);
 

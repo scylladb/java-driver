@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +20,7 @@ package com.datastax.driver.core;
 import static com.datastax.driver.core.Assertions.assertThat;
 import static com.datastax.driver.core.CreateCCM.TestMode.PER_METHOD;
 import static com.datastax.driver.core.ScassandraCluster.SELECT_LOCAL;
+import static com.datastax.driver.core.ScassandraCluster.SELECT_LOCAL_RPC_ADDRESS_AND_PORT;
 import static com.datastax.driver.core.ScassandraCluster.SELECT_PEERS;
 import static com.datastax.driver.core.ScassandraCluster.SELECT_PEERS_DSE68;
 import static com.datastax.driver.core.ScassandraCluster.SELECT_PEERS_V2;
@@ -681,6 +684,50 @@ public class ControlConnectionTest extends CCMTestsSupport {
             .expectedAddress(expectedAddress)
             .build();
     runPeerTest(state);
+  }
+
+  @Test(groups = "short")
+  @CCMConfig(createCcm = false)
+  public void should_extract_hosts_port_using_rpc_port_from_local() throws UnknownHostException {
+    InetAddress expectedAddress = InetAddress.getByName("1.2.3.4");
+    int expectedPort = 29042;
+    PeerRowState state =
+        PeerRowState.builder()
+            .local("rpc_address", expectedAddress)
+            .local("rpc_port", expectedPort)
+            .build();
+
+    ScassandraCluster scassandras =
+        ScassandraCluster.builder().withNodes(2).withPeersV2(state.usePeersV2()).build();
+    scassandras.init();
+
+    Cluster cluster = null;
+    try {
+      scassandras.node(1).primingClient().clearAllPrimes();
+      PrimingClient primingClient = scassandras.node(1).primingClient();
+      primingClient.prime(
+          PrimingRequest.queryBuilder()
+              .withQuery("SELECT * FROM system.local WHERE key='local'")
+              .withThen(
+                  then()
+                      .withColumnTypes(SELECT_LOCAL_RPC_ADDRESS_AND_PORT)
+                      .withRows(state.getLocalRow())
+                      .build())
+              .build());
+      cluster =
+          Cluster.builder()
+              .addContactPoints(scassandras.address(1).getAddress())
+              .withPort(scassandras.getBinaryPort())
+              .withNettyOptions(nonQuietClusterCloseOptions)
+              .build();
+      cluster.connect();
+
+      assertThat(cluster.manager.getControlConnection().connectedHost().getBroadcastRpcAddress())
+          .isEqualTo(new InetSocketAddress(expectedAddress, expectedPort));
+    } finally {
+      if (cluster != null) cluster.close();
+      scassandras.stop();
+    }
   }
 
   private void runPeerTest(PeerRowState state) {
