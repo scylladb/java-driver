@@ -208,7 +208,7 @@ Copyright 2008 Google Inc.
 This product includes software developed as part of the Protocol Buffers project ( https://developers.google.com/protocol-buffers/ ).
 see driver-core/src/main/java/com/datastax/driver/core/VIntCoding.java
 
-This product bundles Java Native Runtime - POSIX 3.1.15,
+This product bundles Java Native Runtime - POSIX 3.1.19,
 which is available under the Eclipse Public License version 2.0.
 see licenses/jnr-posix.txt
 
@@ -216,14 +216,14 @@ This product bundles jnr-x86asm 1.0.2,
 which is available under the MIT License.
 see licenses/jnr-x86asm.txt
 
-This product bundles ASM 9.2: a very small and fast Java bytecode manipulation framework,
+This product bundles ASM 9.7.1 (asm-commons, asm-analysis, asm-tree and asm-util 9.2): a very small and fast Java bytecode manipulation framework,
 which is available under the 3-Clause BSD License.
 see licenses/asm.txt
 
-This product bundles HdrHistogram 2.1.12: A High Dynamic Range (HDR) Histogram,
+This product bundles HdrHistogram 2.2.2: A High Dynamic Range (HDR) Histogram,
 which is available under the 2-Clause BSD License.
 see licenses/HdrHistogram.txt
 
-This product bundles The Simple Logging Facade for Java (SLF4J) API 1.7.26,
+This product bundles The Simple Logging Facade for Java (SLF4J) API 1.7.36,
 which is available under the MIT License.
 see licenses/slf4j-api.txt
