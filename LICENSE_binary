@@ -201,7 +201,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-Apache Cassandra Java Driver bundles code and files from the following projects:
+ScyllaDB Java Driver bundles code and files from the following projects:
 
 Protocol Buffers
 Copyright 2008 Google Inc.
