@@ -106,10 +106,9 @@ public class DefaultSession implements CqlSession {
    * (scylladb/java-driver#846); otherwise delegates to {@link AllNodesFailedException#fromErrors}.
    */
   @NonNull
-  public static Throwable queryPlanExhaustedError(
-      @NonNull DefaultSession session, @Nullable List<Map.Entry<Node, Throwable>> errors) {
-    if ((errors == null || errors.isEmpty()) && (session.isClosing() || session.isClosed())) {
-      return new SessionClosedException("Session is closed");
+  public Throwable queryPlanExhaustedError(@Nullable List<Map.Entry<Node, Throwable>> errors) {
+    if ((errors == null || errors.isEmpty()) && (isClosing() || isClosed())) {
+      return new SessionClosedException();
     }
     return AllNodesFailedException.fromErrors(errors);
   }
@@ -255,8 +254,8 @@ public class DefaultSession implements CqlSession {
       @NonNull RequestT request, @NonNull GenericType<ResultT> resultType) {
     RequestProcessor<RequestT, ResultT> processor =
         processorRegistry.processorFor(request, resultType);
-    return isClosed()
-        ? processor.newFailure(new SessionClosedException("Session is closed"))
+    return (isClosed() || isClosing())
+        ? processor.newFailure(new SessionClosedException())
         : processor.process(request, this, context, logPrefix);
   }
 

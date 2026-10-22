@@ -259,7 +259,7 @@ public class CqlRequestHandler implements Throttled {
         // explicit message
         result.completeExceptionally(
             "cannot be started once stopped".equals(e.getMessage())
-                ? new SessionClosedException("Session is closed")
+                ? new SessionClosedException()
                 : e);
       }
     }
@@ -406,8 +406,7 @@ public class CqlRequestHandler implements Throttled {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
         // We're the last execution so fail the result
-        setFinalError(
-            statement, DefaultSession.queryPlanExhaustedError(session, this.errors), null, -1);
+        setFinalError(statement, session.queryPlanExhaustedError(this.errors), null, -1);
       }
     } else {
       boolean writeSubmitted = false;

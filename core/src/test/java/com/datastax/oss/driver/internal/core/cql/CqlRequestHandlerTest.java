@@ -21,6 +21,7 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -49,6 +50,7 @@ import com.datastax.oss.protocol.internal.response.error.Unprepared;
 import com.datastax.oss.protocol.internal.response.result.Prepared;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.util.Bytes;
+import io.netty.util.Timer;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
@@ -170,6 +172,29 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
+  public void should_preserve_node_errors_when_session_is_closing() {
+    try (RequestHandlerTestHarness harness =
+        RequestHandlerTestHarness.builder().withEmptyPool(node1).build()) {
+      when(harness.getSession().isClosing()).thenReturn(true);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(
+              error -> {
+                assertThat(error).isInstanceOf(AllNodesFailedException.class);
+                assertThat(((AllNodesFailedException) error).getAllErrors()).hasSize(1);
+              });
+    }
+  }
+
+  @Test
   public void should_fail_if_nodes_unavailable() {
     RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
     try (RequestHandlerTestHarness harness =
@@ -264,6 +289,47 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
       assertThatStage(resultSetFuture)
           .isFailed(t -> assertThat(t).isInstanceOf(DriverTimeoutException.class));
+    }
+  }
+
+  @Test
+  public void should_fail_with_session_closed_if_request_timer_is_stopped() {
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      Timer timer = mock(Timer.class);
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+      when(timer.newTimeout(any(), anyLong(), any()))
+          .thenThrow(new IllegalStateException("cannot be started once stopped"));
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
+    }
+  }
+
+  @Test
+  public void should_propagate_other_request_timer_errors() {
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      Timer timer = mock(Timer.class);
+      IllegalStateException timerFailure = new IllegalStateException("other timer failure");
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+      when(timer.newTimeout(any(), anyLong(), any())).thenThrow(timerFailure);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(timerFailure));
     }
   }
 

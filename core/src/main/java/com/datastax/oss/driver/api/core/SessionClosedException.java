@@ -20,8 +20,12 @@ package com.datastax.oss.driver.api.core;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import edu.umd.cs.findbugs.annotations.NonNull;
 
-/** Thrown when an operation cannot be completed because its session is closed. */
+/** Thrown when an operation cannot be completed because its session is closing or closed. */
 public class SessionClosedException extends DriverException {
+
+  public SessionClosedException() {
+    this("Session is closed", null);
+  }
 
   public SessionClosedException(@NonNull String message) {
     this(message, null);

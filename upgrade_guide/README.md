@@ -19,6 +19,16 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.2.4
+
+#### Session shutdown failures use `SessionClosedException`
+
+Requests submitted after session shutdown begins, or whose query plans are exhausted during
+shutdown, now fail with `SessionClosedException`. This replaces `IllegalStateException` for
+requests rejected by `execute()` and `NoNodeAvailableException` when an empty query plan is caused
+by shutdown. Catch `SessionClosedException` to identify these cases. Other failures, including
+`AllNodesFailedException` when node errors were recorded, are unchanged.
+
 ### 4.19.2.3
 
 #### DSE runtime was removed; deprecated API shells remain

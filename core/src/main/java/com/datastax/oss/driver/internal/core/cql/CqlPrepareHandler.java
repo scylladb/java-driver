@@ -226,7 +226,7 @@ public class CqlPrepareHandler implements Throttled {
       }
     }
     if (channel == null) {
-      setFinalError(DefaultSession.queryPlanExhaustedError(session, this.errors));
+      setFinalError(session.queryPlanExhaustedError(this.errors));
     } else {
       boolean writeSubmitted = false;
       try {
