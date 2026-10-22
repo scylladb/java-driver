@@ -29,15 +29,15 @@ under the License.
 - [improvement] Protect Maven publishing credentials and retain sanitized release logs on success and failure.
 - [improvement] DRIVER-787: Validate simple and prepared SELECT without FROM queries without a keyspace or table.
 
-## 3.12.1
+### 3.12.1
 - [improvement] CASSJAVA-55: Remove setting "Host" header for metadata requests.
 - [bug] JAVA-3125: Match broadcast RPC for control connection and Astra events
 
-## 3.12.0
+### 3.12.0
 - [improvement] CASSANDRA-18971: Switch all archs to netty-tcnative-boringssl-static
 - [improvement] CASSJAVA-58: Update 3.x DRIVER_NAME to match 4.x Java driver
 
-## 3.11.5
+### 3.11.5
 - [improvement] JAVA-3114: Shade io.dropwizard.metrics:metrics-core in shaded driver
 - [improvement] JAVA-3115: SchemaChangeListener#onKeyspaceChanged can fire when keyspace has not changed if using SimpleStrategy replication
 
