@@ -781,6 +781,13 @@ public class DefaultSessionPoolsTest {
     pool1CloseFuture.complete(null);
     assertThatStage(closeFuture).isSuccess();
 
+    // After close completes, DefaultSession rejects execute() before it reaches the fake processor.
+    CompletionStage<AsyncResultSet> executeAfterCloseFuture =
+        ((DefaultSession) session)
+            .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC);
+    assertThatStage(executeAfterCloseFuture)
+        .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
+
     verify(pool1, VERIFY_TIMEOUT).closeAsync();
     verify(pool2, VERIFY_TIMEOUT).closeAsync();
     verify(pool3, VERIFY_TIMEOUT).closeAsync();
