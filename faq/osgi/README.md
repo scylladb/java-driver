@@ -1,9 +1,28 @@
 ```{eval-rst}
 :orphan:
 ```
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 ## Frequently Asked Questions - OSGi
 
-### How to use the Java driver in an OSGi environment?
+### How to use the Java Driver in an OSGi environment?
 
 We have complete examples demonstrating usage of the driver in an [OSGi]
 environment; please refer to our [OSGi examples repository].
@@ -30,7 +49,7 @@ major line and update your manifest accordingly, for example:
 ### How to enable compression?
 
 First, read our [manual page on compression](../../manual/compression/)
-to understand how to enable compression for the Java driver.
+to understand how to enable compression for the Java Driver.
             
 OSGi projects can use both Snappy or LZ4 compression algorithms. 
 
@@ -157,7 +176,7 @@ it is also normal to see the following log lines when starting the driver:
 [JAVA-1127]:https://datastax-oss.atlassian.net/browse/JAVA-1127
 [BND]:http://bnd.bndtools.org/
 [Maven bundle plugin]:https://cwiki.apache.org/confluence/display/FELIX/Apache+Felix+Maven+Bundle+Plugin+%28BND%29
-[OSGi examples repository]:https://github.com/datastax/java-driver-examples-osgi
+[OSGi examples repository]:https://github.com/apache/cassandra-java-driver-examples-osgi
 [without metrics]:https://docs.datastax.com/en/drivers/java/3.11/com/datastax/driver/core/Cluster.Builder.html#withoutMetrics--
 [SLF4J]:http://www.slf4j.org/
 [Logback]:http://logback.qos.ch/
