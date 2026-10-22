@@ -24,11 +24,6 @@ under the License.
   3.x versions get published.
 -->
 
-### Unreleased
-
-- [improvement] Protect Maven publishing credentials and retain sanitized release logs on success and failure.
-- [improvement] DRIVER-787: Validate simple and prepared SELECT without FROM queries without a keyspace or table.
-
 ### 3.13.0
 - [bug] CASSJAVA-85: decode custom payload and warnings in correct order
 - [improvement] CASSJAVA-128: Update Netty to 4.1.138 and migrate to Java8
