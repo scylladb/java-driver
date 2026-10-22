@@ -745,6 +745,7 @@ public class DefaultSessionPoolsTest {
             .success(node3, KEYSPACE, NodeDistance.LOCAL, pool3)
             .build();
 
+    // execute() delegates to this registry; the fake processor avoids needing a server or network.
     when(context.getRequestProcessorRegistry())
         .thenReturn(new RequestProcessorRegistry("test", new AsyncStatementProcessor()));
     CompletionStage<CqlSession> initFuture = newSession();
@@ -755,13 +756,14 @@ public class DefaultSessionPoolsTest {
     assertThatStage(initFuture).isSuccess();
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
+    // While open, execute() reaches the fake processor, which returns a completed result.
     assertThatStage(
             ((DefaultSession) session)
                 .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC))
         .isSuccess(result -> assertThat(result).isNotNull());
 
+    // Keep shutdown in progress so execute() is tested while the session is closing.
     CompletableFuture<Void> pool1CloseFuture = new CompletableFuture<>();
-    when(pool1.closeFuture()).thenReturn(pool1CloseFuture);
     when(pool1.closeAsync()).thenReturn(pool1CloseFuture);
 
     assertThat(((DefaultSession) session).isClosing()).isFalse();
@@ -769,6 +771,7 @@ public class DefaultSessionPoolsTest {
     assertThat(((DefaultSession) session).isClosing()).isTrue();
     assertThatStage(closeFuture).isNotDone();
 
+    // While closing, DefaultSession rejects execute() before it reaches the fake processor.
     CompletionStage<AsyncResultSet> executeFuture =
         ((DefaultSession) session)
             .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC);
