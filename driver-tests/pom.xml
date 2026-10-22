@@ -58,6 +58,12 @@
                 </configuration>
             </plugin>
             <plugin>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
+            <plugin>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <configuration>
                     <skip>true</skip>
@@ -75,17 +81,6 @@
                 <configuration>
                     <skip>true</skip>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>net.nicoulaj.maven.plugins</groupId>
-                <artifactId>checksum-maven-plugin</artifactId>
-                <version>1.7</version>
-                <executions>
-                    <execution>
-                        <id>source-release-checksum</id>
-                        <phase>none</phase>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>

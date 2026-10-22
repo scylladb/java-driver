@@ -1,15 +1,12 @@
 # Scylla Java Driver for Scylla and Apache Cassandra®
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.scylladb/scylla-driver-core?versionPrefix=3.11.5)](https://central.sonatype.com/artifact/com.scylladb/scylla-driver-core)
+[![Maven Central](https://img.shields.io/maven-central/v/com.scylladb/scylla-driver-core?versionPrefix=3.11.5)](https://central.sonatype.com/artifact/com.scylladb/scylla-driver-core) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 > **Deprecation Notice:** Scylla Java Driver 3.x is now **deprecated** and has
 > entered **maintenance mode**. Only critical bug fixes will be accepted.
 > For new projects and active development, please migrate to
 > [Scylla Java Driver 4.x](https://github.com/scylladb/java-driver/tree/scylla-4.x)
 > ([documentation](https://java-driver.docs.scylladb.com/stable/)).
-
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.apache.cassandra/cassandra-driver-core/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.apache.cassandra/cassandra-driver-core)
 
 *If you're reading this on github.com, please note that this is the readme
 for the development version and that some features described here might

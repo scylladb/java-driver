@@ -30,7 +30,8 @@ Java Driver 4.x rather than between 3.x versions, see the
 
 ### 3.13.0
 
-With this version the Java driver now requires Java8 to build and run.
+The driver requires Java 8 to build and run. Nothing changes for the ScyllaDB fork, which has
+required Java 8 since 3.11.2.5; upstream raised its floor from Java 6 in this release.
 
 ### 3.11.5.19
 
