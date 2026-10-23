@@ -10,7 +10,7 @@ import re
 import sys
 import tempfile
 import time
-import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 import zipfile
@@ -172,9 +172,14 @@ def finish(mode):
     count = verify_bundle(paths[0], state['version'], set(state['modules']))
     status = wait_for(identifier, 'VALIDATED')
     expected_purls = {f'pkg:maven/com.scylladb/{module}@{state["version"]}' for module in state['modules']}
-    if status.get('purls') and set(status['purls']) != expected_purls:
+    if status.get('purls') and {urllib.parse.unquote(purl.split('?', 1)[0]) for purl in status['purls']} != expected_purls:
         raise Invalid('Central components do not match the verified bundle.')
     if mode == 'publish':
+        major = state['version'].split('.')[0]
+        target.blockers(major)
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            if os.environ.get('RELEASE_TARGET_TAG') == 'scylla-' + major + '.x':
+                target.check_branch(major, os.environ['RELEASE_BASE_COMMIT'])
         api('POST', 'deployment/' + identifier)
         wait_for(identifier, 'PUBLISHED')
         outcome = 'published'
