@@ -10,6 +10,8 @@ The shared GitHub `release` environment must require `scylladb/drivers` review, 
 self-review, disable administrator bypass, and allow deployment from exactly the branches
 `scylla-4.x` and `scylla-3.x`. Dispatch from the corresponding release branch, including
 historical releases. Validation and the integration matrix must finish before approval.
+Enable GitHub's **release immutability** repository setting. Publishing a GitHub Release
+locks its associated tag and release assets; signed tags alone do not enable that lock.
 
 Environment secrets:
 
@@ -115,8 +117,8 @@ line-specific workflow changes, and replace the Central placeholders. Run an app
 `dry-run` on each branch. Dry runs **upload unpublished Central deployments**. The workflow
 verifies every bundle signature and the exact module set, confirms Central validation, and
 deletes the unpublished deployment. Download `verified-central-bundle` and the publication
-report in the Maven logs for independent inspection. Dry runs push no Git refs and publish
-no docs. See
+report in the Maven logs for independent inspection. Dry runs push no Git refs, create no
+GitHub Releases, and publish no docs. See
 [Central publishing behavior](https://central.sonatype.org/publish/publish-portal-maven/).
 
 After both dry runs pass, remove repository-scoped `GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`,
@@ -124,13 +126,20 @@ After both dry runs pass, remove repository-scoped `GPG_PRIVATE_KEY`, `GPG_PASSP
 consumers of `OSSRH_USERNAME`/`OSSRH_PASSWORD` before deleting them. Keep `CODECOV_TOKEN`.
 Revoke the retired Central token only after checking other repositories and consumers.
 Resume release dispatches. Confirm the first real release publishes the expected module
-set, signed commits and tag, and docs. Branch releases push explicitly to
+set, signed commits and tag, immutable GitHub Release, and docs. Branch releases push explicitly to
 `HEAD:refs/heads/scylla-4.x` or `HEAD:refs/heads/scylla-3.x` only after the Portal API
 confirms `PUBLISHED`. Maven always uploads in manual mode;
 `publication.py` verifies signatures, module coordinates, and deployment identity before
 requesting a real publication. It rechecks blockers and branch movement after upload,
-then waits for completion before the SCM push and docs job.
-Historical targets never push refs or publish docs.
+then waits for completion before the SCM push. After the push, the workflow uses its
+existing `contents: write` GitHub token to publish a GitHub Release for the verified tag.
+It verifies signatures again using the public certificate and original preparation
+baseline, compares the exact remote annotated tag object before and after publication,
+and requires the published Release's `immutable` flag before docs can run. No additional
+publisher credential is needed. GitHub Release metadata is created by Actions; its
+associated tag, commits, and Maven artifacts carry the Publisher GPG signatures.
+The 3.x Release does not replace the repository's latest Release. Historical targets
+never push refs, create GitHub Releases, or publish docs.
 
 ## Partial release recovery and key rotation
 
@@ -147,8 +156,18 @@ baseline, run `git bundle verify prepared-release.bundle` and fetch its HEAD and
 into recovery refs. Verify against the original baseline and
 reconcile the actual Central state first. If publication succeeded but SCM push failed,
 verify and push that exact signed history after reconciling branch advancement. Do not
-prepare another release under the same version. Run docs publication only after the SCM
-release state is correct. Retain sanitized logs and deployment identifiers for recovery.
+prepare another release under the same version. If GitHub Release publication fails after
+the push, preserve the existing tag and reconcile the published Central state first.
+Restore `release.properties` with `scm.tag=VERSION`, the original `RELEASE_BASE_COMMIT`,
+and the recovered signed history. Set `RELEASE_MAJOR`, `RELEASE_VERSION`,
+`RELEASE_TARGET_TAG=scylla-MAJOR.x`, `RELEASE_DRY_RUN=false`, and
+`GITHUB_REPOSITORY=scylladb/java-driver`, then run `python3 scripts/release/github_release.py`
+with the trusted launch SHA's helper scripts and public certificate. The helper accepts an
+existing matching immutable Release without editing it. A draft or mutable Release needs
+manual inspection; restore repository release immutability before publishing a missing
+Release. Do not delete or recreate an existing published Release or move its tag.
+Run docs publication only after the SCM release state and immutable GitHub Release are
+correct. Retain sanitized logs and deployment identifiers for recovery.
 
 For rotation, pause releases, export a new protected signing subkey without the primary
 secret, update both pinned fingerprints and the public certificate on both branches, and
