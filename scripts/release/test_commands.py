@@ -258,7 +258,7 @@ class ReleaseCommandTests(unittest.TestCase):
     def test_validation_builds_unsigned_release_artifacts_without_deployment(self):
         workflow = (ROOT / ".github/workflows/release.yml").read_text()
         command = next(script for script in guard.workflow_commands(workflow)
-                       if "-Dgpg.skip=true verify" in script)
+                       if "-Dgpg.skip=true -DskipITs=true verify" in script)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             maven = root / "mvn"
@@ -293,7 +293,7 @@ class ReleaseCommandTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     call = json.loads((root / "trace").read_text())
                     self.assertEqual(call["args"], ["-B", "--no-transfer-progress", "-Prelease",
-                                                    "-Dgpg.skip=true", "verify"])
+                                                    "-Dgpg.skip=true", "-DskipITs=true", "verify"])
                     self.assertEqual("-DskipTests=true" in call["opts"], skip == "true")
 
 

@@ -96,7 +96,7 @@ jobs:
           fi
           python3 "$RELEASE_GUARD" run mvn -B --no-transfer-progress versions:set "-DnewVersion=$RELEASE_VERSION" -DgenerateBackupPoms=false
           python3 "$RELEASE_GUARD" run mvn -B --no-transfer-progress xml-format:xml-format
-          python3 "$RELEASE_GUARD" run mvn -B --no-transfer-progress -Prelease -Dgpg.skip=true verify
+          python3 "$RELEASE_GUARD" run mvn -B --no-transfer-progress -Prelease -Dgpg.skip=true -DskipITs=true verify
 
       - name: Upload sanitized validation logs
         if: always()

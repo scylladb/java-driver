@@ -42,7 +42,9 @@ The workflow resolves the target SHA and version once. It runs release-helper te
 an unsigned `-Prelease -Dgpg.skip=true verify` at the effective version without release
 secrets, then passes that
 same SHA and effective version to the driver integration matrix. `skip-tests` skips only
-project tests; helper tests always run. The matrix must pass unless
+project tests; helper tests always run. As in 4.x release preparation, validation skips
+CCM integration tests (`-DskipITs=true`); integration gates run in CI and the separate
+matrix. The matrix must pass unless
 `skip-integration-matrix` is explicitly selected. Open `release-blocker` issues apply to
 both lines unless labelled solely for the other line. Blockers are checked before
 validation and again immediately before publication, including all result pages.
