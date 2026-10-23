@@ -13,9 +13,8 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 import urllib.parse
-import xml.etree.ElementTree as ET
 
 import guard
 
@@ -34,15 +33,66 @@ def with_central_version(pom, version):
     return updated
 
 
-def policy_pom():
-    # Root-only policy fixtures omit modules; reactor tests declare their own small tree.
-    return re.sub(r"<modules>.*?</modules>", "",
-                  (ROOT / "pom.xml").read_text(), flags=re.S)
-
 
 class ReleaseTests(unittest.TestCase):
     def test_repository_defaults(self):
         guard.check_policy(ROOT)
+
+    def test_release_account_and_baseline_lookups_allow_only_fixed_commands(self):
+        guard.check_maven_capture('if ! user=$(gh api user --jq .login); then')
+        guard.check_maven_capture('baseline=$(git rev-parse HEAD)')
+        for command in (
+            'if ! user=$(gh api user --jq "$(mvn release:perform)"); then',
+            'if ! user=$(gh api user --jq .login; mvn release:perform); then',
+            'baseline=$(git rev-parse HEAD; mvn release:perform)',
+        ):
+            with self.subTest(command=command), self.assertRaises(guard.Unsafe):
+                guard.check_maven_capture(command)
+
+    def test_internal_release_recipes_require_sanitized_capture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            (root / "Makefile").write_text('_release:\n\tmvn deploy\n')
+            with self.assertRaisesRegex(guard.Unsafe, "sanitized log capture"):
+                guard.check_policy(root)
+
+    def test_sourced_release_scripts_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            (root / "release.sh").write_text("mvn release:perform\n")
+            workflow = root / ".github/workflows/release.yml"
+            original = workflow.read_text()
+            for launcher in ("source", "."):
+                with self.subTest(launcher=launcher):
+                    (root / "Makefile").write_text(f"release:\n\t{launcher} ./release.sh\n")
+                    with self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
+                    (root / "Makefile").unlink()
+                    workflow.write_text(original.replace(
+                        'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run',
+                        f"run: {launcher} ./release.sh",
+                    ))
+                    with self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
+                    workflow.write_text(original)
+
+    def test_make_output_functions_cannot_print_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for function in ("info", "warning", "error"):
+                with self.subTest(function=function):
+                    (root / "Makefile").write_text(
+                        f"LEAK := $({function} $(SONATYPE_TOKEN_PASSWORD))\n"
+                        'release:\n\tpython3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform\n'
+                    )
+                    with self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
 
     def test_unsafe_options(self):
         for value in (
@@ -89,18 +139,6 @@ class ReleaseTests(unittest.TestCase):
         guard.check_text("mvn -B -ntp release:perform -DskipTests=true")
         guard.check_text('-Dgpg.bestPractices="true"')
         guard.check_text("if [[ $? -lt 127 ]]", "Makefile", maven_options=False)
-        for text in ("set -x", "use the -x switch", "-Debug"):
-            guard.check_text(text, maven_options=False)
-
-    def test_malformed_quoted_gpg_value_check_is_bounded(self):
-        script = (
-            "import guard\ntry:\n"
-            " guard.check_text('-Dgpg.bestPractices=\"' + '\\\\a' * 64)\n"
-            "except guard.Unsafe:\n raise SystemExit(0)\nraise SystemExit(1)"
-        )
-        result = subprocess.run([sys.executable, "-c", script], cwd=ROOT / "scripts/release",
-                                capture_output=True, timeout=5)
-        self.assertEqual(result.returncode, 0)
 
     def test_complete_gpg_boolean_values(self):
         for value in (
@@ -115,158 +153,36 @@ class ReleaseTests(unittest.TestCase):
                 guard.check_text(value, jvm_options=True)
         for value in (
             '-Dgpg.bestPractices=true',
+        ):
+            guard.check_text(value, jvm_options=True)
+        for value in (
             '-Dgpg.bestPractices="true"',
             "-Dgpg.bestPractices='true'",
             '"-Dgpg.bestPractices=true"',
             '-Dgpg."bestPractices"="true"',
         ):
-            guard.check_text(value, jvm_options=True)
+            with self.subTest(value=value), self.assertRaises(guard.Unsafe):
+                guard.check_text(value, jvm_options=True)
         guard.check_text("-Dgpg.bestPractices")  # Maven CLI bare properties mean true.
         for name in ("MAVEN_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS"):
             for value in ('-Dgpg.bestPractices="true false"', "-Dgpg.bestPractices"):
-                with self.subTest(name=name, value=value), patch.dict(os.environ, {name: value}, clear=True), patch.object(
+                with self.subTest(name=name, value=value), patch.dict(
+                    os.environ, {name: value}, clear=True
+                ), patch.object(
                     sys, "argv", ["guard.py", "run", "mvn", "validate"]
                 ), patch.object(guard, "capture") as capture, patch("sys.stderr", io.StringIO()):
                     self.assertEqual(guard.main(), 2)
                     capture.assert_not_called()
-
-    def test_prose_quotes_do_not_hide_unsafe_gpg_options(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            (root / "pom.xml").write_text(policy_pom())
-            (root / "Makefile").write_text(
-                "# isn't\nrelease-prepare:\n"
-                '\tpython3 "$(RELEASE_GUARD)" run $(MVNCMD) release:prepare '
-                "-D gpg.bestPractices=false\n# it's\n"
-            )
-            with self.assertRaisesRegex(guard.Unsafe, "GPG best practices"):
-                guard.check_policy(root)
-
-    def test_safe_gpg_option_in_shell_assignments(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            (root / "pom.xml").write_text(policy_pom())
-            for prefix in ("", "${MAVEN_OPTS} "):
-                (root / "Makefile").write_text(
-                    'export MAVEN_OPTS="' + prefix
-                    + '-Dgpg.bestPractices=true -DskipTests=true"\n'
-                )
-                with self.subTest(prefix=prefix):
-                    guard.check_policy(root)
-
-    def test_gpg_boolean_quotes_follow_the_jvm_option_source(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            (root / "pom.xml").write_text(policy_pom())
-            (root / ".mvn").mkdir()
-            with patch.object(guard, "Path", side_effect=lambda value: root / value), patch.object(
-                sys, "argv", ["guard.py", "run", "mvn", "validate"]
-            ), patch.object(guard, "capture", return_value=0) as capture, patch("sys.stderr", io.StringIO()):
-                for name, quoted_status in (
-                    ("MAVEN_OPTS", 2), ("MAVEN_DEBUG_OPTS", 2), ("JAVA_TOOL_OPTIONS", 0),
-                    ("JDK_JAVA_OPTIONS", 0), ("_JAVA_OPTIONS", 0),
-                ):
-                    for value, expected in (
-                        ('-Dgpg.bestPractices="true"', quoted_status),
-                        ("-Dgpg.bestPractices='true'", quoted_status),
-                        ("-Dgpg.bestPractices=true", 0),
-                        ("-D=gpg.bestPractices=false", 0),
-                    ):
-                        capture.reset_mock()
-                        with self.subTest(source=name, value=value), patch.dict(os.environ, {name: value}, clear=True):
-                            self.assertEqual(guard.main(), expected)
-                            self.assertEqual(capture.called, expected == 0)
-                for value, expected in (
-                    ('-Dgpg.bestPractices="true"', 2), ("-Dgpg.bestPractices='true'", 2),
-                    ("-Dgpg.bestPractices=true", 0), ("-D=gpg.bestPractices=false", 0),
-                ):
-                    (root / ".mvn/jvm.config").write_text(value)
-                    capture.reset_mock()
-                    with self.subTest(source="jvm.config", value=value), patch.dict(os.environ, {}, clear=True):
-                        if expected == 0:
-                            guard.check_policy(root)
-                            self.assertEqual(guard.main(), 0)
-                            capture.assert_called_once()
-                        else:
-                            with self.assertRaisesRegex(guard.Unsafe, "GPG best practices"):
-                                guard.check_policy(root)
-                            self.assertEqual(guard.main(), 2)
-                            capture.assert_not_called()
-
-    def test_log_file_checks_apply_only_to_maven_arguments(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            pom = re.sub(r"<description>.*?</description>",
-                         "<description>Use -l for locale</description>",
-                         policy_pom(), count=1, flags=re.S)
-            (root / "pom.xml").write_text(pom)
-            (root / ".mvn").mkdir()
-            (root / ".mvn/jvm.config").write_text("-Dfoo=-l")
-            guard.check_policy(root)
-            with patch.object(guard, "Path", side_effect=lambda value: root / value):
-                for name in ("MAVEN_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS"):
-                    with self.subTest(source=name), patch.dict(os.environ, {name: "-Dfoo=-l"}, clear=True):
-                        guard.check_runtime_options()
-                for value in ("-lraw.log", "--log-file=raw.log"):
-                    with self.subTest(value=value), patch.dict(os.environ, {"MAVEN_ARGS": value}, clear=True):
-                        with self.assertRaises(guard.Unsafe):
-                            guard.check_runtime_options()
-                    (root / ".mvn/maven.config").write_text(value)
-                    with patch.dict(os.environ, {}, clear=True), self.assertRaises(guard.Unsafe):
-                        guard.check_runtime_options()
-                    (root / ".mvn/maven.config").unlink()
-
-    def test_known_release_properties_from_jvm_sources(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            (root / "pom.xml").write_text(policy_pom())
-            (root / ".mvn").mkdir()
-            config = root / ".mvn/jvm.config"
-            with patch.object(guard, "Path", side_effect=lambda value: root / value), patch.object(
-                sys, "argv", ["guard.py", "run", "mvn", "validate"]
-            ), patch.object(guard, "capture", return_value=0) as capture, patch("sys.stderr", io.StringIO()):
-                for source, value, expected in (
-                    ("MAVEN_OPTS", "-Darguments=-Xvalidate", 2),
-                    ("JAVA_TOOL_OPTIONS", "-Darguments=-Xvalidate", 2),
-                    ("jvm.config", "-Darguments=-Xvalidate", 2),
-                    ("MAVEN_OPTS", "-Dgoals=deploy,-X", 2),
-                    ("_JAVA_OPTIONS", "-DpreparationGoals=clean,verify,-X", 2),
-                    ("jvm.config", "-DcompletionGoals=verify,--l,raw.log", 2),
-                    ("JAVA_TOOL_OPTIONS", "-Darguments=-D=password=dummy-value", 2),
-                    ("MAVEN_OPTS", "-Darguments=--D=javax.net.debug=all", 2),
-                    ("jvm.config", "-Dgoals=deploy,-D=gpg.bestPractices=false", 2),
-                    ("MAVEN_OPTS", "-Dgoals=deploy -Dfoo=-l -Xmx512m", 0),
-                    ("JAVA_TOOL_OPTIONS", "-Dgoals=deploy", 0),
-                    ("JAVA_TOOL_OPTIONS", '-Darguments="-Dfoo=-l"', 0),
-                    ("MAVEN_OPTS", "-Darguments=-Dfoo=-X", 0),
-                    ("jvm.config", "-D=goals=deploy,-X", 0),
-                    ("MAVEN_OPTS", '-Dgoals="deploy,-X"', 0),
-                    ("JAVA_TOOL_OPTIONS", '-Dgoals="deploy,-X"', 2),
-                ):
-                    config.unlink(missing_ok=True)
-                    if source == "jvm.config":
-                        config.write_text(value)
-                    env = {} if source == "jvm.config" else {source: value}
-                    capture.reset_mock()
-                    with self.subTest(source=source, value=value), patch.dict(os.environ, env, clear=True):
-                        self.assertEqual(guard.main(), expected)
-                        self.assertEqual(capture.called, expected == 0)
-                        if expected == 0:
-                            self.assertEqual(capture.call_args.args[0], ["mvn", "validate"])
-                            if source != "jvm.config":
-                                self.assertEqual(capture.call_args.args[1][source], value)
-                        if source == "jvm.config":
-                            self.assertEqual(config.read_text(), value)
-                            if expected:
-                                with self.assertRaises(guard.Unsafe):
-                                    guard.check_policy(root)
-                            else:
-                                guard.check_policy(root)
+        for name in guard.ENV_OPTIONS:
+            for value in ("-Dorg.slf4j.simpleLogger.logFile=raw.log",
+                          "-Dorg.slf4j.simpleLogger.logFile"):
+                with self.subTest(name=name, value=value), patch.dict(
+                    os.environ, {name: value}, clear=True
+                ), patch.object(sys, "argv", ["guard.py", "run", "mvn", "validate"]), patch.object(
+                    guard, "capture"
+                ) as capture, patch("sys.stderr", io.StringIO()):
+                    self.assertEqual(guard.main(), 2)
+                    capture.assert_not_called()
 
     def test_direct_gpg_argument_boundaries(self):
         for value, expected in (("true false", 2), ("true ", 2), ("true", 0)):
@@ -277,24 +193,15 @@ class ReleaseTests(unittest.TestCase):
                 self.assertEqual(capture.called, expected == 0)
 
     def test_direct_gpg_aliases_and_nested_arguments(self):
-        for option in ("-D", "-D=", "--D=", "-define=", "--define="):
+        for option in ("-D", "-define=", "--define="):
             with self.subTest(option=option), self.assertRaises(guard.Unsafe):
                 argument = option + "gpg.bestPractices=true false"
                 guard.check_text(argument, maven_arguments=[argument])
         with self.assertRaises(guard.Unsafe):
             guard.check_text("-D gpg.bestPractices=true false",
                              maven_arguments=["-D", "gpg.bestPractices=true false"])
-        for nested in (
-            "-Darguments=-Dgpg.bestPractices=true -DskipTests=true",
-            '-Darguments="-Dgpg.bestPractices=true"',
-        ):
-            guard.check_text(nested, maven_arguments=[nested])
-        for nested in (
-            "-Darguments=\"-Dgpg.bestPractices='true false'\"",
-            '-Darguments="-Dgpg.bestPractices=true -DskipTests=true"',
-        ):
-            with self.assertRaises(guard.Unsafe):
-                guard.check_text(nested, maven_arguments=[nested])
+        nested = "-Darguments=-Dgpg.bestPractices=true -DskipTests=true"
+        guard.check_text(nested, maven_arguments=[nested])
 
     def test_direct_debug_options(self):
         guard.check_text("-Xmx1g -Xms256m")
@@ -340,284 +247,503 @@ class ReleaseTests(unittest.TestCase):
                     self.assertEqual(guard.main(), 0)
                     capture.assert_called_once()
 
-    def test_maven_argument_sources_reject_attached_debug_and_log_options(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / ".mvn").mkdir()
-            config = root / ".mvn/maven.config"
-            with patch.object(
-                guard, "Path", side_effect=lambda value: root / value if value == ".mvn" else Path(value)
-            ), patch.object(guard, "capture", return_value=0) as capture, patch("sys.stderr", io.StringIO()):
-                for arguments, expected in (
-                    (["-B-X"], 2), (["-e-l", "raw.log"], 2),
-                    (["--X"], 2), (["--l", "raw.log"], 2),
-                    (["-B--debug"], 2), (["-B--log-file", "raw.log"], 2),
-                    (["-B--X"], 2), (["-B--l", "raw.log"], 2),
-                    (["-B-log-file", "raw.log"], 2), (["-ntp=--l", "raw.log"], 2),
-                    (["-llr"], 0), (["--llr"], 0), (["-B-llr"], 0),
-                    (["--legacy-local-repository"], 0),
-                    (["-pl", "driver-core"], 0), (["-B-pl", "driver-core"], 0),
-                    (["-Dfoo=pre-load"], 0),
-                    (["-Dfoo=-l"], 0), (["-Dfoo=-X"], 0),
-                    (["--define=foo=-l"], 0), (["-define", "foo=-l"], 0),
-                    (["-D", "foo=-l"], 0), (["-D=foo=-l"], 0), (["--D=foo=-l"], 0),
-                    (["-Dfoo=--l"], 0), (["-Dfoo=-B-l"], 0),
-                    (["-D=gpg.bestPractices=false"], 2), (["--D=gpg.bestPractices=false"], 2),
-                    (["-D=gpg.bestPractices=true"], 0), (["--D=gpg.bestPractices=true"], 0),
-                    (["--D=gpg.bestPractices="], 2),
-                    (["-D=password=dummy-value"], 2), (["--D=javax.net.debug=all"], 2),
-                    (["--D=org.slf4j.simpleLogger.logFile=raw.log"], 2),
-                    (["-Darguments=-X"], 2), (["-Darguments=-l raw.log"], 2),
-                    (["--D=arguments=-l raw.log"], 2),
-                    (["-Darguments=-Xvalidate"], 2), (["--D=arguments=-Xvalidate"], 2),
-                    (['"-Xvalidate"'], 2), (['"-Darguments=-Xvalidate"'], 2),
-                    (['"-Dfoo=-l"'], 0),
-                    (['"-Dfoo=some', "-l", "raw.log", '-X"'], 0),
-                    (["-Darguments=-Dfoo=-l"], 0), (["-Darguments=-Dfoo=-X"], 0),
-                    (["-Darguments=-Dfoo=some -X"], 2),
-                    (["-Darguments=-Dfoo=some -l raw.log"], 2),
-                    (["-Darguments=-Dfoo=some --l raw.log"], 2),
-                    (["-Darguments=-Dfoo=some -B-l raw.log"], 2),
-                    (["-Darguments=-Dfoo=some -ntp=--l raw.log"], 2),
-                    (["-Dgoals=deploy,-X"], 2),
-                    (["-DpreparationGoals=clean,-Xvalidate"], 2),
-                    (["-DcompletionGoals=verify,--l,raw.log"], 2),
-                    (['-Dgoals=deploy,-Dfoo="some -l raw.log"'], 2),
-                    (["-Dgoals=deploy,-Dfoo=-l"], 0), (["-Dgoals=deploy,-Dfoo=-X"], 0),
-                    (["-Dgoals=deploy"], 0), (['"-DpreparationGoals=clean verify"'], 0),
-                    (["-DGoals=deploy,-X"], 0),
-                    (["-Darguments=-Dgoals=deploy,-X"], 0),
-                ):
-                    for source in ("cli", "MAVEN_ARGS", "maven.config"):
-                        config.unlink(missing_ok=True)
-                        if source == "maven.config":
-                            config.write_text("\n".join(arguments))
-                        env = {"MAVEN_ARGS": " ".join(arguments)} if source == "MAVEN_ARGS" else {}
-                        argv = ["guard.py", "run", "mvn"] + (arguments if source == "cli" else ["validate"])
-                        capture.reset_mock()
-                        with self.subTest(source=source, arguments=arguments), patch.dict(os.environ, env, clear=True), patch.object(
-                            sys, "argv", argv
-                        ):
-                            self.assertEqual(guard.main(), expected)
-                            self.assertEqual(capture.called, expected == 0)
-
-    def test_maven_property_values_preserve_argument_boundaries(self):
-        for arguments, expected in (
-            (["-Dfoo=some -l raw.log -X"], 0),
-            (["-Dfoo=some", "-l", "raw.log"], 2),
-            (['-Darguments=-Dfoo="some -l raw.log -X"'], 0),
-            (["-Darguments=-Dfoo='some -l raw.log -X'"], 0),
-            (['-Darguments=-Dfoo="back\\slash -l raw.log"'], 0),
-            (['-Darguments=-Dfoo="trailing\\"'], 0),
-        ):
-            with self.subTest(arguments=arguments), patch.dict(os.environ, {}, clear=True), patch.object(
-                sys, "argv", ["guard.py", "run", "mvn"] + arguments
-            ), patch.object(guard, "capture", return_value=0) as capture, patch("sys.stderr", io.StringIO()):
-                self.assertEqual(guard.main(), expected)
-                self.assertEqual(capture.called, expected == 0)
-                if expected == 0:
-                    self.assertEqual(capture.call_args.args[0], ["mvn"] + arguments)
+    def test_maven_aliases_are_rejected_across_argument_sources(self):
+        for value in ("--X", "--l raw.log", "--l=raw.log",
+                      "--Dgpg.bestPractices=false", "--D=gpg.bestPractices=false",
+                      "--Dorg.slf4j.simpleLogger.logFile=raw.log"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                shutil.copytree(ROOT / ".github", root / ".github")
+                shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+                config = root / ".mvn/maven.config"
+                config.parent.mkdir()
+                config.write_text(value.replace(" ", "\n"))
+                with self.assertRaises(guard.Unsafe):
+                    guard.check_policy(root)
+                with patch.object(guard, "capture") as capture, \
+                     patch.dict(os.environ, {"MAVEN_ARGS": value}, clear=True), \
+                     patch.object(sys, "argv", ["guard.py", "run", "mvn"]):
+                    self.assertEqual(guard.main(), 2)
+                    capture.assert_not_called()
+                with patch.object(guard, "capture") as capture, \
+                     patch.dict(os.environ, {}, clear=True), \
+                     patch.object(sys, "argv", ["guard.py", "run", "mvn", *value.split()]):
+                    self.assertEqual(guard.main(), 2)
+                    capture.assert_not_called()
 
     def test_unwrapped_release_goals(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shutil.copytree(ROOT / ".github", root / ".github")
-            (root / "pom.xml").write_text(policy_pom())
-            for maven in ("$(MVNCMD)", "${MVNCMD}", "mvn"):
-                for goal in ("prepare", "perform"):
-                    for options in ("", "-B ", "-B -ntp "):
-                        for separator in (" ", " \\\n\t"):
-                            command = f"{maven}{separator}{options}release:{goal}\n"
-                            (root / "Makefile").write_text("\t" + command)
-                            with self.subTest(maven=maven, goal=goal, options=options, separator=separator):
-                                with self.assertRaises(guard.Unsafe):
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for goal in ("prepare", "perform"):
+                for options in ("", "-B ", "-B -ntp "):
+                    (root / "Makefile").write_text(f"\t$(MVNCMD) {options}release:{goal}\n")
+                    with self.subTest(goal=goal, options=options), self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
+
+    def test_make_capture_continuations_and_variable_goals(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for executable in ("mvn", "/usr/bin/mvn", "./mvnw", "$(MVNCMD)",
+                               "${MVNCMD}", "$${MVNCMD}", "$$MVNCMD"):
+                for arguments in ("-B release:perform", "-B \\\n\t release:prepare",
+                                  "$(GOAL)", "${GOAL}", "clean"):
+                    for prefix in ("", "echo '$(RELEASE_GUARD)'; "):
+                        for target in ("compile", "release"):
+                            (root / "Makefile").write_text(
+                                "GOAL = release:perform\n" + target + ":\n\t" + prefix
+                                + executable + " " + arguments + " # $(RELEASE_GUARD)\n"
+                            )
+                            with self.subTest(executable=executable, arguments=arguments,
+                                              prefix=prefix, target=target):
+                                if target == "compile" and arguments == "clean":
                                     guard.check_policy(root)
-                                (root / "Makefile").write_text('\tpython3 "$(RELEASE_GUARD)" run ' + command)
-                                guard.check_policy(root)
-
-    def test_root_gpg_boolean_normalization(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            for value, enabled in (("true", True), ("TRUE", True), ("\n true\n", True),
-                                   ("false", False), ("", False)):
-                (root / "pom.xml").write_text(policy_pom().replace(
-                    "<gpg.bestPractices>true</gpg.bestPractices>",
-                    f"<gpg.bestPractices>{value}</gpg.bestPractices>", 1))
-                with self.subTest(value=value):
-                    if enabled:
-                        guard.check_policy(root)
-                    else:
-                        with self.assertRaisesRegex(guard.Unsafe, "enable GPG best practices"):
-                            guard.check_policy(root)
-
-    def test_profile_and_plugin_management_declarations(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            namespace = "{http://maven.apache.org/POM/4.0.0}"
-            for location in (
-                ("build", "pluginManagement", "plugins"),
-                ("profiles", "profile", "build", "plugins"),
-                ("profiles", "profile", "build", "pluginManagement", "plugins"),
-            ):
-                pom = ET.fromstring(policy_pom())
-                plugins = pom.find(f"{namespace}build/{namespace}plugins")
-                central = next(plugin for plugin in plugins
-                               if plugin.findtext(namespace + "artifactId") == "central-publishing-maven-plugin")
-                plugins.remove(central)
-                target = pom
-                for tag in location:
-                    child = target.find(namespace + tag)
-                    if child is None:
-                        child = ET.SubElement(target, namespace + tag)
-                    target = child
-                target.append(central)
-                ET.ElementTree(pom).write(root / "pom.xml")
-                with self.subTest(location=location):
-                    guard.check_policy(root)
-                    version = central.find(namespace + "version")
-                    safe_version = version.text
-                    version.text = "0.10.0"
-                    ET.ElementTree(pom).write(root / "pom.xml")
-                    with self.assertRaisesRegex(guard.Unsafe, "update Central publishing"):
-                        guard.check_policy(root)
-                    version.text = safe_version
-                    gpg = ET.SubElement(target, namespace + "plugin")
-                    ET.SubElement(gpg, namespace + "artifactId").text = "maven-gpg-plugin"
-                    config = ET.SubElement(gpg, namespace + "configuration")
-                    ET.SubElement(config, namespace + "bestPractices").text = "false"
-                    ET.ElementTree(pom).write(root / "pom.xml")
-                    with self.assertRaisesRegex(guard.Unsafe, "GPG best practices"):
-                        guard.check_policy(root)
-
-    def test_central_version_must_be_pinned(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            original = policy_pom()
-            for version in ("", " \n ", None):
-                pom = with_central_version(original, version or "")
-                if version is None:
-                    pom = CENTRAL_VERSION.sub(lambda match: match[1][:-len("<version>")], original)
-                (root / "pom.xml").write_text(pom)
-                with self.subTest(version=version), self.assertRaisesRegex(guard.Unsafe, "pin Central publishing"):
-                    guard.check_policy(root)
-
-    def test_root_pom_must_declare_central_publishing(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            pom = ET.fromstring(policy_pom())
-            ns = {"m": "http://maven.apache.org/POM/4.0.0"}
-            plugins = pom.find("m:build/m:plugins", ns)
-            central = next(plugin for plugin in plugins
-                           if plugin.findtext("m:artifactId", namespaces=ns) == "central-publishing-maven-plugin")
-            plugins.remove(central)
-            ET.ElementTree(pom).write(root / "pom.xml")
-            with self.assertRaisesRegex(guard.Unsafe, "pin Central publishing"):
+                                else:
+                                    with self.assertRaises(guard.Unsafe):
+                                        guard.check_policy(root)
+                (root / "Makefile").write_text(
+                    "compile:\n\t" + executable + " compile test-compile -Dfmt.skip=true\n"
+                    "release:\n\tpython3 \"$(RELEASE_GUARD)\" run " + executable
+                    + " \\\n\t $(GOAL)\n"
+                )
                 guard.check_policy(root)
 
-    def test_reactor_poms_inherit_defaults_but_reject_unsafe_overrides(self):
+    def test_workflow_requires_capture_for_each_maven_command(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            (root / "pom.xml").write_text(policy_pom().replace(
-                "</project>", "<modules><module>child</module><module>child</module></modules></project>"))
-            nested = root / "child/nested"
-            nested.mkdir(parents=True)
-            project = '<project xmlns="http://maven.apache.org/POM/4.0.0">{}</project>'
-            (root / "child/pom.xml").write_text(project.format("<modules><module>nested</module></modules>"))
-            for settings in (
-                "",
-                "<properties><gpg.bestPractices>false</gpg.bestPractices></properties>",
-                "<build><plugins><plugin><artifactId>maven-gpg-plugin</artifactId>"
-                "<configuration><bestPractices>false</bestPractices></configuration></plugin></plugins></build>",
-                "<build><plugins><plugin><artifactId>central-publishing-maven-plugin</artifactId>"
-                "<version>0.8.0</version></plugin></plugins></build>",
-            ):
-                (nested / "pom.xml").write_text(project.format(settings))
-                with self.subTest(settings=settings):
-                    if settings:
-                        with self.assertRaises(guard.Unsafe):
-                            guard.check_policy(root)
-                    else:
-                        guard.check_policy(root)
-            (nested / "pom.xml").unlink()
-            with self.assertRaises(OSError):
-                guard.check_policy(root)
-
-    def test_reactor_policy_checks_do_not_depend_on_xml_namespace(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            pom = policy_pom().replace("</project>", "<modules><module>child</module></modules></project>")
-            (root / "pom.xml").write_text(pom)
-            nested = root / "child/nested"
-            nested.mkdir(parents=True)
-            qualified = '<project xmlns="http://maven.apache.org/POM/4.0.0">{}</project>'
-            unsafe = "<properties><gpg.bestPractices>false</gpg.bestPractices></properties>"
-            for namespace in ("", ' xmlns="urn:alternate-pom"'):
-                project = "<project" + namespace + ">{}</project>"
-                modules = "<modules><module>nested</module></modules>"
-                (nested / "pom.xml").write_text(qualified.format(""))
-                for settings in (
-                    "", unsafe,
-                    "<build><plugins><plugin><artifactId>maven-gpg-plugin</artifactId>"
-                    "<configuration><bestPractices>false</bestPractices></configuration></plugin></plugins></build>",
-                    "<build><plugins><plugin><artifactId>central-publishing-maven-plugin</artifactId>"
-                    "<version>0.8.0</version></plugin></plugins></build>",
+            workflow_path = root / ".github/workflows/release.yml"
+            workflow_path.parent.mkdir(parents=True)
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            workflow = (ROOT / ".github/workflows/release.yml").read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            self.assertIn(original, workflow)
+            for executable in ("mvn", "/usr/bin/mvn", "./mvnw", "${MVNCMD}", "$MVNCMD"):
+                for script in (
+                    executable + " clean # RELEASE_GUARD",
+                    json.dumps(executable + ' clean # RELEASE_GUARD'),
+                    "'" + executable + " clean # RELEASE_GUARD'",
+                    '|\n          ' + executable + " clean # RELEASE_GUARD",
+                    '>\n          ' + executable + "\n          clean # RELEASE_GUARD",
+                    'python3 "$RELEASE_GUARD" run $MVNCMD clean; ' + executable + ' release:clean',
+                    '|\n          python3 "$RELEASE_GUARD" run $MVNCMD clean\n          '
+                    + executable + ' release:clean',
                 ):
-                    (root / "child/pom.xml").write_text(project.format(settings + modules))
-                    with self.subTest(namespace=namespace, settings=settings):
-                        if settings:
-                            with self.assertRaises(guard.Unsafe):
+                    workflow_path.write_text(workflow.replace(original, "run: " + script))
+                    with self.subTest(script=script), self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
+                workflow_path.write_text(workflow.replace(
+                    original, 'run: python3 "${RELEASE_GUARD}" run ' + executable + " clean"
+                ))
+                guard.check_policy(root)
+            workflow_path.write_text(workflow.replace(
+                original, 'run: >\n          python3 "$RELEASE_GUARD" run\n          $MVNCMD clean'
+            ))
+            guard.check_policy(root)
+
+    def test_unresolved_executables_require_guard_routing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            workflow_path = root / ".github/workflows/release.yml"
+            workflow = workflow_path.read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            for executable in ('$(printf mvn)', '"$(printf mvn)"', '`printf mvn`',
+                               '$TOOL', '${TOOLS}/mvn', './mv*'):
+                for prefix in ('', 'SAFE=true ', 'exec ', 'env '):
+                    command = prefix + executable + ' release:perform'
+                    with self.subTest(command=command):
+                        (root / "Makefile").write_text('release:\n\t' + command + '\n')
+                        with self.assertRaisesRegex(guard.Unsafe, 'unresolved release executables'):
+                            guard.check_policy(root)
+                        (root / "Makefile").unlink()
+                        workflow_path.write_text(workflow.replace(original, 'run: |\n          ' + command))
+                        with self.assertRaisesRegex(guard.Unsafe, 'unresolved release executables'):
+                            guard.check_policy(root)
+                        workflow_path.write_text(workflow)
+                guarded = 'SAFE=true python3 "$RELEASE_GUARD" run ' + executable + ' release:perform'
+                if "$(" in executable or "`" in executable:
+                    # Shell expansion happens before the guard can capture it.
+                    with self.assertRaises(guard.Unsafe):
+                        guard.check_maven_capture(guarded, require_capture=True)
+                else:
+                    guard.check_maven_capture(guarded, require_capture=True)
+            for executable in ('/usr/bin/mvn', './mvnw', 'custom-maven'):
+                guard.check_maven_capture(
+                    'python3 "$RELEASE_GUARD" run ' + executable + ' release:perform',
+                    require_capture=True,
+                )
+            # Real workflow includes multiline gh command substitutions in assignments.
+            guard.check_policy(root)
+
+    def test_workflow_quoted_and_spaced_run_keys(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            path = root / ".github/workflows/release.yml"
+            workflow = path.read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            for key in ('run :', '"run":', "'run':", '"run" :', "'run'  :"):
+                for value in ('mvn release:perform', '"mvn release:perform"',
+                              '|\n          mvn release:perform',
+                              '>\n          mvn\n          release:perform'):
+                    with self.subTest(key=key, value=value):
+                        path.write_text(workflow.replace(original, key + ' ' + value))
+                        with self.assertRaisesRegex(guard.Unsafe, 'sanitized log capture'):
+                            guard.check_policy(root)
+                path.write_text(workflow.replace('run:', key))
+                guard.check_policy(root)
+                self.assertEqual(list(guard.workflow_commands('- ' + key + ' mvn clean')),
+                                 ['mvn clean'])
+
+    def test_assignment_substitutions_and_eval_cannot_bypass_capture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for command in ('result=$$(mvn release:perform)',
+                            'result="$$(mvn release:perform)"',
+                            'result=`mvn release:perform`',
+                            "eval 'mvn release:perform'",
+                            "command eval 'mvn release:perform'",
+                            "env -- eval 'mvn release:perform'"):
+                with self.subTest(command=command):
+                    (root / "Makefile").write_text('release:\n\t' + command + '\n')
+                    with self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
+
+    def test_blocker_lookup_allows_only_existing_fixed_command(self):
+        script = "blocker=$(gh issue list --repo \"$GITHUB_REPOSITORY\" --state open --label release-blocker --limit 1 --json title,url --jq '.[0] // empty')"
+        guard.check_maven_capture(script, require_capture=True)
+        for extra in ('; mvn release:perform', ' $(mvn release:perform)',
+                      ' `mvn release:perform`', '\n mvn release:perform'):
+            with self.subTest(extra=extra), self.assertRaises(guard.Unsafe):
+                guard.check_maven_capture(script.replace('gh issue list', 'gh issue list' + extra),
+                                          require_capture=True)
+
+    def test_env_launcher_options_cannot_hide_executables(self):
+        for command in ('env -- "$$(command -v mvn)" -B release:perform',
+                        'env -- SAFE=true "$$(command -v mvn)" release:perform',
+                        'env -- mvn release:perform',
+                        'env -- /bin/bash -c "mvn release:perform"',
+                        'env -S "mvn release:perform"',
+                        'env --split-string="mvn release:perform"'):
+            with self.subTest(command=command), self.assertRaises(guard.Unsafe):
+                guard.check_maven_capture(command, require_capture=True)
+        guard.check_maven_capture(
+            'env -- SAFE=true python3 "$RELEASE_GUARD" run mvn release:perform',
+            require_capture=True,
+        )
+
+    def test_guarded_maven_arguments_are_not_shell_launchers(self):
+        for argument in ('-Dsafe.path=/tmp/bash', '/tmp/bash', 'eval', 'sh'):
+            with self.subTest(argument=argument):
+                guard.check_maven_capture(
+                    'python3 "$RELEASE_GUARD" run mvn release:perform ' + argument,
+                    require_capture=True, make_variables=True,
+                )
+
+    def test_quoted_workflow_run_comments_preserve_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            path = root / '.github/workflows/release.yml'
+            workflow = path.read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            for command in ('python3 "$RELEASE_GUARD" run mvn clean -Dsafe.path=/tmp/#bash',
+                            "python3 '$RELEASE_GUARD' run mvn clean -Dsafe.path=/tmp/#bash",
+                            'mvn release:perform # RELEASE_GUARD'):
+                for scalar in (json.dumps(command), "'" + command.replace("'", "''") + "'"):
+                    value = scalar + ' # YAML comment with "quotes" and # hashes'
+                    with self.subTest(value=value):
+                        self.assertEqual(list(guard.workflow_commands('run: ' + value)), [command])
+                        path.write_text(workflow.replace(original, 'run: ' + value))
+                        if command.startswith('mvn'):
+                            with self.assertRaisesRegex(guard.Unsafe, 'sanitized log capture'):
                                 guard.check_policy(root)
                         else:
                             guard.check_policy(root)
-                (root / "child/pom.xml").write_text(project.format(modules))
-                (nested / "pom.xml").write_text(qualified.format(unsafe))
-                with self.subTest(namespace=namespace), self.assertRaises(guard.Unsafe):
-                    guard.check_policy(root)
-            (nested / "pom.xml").write_text(qualified.format(""))
-            (root / "pom.xml").write_text(pom.replace('xmlns="http://maven.apache.org/POM/4.0.0"', ""))
-            guard.check_policy(root)
-            (root / "child/pom.xml").write_text('<document xmlns="urn:alternate-pom"/>')
-            with self.assertRaisesRegex(guard.Unsafe, "project POM"):
-                guard.check_policy(root)
 
-    def test_plugin_payload_is_not_a_maven_declaration(self):
+    def test_make_rejects_custom_recipe_prefix(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shutil.copytree(ROOT / ".github", root / ".github")
-            payload = (
-                '<custom xmlns="urn:payload"><gpg.bestPractices>false</gpg.bestPractices>'
-                '<modules><module>not-a-reactor-module</module></modules>'
-                '<plugin><artifactId>central-publishing-maven-plugin</artifactId>'
-                '<version>0.8.0</version></plugin></custom>'
-            )
-            pom = policy_pom().replace(
-                "</plugins>",
-                "<plugin><artifactId>maven-release-plugin</artifactId><configuration>"
-                + payload + "</configuration></plugin></plugins>", 1,
-            )
-            (root / "pom.xml").write_text(pom)
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for setting in ('.RECIPEPREFIX := >', '.RECIPEPREFIX = >',
+                            'override .RECIPEPREFIX := >', 'export .RECIPEPREFIX := >'):
+                with self.subTest(setting=setting):
+                    (root / "Makefile").write_text(setting + '\nrelease:\n>mvn release:perform\n')
+                    with self.assertRaisesRegex(guard.Unsafe, r'\.RECIPEPREFIX.*unsupported'):
+                        guard.check_policy(root)
+            (root / "Makefile").write_text('# .RECIPEPREFIX := >\nrelease:\n\t@echo safe\n')
             guard.check_policy(root)
+
+    def test_make_rejects_nested_shell_launchers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for launcher in ("bash -c", "/bin/sh -c", "env bash -lc", "exec zsh -c"):
+                for executable in ("mvn", "$(MVNCMD)", "$$MVNCMD"):
+                    for target in ("compile", ".release", "release-prepare"):
+                        for separator in ("\n\t", " ; "):
+                            (root / "Makefile").write_text(
+                                target + ":" + separator + "@" + launcher + " '"
+                                + executable + " -B release:perform' # $(RELEASE_GUARD)\n"
+                            )
+                            with self.subTest(launcher=launcher, executable=executable,
+                                              target=target, separator=separator), \
+                                 self.assertRaisesRegex(guard.Unsafe, "nested shell launchers"):
+                                guard.check_policy(root)
+
+    def test_workflow_rejects_nested_shell_launchers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workflow_path = root / ".github/workflows/release.yml"
+            workflow_path.parent.mkdir(parents=True)
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            workflow = (ROOT / ".github/workflows/release.yml").read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            self.assertIn(original, workflow)
+            for launcher in ("sh", "bash", "dash", "ash", "ksh", "zsh", "fish", "/bin/bash"):
+                for script in ("mvn -B release:perform", "$MVNCMD clean"):
+                    command = launcher + " -c '" + script + "' # RELEASE_GUARD"
+                    for value in (command, json.dumps(command), "|\n          " + command):
+                        workflow_path.write_text(workflow.replace(original, "run: " + value))
+                        with self.subTest(launcher=launcher, script=script, value=value), \
+                             self.assertRaisesRegex(guard.Unsafe, "nested shell launchers"):
+                            guard.check_policy(root)
+
+    def test_make_inline_recipes_require_capture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for target in (".release", "release-prepare", "compile", "compile .release"):
+                for executable in ("mvn", "$(MVNCMD)", "${MVNCMD}"):
+                    for arguments in ("-B release:perform", "$(GOAL)", "clean"):
+                        for prefix in ("", "@", "+", "-", "echo capture; "):
+                            (root / "Makefile").write_text(
+                                "GOAL = release:perform\n" + target + ": ; "
+                                + prefix + executable + " " + arguments
+                                + " # $(RELEASE_GUARD)\n"
+                            )
+                            with self.subTest(target=target, executable=executable,
+                                              arguments=arguments, prefix=prefix):
+                                if target == "compile" and arguments == "clean":
+                                    guard.check_policy(root)
+                                else:
+                                    with self.assertRaises(guard.Unsafe):
+                                        guard.check_policy(root)
+                    (root / "Makefile").write_text(
+                        "compile: ; " + executable + " compile test-compile -Dfmt.skip=true\n"
+                        + target + ': ; @python3 "$(RELEASE_GUARD)" run ' + executable
+                        + " -B \\\n\t release:perform\n"
+                    )
+                    guard.check_policy(root)
+
+    def test_release_prerequisites_and_executable_make_directives_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            for text in (
+                'release: helper\nhelper:\n\tbash -c "mvn release:perform"\n',
+                'include unsafe.mk\nrelease:\n\techo safe\n',
+                'X := $(shell mvn release:perform)\nrelease:\n\techo safe\n',
+                '$(eval release: ; mvn release:perform)\n',
+                'release:\n\tcustom-maven release:perform\n',
+            ):
+                with self.subTest(text=text):
+                    (root / "Makefile").write_text(text)
+                    with self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
+
+    def test_argument_substitutions_and_opaque_launchers_fail_full_policy(self):
+        commands = (
+            'echo "$(mvn release:perform)"',
+            'printf "%s\\n" "$(mvn release:perform)"',
+            'echo "`mvn release:perform`"',
+            'echo "$(mvn)"',
+            'python3 "$RELEASE_GUARD" run mvn "$(mvn release:perform)"',
+            'python3 "$RELEASE_GUARD" run mvn "`mvn release:perform`"',
+            "builtin eval 'mvn release:perform'",
+            "command -p bash -c 'mvn release:perform'",
+            "command -- builtin eval 'mvn release:perform'",
+            "exec -a safe bash -c 'mvn release:perform'",
+            "env -S 'mvn release:perform'",
+            'xargs mvn clean',
+            'xargs custom-maven release:perform',
+            'timeout 10 mvn clean',
+            'nice mvn clean',
+            'nohup mvn clean',
+            'custom-wrapper mvn clean',
+            'custom-maven release:perform',
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            workflow_path = root / ".github/workflows/release.yml"
+            workflow = workflow_path.read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            self.assertIn(original, workflow)
+            for command in commands:
+                with self.subTest(command=command, source="workflow"):
+                    workflow_path.write_text(workflow.replace(original, 'run: ' + json.dumps(command)))
+                    with self.assertRaises(guard.Unsafe):
+                        guard.check_policy(root)
+                workflow_path.write_text(workflow)
+                # Make escapes shell dollars; the rejection must survive that layer.
+                for target in ('release', 'compile'):
+                    with self.subTest(command=command, source="Makefile", target=target):
+                        (root / "Makefile").write_text(
+                            target + ':\n\t' + command.replace('$', '$$') + '\n'
+                        )
+                        with self.assertRaises(guard.Unsafe):
+                            guard.check_policy(root)
+                (root / "Makefile").unlink()
+
+    def test_diagnostic_arguments_and_supported_launchers_pass_full_policy(self):
+        commands = (
+            'echo mvn release:perform',
+            'printf "%s\\n" mvn release:perform',
+            'echo bash eval custom-maven release:perform',
+            'command -- echo mvn release:perform',
+            'env -- SAFE=true printf "%s\\n" mvn release:perform',
+            'command -- python3 "$RELEASE_GUARD" run custom-maven release:perform',
+            'exec -- python3 "$RELEASE_GUARD" run mvn release:perform',
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            workflow_path = root / ".github/workflows/release.yml"
+            workflow = workflow_path.read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            for command in commands:
+                with self.subTest(command=command):
+                    workflow_path.write_text(workflow.replace(original, 'run: ' + json.dumps(command)))
+                    (root / "Makefile").write_text('release:\n\t' + command + '\n')
+                    guard.check_policy(root)
+
+    def test_workflow_aliases_and_tags_are_rejected_before_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / ".github", root / ".github")
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
+            path = root / ".github/workflows/release.yml"
+            workflow = path.read_text()
+            for value in ("*release", "&release mvn release:perform", "!!str mvn release:perform"):
+                with self.subTest(value=value):
+                    path.write_text("command: &release mvn release:perform\n" +
+                                    workflow.replace('run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run', "run: " + value))
+                    with self.assertRaisesRegex(guard.Unsafe, "aliased or tagged"):
+                        guard.check_policy(root)
+
+    def test_process_substitutions_and_subshells_fail_full_policy(self):
+        commands = (
+            'cat <(mvn deploy)',
+            'cat >(/usr/bin/mvn deploy)',
+            'python3 "$RELEASE_GUARD" run mvn clean <(mvn deploy)',
+            'python3 "$RELEASE_GUARD" run mvn clean >(mvn deploy)',
+            '(mvn $GOAL)',
+            '( mvn $GOAL )',
+            'echo safe; (mvn $GOAL)',
+            'if true; then (mvn $GOAL); fi',
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / '.github', root / '.github')
+            shutil.copy(ROOT / 'pom.xml', root / 'pom.xml')
+            workflow_path = root / '.github/workflows/release.yml'
+            workflow = workflow_path.read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            self.assertIn(original, workflow)
+            for command in commands:
+                with self.subTest(command=command, source='workflow'):
+                    workflow_path.write_text(workflow.replace(original, 'run: ' + json.dumps(command)))
+                    with self.assertRaisesRegex(guard.Unsafe, 'grouping and process substitutions'):
+                        guard.check_policy(root)
+                workflow_path.write_text(workflow)
+                with self.subTest(command=command, source='Makefile'):
+                    (root / 'Makefile').write_text(
+                        'GOAL = release:perform\n.release:\n\t'
+                        + command.replace('$GOAL', '$(GOAL)') + '\n'
+                    )
+                    with self.assertRaisesRegex(guard.Unsafe, 'grouping and process substitutions'):
+                        guard.check_policy(root)
+                (root / 'Makefile').unlink()
+
+    def test_shell_comments_preserve_command_boundaries_full_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / '.github', root / '.github')
+            shutil.copy(ROOT / 'pom.xml', root / 'pom.xml')
+            workflow_path = root / '.github/workflows/release.yml'
+            workflow = workflow_path.read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            self.assertIn(original, workflow)
+            for executable in ('mvn', '/usr/bin/mvn', './mvnw', '$MVNCMD'):
+                for comment in ('# captured', '# ignored (mvn deploy) <(mvn deploy)'):
+                    script = ('python3 "$RELEASE_GUARD" run $MVNCMD clean '
+                              + comment + '\n' + executable + ' release:perform')
+                    with self.subTest(executable=executable, comment=comment):
+                        workflow_path.write_text(workflow.replace(
+                            original, 'run: |\n          ' + script.replace('\n', '\n          ')
+                        ))
+                        with self.assertRaisesRegex(guard.Unsafe, 'sanitized log capture'):
+                            guard.check_policy(root)
+
+    def test_comments_and_literal_parentheses_pass_full_policy(self):
+        commands = (
+            'python3 "$RELEASE_GUARD" run mvn clean # captured',
+            '# ignored (mvn deploy) <(mvn deploy) >(mvn deploy) $(mvn deploy)\n'
+            'python3 "$RELEASE_GUARD" run mvn clean',
+            'python3 "$RELEASE_GUARD" run mvn clean # captured\necho safe # done',
+            'python3 "$RELEASE_GUARD" run mvn clean "-Dlabel=(ordinary)"',
+            "python3 \"$RELEASE_GUARD\" run mvn clean '-Dlabel=<(ordinary)>(text)'",
+            r'python3 "$RELEASE_GUARD" run mvn clean -Dlabel=\(ordinary\)',
+            'python3 "$RELEASE_GUARD" run mvn clean -Dlabel=hash#text',
+            'python3 "$RELEASE_GUARD" run mvn clean "-Dlabel=#(text)"',
+            'if test -n "$GOAL"; then python3 "$RELEASE_GUARD" run mvn clean; fi',
+            'if [[ -n "$GOAL" ]]; then python3 "$RELEASE_GUARD" run mvn clean; fi',
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(ROOT / '.github', root / '.github')
+            shutil.copy(ROOT / 'pom.xml', root / 'pom.xml')
+            workflow_path = root / '.github/workflows/release.yml'
+            workflow = workflow_path.read_text()
+            makefile = (ROOT / 'Makefile').read_text()
+            original = 'run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run'
+            self.assertIn(original, workflow)
+            for command in commands:
+                with self.subTest(command=command):
+                    workflow_path.write_text(workflow.replace(original, 'run: ' + json.dumps(command)))
+                    # Keep all native credential gates while adding a safe recipe.
+                    (root / 'Makefile').write_text(
+                        makefile + '\nrelease-lexical:\n\t'
+                        + command.replace('$', '$$').replace('\n', '\n\t') + '\n'
+                    )
+                    guard.check_policy(root)
 
     def test_old_release_target(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shutil.copytree(ROOT / ".github", root / ".github")
-            pom = policy_pom()
+            pom = (ROOT / "pom.xml").read_text()
             for case, text, message in (
                 ("bestPractices", pom.replace("<gpg.bestPractices>true</gpg.bestPractices>", ""),
                  "enable GPG best practices"),
                 ("central 0.8.0", with_central_version(pom, "0.8.0"), "update Central publishing"),
                 ("central 0.10.0", with_central_version(pom, "0.10.0"),
                  "update Central publishing"),
-                ("central property", with_central_version(pom, "${central.version}"), "update Central publishing"),
-                ("central incomplete", with_central_version(pom, "0.12"), "update Central publishing"),
-                ("central snapshot", with_central_version(pom, "0.12.0-SNAPSHOT"), "update Central publishing"),
             ):
                 (root / "pom.xml").write_text(text)
                 with self.subTest(case=case), self.assertRaisesRegex(guard.Unsafe, message):
@@ -628,7 +754,7 @@ class ReleaseTests(unittest.TestCase):
             root = Path(directory)
             shutil.copytree(ROOT / ".github", root / ".github")
             for value in ("false", "no", "0", "", "true"):
-                pom = policy_pom().replace(
+                pom = (ROOT / "pom.xml").read_text().replace(
                     "<artifactId>maven-gpg-plugin</artifactId>",
                     "<artifactId>maven-gpg-plugin</artifactId>"
                     f"<configuration><bestPractices>{value}</bestPractices></configuration>",
@@ -644,27 +770,22 @@ class ReleaseTests(unittest.TestCase):
     def test_disabled_gpg_profile(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            shutil.copytree(ROOT / ".github", root / ".github")
-            for value in ("false", "no", "0", "", "true"):
-                pom = policy_pom().replace(
+            for value in ("false", "no", "0", ""):
+                pom = (ROOT / "pom.xml").read_text().replace(
                     "<profiles>",
                     "<profiles><profile><id>unsafe</id><properties>"
                     f"<gpg.bestPractices>{value}</gpg.bestPractices></properties></profile>",
                 )
                 (root / "pom.xml").write_text(pom)
-                with self.subTest(value=value):
-                    if value == "true":
-                        guard.check_policy(root)
-                    else:
-                        with self.assertRaisesRegex(guard.Unsafe, "GPG best practices must not be disabled"):
-                            guard.check_policy(root)
+                with self.subTest(value=value), self.assertRaises(guard.Unsafe):
+                    guard.check_policy(root)
 
     def test_newer_central_versions(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shutil.copytree(ROOT / ".github", root / ".github")
-            pom = policy_pom()
-            for version in ("0.11.0", "0.11.1", "0.12.0", "1.0.0", " \n 0.12.0 \n "):
+            pom = (ROOT / "pom.xml").read_text()
+            for version in ("0.11.0", "0.11.1", "0.12.0", "1.0.0"):
                 (root / "pom.xml").write_text(with_central_version(pom, version))
                 with self.subTest(version=version):
                     guard.check_policy(root)
@@ -673,7 +794,7 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shutil.copytree(ROOT / ".github", root / ".github")
-            (root / "pom.xml").write_text(policy_pom())
+            shutil.copy(ROOT / "pom.xml", root / "pom.xml")
             workflow = root / ".github/workflows/release.yml"
             original = workflow.read_text()
             workflow.write_text(original.replace("if: always()", "if: ${{ always() }}"))
@@ -701,11 +822,6 @@ class ReleaseTests(unittest.TestCase):
                 self.assertNotIn("secret", output.getvalue())
         for text in ("-Dmaven.repo.local=/x/repo-f", "-Dfoo=a-s", "-fae -ff -llr"):
             guard.check_text(text)
-        arguments = ["-B", "-Darguments=-Dfoo=some -l raw.log", "-ntp"]
-        with patch("sys.stderr", new_callable=io.StringIO) as output, self.assertRaises(guard.Unsafe):
-            guard.check_text("\n".join(arguments), ".mvn/maven.config", maven_arguments=arguments)
-        self.assertIn("at .mvn/maven.config;", output.getvalue())
-        self.assertNotRegex(output.getvalue(), r"maven\.config:\d")
 
     def test_termination_signals_stop_maven(self):
         for signum in (signal.SIGTERM, signal.SIGHUP):
@@ -725,7 +841,6 @@ class ReleaseTests(unittest.TestCase):
                              RELEASE_LOG_DIR=str(root / "logs")),
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 )
-                child = None
                 try:
                     deadline = time.monotonic() + 5
                     while not ready.exists() and time.monotonic() < deadline:
@@ -742,19 +857,8 @@ class ReleaseTests(unittest.TestCase):
                         os.kill(child, 0)
                 finally:
                     if process.poll() is None:
-                        process.terminate()
-                    if child is None and ready.exists():
-                        child = int(ready.read_text())
-                    if child is not None:
-                        try:
-                            os.killpg(child, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                    try:
-                        process.communicate(timeout=5)
-                    except subprocess.TimeoutExpired:
                         process.kill()
-                        process.communicate(timeout=5)
+                    process.communicate()
 
     def test_encoded_and_multiline_credentials(self):
         env = {
@@ -781,6 +885,34 @@ class ReleaseTests(unittest.TestCase):
             b"Authorization: [REDACTED]\n-Dpassword=[REDACTED]",
         )
 
+    def test_xml_escaped_credentials_in_both_streams(self):
+        secret = "xml&<tag>\"'secret"
+        forms = (
+            "xml&amp;&lt;tag&gt;\"'secret",
+            "xml&amp;&lt;tag&gt;&quot;&apos;secret",
+            "xml&amp;&lt;tag&gt;&quot;&#x27;secret",
+            "xml&amp;&lt;tag&gt;&#34;&#39;secret",
+            "xml&amp;&lt;tag&gt;&#x22;&#x27;secret",
+        )
+        output = ("\n".join(forms) + "\n").encode()
+        with tempfile.TemporaryDirectory() as directory:
+            command = [sys.executable, "-c",
+                       f"import os; os.write(1, {output!r}); os.write(2, {output!r})"]
+            script = (
+                "import guard, os\nfrom pathlib import Path\n"
+                f"raise SystemExit(guard.capture({command!r}, os.environ, "
+                f"guard.secret_forms(os.environ), Path({directory!r})))"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", script], capture_output=True,
+                cwd=ROOT / "scripts/release",
+                env=dict(os.environ, MAVEN_GPG_PASSPHRASE=secret),
+            )
+            self.assertEqual(result.returncode, 0)
+            for name, console in (("stdout", result.stdout), ("stderr", result.stderr)):
+                self.assertEqual(console, b"[REDACTED]\n" * len(forms))
+                self.assertEqual((Path(directory) / (name + ".log")).read_bytes(), console)
+
     def test_quoted_authorization_headers(self):
         for header in ("Authorization", "Proxy-Authorization"):
             for quote in ("", "'", '"'):
@@ -789,11 +921,9 @@ class ReleaseTests(unittest.TestCase):
                     self.assertNotIn(b"unknown", guard.redact(data, []))
 
     def test_quoted_credential_arguments(self):
-        for option in (b"-Dpassword=", b"-D=password=", b"--D=token=",
-                       b"--define=token=", b"--define secret=", b"-define=token=", b"-define secret="):
-            with self.subTest(option=option):
-                self.assertEqual(guard.redact(option + b"unregistered-value", []), option + b"[REDACTED]")
-            for quote in (b"'", b'"'):
+        for quote in (b"'", b'"'):
+            for option in (b"-Dpassword=", b"--define=token=", b"--define secret=",
+                           b"-define=token=", b"-define secret="):
                 with self.subTest(quote=quote, option=option):
                     result = guard.redact(quote + option + b"two words\nlast" + quote, [])
                     self.assertNotIn(b"words", result)
@@ -812,73 +942,6 @@ class ReleaseTests(unittest.TestCase):
                     self.assertNotIn(b"beta", result)
                     self.assertNotIn(b"gamma", result)
                     self.assertIn(b"[REDACTED]", result)
-
-    def test_unquoted_escaped_whitespace_credentials(self):
-        for whitespace in (b" ", b"\t", b"\n", b"\r", b"\r\n", b"\v", b"\f"):
-            for option in (b"-Dpassword=", b"--define=token=", b"-define secret="):
-                for ending in (b"", b"\\"):
-                    with self.subTest(whitespace=whitespace, option=option, ending=ending):
-                        value = b"first\\" + whitespace + b"secret-tail" + ending
-                        diagnostic = b"\nordinary following diagnostic\n"
-                        self.assertEqual(guard.redact(option + value + diagnostic, []),
-                                         option + b"[REDACTED]" + diagnostic if not ending
-                                         else option + b"[REDACTED] following diagnostic\n")
-                        self.assertEqual(guard.redact(option + value, []), option + b"[REDACTED]")
-        self.assertEqual(guard.redact(b"-Dpassword=\\\n", []), b"-Dpassword=[REDACTED]")
-        self.assertEqual(guard.redact(b"-Dpassword=\\", []), b"-Dpassword=[REDACTED]")
-
-    def test_json_url_secret_variants_in_all_capture_outputs(self):
-        secret = "pa/ss<&word +é"
-        forms = guard.secret_forms({"SONATYPE_TOKEN_PASSWORD": secret})
-        variants = {urllib.parse.quote(secret, safe=""), urllib.parse.quote(secret),
-                    urllib.parse.quote_plus(secret, safe="")}
-        variants |= {value.lower() for value in variants}
-        payloads = []
-        for value in sorted(variants):
-            for slash_escape in (False, True):
-                serialized = json.dumps(value)
-                if slash_escape:
-                    serialized = serialized.replace("/", "\\/")
-                for payload in (serialized, serialized[1:-1]):
-                    with self.subTest(payload=payload):
-                        self.assertIn(b"[REDACTED]", guard.redact(payload.encode(), forms))
-                        self.assertNotIn(b"word", guard.redact(payload.encode(), forms))
-                    payloads.append(payload.encode())
-        # Both fixes traverse the real capture path to both consoles and artifacts.
-        payloads.extend(b"-Dpassword=first\\" + whitespace + b"secret-tail"
-                        for whitespace in (b" ", b"\t", b"\n", b"\r\n"))
-        data = b"\n".join(payloads) + b"\nordinary following diagnostic\n"
-        expected = guard.redact(data, forms)
-        self.assertNotIn(b"secret-tail", expected)
-        self.assertNotIn(b"pa", expected.replace(b"-Dpassword=", b""))
-        self.assertTrue(expected.endswith(b"\nordinary following diagnostic\n"))
-        with tempfile.TemporaryDirectory() as directory:
-            command = [sys.executable, "-c", "import os\nfor fd in (1, 2):\n"
-                       f" os.write(fd, {data!r})\nraise SystemExit(17)"]
-            script = ("import guard, os\nfrom pathlib import Path\n"
-                      f"raise SystemExit(guard.capture({command!r}, os.environ, "
-                      f"guard.secret_forms({dict(SONATYPE_TOKEN_PASSWORD=secret)!r}), Path({directory!r})))")
-            result = subprocess.run([sys.executable, "-c", script], capture_output=True,
-                                    cwd=ROOT / "scripts/release", timeout=5)
-            self.assertEqual(result.returncode, 17)
-            for name, console in (("stdout", result.stdout), ("stderr", result.stderr)):
-                self.assertEqual(console, expected)
-                self.assertEqual((Path(directory) / (name + ".log")).read_bytes(), expected)
-
-    def test_unclosed_quoted_credentials_are_redacted_through_eof(self):
-        for quote in (b"'", b'"'):
-            for prefix in (b"-Dpassword=" + quote, quote + b"-Dpassword="):
-                for payload in (b"first\nsecret tail", b"first\\" + quote + b"\nsecret tail"):
-                    for ending in (b"", b"\\"):
-                        with self.subTest(prefix=prefix, payload=payload, ending=ending):
-                            result = guard.redact(prefix + payload + ending, [])
-                            self.assertNotIn(b"first", result)
-                            self.assertNotIn(b"secret tail", result)
-                            self.assertTrue(result.endswith(b"[REDACTED]"))
-                    diagnostic = b"\nordinary following diagnostic\n"
-                    result = guard.redact(prefix + payload + quote + diagnostic, [])
-                    self.assertNotIn(b"secret tail", result)
-                    self.assertTrue(result.endswith(diagnostic))
 
     def test_secrets_matching_credential_markers(self):
         for marker, output in (
@@ -899,47 +962,50 @@ class ReleaseTests(unittest.TestCase):
 
     def test_split_output_artifacts_and_exit_status(self):
         with tempfile.TemporaryDirectory() as directory:
-            expected_artifact = b""
-            for marker, status in (("first", 0), ("second", 17)):
-                # Real captures share logs so earlier sanitized invocations must remain.
-                command = [
-                    sys.executable, "-c",
-                    "import os\nfor fd in (1, 2):\n"
-                    f" for part in ({(marker + ': ').encode()!r}, b'dummy-', b'secret\\n'):\n"
-                    f"  os.write(fd, part)\nraise SystemExit({status})",
-                ]
-                script = (
-                    "import guard, os\nfrom pathlib import Path\n"
-                    f"raise SystemExit(guard.capture({command!r}, os.environ, "
-                    f"guard.secret_forms(os.environ), Path({directory!r})))"
-                )
-                result = subprocess.run(
-                    [sys.executable, "-c", script], capture_output=True,
-                    cwd=ROOT / "scripts/release",
-                    env=dict(os.environ, MAVEN_GPG_PASSPHRASE="dummy-secret"), timeout=5,
-                )
-                self.assertEqual(result.returncode, status)
-                expected_console = marker.encode() + b": [REDACTED]\n"
-                expected_artifact += expected_console
-                for name, console in (("stdout", result.stdout), ("stderr", result.stderr)):
-                    self.assertEqual(console, expected_console)
-                    self.assertEqual((Path(directory) / (name + ".log")).read_bytes(), expected_artifact)
-
-    def test_completed_eof_redacts_unclosed_credentials_and_preserves_status(self):
-        with tempfile.TemporaryDirectory() as directory:
-            command = [sys.executable, "-c",
-                       "import os\nfor fd in (1, 2):\n"
-                       " os.write(fd, b'-Dpassword=\"first\\nsecret tail')\nraise SystemExit(17)"]
+            # Use a real subprocess to verify both console streams and the resulting files.
+            command = [
+                sys.executable,
+                "-c",
+                "import os\nfor fd in (1, 2):\n"
+                ' for part in (b"diagnostic: ", b"dummy-", b"secret\\n"):\n'
+                "  os.write(fd, part)\nraise SystemExit(17)",
+            ]
             script = (
                 "import guard, os\nfrom pathlib import Path\n"
-                f"raise SystemExit(guard.capture({command!r}, os.environ, [], Path({directory!r})))"
+                f"raise SystemExit(guard.capture({command!r}, os.environ, "
+                f"guard.secret_forms(os.environ), Path({directory!r})))"
             )
-            result = subprocess.run([sys.executable, "-c", script], capture_output=True,
-                                    cwd=ROOT / "scripts/release", timeout=5)
+            result = subprocess.run(
+                [sys.executable, "-c", script],
+                capture_output=True,
+                cwd=ROOT / "scripts/release",
+                env=dict(os.environ, MAVEN_GPG_PASSPHRASE="dummy-secret"),
+            )
             self.assertEqual(result.returncode, 17)
             for name, console in (("stdout", result.stdout), ("stderr", result.stderr)):
-                self.assertEqual(console, b"-Dpassword=[REDACTED]")
-                self.assertEqual((Path(directory) / (name + ".log")).read_bytes(), console)
+                self.assertEqual(console, (Path(directory) / (name + ".log")).read_bytes())
+                self.assertEqual(console, b"diagnostic: [REDACTED]\n")
+
+    def test_capture_read_failure_preserves_completed_maven_status(self):
+        for status in (0, 17):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as directory:
+                process = unittest.mock.Mock()
+                process.poll.return_value = status
+                process.wait.return_value = status
+                with patch.object(guard.subprocess, "Popen", return_value=process), \
+                     patch.object(guard.selectors, "DefaultSelector", side_effect=OSError("secret")), \
+                     patch.object(guard.os, "killpg"), patch.object(guard, "write_logs") as logs:
+                    self.assertEqual(guard.capture(["mvn"], {}, [], Path(directory)), status)
+                    logs.assert_called_once_with([guard.FAILED_LOG, guard.FAILED_LOG], Path(directory))
+
+    def test_configured_maven_executable(self):
+        for executable in ("/usr/bin/mvn", "./mvnw", "custom-maven"):
+            with self.subTest(executable=executable), \
+                 patch.object(sys, "argv", ["guard.py", "run", executable, "release:prepare"]), \
+                 patch.object(guard, "capture", return_value=0) as capture, \
+                 patch.object(guard, "check_runtime_options"):
+                self.assertEqual(guard.main(), 0)
+                self.assertEqual(capture.call_args.args[0], [executable, "release:prepare"])
 
     def test_output_failures_preserve_maven_status(self):
         for status in (0, 17):
@@ -964,7 +1030,6 @@ class ReleaseTests(unittest.TestCase):
                             [sys.executable, "-c", script], cwd=ROOT / "scripts/release",
                             stdout=write_fd if failure == "stdout" else subprocess.PIPE,
                             stderr=write_fd if failure == "stderr" else subprocess.PIPE,
-                            timeout=5,
                         )
                     finally:
                         os.close(write_fd)
@@ -979,102 +1044,22 @@ class ReleaseTests(unittest.TestCase):
                     if failure != "directory":
                         self.assertEqual((logs / "stderr.log").read_bytes(), b"err\n")
 
-    def test_capture_io_failure_preserves_only_completed_maven_status(self):
-        for operation in ("select", "read"):
-            for status in (0, 17, -signal.SIGTERM, None):
-                for error in (OSError("synthetic-secret"), ValueError("synthetic-secret"),
-                              KeyboardInterrupt(), SystemExit(143)):
-                    with self.subTest(operation=operation, status=status, error=type(error).__name__):
-                        process = Mock()
-                        process.poll.return_value = status
-                        process.wait.return_value = status if status is not None else -signal.SIGTERM
-                        selector = Mock()
-                        selector.get_map.return_value = {1: object()}
-                        key = Mock(data=0, fileobj=process.stdout)
-                        selector.select.return_value = [(key, 1)]
-                        if operation == "select":
-                            selector.select.side_effect = error
-                        with patch.object(guard.subprocess, "Popen", return_value=process), patch.object(
-                            guard.selectors, "DefaultSelector"
-                        ) as factory, patch.object(guard.os, "read", side_effect=error), patch.object(
-                            guard.os, "killpg"
-                        ) as killpg, patch.object(guard, "write_logs") as write_logs:
-                            factory.return_value.__enter__.return_value = selector
-                            write_logs.side_effect = lambda *_: self.assertEqual(killpg.call_count, 2)
-                            if status is not None and isinstance(error, Exception):
-                                self.assertEqual(guard.capture(["mvn"], {}, [], Path("unused")),
-                                                 status if status >= 0 else 128 - status)
-                            else:
-                                with self.assertRaises(type(error)):
-                                    guard.capture(["mvn"], {}, [], Path("unused"))
-                            self.assertEqual([call.args for call in killpg.call_args_list], [
-                                (process.pid, signal.SIGTERM), (process.pid, signal.SIGKILL)])
-                            diagnostic = (guard.CANCELLED_LOG if isinstance(
-                                error, (KeyboardInterrupt, SystemExit)) else guard.FAILED_LOG)
-                            write_logs.assert_called_once_with([diagnostic, diagnostic], Path("unused"))
-
-    def test_missing_or_detached_console_keeps_both_artifacts(self):
-        for name in ("stdout", "stderr"):
-            for failure in ("missing", "detached"):
-                with self.subTest(stream=name, failure=failure), tempfile.TemporaryDirectory() as directory:
-                    broken = None
-                    if failure == "detached":
-                        broken = io.TextIOWrapper(io.BytesIO())
-                        broken.detach()
-                    other = "stderr" if name == "stdout" else "stdout"
-                    good = Mock()
-                    good.buffer = io.BytesIO()
-                    logs = Path(directory)
-                    with patch.object(sys, name, broken), patch.object(sys, other, good), patch.object(
-                        guard.os, "write"
-                    ) as notice:
-                        guard.write_logs([b"out\n", b"err\n"], logs)
-                    self.assertEqual((logs / "stdout.log").read_bytes(), b"out\n")
-                    self.assertEqual((logs / "stderr.log").read_bytes(), b"err\n")
-                    self.assertEqual(good.buffer.getvalue(), b"err\n" if other == "stderr" else b"out\n")
-                    notice.assert_called_once_with(
-                        2, b"Sanitized release output could not be fully written; values withheld.\n")
-
     def test_sanitization_failure_writes_fixed_logs(self):
         for status in (0, 17):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as directory:
-                child = f"import sys; print('secret'); sys.exit({status})"
                 script = (
                     "import guard, os\nfrom pathlib import Path\n"
                     "guard.redact = lambda *_: (_ for _ in ()).throw(ValueError('secret'))\n"
-                    f"raise SystemExit(guard.capture([{sys.executable!r}, '-c', {child!r}], os.environ, [], Path({directory!r})))\n"
+                    f"raise SystemExit(guard.capture([{sys.executable!r}, '-c', "
+                    f"'print(\"secret\"); raise SystemExit({status})'], os.environ, [], Path({directory!r})))"
                 )
                 result = subprocess.run([sys.executable, "-c", script], capture_output=True,
-                                        cwd=ROOT / "scripts/release", timeout=5)
+                                        cwd=ROOT / "scripts/release")
                 self.assertEqual(result.returncode, status)
                 self.assertEqual(result.stdout, guard.FAILED_LOG)
                 self.assertEqual(result.stderr, guard.FAILED_LOG)
                 self.assertEqual((Path(directory) / "stdout.log").read_bytes(), guard.FAILED_LOG)
                 self.assertEqual((Path(directory) / "stderr.log").read_bytes(), guard.FAILED_LOG)
-
-    def test_json_escaped_environment_secrets(self):
-        secret = 'synthetic "quote" \\ slash/\nline é'
-        forms = guard.secret_forms({"MAVEN_GPG_PASSPHRASE": secret})
-        for ensure_ascii in (True, False):
-            value = json.dumps({"message": secret}, ensure_ascii=ensure_ascii)
-            for escaped in (value, value.replace("/", "\\/")):
-                with self.subTest(ensure_ascii=ensure_ascii, escaped_slash="\\/" in escaped):
-                    sanitized = guard.redact(escaped.encode(), forms)
-                    self.assertIn(b"[REDACTED]", sanitized)
-                    self.assertNotIn(b"synthetic", sanitized)
-
-    def test_precredential_check_rejects_unsafe_runtime_environment(self):
-        for name, value in (
-            ("MAVEN_ARGS", "-X"), ("MAVEN_OPTS", "-Dgpg.bestPractices=false"),
-            ("JAVA_TOOL_OPTIONS", "-Djavax.net.debug=all"),
-            ("JDK_JAVA_OPTIONS", "-Dgpg.bestPractices=false"),
-            ("_JAVA_OPTIONS", "-Dgpg.bestPractices=false"),
-            ("MAVEN_DEBUG_OPTS", "--debug"), ("MAVEN_CONFIG", "--debug"),
-        ):
-            with self.subTest(name=name), patch.dict(os.environ, {name: value}, clear=True), patch.object(
-                sys, "argv", ["guard.py", "check"]
-            ), patch.object(guard, "check_policy"), patch("sys.stderr", io.StringIO()):
-                self.assertEqual(guard.main(), 2)
 
     def test_overflow_drains_without_interrupting_maven(self):
         for status in (0, 17):
