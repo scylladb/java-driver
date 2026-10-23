@@ -130,7 +130,8 @@ set, signed commits and tag, and docs. Branch releases push explicitly to
 `HEAD:refs/heads/scylla-4.x` or `HEAD:refs/heads/scylla-3.x` only after the Portal API
 confirms `PUBLISHED`. Maven always uploads in manual mode;
 `publication.py` verifies signatures, module coordinates, and deployment identity before
-requesting a real publication. It waits for completion before the SCM push and docs job.
+requesting a real publication. It rechecks blockers and branch movement after upload,
+then waits for completion before the SCM push and docs job.
 Historical targets never push refs or publish docs.
 
 ## Partial release recovery and key rotation

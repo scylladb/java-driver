@@ -201,6 +201,7 @@ jobs:
       - name: Perform release
         if: inputs.dry-run == false
         env:
+          GH_TOKEN: ${{ github.token }}
           RELEASE_GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}

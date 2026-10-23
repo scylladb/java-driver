@@ -5,6 +5,7 @@ from contextlib import redirect_stderr
 from io import StringIO
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 import tempfile
@@ -22,6 +23,7 @@ IDENTIFIER = '01234567-89ab-cdef-0123-456789abcdef'
 PREFIX = f'com/scylladb/driver-core/{VERSION}/driver-core-{VERSION}'
 
 
+@unittest.skipUnless(shutil.which("gpg") and shutil.which("git"), "GnuPG and Git required")
 class PublicationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -91,7 +93,8 @@ class PublicationTests(unittest.TestCase):
         with self.signer.repository() as directory:
             _, _, logs = self.bundle(directory)
             statuses = [self.status('VALIDATED'), None, self.status('PUBLISHING'), self.status('PUBLISHED')]
-            with patch.object(publication, 'api', side_effect=statuses) as api, patch.object(publication.time, 'sleep'):
+            with patch.object(publication, 'api', side_effect=statuses) as api, \
+                    patch.object(publication.target, 'blockers'), patch.object(publication.time, 'sleep'):
                 publication.finish('publish')
             self.assertEqual([call.args for call in api.call_args_list], [
                 ('POST', 'status?id=' + IDENTIFIER), ('POST', 'deployment/' + IDENTIFIER),
@@ -101,10 +104,29 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(report['outcome'], 'published')
             self.assertEqual(report['signed_files'], 2)
 
+    def test_blockers_and_moved_branch_are_rechecked_after_upload_before_publication(self):
+        with self.signer.repository() as directory:
+            self.bundle(directory)
+            with patch.dict(os.environ, {'GITHUB_ACTIONS': 'true', 'RELEASE_TARGET_TAG': 'scylla-4.x',
+                                         'RELEASE_BASE_COMMIT': 'a' * 40}):
+                for gate in ('blockers', 'check_branch'):
+                    with patch.object(publication, 'api', return_value=self.status('VALIDATED')) as api, \
+                            patch.object(publication.target, 'blockers') as blockers, \
+                            patch.object(publication.target, 'check_branch') as branch:
+                        (blockers if gate == 'blockers' else branch).side_effect = publication.target.Invalid('Gate closed')
+                        with self.assertRaises(publication.target.Invalid):
+                            publication.finish('publish')
+                        self.assertEqual(len(api.call_args_list), 1)
+                        blockers.assert_called_once_with('4')
+                        if gate == 'check_branch':
+                            branch.assert_called_once_with('4', 'a' * 40)
+
     def test_dry_run_deletes_only_its_validated_unpublished_deployment(self):
         with self.signer.repository() as directory:
             _, _, logs = self.bundle(directory)
-            with patch.object(publication, 'api', side_effect=[self.status('VALIDATED'), None]) as api:
+            status = self.status('VALIDATED')
+            status['purls'] = [status['purls'][0] + '?type=jar', status['purls'][0] + '?type=pom']
+            with patch.object(publication, 'api', side_effect=[status, None]) as api:
                 publication.finish('dry-run')
             self.assertEqual(api.call_args_list[-1].args, ('DELETE', 'deployment/' + IDENTIFIER))
             self.assertFalse(any(call.args == ('POST', 'deployment/' + IDENTIFIER) for call in api.call_args_list))
