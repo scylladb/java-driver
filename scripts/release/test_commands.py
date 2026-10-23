@@ -43,6 +43,8 @@ class ReleaseCommandTests(unittest.TestCase):
             "if sys.argv[1] == 'exec':\n"
             " raise SystemExit(subprocess.run(sys.argv[2:]).returncode)\n"
         )
+        publisher = root / "publication.py"
+        publisher.write_text("pass\n")
         env = {key: value for key, value in os.environ.items() if key not in guard.ENV_OPTIONS}
         env.update(
             PATH=str(root) + os.pathsep + env.get("PATH", ""),
@@ -59,6 +61,7 @@ class ReleaseCommandTests(unittest.TestCase):
             GITHUB_ACTOR="release-operator",
             GITHUB_TRIGGERING_ACTOR="rerun-operator",
             RELEASE_SIGNING_HELPER=str(helper),
+            RELEASE_PUBLICATION_HELPER=str(publisher),
         )
         return root, env
 
@@ -80,7 +83,7 @@ class ReleaseCommandTests(unittest.TestCase):
             self.assertIn("release:prepare", calls[0]["args"])
             self.assertIn("release:perform", calls[1]["args"])
             self.assertIn("release:perform", calls[2]["args"])
-            self.assertIn("-Drelease.autopublish=true", calls[1]["args"])
+            self.assertIn("-Drelease.autopublish=false", calls[1]["args"])
             self.assertNotIn("-Drelease.autopublish=true", calls[2]["args"])
             for call in calls:
                 self.assertEqual(call["passphrase"], env["MAVEN_GPG_PASSPHRASE"])
@@ -149,6 +152,7 @@ class ReleaseCommandTests(unittest.TestCase):
             shutil.copy2(env.pop("RELEASE_SIGNING_HELPER"), preserved / "signing.py")
             shutil.copy2(ROOT / "scripts/release/publisher.asc", preserved / "publisher.asc")
             shutil.copy2(ROOT / "scripts/release/target.py", preserved / "target.py")
+            shutil.copy2(env.pop("RELEASE_PUBLICATION_HELPER"), preserved / "publication.py")
             env["FAKE_PUBLISHER_CERT"] = (preserved / "publisher.asc").read_text()
             env.update(RUNNER_TEMP=str(root), RELEASE_GUARD=str(target / "unsafe.py"),
                        GITHUB_ENV=str(root / "github-env"), FAKE_RELEASE_BASE=baseline)

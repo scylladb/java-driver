@@ -46,6 +46,12 @@ def resolve(major, target, override, launch_sha, launch_ref):
     return commit, effective
 
 
+def check_branch(major, expected):
+    git('fetch', '--no-tags', 'origin', 'refs/heads/scylla-' + major + '.x')
+    if git('rev-parse', 'FETCH_HEAD') != expected:
+        raise Invalid('Release branch advanced after validation; dispatch again.')
+
+
 def checkout(major, target, commit):
     if not re.fullmatch('[0-9a-f]{40}', commit):
         raise Invalid('Invalid validated commit.')
@@ -54,9 +60,7 @@ def checkout(major, target, commit):
         version(major, target)
     git('fetch', '--no-tags', 'origin', commit)
     if target == branch:
-        git('fetch', '--no-tags', 'origin', 'refs/heads/' + branch)
-        if git('rev-parse', 'FETCH_HEAD') != commit:
-            raise Invalid('Release branch advanced after validation; dispatch again.')
+        check_branch(major, commit)
         git('checkout', '-B', branch, commit)
     else:
         git('checkout', '--detach', commit)
@@ -81,7 +85,7 @@ def blockers(major):
     # Paginate: a relevant blocker beyond the first 100 must still stop publication.
     payload = subprocess.check_output([
         'gh', 'api', '--paginate', '--slurp',
-        f'repos/{os.environ["GITHUB_REPOSITORY"]}/issues?state=open&labels=release-blocker&per_page=100',
+        f'repos/{os.environ.get("GITHUB_REPOSITORY", "scylladb/java-driver")}/issues?state=open&labels=release-blocker&per_page=100',
     ], text=True)
     other = '3' if major == '4' else '4'
     matches = []
@@ -120,10 +124,7 @@ def main():
             checkout(os.environ['RELEASE_MAJOR'], os.environ['RELEASE_TARGET_TAG'],
                      os.environ['RELEASE_TARGET_COMMIT'])
         elif command == 'check-branch':
-            branch = 'refs/heads/scylla-' + os.environ['RELEASE_MAJOR'] + '.x'
-            git('fetch', '--no-tags', 'origin', branch)
-            if git('rev-parse', 'FETCH_HEAD') != os.environ['RELEASE_TARGET_COMMIT']:
-                raise Invalid('Release branch advanced after validation; dispatch again.')
+            check_branch(os.environ['RELEASE_MAJOR'], os.environ['RELEASE_TARGET_COMMIT'])
         elif command == 'preflight':
             preflight()
         elif command == 'blockers':
