@@ -562,6 +562,9 @@ class SigningTests(unittest.TestCase):
             helper.write_text(helper.read_text().replace(REPOSITORY_PRIMARY, self.primary)
                               .replace(REPOSITORY_SIGNING, self.subkey))
             shutil.copyfile(self.public, "scripts/release/publisher.asc")
+            publisher = directory / "publication.py"
+            publisher.write_text("pass\n")
+            os.environ["RELEASE_PUBLICATION_HELPER"] = str(publisher)
             tools = directory / "bin"
             tools.mkdir()
             maven = tools / "mvn"

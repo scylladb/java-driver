@@ -32,9 +32,9 @@ env:
   RELEASE_TARGET_TAG: ${{ inputs.target-tag }}
   RELEASE_VERSION: ${{ inputs.release-version }}
 
-# Serialize both release lines through the shared publisher environment.
+# Serialize each release branch; the two driver lines can validate independently.
 concurrency:
-  group: java-driver-release
+  group: java-driver-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -184,6 +184,10 @@ jobs:
       - name: Verify prepared release commits and tag with public key only
         run: python3 "$RUNNER_TEMP/release-safety/signing.py" verify-prepared
 
+      - name: Preserve prepared release history for recovery
+        run: |
+          git bundle create "$RUNNER_TEMP/prepared-release.bundle" HEAD "refs/tags/$RELEASE_VERSION" "^$RELEASE_BASE_COMMIT"
+
       - name: Recheck for open release blockers
         if: inputs.dry-run == false
         env:
@@ -216,9 +220,27 @@ jobs:
           RELEASE_SKIP_TESTS: 'true'
         run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run
 
+      - name: Upload verified dry-run bundle
+        if: inputs.dry-run == true && success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verified-central-bundle
+          path: target/checkout/**/target/central-publishing/central-bundle.zip
+          if-no-files-found: error
+
       - name: Push changes to SCM
         if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
         run: git push origin --follow-tags -v HEAD:refs/heads/scylla-3.x
+
+      - name: Upload prepared release recovery state
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: prepared-release-state
+          path: |
+            ${{ runner.temp }}/prepared-release.bundle
+            ${{ runner.temp }}/release-safety/publisher.asc
+          if-no-files-found: ignore
 
       - name: Upload sanitized release logs
         if: always()
