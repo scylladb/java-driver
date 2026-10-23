@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -165,6 +167,9 @@ public final class CodecUtils {
    *
    * <p>The protocol encodes DATE values as <em>unsigned</em> ints with the Epoch in the middle of
    * the range (2^31). This method handles the conversion from an "unsigned" to a signed int.
+   *
+   * @param unsigned the (unsigned) value to convert
+   * @return the input arg as a signed value
    */
   public static int fromUnsignedToSignedInt(int unsigned) {
     return unsigned + Integer.MIN_VALUE; // this relies on overflow for "negative" values
@@ -175,6 +180,9 @@ public final class CodecUtils {
    *
    * <p>The protocol encodes DATE values as <em>unsigned</em> ints with the Epoch in the middle of
    * the range (2^31). This method handles the conversion from a signed to an "unsigned" int.
+   *
+   * @param signed the (signed) value to convert
+   * @return the input arg as an unsigned value
    */
   public static int fromSignedToUnsignedInt(int signed) {
     return signed - Integer.MIN_VALUE;

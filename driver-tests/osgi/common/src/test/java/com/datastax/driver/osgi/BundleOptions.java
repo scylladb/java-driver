@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -100,8 +102,10 @@ public class BundleOptions {
       @Override
       public Option[] getOptions() {
         return options(
-            systemProperty("cassandra.compression").value(ProtocolOptions.Compression.LZ4.name()),
-            mavenBundle("at.yawk.lz4", "lz4-java", getVersion("lz4.version")));
+            mavenBundle("at.yawk.lz4", "lz4-java", getVersion("lz4.version")),
+            mavenBundle("com.diffplug.osgi", "com.diffplug.osgi.extension.sun.misc")
+                .version("0.0.0"),
+            systemProperty("cassandra.compression").value(ProtocolOptions.Compression.LZ4.name()));
       }
     };
   }
@@ -186,13 +190,13 @@ public class BundleOptions {
                 mavenBundle(
                     "com.fasterxml.jackson.core",
                     "jackson-databind",
-                    getVersion("jackson-databind.version")),
+                    getVersion("jackson.version")),
                 mavenBundle(
                     "com.fasterxml.jackson.core", "jackson-core", getVersion("jackson.version")),
                 mavenBundle(
                     "com.fasterxml.jackson.core",
                     "jackson-annotations",
-                    getVersion("jackson.version")),
+                    getVersion("jackson-annotations.version")),
                 mavenBundle("org.testng", "testng", getVersion("testng.version")),
                 systemPackages(
                     "org.testng",

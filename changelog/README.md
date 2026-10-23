@@ -1,3 +1,22 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
 ## Changelog
 
 <!--
@@ -5,10 +24,17 @@
   3.x versions get published.
 -->
 
-### Unreleased
+### 3.13.0
+- [bug] CASSJAVA-85: decode custom payload and warnings in correct order
+- [improvement] CASSJAVA-128: Update Netty to 4.1.138 and migrate to Java8
 
-- [improvement] Protect Maven publishing credentials and retain sanitized release logs on success and failure.
-- [improvement] DRIVER-787: Validate simple and prepared SELECT without FROM queries without a keyspace or table.
+### 3.12.1
+- [improvement] CASSJAVA-55: Remove setting "Host" header for metadata requests.
+- [bug] JAVA-3125: Match broadcast RPC for control connection and Astra events
+
+### 3.12.0
+- [improvement] CASSANDRA-18971: Switch all archs to netty-tcnative-boringssl-static
+- [improvement] CASSJAVA-58: Update 3.x DRIVER_NAME to match 4.x Java driver
 
 ### 3.11.5
 - [improvement] JAVA-3114: Shade io.dropwizard.metrics:metrics-core in shaded driver

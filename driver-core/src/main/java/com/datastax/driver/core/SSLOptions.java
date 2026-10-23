@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +19,7 @@ package com.datastax.driver.core;
 
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.ssl.SslHandler;
+import java.net.InetSocketAddress;
 
 /**
  * Defines how the driver configures SSL connections.
@@ -43,8 +46,8 @@ public interface SSLOptions {
    *
    * @param channel the channel.
    * @return the handler.
-   * @deprecated use {@link RemoteEndpointAwareSSLOptions#newSSLHandler(SocketChannel, EndPoint)}
-   *     instead.
+   * @deprecated use {@link RemoteEndpointAwareSSLOptions#newSSLHandler(SocketChannel,
+   *     InetSocketAddress)} instead.
    */
   @SuppressWarnings("DeprecatedIsStillUsed")
   @Deprecated

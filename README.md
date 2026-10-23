@@ -1,6 +1,6 @@
 # Scylla Java Driver for Scylla and Apache Cassandra®
 
-[![Maven Central](https://img.shields.io/maven-central/v/com.scylladb/scylla-driver-core?versionPrefix=3.11.5)](https://central.sonatype.com/artifact/com.scylladb/scylla-driver-core)
+[![Maven Central](https://img.shields.io/maven-central/v/com.scylladb/scylla-driver-core?versionPrefix=3.11.5)](https://central.sonatype.com/artifact/com.scylladb/scylla-driver-core) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 > **Deprecation Notice:** Scylla Java Driver 3.x is now **deprecated** and has
 > entered **maintenance mode**. Only critical bug fixes will be accepted.
@@ -59,7 +59,7 @@ The driver contains the following modules:
 
 - driver-core: the core layer.
 - driver-mapping: the object mapper.
-- driver-extras: optional features for the Java driver.
+- driver-extras: optional features for the Java Driver.
 - driver-examples: example applications using the other modules which are
   only meant for demonstration purposes.
 - driver-tests: tests for the java-driver.
@@ -160,4 +160,6 @@ Apache®, Apache Cassandra®, Cassandra®, the Apache feather logo and the Apach
 Eye logo are either registered trademarks or trademarks of the Apache Software Foundation in the United States 
 and/or other countries. 
 No endorsement by The Apache Software Foundation is implied by the use of these marks.
+
+Binary artifacts of this product bundle Java Native Runtime libraries, which is available under the Eclipse Public License version 2.0.
 

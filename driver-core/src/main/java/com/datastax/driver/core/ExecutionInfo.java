@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -173,6 +175,7 @@ public class ExecutionInfo {
    * executions are disabled, this will always be 0. If they are enabled and one speculative
    * execution was triggered in addition to the initial execution, this will be 1, etc.
    *
+   * @return the number of speculative executions
    * @see #getSuccessfulExecutionIndex()
    * @see
    *     Cluster.Builder#withSpeculativeExecutionPolicy(com.datastax.driver.core.policies.SpeculativeExecutionPolicy)
@@ -187,6 +190,7 @@ public class ExecutionInfo {
    * <p>0 represents the initial, normal execution of the query, 1 represents the first speculative
    * execution, etc.
    *
+   * @return the index of the specific speculative execution which completed this query
    * @see #getSpeculativeExecutions()
    * @see
    *     Cluster.Builder#withSpeculativeExecutionPolicy(com.datastax.driver.core.policies.SpeculativeExecutionPolicy)

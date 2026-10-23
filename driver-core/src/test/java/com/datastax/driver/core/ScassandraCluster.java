@@ -1,11 +1,13 @@
 /*
- * Copyright DataStax, Inc.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -729,14 +731,14 @@ public class ScassandraCluster {
     column("cluster_name", TEXT),
     column("cql_version", TEXT),
     column("data_center", TEXT),
+    column("graph", BOOLEAN),
+    column("host_id", UUID),
     column("listen_address", INET),
     column("partitioner", TEXT),
     column("rack", TEXT),
     column("release_version", TEXT),
-    column("tokens", set(TEXT)),
-    column("graph", BOOLEAN),
-    column("host_id", UUID),
-    column("schema_version", UUID)
+    column("schema_version", UUID),
+    column("tokens", set(TEXT))
   };
 
   public static final org.scassandra.http.client.types.ColumnMetadata[] SELECT_LOCAL_V2 = {
@@ -747,15 +749,36 @@ public class ScassandraCluster {
     column("cluster_name", TEXT),
     column("cql_version", TEXT),
     column("data_center", TEXT),
+    column("graph", BOOLEAN),
+    column("host_id", UUID),
     column("listen_address", INET),
     column("listen_port", INT),
     column("partitioner", TEXT),
     column("rack", TEXT),
     column("release_version", TEXT),
-    column("tokens", set(TEXT)),
-    column("graph", BOOLEAN),
+    column("schema_version", UUID),
+    column("tokens", set(TEXT))
+  };
+
+  public static final org.scassandra.http.client.types.ColumnMetadata[]
+      SELECT_LOCAL_RPC_ADDRESS_AND_PORT = {
+    column("key", TEXT),
+    column("bootstrapped", TEXT),
+    column("broadcast_address", INET),
+    column("broadcast_port", INT),
+    column("cluster_name", TEXT),
+    column("cql_version", TEXT),
+    column("data_center", TEXT),
     column("host_id", UUID),
-    column("schema_version", UUID)
+    column("listen_address", INET),
+    column("listen_port", INT),
+    column("partitioner", TEXT),
+    column("rack", TEXT),
+    column("release_version", TEXT),
+    column("rpc_address", INET),
+    column("rpc_port", INT),
+    column("schema_version", UUID),
+    column("tokens", set(TEXT))
   };
 
   static final org.scassandra.http.client.types.ColumnMetadata[] SELECT_CLUSTER_NAME = {

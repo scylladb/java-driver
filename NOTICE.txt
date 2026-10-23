@@ -1,0 +1,8 @@
+ScyllaDB Java Driver
+Copyright 2018- ScyllaDB
+
+This product is derived from the Apache Cassandra Java Driver
+Copyright 2012- The Apache Software Foundation
+
+This product includes software developed at The Apache Software
+Foundation (http://www.apache.org/).
