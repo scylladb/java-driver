@@ -1,0 +1,142 @@
+name: Upstream sync ancestry
+
+# A pull request that merges an upstream tag must land as a merge commit; squash or rebase drops
+# apache's ancestry. GitHub can't enforce a merge method per pull request, so this reminds before
+# the merge and raises an alarm after a bad one. pull_request_target reads this file from the
+# default branch, so this copy covers both lines.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, closed]
+    branches: [scylla-4.x, scylla-3.x]
+
+permissions: {}
+
+jobs:
+  check:
+    name: Check upstream sync ancestry
+    # edited only matters when the base branch changed, not the title or the description.
+    if: >-
+      (github.event.action != 'closed' || github.event.pull_request.merged)
+      && (github.event.action != 'edited' || github.event.changes.base)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # At job level, so a skipped run never joins the group and cancels the pending one.
+    concurrency:
+      group: upstream-sync-ancestry-${{ github.event.pull_request.number }}
+
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Compare the apache tags in the pull request with the base branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+          MERGED: ${{ github.event.pull_request.merged }}
+          MERGED_BY: ${{ github.event.pull_request.merged_by.login }}
+        run: |
+          set -euo pipefail
+          # Commits only, no checkout: pull request code is never on disk, let alone run.
+          git init -q graph
+          cd graph
+          git fetch -q --filter=tree:0 --no-tags "https://github.com/$GITHUB_REPOSITORY" \
+            "+refs/pull/$PR/head:refs/pr/head" "+refs/heads/$BASE:refs/base/tip"
+          git fetch -q --filter=tree:0 --no-tags https://github.com/apache/cassandra-java-driver \
+            '+refs/tags/*:refs/apache-tags/*'
+
+          # Id of this workflow's comment that carries marker $1, if any.
+          bot_comment() {
+            gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR/comments" \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$1\"))) | .id" |
+              sed -n 1p
+          }
+          marker='<!-- upstream-sync-ancestry -->'
+
+          # Only the base line's own major: a head cut from the other line carries that line's tags.
+          # Before the merge, a non-empty list makes this a sync pull request. After the merge,
+          # it means the base lost the ancestry.
+          major="${BASE#scylla-}"
+          major="${major%%.*}"
+          # The suffix puts 4.0.0 above 4.0.0-rc1.
+          tags="$(
+            git -c versionsort.suffix=- for-each-ref --sort=-version:refname \
+              --format='%(refname:lstrip=2)' \
+              --merged refs/pr/head --no-merged refs/base/tip "refs/apache-tags/$major.*"
+          )"
+          if [[ -z "$tags" ]]; then
+            echo "No upstream tag missing from $BASE."
+            # A reminder left from before a force-push or a retarget no longer applies.
+            if [[ "$MERGED" != true ]]; then
+              id="$(bot_comment "$marker")"
+              [[ -z "$id" ]] || gh api -X DELETE "repos/$GITHUB_REPOSITORY/issues/comments/$id"
+            fi
+            exit 0
+          fi
+          # Version sort puts 4.12.x above 4.12.1 and 4.8.0_fixes above 4.8.0, so skip those.
+          newest="$(
+            grep -m 1 -E '^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)[0-9]*)?$' <<<"$tags" ||
+              head -n 1 <<<"$tags"
+          )"
+          echo "Upstream tags in the pull request but not in $BASE: $(paste -sd' ' <<<"$tags")"
+          guide="https://github.com/$GITHUB_REPOSITORY/blob/scylla-4.x/CONTRIBUTING.md#merging-upstream-releases"
+
+          if [[ "$MERGED" != true ]]; then
+            reminder="$(cat <<EOF
+          $marker
+          This pull request merges upstream \`$newest\`. Merge it with **Create a merge commit**, using the ruleset bypass. Squash or rebase drops \`$newest\` from \`$BASE\`'s history.
+          See [Merging upstream releases]($guide).
+          EOF
+            )"
+            id="$(bot_comment "$marker")"
+            if [[ -z "$id" ]]; then
+              gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$reminder"
+            elif [[ "$(gh api "repos/$GITHUB_REPOSITORY/issues/comments/$id" --jq .body | tr -d '\r')" != "$reminder" ]]; then
+              # The pull request now merges another tag or targets another line.
+              gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$reminder" >/dev/null
+            else
+              echo "Already reminded."
+            fi
+            exit 0
+          fi
+
+          body="$(cat <<EOF
+          #$PR was merged into \`$BASE\` without \`$newest\` becoming an ancestor, so it was squashed or rebased. Its changes are on \`$BASE\`; its ancestry is not.
+
+          Repair it with a pull request that holds only an ancestry merge, merged with **Create a merge commit** (as #1281 did):
+
+          \`\`\`
+          git fetch --no-tags https://github.com/apache/cassandra-java-driver refs/tags/$newest:refs/upstream/$newest
+          git switch -c restore-$newest <scylladb-remote>/$BASE
+          git merge -s ours refs/upstream/$newest -m "chore: record upstream $newest ancestry"
+          \`\`\`
+
+          See [Merging upstream releases]($guide).
+          EOF
+          )"
+          # The issue and the comment are each looked up first, so a rerun completes a partial alarm.
+          # The pull request comment carries the repair too, in case the issue can't be opened.
+          title="$BASE: restore upstream $newest ancestry lost in #$PR"
+          issue="$(
+            gh issue list --repo "$GITHUB_REPOSITORY" --state all \
+              --search "\"$title\" in:title" --json title,url |
+              jq -r --arg title "$title" 'map(select(.title == $title)) | .[0].url // empty'
+          )" || issue=""
+          if [[ -z "$issue" ]]; then
+            issue="$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body")" ||
+              issue="no issue opened"
+          fi
+          alarm='<!-- upstream-sync-ancestry:alarm -->'
+          if [[ -n "$(bot_comment "$alarm")" ]]; then
+            echo "::error::#$PR dropped $newest from $BASE's history; the repair is already posted ($issue)"
+            exit 1
+          fi
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file - <<EOF
+          $alarm
+          @$MERGED_BY this merge dropped \`$newest\` from \`$BASE\`'s history ($issue).
+
+          $body
+          EOF
+          echo "::error::#$PR dropped $newest from $BASE's history ($issue)"
+          exit 1
