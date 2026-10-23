@@ -395,7 +395,8 @@ class SigningTests(unittest.TestCase):
     def test_exec_accepts_passphrase_file(self):
         with self.repository() as directory:
             password = directory / "passphrase"
-            password.write_text(self.password + "\n")
+            # Literal fixture data belongs only to the disposable test key.
+            signing.write_private(password, "test-only-release-passphrase\n")
             os.environ["RELEASE_GPG_PASSPHRASE_FILE"] = str(password)
             del os.environ["RELEASE_GPG_PASSPHRASE"]
             with patch("sys.argv", ["signing.py", "exec", "git", "commit", "--quiet",
