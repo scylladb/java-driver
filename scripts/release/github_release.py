@@ -18,21 +18,25 @@ def gh(*arguments, missing_ok=False):
     result = subprocess.run(
         ['gh', *arguments], capture_output=True, text=True, timeout=60,
     )
+    output = result.stdout
+    if missing_ok:
+        # gh api --include supplies the HTTP status independently of error JSON
+        # or stderr diagnostics. Denied access and network errors are not absence.
+        headers, separator, output = output.partition('\n\n')
+        status = headers.splitlines()[0].split() if headers else []
+        if not separator or len(status) < 2 or not status[0].startswith('HTTP/'):
+            raise Invalid('GitHub release request failed; response withheld.')
+        if result.returncode and status[1] == '404':
+            return None
+        if status[1] != '200':
+            raise Invalid('GitHub release request failed; response withheld.')
     if result.returncode:
-        # Only an explicit API 404 means absent. Never treat denied access or a
-        # failed network request as permission to create another release.
-        if missing_ok:
-            try:
-                if json.loads(result.stdout).get('status') == '404':
-                    return None
-            except (ValueError, AttributeError):
-                pass
         raise Invalid('GitHub release request failed; response withheld.')
-    return result.stdout
+    return output
 
 
 def release(repository, version):
-    value = gh('api', '--hostname', 'github.com',
+    value = gh('api', '--hostname', 'github.com', '--include',
                f'repos/{repository}/releases/tags/{version}', missing_ok=True)
     return json.loads(value) if value is not None else None
 
