@@ -987,6 +987,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </profile>
     <profile>
       <id>release</id>
+      <properties>
+        <!-- Distribution archives are excluded from Central and have no assembly descriptors. -->
+        <assembly.skipAssembly>true</assembly.skipAssembly>
+      </properties>
       <build>
         <plugins>
           <plugin>

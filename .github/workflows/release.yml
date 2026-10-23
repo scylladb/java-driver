@@ -10,7 +10,7 @@ on:
 
       skip-tests:
         type: boolean
-        description: 'skip-tests: do not run tests while releasing'
+        description: 'skip-tests: skip project tests; release helper tests always run'
         default: false
 
       target-tag:
@@ -22,245 +22,214 @@ on:
         type: boolean
         description: 'skip-integration-matrix: do not run the driver matrix integration tests before releasing'
         default: false
+      release-version:
+        type: string
+        required: false
+        description: 'Optional four-component 4.x release version override'
 
 env:
-  # The driver line this branch releases; scopes release-blocker issues.
-  RELEASE_LINE: 4.x
-  # The other line released from this repository.
-  OTHER_LINE: 3.x
+  RELEASE_MAJOR: '4'
+  RELEASE_TARGET_TAG: ${{ inputs.target-tag }}
+  RELEASE_VERSION: ${{ inputs.release-version }}
+
+# Serialize both release lines through the shared publisher environment.
+concurrency:
+  group: java-driver-release
+  cancel-in-progress: false
 
 jobs:
-  release-target:
-    name: Resolve release target
+  validate:
+    name: Validate release
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       issues: read
-
     outputs:
       ref: ${{ steps.target.outputs.ref }}
       version: ${{ steps.target.outputs.version }}
-
     steps:
+      - name: Checkout validation source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
       - name: Check for open release blockers
         if: inputs.dry-run == false
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # Only a blocker scoped solely to the other line is skipped.
-          blockers="$(
-            gh issue list \
-              --repo "$GITHUB_REPOSITORY" \
-              --state open \
-              --label release-blocker \
-              --limit 100 \
-              --json labels,title,url |
-            jq -r \
-              --arg line "area/Driver_-_java-driver-$RELEASE_LINE" \
-              --arg other "area/Driver_-_java-driver-$OTHER_LINE" '
-              .[]
-              | [.labels[].name] as $names
-              | select((any($names[]; . == $other) | not) or any($names[]; . == $line))
-              | "\(.url) — \(.title)"'
-          )"
-          if [[ -n "$blockers" ]]; then
-            while IFS= read -r blocker; do
-              echo "::error::Release blocked by open issue: $blocker"
-            done <<<"$blockers"
-            exit 1
-          fi
-          echo "No open release blockers for $RELEASE_LINE."
+        run: python3 scripts/release/target.py blockers
 
-      - name: Checkout Repository
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Set up validation Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          fetch-depth: 0
-          persist-credentials: false
+          java-version: '11'
+          distribution: temurin
 
-      # The commit release:prepare starts from, and the version it will tag: HEAD, or one commit
-      # before target-tag for a re-release, as make checkout-one-commit-before does.
+      - name: Validate release tooling
+        run: |
+          python3 scripts/release/guard.py check
+          python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
+
+      - name: Preserve validation guard
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-safety"
+          cp scripts/release/*.py scripts/release/publisher.asc Makefile "$RUNNER_TEMP/release-safety/"
+          echo "RELEASE_GUARD=$RUNNER_TEMP/release-safety/guard.py" >> "$GITHUB_ENV"
+          echo "RELEASE_LOG_DIR=$RUNNER_TEMP/release-logs" >> "$GITHUB_ENV"
+
       - name: Resolve release commit and version
         id: target
+        run: python3 "$RUNNER_TEMP/release-safety/target.py" resolve
+
+      - name: Validate target without release credentials
         env:
-          TARGET_TAG: ${{ inputs.target-tag }}
+          RELEASE_TARGET_COMMIT: ${{ steps.target.outputs.ref }}
+          RELEASE_VERSION: ${{ steps.target.outputs.version }}
+          RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
         run: |
-          set -euo pipefail
-          ref="$GITHUB_SHA"
-          if [[ "$TARGET_TAG" == 4.* ]]; then
-            ref="$(git rev-parse "refs/tags/$TARGET_TAG~1")"
+          python3 "$RUNNER_TEMP/release-safety/target.py" checkout
+          python3 "$RELEASE_GUARD" check
+          if [[ "$RELEASE_SKIP_TESTS" == true ]]; then
+            export MAVEN_OPTS="${MAVEN_OPTS:-} -DskipTests=true -DskipITs=true"
           fi
-          version="$(git show "$ref:pom.xml" | python3 -c 'import sys, xml.etree.ElementTree as ET; print(ET.parse(sys.stdin).getroot().findtext("{http://maven.apache.org/POM/4.0.0}version"))')"
-          version="${version%-SNAPSHOT}"
-          if [[ ! "$version" =~ ^4\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Unexpected release version '$version' at $ref"
-            exit 1
-          fi
-          if [[ "$TARGET_TAG" == 4.* && "$version" != "$TARGET_TAG" ]]; then
-            echo "::error::$TARGET_TAG~1 would release $version, not $TARGET_TAG"
-            exit 1
-          fi
-          echo "Releasing $version from $ref"
-          echo "ref=$ref" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          python3 "$RELEASE_GUARD" run mvn -B --no-transfer-progress versions:set "-DnewVersion=$RELEASE_VERSION" -DgenerateBackupPoms=false
+          python3 "$RELEASE_GUARD" run mvn -B --no-transfer-progress xml-format:xml-format
+          python3 "$RELEASE_GUARD" run mvn -B --no-transfer-progress -Prelease -Dgpg.skip=true verify
 
-      - name: Skip integration matrix
-        if: inputs.skip-integration-matrix == true
-        run: echo "::warning::Pre-release integration matrix skipped"
+      - name: Upload sanitized validation logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: validation-maven-logs
+          path: ${{ runner.temp }}/release-logs/*.log
+          if-no-files-found: ignore
 
-  # The driver matrix patches and tests every release, and a release that breaks it used to
-  # surface only in the nightly Jenkins run, after it was public (4.19.2.2). This runs the full
-  # Scylla matrix from matrix master on the commit about to be released, selecting patches as
-  # if it were already tagged with the release version. If it fails, fix the matrix (for
-  # example, add versions/scylla/<version>), merge that, and re-dispatch.
   pre-release-integration:
     name: Pre-release integration matrix
-    needs: release-target
+    needs: validate
     if: inputs.skip-integration-matrix == false
     permissions:
       contents: read
     uses: scylladb/scylla-java-driver-matrix/.github/workflows/driver-integration-matrix.yml@master
     with:
       run_apache: false
-      driver_ref: ${{ needs.release-target.outputs.ref }}
-      driver_version: ${{ needs.release-target.outputs.version }}
+      driver_ref: ${{ needs.validate.outputs.ref }}
+      driver_version: ${{ needs.validate.outputs.version }}
 
   release:
     name: Release
-    needs: [release-target, pre-release-integration]
-    if: ${{ !cancelled() && needs.release-target.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.pre-release-integration.result) }}
+    needs: [validate, pre-release-integration]
+    if: ${{ !cancelled() && needs.validate.result == 'success' && (needs.pre-release-integration.result == 'success' || (inputs.skip-integration-matrix && needs.pre-release-integration.result == 'skipped')) }}
     runs-on: ubuntu-latest
-
+    environment: release
     permissions:
       contents: write
       issues: read
-
     env:
-      MVNCMD: mvn -B -ntp
-
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout workflow launch source
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
 
       - name: Preserve release guard
         run: |
           mkdir -p "$RUNNER_TEMP/release-safety"
-          cp scripts/release/*.py scripts/release/publisher.asc "$RUNNER_TEMP/release-safety/"
+          cp scripts/release/*.py scripts/release/publisher.asc Makefile "$RUNNER_TEMP/release-safety/"
           echo "RELEASE_GUARD=$RUNNER_TEMP/release-safety/guard.py" >> "$GITHUB_ENV"
           echo "RELEASE_LOG_DIR=$RUNNER_TEMP/release-logs" >> "$GITHUB_ENV"
 
-      - name: Checkout Code One Commit Before ${{ inputs.target-tag }}
-        if: inputs.target-tag != 'scylla-4.x'
+      - name: Checkout release target
         env:
-          RELEASE_TARGET_TAG: ${{ inputs.target-tag }}
-        run: make checkout-one-commit-before
+          RELEASE_TARGET_COMMIT: ${{ needs.validate.outputs.ref }}
+        run: python3 "$RUNNER_TEMP/release-safety/target.py" checkout
 
       - name: Check release credential safety before importing credentials
         run: python3 "$RUNNER_TEMP/release-safety/guard.py" check
 
-      - name: Set up JDK 11
+      - name: Check Central credentials before release preparation
+        env:
+          SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}
+          SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
+        run: python3 "$RUNNER_TEMP/release-safety/target.py" preflight
+
+      - name: Set up publishing Java
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           java-version: '11'
-          distribution: 'temurin'
+          distribution: temurin
           server-id: central
-          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          # Name the env var the release steps export. Otherwise v6 writes
-          # gpg.passphraseEnvName=GPG_PASSPHRASE and signing fails with "No pinentry"
-          gpg-passphrase-env-var: MAVEN_GPG_PASSPHRASE
           server-username: SONATYPE_TOKEN_USERNAME
           server-password: SONATYPE_TOKEN_PASSWORD
-          cache: maven
-
-      - name: Configure and check protected release signing
-        env:
-          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: python3 "$RUNNER_TEMP/release-safety/signing.py" configure
 
       - name: Prepare release
         env:
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
-        run: make release-prepare
+          SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}
+          SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
+          RELEASE_SKIP_TESTS: 'true'
+        run: |
+          baseline=$(git rev-parse HEAD)
+          export RELEASE_BASE_COMMIT="$baseline"
+          echo "RELEASE_BASE_COMMIT=$baseline" >> "$GITHUB_ENV"
+          make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-prepare
 
-      - name: Verify release commit and tag signatures
-        env:
-          RELEASE_VERSION: ${{ needs.release-target.outputs.version }}
-        run: python3 "$RUNNER_TEMP/release-safety/signing.py" verify-release "$RELEASE_VERSION"
+      - name: Verify prepared release commits and tag with public key only
+        run: python3 "$RUNNER_TEMP/release-safety/signing.py" verify-prepared
 
       - name: Recheck for open release blockers
         if: inputs.dry-run == false
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # Only a blocker scoped solely to the other line is skipped.
-          blockers="$(
-            gh issue list \
-              --repo "$GITHUB_REPOSITORY" \
-              --state open \
-              --label release-blocker \
-              --limit 100 \
-              --json labels,title,url |
-            jq -r \
-              --arg line "area/Driver_-_java-driver-$RELEASE_LINE" \
-              --arg other "area/Driver_-_java-driver-$OTHER_LINE" '
-              .[]
-              | [.labels[].name] as $names
-              | select((any($names[]; . == $other) | not) or any($names[]; . == $line))
-              | "\(.url) — \(.title)"'
-          )"
-          if [[ -n "$blockers" ]]; then
-            while IFS= read -r blocker; do
-              echo "::error::Release blocked by open issue: $blocker"
-            done <<<"$blockers"
-            exit 1
-          fi
-          echo "No open release blockers for $RELEASE_LINE."
+        run: python3 "$RUNNER_TEMP/release-safety/target.py" blockers
+
+      - name: Recheck release branch before publication
+        if: inputs.target-tag == 'scylla-4.x'
+        env:
+          RELEASE_TARGET_COMMIT: ${{ needs.validate.outputs.ref }}
+        run: python3 "$RUNNER_TEMP/release-safety/target.py" check-branch
 
       - name: Perform release
         if: inputs.dry-run == false
         env:
-          RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}
           SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
-        run: make release
+          RELEASE_SKIP_TESTS: 'true'
+        run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release
 
       - name: Perform release dry-run
         if: inputs.dry-run == true
         env:
-          RELEASE_SKIP_TESTS: ${{ inputs.skip-tests }}
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           SONATYPE_TOKEN_USERNAME: ${{ secrets.SONATYPE_TOKEN_USERNAME }}
           SONATYPE_TOKEN_PASSWORD: ${{ secrets.SONATYPE_TOKEN_PASSWORD }}
-        run: make release-dry-run
+          RELEASE_SKIP_TESTS: 'true'
+        run: make -f "$RUNNER_TEMP/release-safety/Makefile" RELEASE_GUARD="$RUNNER_TEMP/release-safety/guard.py" release-dry-run
 
       - name: Push changes to SCM
         if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-4.x' }}
-        run: |
-          git status && git log -3
-          git push origin --follow-tags -v
-
-      - name: Remove release signing passphrase and configuration
-        if: always()
-        run: python3 "$RUNNER_TEMP/release-safety/signing.py" cleanup
+        run: git push origin --follow-tags -v HEAD:refs/heads/scylla-4.x
 
       - name: Upload sanitized release logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: maven-stdout
+          name: maven-logs
           path: ${{ runner.temp }}/release-logs/*.log
           if-no-files-found: ignore
 
   publish-docs:
     name: Publish docs
     needs: release
-    # Without !cancelled(), a skipped pre-release-integration would skip this job too.
     if: ${{ !cancelled() && needs.release.result == 'success' && inputs.dry-run == false && inputs.target-tag == 'scylla-4.x' }}
-    # The release push uses the workflow token, which starts no workflow.
     uses: ./.github/workflows/docs-pages.yml
     permissions:
       contents: write
