@@ -233,6 +233,13 @@ jobs:
         if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
         run: git push origin --follow-tags -v HEAD:refs/heads/scylla-3.x
 
+      - name: Publish immutable GitHub Release for the verified signed tag
+        if: ${{ inputs.dry-run == false && inputs.target-tag == 'scylla-3.x' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DRY_RUN: ${{ inputs.dry-run }}
+        run: python3 "$RUNNER_TEMP/release-safety/github_release.py"
+
       - name: Upload prepared release recovery state
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
