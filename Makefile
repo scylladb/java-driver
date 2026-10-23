@@ -1,4 +1,10 @@
 RELEASE_GUARD ?= scripts/release/guard.py
+RELEASE_TARGET_HELPER ?= $(dir $(RELEASE_GUARD))target.py
+RELEASE_SIGNING_HELPER ?= $(dir $(RELEASE_GUARD))signing.py
+RELEASE_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+export RELEASE_VERSION RELEASE_BASE_COMMIT
+.PHONY: release-check-user release-preflight release-prepare release release-dry-run
+.PHONY: _release-prepare _release _release-dry-run test-release-signing
 SHELL := bash
 .ONESHELL:
 
@@ -328,61 +334,90 @@ download-scylla: .prepare-scylla-ccm resolve-scylla-version
 	ccm create ccm_1 -i 127.0.254. -n 1:0 -v "$${SCYLLA_VERSION_RESOLVED}" --scylla --config-dir=/tmp/download.ccm
 	rm -rf /tmp/download.ccm
 
-.require-release-prepare-env:
-	@if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
-		echo "MAVEN_GPG_PASSPHRASE is empty"
-		exit 1
-	fi
-
-.require-release-env:
-	@if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
-		echo "MAVEN_GPG_PASSPHRASE is empty"
-		exit 1
-	fi
-	if [[ -z "$${SONATYPE_TOKEN_USERNAME}" ]]; then
-		echo "SONATYPE_TOKEN_USERNAME is empty"
-		exit 1
-	fi
-	if [[ -z "$${SONATYPE_TOKEN_PASSWORD}" ]]; then
-		echo "SONATYPE_TOKEN_PASSWORD is empty"
-		exit 1
-	fi
-
-checkout-one-commit-before:
-	@if [[ "$${RELEASE_TARGET_TAG}" == 'scylla-3.x' ]]; then
+release-check-user:
+	@set -eu
+	if [ "$${GITHUB_ACTIONS:-}" = true ]; then
+		# The release environment authorizes workflow operators independently of the signer.
 		exit 0
 	fi
-	if [[ "$${RELEASE_TARGET_TAG}" != 3.* ]]; then
-		echo "Use scylla-3.x or a safe 3.x release tag. Other branches are unsupported."
+	if ! user=$$(gh api user --jq .login); then
+		echo "Release requires GitHub user scylladb-publisher. Run gh auth login or gh auth switch." >&2
 		exit 1
 	fi
-	set -e
-	echo "Checking out one commit before $${RELEASE_TARGET_TAG}"
-	release_makefile=$$(mktemp)
-	trap 'rm -f "$${release_makefile}"' EXIT
-	cp -f Makefile "$${release_makefile}"
-	git fetch --prune --unshallow || git fetch --prune
-	git checkout "refs/tags/$${RELEASE_TARGET_TAG}~1"
-	git tag -d "$${RELEASE_TARGET_TAG}"
-	cp -f "$${release_makefile}" ./Makefile
+	if [ "$$user" != scylladb-publisher ]; then
+		echo "Release requires GitHub user scylladb-publisher (current: $$user)." >&2
+		exit 1
+	fi
 
-release-prepare: .require-release-prepare-env
-	@if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
+release-preflight: release-check-user
+	@set -eo pipefail
+	python3 "$(RELEASE_TARGET_HELPER)" preflight
+
+release-prepare: release-check-user
+	@set -eo pipefail
+	python3 "$(RELEASE_TARGET_HELPER)" preflight
+	python3 "$(RELEASE_GUARD)" check
+	+@python3 "$(RELEASE_SIGNING_HELPER)" exec $(MAKE) -f "$(RELEASE_MAKEFILE)" _release-prepare
+
+release: release-check-user
+	@set -eo pipefail
+	python3 "$(RELEASE_TARGET_HELPER)" preflight
+	python3 "$(RELEASE_GUARD)" check
+	python3 "$(RELEASE_SIGNING_HELPER)" verify-prepared
+	+@python3 "$(RELEASE_SIGNING_HELPER)" exec $(MAKE) -f "$(RELEASE_MAKEFILE)" _release
+
+release-dry-run: release-check-user
+	@set -eo pipefail
+	python3 "$(RELEASE_TARGET_HELPER)" preflight
+	python3 "$(RELEASE_GUARD)" check
+	python3 "$(RELEASE_SIGNING_HELPER)" verify-prepared
+	+@python3 "$(RELEASE_SIGNING_HELPER)" exec $(MAKE) -f "$(RELEASE_MAKEFILE)" _release-dry-run
+
+test-release-signing:
+	python3 -m unittest discover -s scripts/release -p 'test_signing.py' -v
+
+_release-prepare: release-check-user
+	@set -eo pipefail
+	python3 "$(RELEASE_TARGET_HELPER)" preflight
+	if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
+		echo "MAVEN_GPG_PASSPHRASE is empty, can't continue"
+		exit 1
+	fi
+	if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:prepare -DpushChanges=false -DcheckModificationExcludeList=README.md
+	NEXT_RELEASE=()
+	if [[ -n "$${RELEASE_VERSION}" ]]; then
+		NEXT_RELEASE=("-DreleaseVersion=$${RELEASE_VERSION}")
+	fi
+	export MAVEN_OPTS
+	baseline=$$(git rev-parse HEAD)
+	python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:prepare -DpushChanges=false -DcheckModificationExcludeList=README.md "$${NEXT_RELEASE[@]}"
+	python3 "$(RELEASE_SIGNING_HELPER)" verify-prepared "$$baseline"
 
-release: .require-release-env
-	@if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
+_release: release-check-user
+	@set -eo pipefail
+	python3 "$(RELEASE_TARGET_HELPER)" preflight
+	if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
+		echo "MAVEN_GPG_PASSPHRASE is empty, can't continue"
+		exit 1
+	fi
+	if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform -Drelease.autopublish=true
+	python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform -Drelease.autopublish=true
 
-release-dry-run: .require-release-env
-	@if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
+_release-dry-run: release-check-user
+	@set -eo pipefail
+	python3 "$(RELEASE_TARGET_HELPER)" preflight
+	if [[ -z "$${MAVEN_GPG_PASSPHRASE}" ]]; then
+		echo "MAVEN_GPG_PASSPHRASE is empty, can't continue"
+		exit 1
+	fi
+	if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	@python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform
+	python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform
 
 compile-all:
 	mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true
