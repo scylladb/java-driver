@@ -38,8 +38,11 @@ class GitHubReleaseTests(unittest.TestCase):
                 'state = Path(os.environ["STATE"])\n'
                 'if args[0] == "api":\n'
                 ' if not state.exists():\n'
-                '  print(json.dumps({"message": "Not Found", "status": "404"}))\n'
+                '  print("HTTP/2.0 404 Not Found\\nContent-Type: application/json\\n")\n'
+                '  print(json.dumps({"message": "Not Found"}))\n'
+                '  print("gh: Not Found (HTTP 404)", file=sys.stderr)\n'
                 '  raise SystemExit(1)\n'
+                ' print("HTTP/2.0 200 OK\\nContent-Type: application/json\\n")\n'
                 ' print(state.read_text())\n'
                 'elif args[:2] == ["release", "create"]:\n'
                 ' state.write_text(json.dumps({"tag_name": args[2], "draft": False,\n'
@@ -166,6 +169,17 @@ class GitHubReleaseTests(unittest.TestCase):
             self.assertNotIn(os.environ['GH_TOKEN'], errors.getvalue())
             self.assertEqual(len(self.calls(root)), 1)
             self.assertEqual(self.calls(root)[0][0], 'api')
+
+    def test_only_an_explicit_http_404_is_absence(self):
+        for output in ('', '{"status":"404"}',
+                       'HTTP/2.0 403 Forbidden\n\n{"status":"404"}',
+                       'HTTP/2.0 429 Too Many Requests\n\n{}',
+                       'HTTP/2.0 500 Internal Server Error\n\n{}'):
+            with self.subTest(output=output), patch.object(
+                    subprocess, 'run', return_value=subprocess.CompletedProcess(
+                        [], 1, stdout=output, stderr='test-only-token')):
+                with self.assertRaises(github_release.Invalid):
+                    github_release.release('scylladb/java-driver', '4.1.2.3')
 
     def test_creation_failure_stops_without_printing_credentials(self):
         with self.fixture() as (root, _, _):
