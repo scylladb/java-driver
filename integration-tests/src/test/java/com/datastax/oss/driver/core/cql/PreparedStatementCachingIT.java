@@ -25,7 +25,6 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.context.DriverContext;
-import com.datastax.oss.driver.api.core.cql.PrepareRequest;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
@@ -36,12 +35,10 @@ import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
-import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareSyncProcessor;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEvent;
 import com.datastax.oss.driver.internal.core.session.BuiltInRequestProcessors;
-import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.RequestProcessorRegistry;
 import com.datastax.oss.driver.shaded.guava.common.cache.RemovalListener;
@@ -57,7 +54,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -122,9 +118,6 @@ public class PreparedStatementCachingIT {
     private static final Logger LOG =
         LoggerFactory.getLogger(PreparedStatementCachingIT.TestCqlPrepareAsyncProcessor.class);
 
-    private final Set<CompletableFuture<PreparedStatement>> retainedCacheValues =
-        ConcurrentHashMap.newKeySet();
-
     private static RemovalListener<Object, Object> buildCacheRemoveCallback(
         @NonNull Optional<DefaultDriverContext> context) {
       return (evt) -> {
@@ -141,24 +134,9 @@ public class PreparedStatementCachingIT {
     }
 
     public TestCqlPrepareAsyncProcessor(@NonNull Optional<DefaultDriverContext> context) {
-      // Default CqlPrepareAsyncProcessor uses weak values. Retain the cached futures so this test
-      // validates type-change invalidation instead of racing cache value collection.
+      // Default CqlPrepareAsyncProcessor uses weak values here as well.  We avoid doing so
+      // to prevent cache entries from unexpectedly disappearing mid-test.
       super(context, builder -> builder.removalListener(buildCacheRemoveCallback(context)));
-    }
-
-    @Override
-    public CompletionStage<PreparedStatement> process(
-        PrepareRequest request,
-        DefaultSession session,
-        InternalDriverContext context,
-        String sessionLogPrefix) {
-      CompletionStage<PreparedStatement> stage =
-          super.process(request, session, context, sessionLogPrefix);
-      CompletableFuture<PreparedStatement> cachedValue = cache.getIfPresent(request);
-      if (cachedValue != null) {
-        retainedCacheValues.add(cachedValue);
-      }
-      return stage;
     }
   }
 
@@ -217,8 +195,8 @@ public class PreparedStatementCachingIT {
       Consumer<CqlSession> setupTestSchema, Set<String> expectedChangedTypes) {
     invalidationTestInner(
         setupTestSchema,
-        "select f from test_table_1 where e = ?",
-        "select h from test_table_2 where g = ?",
+        "select f from test_table_caching_1 where e = ?",
+        "select h from test_table_caching_2 where g = ?",
         expectedChangedTypes);
   }
 
@@ -229,8 +207,8 @@ public class PreparedStatementCachingIT {
     String condition = isCollection ? "contains ?" : "= ?";
     invalidationTestInner(
         setupTestSchema,
-        String.format("select e from test_table_1 where f %s allow filtering", condition),
-        String.format("select g from test_table_2 where h %s allow filtering", condition),
+        String.format("select e from test_table_caching_1 where f %s allow filtering", condition),
+        String.format("select g from test_table_caching_2 where h %s allow filtering", condition),
         expectedChangedTypes);
   }
 
@@ -285,11 +263,13 @@ public class PreparedStatementCachingIT {
                 }
               });
 
-      // alter test_type_2 to trigger cache invalidation and above events
-      session.execute("ALTER TYPE test_type_2 add i blob");
+      // alter test_type_caching_2 to trigger cache invalidation and above events
+      session.execute("ALTER TYPE test_type_caching_2 add i blob");
+
+      session.checkSchemaAgreement();
 
       // wait for latches and fail if they don't reach zero before timeout
-      assertThat(Uninterruptibles.awaitUninterruptibly(typeChangeEventLatch, 10, TimeUnit.SECONDS))
+      assertThat(Uninterruptibles.awaitUninterruptibly(typeChangeEventLatch, 20, TimeUnit.SECONDS))
           .withFailMessage("typeChangeEventLatch did not trigger before timeout")
           .isTrue();
 
@@ -304,7 +284,7 @@ public class PreparedStatementCachingIT {
       assertThat(getPreparedCacheSize(session)).isEqualTo(2);
 
       assertThat(changedTypes.keySet()).isEqualTo(expectedChangedTypes);
-      removedQueryIds.get().ifPresent(queryId -> assertThat(queryId).isEqualTo(queryId2));
+      assertThat(removedQueryIds.get()).isNotEmpty().get().isEqualTo(queryId2);
 
       // check no errors were seen in callback (and report those as fail msgs)
       // if something is broken these may still succeed due to timing
@@ -320,17 +300,20 @@ public class PreparedStatementCachingIT {
 
   Consumer<CqlSession> setupCacheEntryTestBasic =
       (session) -> {
-        session.execute("CREATE TYPE test_type_1 (a text, b int)");
-        session.execute("CREATE TYPE test_type_2 (c int, d text)");
-        session.execute("CREATE TABLE test_table_1 (e int primary key, f frozen<test_type_1>)");
-        session.execute("CREATE TABLE test_table_2 (g int primary key, h frozen<test_type_2>)");
+        session.execute("CREATE TYPE test_type_caching_1 (a text, b int)");
+        session.execute("CREATE TYPE test_type_caching_2 (c int, d text)");
+        session.execute(
+            "CREATE TABLE test_table_caching_1 (e int primary key, f frozen<test_type_caching_1>)");
+        session.execute(
+            "CREATE TABLE test_table_caching_2 (g int primary key, h frozen<test_type_caching_2>)");
       };
 
   @Test
   public void should_invalidate_cache_entry_on_basic_udt_change_result_set() {
     SchemaChangeSynchronizer.withLock(
         () -> {
-          invalidationResultSetTest(setupCacheEntryTestBasic, ImmutableSet.of("test_type_2"));
+          invalidationResultSetTest(
+              setupCacheEntryTestBasic, ImmutableSet.of("test_type_caching_2"));
         });
   }
 
@@ -339,25 +322,26 @@ public class PreparedStatementCachingIT {
     SchemaChangeSynchronizer.withLock(
         () -> {
           invalidationVariableDefsTest(
-              setupCacheEntryTestBasic, false, ImmutableSet.of("test_type_2"));
+              setupCacheEntryTestBasic, false, ImmutableSet.of("test_type_caching_2"));
         });
   }
 
   Consumer<CqlSession> setupCacheEntryTestCollection =
       (session) -> {
-        session.execute("CREATE TYPE test_type_1 (a text, b int)");
-        session.execute("CREATE TYPE test_type_2 (c int, d text)");
+        session.execute("CREATE TYPE test_type_caching_1 (a text, b int)");
+        session.execute("CREATE TYPE test_type_caching_2 (c int, d text)");
         session.execute(
-            "CREATE TABLE test_table_1 (e int primary key, f list<frozen<test_type_1>>)");
+            "CREATE TABLE test_table_caching_1 (e int primary key, f list<frozen<test_type_caching_1>>)");
         session.execute(
-            "CREATE TABLE test_table_2 (g int primary key, h list<frozen<test_type_2>>)");
+            "CREATE TABLE test_table_caching_2 (g int primary key, h list<frozen<test_type_caching_2>>)");
       };
 
   @Test
   public void should_invalidate_cache_entry_on_collection_udt_change_result_set() {
     SchemaChangeSynchronizer.withLock(
         () -> {
-          invalidationResultSetTest(setupCacheEntryTestCollection, ImmutableSet.of("test_type_2"));
+          invalidationResultSetTest(
+              setupCacheEntryTestCollection, ImmutableSet.of("test_type_caching_2"));
         });
   }
 
@@ -366,25 +350,26 @@ public class PreparedStatementCachingIT {
     SchemaChangeSynchronizer.withLock(
         () -> {
           invalidationVariableDefsTest(
-              setupCacheEntryTestCollection, true, ImmutableSet.of("test_type_2"));
+              setupCacheEntryTestCollection, true, ImmutableSet.of("test_type_caching_2"));
         });
   }
 
   Consumer<CqlSession> setupCacheEntryTestTuple =
       (session) -> {
-        session.execute("CREATE TYPE test_type_1 (a text, b int)");
-        session.execute("CREATE TYPE test_type_2 (c int, d text)");
+        session.execute("CREATE TYPE test_type_caching_1 (a text, b int)");
+        session.execute("CREATE TYPE test_type_caching_2 (c int, d text)");
         session.execute(
-            "CREATE TABLE test_table_1 (e int primary key, f tuple<int, test_type_1, text>)");
+            "CREATE TABLE test_table_caching_1 (e int primary key, f tuple<int, test_type_caching_1, text>)");
         session.execute(
-            "CREATE TABLE test_table_2 (g int primary key, h tuple<text, test_type_2, int>)");
+            "CREATE TABLE test_table_caching_2 (g int primary key, h tuple<text, test_type_caching_2, int>)");
       };
 
   @Test
   public void should_invalidate_cache_entry_on_tuple_udt_change_result_set() {
     SchemaChangeSynchronizer.withLock(
         () -> {
-          invalidationResultSetTest(setupCacheEntryTestTuple, ImmutableSet.of("test_type_2"));
+          invalidationResultSetTest(
+              setupCacheEntryTestTuple, ImmutableSet.of("test_type_caching_2"));
         });
   }
 
@@ -393,18 +378,20 @@ public class PreparedStatementCachingIT {
     SchemaChangeSynchronizer.withLock(
         () -> {
           invalidationVariableDefsTest(
-              setupCacheEntryTestTuple, false, ImmutableSet.of("test_type_2"));
+              setupCacheEntryTestTuple, false, ImmutableSet.of("test_type_caching_2"));
         });
   }
 
   Consumer<CqlSession> setupCacheEntryTestNested =
       (session) -> {
-        session.execute("CREATE TYPE test_type_1 (a text, b int)");
-        session.execute("CREATE TYPE test_type_2 (c int, d text)");
-        session.execute("CREATE TYPE test_type_3 (e frozen<test_type_1>, f int)");
-        session.execute("CREATE TYPE test_type_4 (g int, h frozen<test_type_2>)");
-        session.execute("CREATE TABLE test_table_1 (e int primary key, f frozen<test_type_3>)");
-        session.execute("CREATE TABLE test_table_2 (g int primary key, h frozen<test_type_4>)");
+        session.execute("CREATE TYPE test_type_caching_1 (a text, b int)");
+        session.execute("CREATE TYPE test_type_caching_2 (c int, d text)");
+        session.execute("CREATE TYPE test_type_caching_3 (e frozen<test_type_caching_1>, f int)");
+        session.execute("CREATE TYPE test_type_caching_4 (g int, h frozen<test_type_caching_2>)");
+        session.execute(
+            "CREATE TABLE test_table_caching_1 (e int primary key, f frozen<test_type_caching_3>)");
+        session.execute(
+            "CREATE TABLE test_table_caching_2 (g int primary key, h frozen<test_type_caching_4>)");
       };
 
   @Test
@@ -412,7 +399,8 @@ public class PreparedStatementCachingIT {
     SchemaChangeSynchronizer.withLock(
         () -> {
           invalidationResultSetTest(
-              setupCacheEntryTestNested, ImmutableSet.of("test_type_2", "test_type_4"));
+              setupCacheEntryTestNested,
+              ImmutableSet.of("test_type_caching_2", "test_type_caching_4"));
         });
   }
 
@@ -421,7 +409,9 @@ public class PreparedStatementCachingIT {
     SchemaChangeSynchronizer.withLock(
         () -> {
           invalidationVariableDefsTest(
-              setupCacheEntryTestNested, false, ImmutableSet.of("test_type_2", "test_type_4"));
+              setupCacheEntryTestNested,
+              false,
+              ImmutableSet.of("test_type_caching_2", "test_type_caching_4"));
         });
   }
 

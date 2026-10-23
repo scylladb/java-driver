@@ -151,7 +151,7 @@ Note that caching is based on:
   bound statements with their respective consistency level).
 
 The size of the cache is exposed as a session-level [metric](../../metrics/)
-`cql-prepared-cache-size`. The cache uses [weak values]([guava eviction]) eviction, so this
+`cql-prepared-cache-size`. The cache uses [weak values][guava eviction] eviction, so this
 represents the number of `PreparedStatement` instances that your application has created, and is
 still holding a reference to.
 

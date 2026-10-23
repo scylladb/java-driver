@@ -429,7 +429,7 @@ that you wish to modify – but keep in mind that it may be simpler to just star
 
 ### Using multiple policies
 
-The load balancing policy can be overridden in [execution profiles](../configuration/#profiles):
+The load balancing policy can be overridden in [execution profiles](../configuration/#execution-profiles):
 
 ```
 datastax-java-driver {
