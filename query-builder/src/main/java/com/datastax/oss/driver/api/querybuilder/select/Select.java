@@ -140,7 +140,8 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
    * Adds the provided ORDER BY clause to the query.
    *
    * <p>If an ordering was already defined for this identifier, it will be removed and the new
-   * clause will be appended at the end of the current list for this query.
+   * clause will be appended at the end of the current list for this query. If the query currently
+   * orders by {@code ANN OF}, that ordering is replaced.
    */
   @NonNull
   Select orderBy(@NonNull CqlIdentifier columnId, @NonNull ClusteringOrder order);
@@ -161,7 +162,10 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
   @NonNull
   Select orderByAnnOf(@NonNull String columnName, @NonNull CqlVector<?> ann);
 
-  /** Adds the ORDER BY ... ANN OF ... clause, usually used for vector search */
+  /**
+   * Adds the ORDER BY ... ANN OF ... clause, usually used for vector search. It replaces any
+   * ordering already defined for this query.
+   */
   @NonNull
   Select orderByAnnOf(@NonNull CqlIdentifier columnId, @NonNull CqlVector<?> ann);
   /**
