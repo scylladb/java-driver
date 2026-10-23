@@ -254,7 +254,7 @@ class SigningTests(unittest.TestCase):
         def running(pid):
             try:
                 return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
                 return False
         for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
             with self.subTest(signum=signum), self.make_repository() as directory:
