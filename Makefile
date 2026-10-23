@@ -1,5 +1,6 @@
 RELEASE_GUARD ?= scripts/release/guard.py
 RELEASE_TARGET_HELPER ?= $(dir $(RELEASE_GUARD))target.py
+RELEASE_PUBLICATION_HELPER ?= $(dir $(RELEASE_GUARD))publication.py
 RELEASE_SIGNING_HELPER ?= $(dir $(RELEASE_GUARD))signing.py
 RELEASE_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
 export RELEASE_VERSION RELEASE_BASE_COMMIT
@@ -364,14 +365,18 @@ release: release-check-user
 	python3 "$(RELEASE_TARGET_HELPER)" preflight
 	python3 "$(RELEASE_GUARD)" check
 	python3 "$(RELEASE_SIGNING_HELPER)" verify-prepared
+	python3 "$(RELEASE_PUBLICATION_HELPER)" begin
 	+@python3 "$(RELEASE_SIGNING_HELPER)" exec $(MAKE) -f "$(RELEASE_MAKEFILE)" _release
+	python3 "$(RELEASE_PUBLICATION_HELPER)" publish
 
 release-dry-run: release-check-user
 	@set -eo pipefail
 	python3 "$(RELEASE_TARGET_HELPER)" preflight
 	python3 "$(RELEASE_GUARD)" check
 	python3 "$(RELEASE_SIGNING_HELPER)" verify-prepared
+	python3 "$(RELEASE_PUBLICATION_HELPER)" begin
 	+@python3 "$(RELEASE_SIGNING_HELPER)" exec $(MAKE) -f "$(RELEASE_MAKEFILE)" _release-dry-run
+	python3 "$(RELEASE_PUBLICATION_HELPER)" dry-run
 
 test-release-signing:
 	python3 -m unittest discover -s scripts/release -p 'test_signing.py' -v
@@ -405,7 +410,7 @@ _release: release-check-user
 	if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform -Drelease.autopublish=true
+	python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform -Drelease.autopublish=false
 
 _release-dry-run: release-check-user
 	@set -eo pipefail
@@ -417,7 +422,7 @@ _release-dry-run: release-check-user
 	if [[ "$${RELEASE_SKIP_TESTS}" == "true" ]] || [[ "$${RELEASE_SKIP_TESTS}" == "1" ]]; then
 		export MAVEN_OPTS="$${MAVEN_OPTS} -DskipTests=true -DskipITs=true"
 	fi
-	python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform
+	python3 "$(RELEASE_GUARD)" run $(MVNCMD) release:perform -Drelease.autopublish=false
 
 compile-all:
 	mvn -B compile test-compile -Dfmt.skip=true -Dclirr.skip=true -Danimal.sniffer.skip=true

@@ -451,6 +451,9 @@ def check_policy(root):
                 if (setting.text or "").strip().lower() != "true":
                     raise Unsafe("GPG best practices must not be disabled")
         if plugin.findtext("m:artifactId", namespaces=ns) == "central-publishing-maven-plugin":
+            autopublish = plugin.findtext("m:configuration/m:autoPublish", namespaces=ns)
+            if autopublish not in ("${release.autopublish}", "false"):
+                raise Unsafe("Central upload must remain unpublished until bundle verification")
             version = plugin.findtext("m:version", namespaces=ns)
             if version and (
                 not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)

@@ -109,11 +109,14 @@ python3 -m unittest discover -s scripts/release -p 'test_*.py' -v
 
 ## Cutover and dry runs
 
+Each branch serializes its own releases; the two lines can validate independently.
 Pause release dispatches during cutover. Provision the protected environment, merge both
 line-specific workflow changes, and replace the Central placeholders. Run an approved
-`dry-run` on each branch. Dry runs **upload unpublished Central deployments**; inspect
-signatures, coordinates, and module contents in Central, then delete those deployments.
-They push no Git refs and publish no docs. See
+`dry-run` on each branch. Dry runs **upload unpublished Central deployments**. The workflow
+verifies every bundle signature and the exact module set, confirms Central validation, and
+deletes the unpublished deployment. Download `verified-central-bundle` and the publication
+report in the Maven logs for independent inspection. Dry runs push no Git refs and publish
+no docs. See
 [Central publishing behavior](https://central.sonatype.org/publish/publish-portal-maven/).
 
 After both dry runs pass, remove repository-scoped `GPG_PRIVATE_KEY`, `GPG_PASSPHRASE`,
@@ -122,7 +125,11 @@ consumers of `OSSRH_USERNAME`/`OSSRH_PASSWORD` before deleting them. Keep `CODEC
 Revoke the retired Central token only after checking other repositories and consumers.
 Resume release dispatches. Confirm the first real release publishes the expected module
 set, signed commits and tag, and docs. Branch releases push explicitly to
-`HEAD:refs/heads/scylla-4.x` or `HEAD:refs/heads/scylla-3.x` only after publication succeeds.
+`HEAD:refs/heads/scylla-4.x` or `HEAD:refs/heads/scylla-3.x` only after the Portal API
+confirms `PUBLISHED`. Maven always uploads in manual mode;
+`publication.py` verifies signatures, module coordinates, and deployment identity before
+requesting a real publication. It rechecks blockers and branch movement after upload,
+then waits for completion before the SCM push and docs job.
 Historical targets never push refs or publish docs.
 
 ## Partial release recovery and key rotation
@@ -134,7 +141,10 @@ unpublished local state in a disposable checkout. Never move a published release
 If Central upload/validation fails, inspect the deployment status and module set before
 retrying. Delete an unpublished deployment when appropriate. If some artifacts are already
 public, Maven Central versions are immutable: do not blindly rerun or overwrite them.
-Recover the original prepared commits and tag, verify against the original baseline, and
+Download `prepared-release-state`: its Git bundle retains the original signed commits
+and tag, with the matching public certificate. In a clone containing the original
+baseline, run `git bundle verify prepared-release.bundle` and fetch its HEAD and tag
+into recovery refs. Verify against the original baseline and
 reconcile the actual Central state first. If publication succeeded but SCM push failed,
 verify and push that exact signed history after reconciling branch advancement. Do not
 prepare another release under the same version. Run docs publication only after the SCM
