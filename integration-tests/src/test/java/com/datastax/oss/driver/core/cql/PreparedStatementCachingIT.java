@@ -25,7 +25,6 @@ import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.context.DriverContext;
-import com.datastax.oss.driver.api.core.cql.PrepareRequest;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.metrics.DefaultSessionMetric;
 import com.datastax.oss.driver.api.core.session.ProgrammaticArguments;
@@ -36,12 +35,10 @@ import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.categories.IsolatedTests;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
-import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareAsyncProcessor;
 import com.datastax.oss.driver.internal.core.cql.CqlPrepareSyncProcessor;
 import com.datastax.oss.driver.internal.core.metadata.schema.events.TypeChangeEvent;
 import com.datastax.oss.driver.internal.core.session.BuiltInRequestProcessors;
-import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.RequestProcessorRegistry;
 import com.datastax.oss.driver.shaded.guava.common.cache.RemovalListener;
@@ -57,7 +54,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -122,9 +118,6 @@ public class PreparedStatementCachingIT {
     private static final Logger LOG =
         LoggerFactory.getLogger(PreparedStatementCachingIT.TestCqlPrepareAsyncProcessor.class);
 
-    private final Set<CompletableFuture<PreparedStatement>> retainedCacheValues =
-        ConcurrentHashMap.newKeySet();
-
     private static RemovalListener<Object, Object> buildCacheRemoveCallback(
         @NonNull Optional<DefaultDriverContext> context) {
       return (evt) -> {
@@ -141,24 +134,9 @@ public class PreparedStatementCachingIT {
     }
 
     public TestCqlPrepareAsyncProcessor(@NonNull Optional<DefaultDriverContext> context) {
-      // Default CqlPrepareAsyncProcessor uses weak values. Retain the cached futures so this test
-      // validates type-change invalidation instead of racing cache value collection.
+      // Default CqlPrepareAsyncProcessor uses weak values here as well.  We avoid doing so
+      // to prevent cache entries from unexpectedly disappearing mid-test.
       super(context, builder -> builder.removalListener(buildCacheRemoveCallback(context)));
-    }
-
-    @Override
-    public CompletionStage<PreparedStatement> process(
-        PrepareRequest request,
-        DefaultSession session,
-        InternalDriverContext context,
-        String sessionLogPrefix) {
-      CompletionStage<PreparedStatement> stage =
-          super.process(request, session, context, sessionLogPrefix);
-      CompletableFuture<PreparedStatement> cachedValue = cache.getIfPresent(request);
-      if (cachedValue != null) {
-        retainedCacheValues.add(cachedValue);
-      }
-      return stage;
     }
   }
 
@@ -306,7 +284,7 @@ public class PreparedStatementCachingIT {
       assertThat(getPreparedCacheSize(session)).isEqualTo(2);
 
       assertThat(changedTypes.keySet()).isEqualTo(expectedChangedTypes);
-      removedQueryIds.get().ifPresent(queryId -> assertThat(queryId).isEqualTo(queryId2));
+      assertThat(removedQueryIds.get()).isNotEmpty().get().isEqualTo(queryId2);
 
       // check no errors were seen in callback (and report those as fail msgs)
       // if something is broken these may still succeed due to timing
