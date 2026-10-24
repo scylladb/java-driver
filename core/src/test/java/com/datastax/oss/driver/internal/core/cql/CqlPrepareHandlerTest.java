@@ -23,15 +23,18 @@ import static com.datastax.oss.driver.internal.core.cql.CqlRequestHandlerTestBas
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
@@ -53,6 +56,7 @@ import com.datastax.oss.protocol.internal.response.result.Prepared;
 import com.datastax.oss.protocol.internal.response.result.RawType;
 import com.datastax.oss.protocol.internal.response.result.RowsMetadata;
 import com.datastax.oss.protocol.internal.util.Bytes;
+import io.netty.util.Timer;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -109,6 +113,23 @@ public class CqlPrepareHandlerTest {
       node3Behavior.setResponseSuccess(defaultFrameOf(simplePrepared()));
 
       assertThatStage(prepareFuture).isSuccess(CqlPrepareHandlerTest::assertMatchesSimplePrepared);
+    }
+  }
+
+  @Test
+  public void should_fail_with_session_closed_if_request_timer_is_stopped() {
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      // Simulate the shutdown race where the request timer has already stopped.
+      Timer timer = mock(Timer.class);
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+      when(timer.newTimeout(any(), anyLong(), any()))
+          .thenThrow(new IllegalStateException("cannot be started once stopped"));
+
+      assertThatThrownBy(
+              () ->
+                  new CqlPrepareHandler(
+                      PREPARE_REQUEST, harness.getSession(), harness.getContext(), "test"))
+          .isInstanceOf(SessionClosedException.class);
     }
   }
 

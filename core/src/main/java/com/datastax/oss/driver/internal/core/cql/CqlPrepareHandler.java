@@ -25,6 +25,7 @@ import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.cql.PrepareRequest;
@@ -167,18 +168,25 @@ public class CqlPrepareHandler implements Throttled {
 
   private Timeout scheduleTimeout(Duration timeoutDuration) {
     if (timeoutDuration.toNanos() > 0) {
-      return this.timer.newTimeout(
-          (Timeout timeout1) -> {
-            NodeDiagnostics diagnostics = buildNodeDiagnostics();
-            setFinalError(
-                new DriverTimeoutException(
-                    "Query timed out after " + timeoutDuration, diagnostics));
-            if (initialCallback != null) {
-              initialCallback.cancel();
-            }
-          },
-          timeoutDuration.toNanos(),
-          TimeUnit.NANOSECONDS);
+      try {
+        return this.timer.newTimeout(
+            (Timeout timeout1) -> {
+              NodeDiagnostics diagnostics = buildNodeDiagnostics();
+              setFinalError(
+                  new DriverTimeoutException(
+                      "Query timed out after " + timeoutDuration, diagnostics));
+              if (initialCallback != null) {
+                initialCallback.cancel();
+              }
+            },
+            timeoutDuration.toNanos(),
+            TimeUnit.NANOSECONDS);
+      } catch (IllegalStateException e) {
+        if ("cannot be started once stopped".equals(e.getMessage())) {
+          throw new SessionClosedException();
+        }
+        throw e;
+      }
     } else {
       return null;
     }
