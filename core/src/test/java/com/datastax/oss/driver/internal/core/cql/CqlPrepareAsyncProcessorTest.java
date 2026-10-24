@@ -17,7 +17,12 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
+import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.cql.PrepareRequest;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
@@ -25,6 +30,7 @@ import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.core.type.UserDefinedType;
 import com.datastax.oss.driver.internal.core.type.UserDefinedTypeBuilder;
 import com.datastax.oss.driver.shaded.guava.common.cache.Cache;
+import io.netty.util.Timer;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -87,6 +93,31 @@ public class CqlPrepareAsyncProcessorTest {
     // Cancelling the returned copy should NOT affect the cached future
     returned.toCompletableFuture().cancel(false);
     assertThat(inFlight.isCancelled()).isFalse();
+  }
+
+  @Test
+  public void should_complete_and_invalidate_cached_future_if_handler_construction_fails() {
+    PrepareRequest request = new DefaultPrepareRequest("SELECT 1");
+    IllegalArgumentException failure = new IllegalArgumentException("mock timer failure");
+
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      // A construction failure must clear the cache so a later prepare can retry.
+      Timer timer = mock(Timer.class);
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+      when(timer.newTimeout(any(), anyLong(), any())).thenThrow(failure);
+
+      CompletionStage<PreparedStatement> first =
+          processor.process(request, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(first).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(cache.getIfPresent(request)).isNull();
+
+      CompletionStage<PreparedStatement> retry =
+          processor.process(request, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(retry).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(cache.getIfPresent(request)).isNull();
+    }
   }
 
   @Test
