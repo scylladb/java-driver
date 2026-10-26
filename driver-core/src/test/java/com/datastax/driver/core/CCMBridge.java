@@ -125,8 +125,21 @@ public class CCMBridge implements CCMAccess {
    * <p>At times it is necessary to use a separate java install for CCM then what is being used for
    * running tests. For example, if you want to run tests with JDK 6 but against Cassandra 2.0,
    * which requires JDK 7.
+   *
+   * <p>This is the environment for the globally configured server version, assembled by {@link
+   * #buildGlobalEnvironmentMap}; a cluster that configures its own version gets one derived from
+   * {@link #BASE_ENVIRONMENT_MAP} instead, see {@link
+   * Builder#buildEnvironmentMap(Builder.ResolvedVersions)}.
    */
   private static final Map<String, String> ENVIRONMENT_MAP;
+
+  /**
+   * {@link #ENVIRONMENT_MAP} without the variables that depend on which server flavor and version
+   * is installed, i.e. everything a cluster configuring its own version can reuse. {@code
+   * SCYLLA_PRODUCT} is stripped even if the surrounding process defined it, so that it can only
+   * ever be re-added for a version that was actually resolved as Enterprise.
+   */
+  private static final Map<String, String> BASE_ENVIRONMENT_MAP;
 
   /**
    * A mapping of full DSE versions to their C* counterpart. This is not meant to be comprehensive.
@@ -200,6 +213,8 @@ public class CCMBridge implements CCMAccess {
     String branch = System.getProperty("cassandra.branch");
     // Inherit the current environment.
     Map<String, String> envMap = Maps.newHashMap(new ProcessBuilder().environment());
+    boolean globalScyllaEnterprise = false;
+    boolean globalScyllaBranchSpec = false;
     ImmutableSet.Builder<String> installArgs = ImmutableSet.builder();
     if (installDirectory != null && !installDirectory.trim().isEmpty()) {
       installArgs.add("--install-dir=" + new File(installDirectory).getAbsolutePath());
@@ -211,12 +226,9 @@ public class CCMBridge implements CCMAccess {
         installArgs.add("-v release:" + inputScyllaVersion);
       } else {
         installArgs.add("-v " + inputScyllaVersion);
+        globalScyllaBranchSpec = true;
       }
-      // Detect Scylla Enterprise - it should start with
-      // a 4-digit year.
-      if (inputScyllaVersion.matches("\\d{4}\\..*")) {
-        envMap.put("SCYLLA_PRODUCT", "enterprise");
-      }
+      globalScyllaEnterprise = isScyllaEnterpriseVersion(inputScyllaVersion);
     } else if (inputCassandraVersion != null && !inputCassandraVersion.trim().isEmpty()) {
       installArgs.add("-v " + inputCassandraVersion);
     }
@@ -248,7 +260,13 @@ public class CCMBridge implements CCMAccess {
     if (ccmJavaHome != null) {
       envMap.put("JAVA_HOME", ccmJavaHome);
     }
-    ENVIRONMENT_MAP = ImmutableMap.copyOf(envMap);
+    ENVIRONMENT_MAP =
+        buildGlobalEnvironmentMap(envMap, globalScyllaEnterprise, globalScyllaBranchSpec);
+    // A cluster that configures its own version derives SCYLLA_PRODUCT from that version instead,
+    // so an inherited value must not reach it: it would install an explicitly configured OSS
+    // version from the Enterprise repository.
+    envMap.remove("SCYLLA_PRODUCT");
+    BASE_ENVIRONMENT_MAP = ImmutableMap.copyOf(envMap);
 
     if (isDse()) {
       GLOBAL_DSE_VERSION_NUMBER = VersionNumber.parse(inputCassandraVersion);
@@ -348,6 +366,53 @@ public class CCMBridge implements CCMAccess {
     return osName != null && osName.startsWith("Windows");
   }
 
+  /**
+   * Scylla Enterprise versions start with a 4-digit year (e.g. 2026.1.0), OSS ones don't. CCM
+   * installs them from a different repository, selected with the {@code SCYLLA_PRODUCT} variable.
+   */
+  private static boolean isScyllaEnterpriseVersion(String versionString) {
+    return versionString != null && versionString.matches("\\d{4}\\..*");
+  }
+
+  /**
+   * Builds {@link #ENVIRONMENT_MAP}, the environment for the globally configured server version,
+   * from an inherited process environment.
+   *
+   * <p>Package-private and free of static state so that the {@code SCYLLA_PRODUCT} decision is
+   * assertable without a live process environment -- it is otherwise only reachable through a
+   * static initializer.
+   *
+   * <p>An inherited {@code SCYLLA_PRODUCT} is honoured only for a branch spec, where {@link
+   * #isScyllaEnterpriseVersion} cannot classify the string and exporting the variable is the only
+   * way to select the repository. For a version number, a pure Cassandra run, or no configured
+   * version, the resolved flavor wins and an inherited value is dropped: otherwise a stale {@code
+   * SCYLLA_PRODUCT=enterprise} in the surrounding shell would install an OSS version from the
+   * Enterprise repository.
+   */
+  static Map<String, String> buildGlobalEnvironmentMap(
+      Map<String, String> inheritedEnvironment,
+      boolean scyllaEnterprise,
+      boolean scyllaBranchSpec) {
+    if (scyllaEnterprise) {
+      return withScyllaEnterprise(inheritedEnvironment);
+    }
+    if (scyllaBranchSpec) {
+      return ImmutableMap.copyOf(inheritedEnvironment);
+    }
+    Map<String, String> envMap = Maps.newHashMap(inheritedEnvironment);
+    envMap.remove("SCYLLA_PRODUCT");
+    return ImmutableMap.copyOf(envMap);
+  }
+
+  /** Adds the CCM variable that makes Scylla install from the Enterprise repository. */
+  private static Map<String, String> withScyllaEnterprise(Map<String, String> environmentMap) {
+    // Not an ImmutableMap.Builder: the inherited environment may already define the variable, and
+    // duplicate keys would make build() throw.
+    Map<String, String> envMap = Maps.newHashMap(environmentMap);
+    envMap.put("SCYLLA_PRODUCT", "enterprise");
+    return ImmutableMap.copyOf(envMap);
+  }
+
   private static boolean isVersionNumber(String versionString) {
     try {
       VersionNumber.parse(versionString);
@@ -408,6 +473,9 @@ public class CCMBridge implements CCMAccess {
 
   private final int[] jmxPorts;
 
+  /** The environment to use for this cluster's CCM commands, see {@link #ENVIRONMENT_MAP}. */
+  private final Map<String, String> environmentMap;
+
   protected CCMBridge(
       String clusterName,
       VersionNumber cassandraVersion,
@@ -419,7 +487,8 @@ public class CCMBridge implements CCMAccess {
       int binaryPort,
       int[] jmxPorts,
       String jvmArgs,
-      int[] nodes) {
+      int[] nodes,
+      Map<String, String> environmentMap) {
 
     this.clusterName = clusterName;
     this.cassandraVersion = cassandraVersion;
@@ -435,6 +504,7 @@ public class CCMBridge implements CCMAccess {
     this.nodes = nodes;
     this.ccmDir = Files.createTempDir();
     this.jmxPorts = jmxPorts;
+    this.environmentMap = environmentMap;
   }
 
   public static Builder builder() {
@@ -480,7 +550,7 @@ public class CCMBridge implements CCMAccess {
 
   @Override
   public InetSocketAddress jmxAddressOfNode(int n) {
-    if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
+    if (isScylla) {
       return new InetSocketAddress(ipOfNode(n), jmxPorts[n - 1]);
     } else {
       return new InetSocketAddress("localhost", jmxPorts[n - 1]);
@@ -851,7 +921,19 @@ public class CCMBridge implements CCMAccess {
     }
   }
 
+  /**
+   * Runs a CCM command with the environment of the globally configured server version.
+   *
+   * <p>Note that {@link #getScyllaVersionThroughCcm(String)} reaches this from the static
+   * initializer, before that environment is assigned; commons-exec then inherits this process's
+   * environment as-is.
+   */
   private static String execute(File ccmDir, String command, Object... args) {
+    return execute(ccmDir, ENVIRONMENT_MAP, command, args);
+  }
+
+  private static String execute(
+      File ccmDir, Map<String, String> environmentMap, String command, Object... args) {
     Logger logger = CCMBridge.logger;
     String fullCommand = String.format(command, args) + " --config-dir=" + ccmDir;
     Closer closer = Closer.create();
@@ -887,7 +969,7 @@ public class CCMBridge implements CCMAccess {
       ExecuteStreamHandler streamHandler = new PumpStreamHandler(outStream, errStream);
       executor.setStreamHandler(streamHandler);
       executor.setWatchdog(watchDog);
-      int retValue = executor.execute(cli, ENVIRONMENT_MAP);
+      int retValue = executor.execute(cli, environmentMap);
       if (retValue != 0) {
         logger.error(
             "Non-zero exit code ({}) returned from executing ccm command: {}",
@@ -917,7 +999,7 @@ public class CCMBridge implements CCMAccess {
   }
 
   private String execute(String command, Object... args) {
-    return execute(this.ccmDir, command, args);
+    return execute(this.ccmDir, this.environmentMap, command, args);
   }
 
   /**
@@ -1019,6 +1101,8 @@ public class CCMBridge implements CCMAccess {
     private boolean start = true;
     private boolean dse = isDse();
     private boolean scylla = GLOBAL_SCYLLA_VERSION_NUMBER != null;
+    private boolean ssl = false;
+    private boolean auth = false;
     private VersionNumber version = null;
     private final Set<String> createOptions = new LinkedHashSet<String>();
     private final Set<String> jvmArgs = new LinkedHashSet<String>();
@@ -1060,40 +1144,22 @@ public class CCMBridge implements CCMAccess {
       return this;
     }
 
-    /** Enables SSL encryption. */
+    /**
+     * Enables SSL encryption.
+     *
+     * <p>Only records the request: which keys and certificates to point the server at depends on
+     * the server flavor, which isn't resolved until {@link #build()}, see {@link
+     * #buildClientEncryptionOptions(ResolvedVersions)}.
+     */
     public Builder withSSL() {
-      cassandraConfiguration.put("client_encryption_options.enabled", "true");
-      if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
-        cassandraConfiguration.put(
-            "client_encryption_options.certificate",
-            DEFAULT_SERVER_CERT_CHAIN_FILE.getAbsolutePath());
-        cassandraConfiguration.put(
-            "client_encryption_options.keyfile", DEFAULT_SERVER_PRIVATE_KEY_FILE.getAbsolutePath());
-      } else {
-        cassandraConfiguration.put("client_encryption_options.optional", "false");
-        cassandraConfiguration.put(
-            "client_encryption_options.keystore", DEFAULT_SERVER_KEYSTORE_FILE.getAbsolutePath());
-        cassandraConfiguration.put(
-            "client_encryption_options.keystore_password", DEFAULT_SERVER_KEYSTORE_PASSWORD);
-      }
+      this.ssl = true;
       return this;
     }
 
     /** Enables client authentication. This also enables encryption ({@link #withSSL()}. */
     public Builder withAuth() {
       withSSL();
-      cassandraConfiguration.put("client_encryption_options.require_client_auth", "true");
-      if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
-        cassandraConfiguration.put(
-            "client_encryption_options.truststore",
-            DEFAULT_SERVER_TRUSTSTORE_PEM_FILE.getAbsolutePath());
-      } else {
-        cassandraConfiguration.put(
-            "client_encryption_options.truststore",
-            DEFAULT_SERVER_TRUSTSTORE_FILE.getAbsolutePath());
-        cassandraConfiguration.put(
-            "client_encryption_options.truststore_password", DEFAULT_SERVER_TRUSTSTORE_PASSWORD);
-      }
+      this.auth = true;
       return this;
     }
 
@@ -1106,6 +1172,12 @@ public class CCMBridge implements CCMAccess {
     /**
      * The Cassandra or DSE or Scylla version to use. If not specified the globally configured
      * version is used instead.
+     *
+     * <p>Which of the three this version names is decided by {@link #withDSE(boolean)} and {@link
+     * #withScylla(boolean)}, which default to the flavor of the surrounding run rather than to
+     * anything about this version. Call the matching one alongside this method, or a Cassandra
+     * version passed under {@code -Dscylla.version=...} is resolved as a Scylla release (and vice
+     * versa).
      */
     public Builder withVersion(VersionNumber version) {
       this.version = version;
@@ -1186,37 +1258,60 @@ public class CCMBridge implements CCMAccess {
       return this;
     }
 
+    /** The server versions this builder's configuration resolves to. */
+    static class ResolvedVersions {
+      final boolean versionConfigured;
+      final VersionNumber cassandra;
+      final VersionNumber dse;
+      final VersionNumber scylla;
+
+      ResolvedVersions(
+          boolean versionConfigured,
+          VersionNumber cassandra,
+          VersionNumber dse,
+          VersionNumber scylla) {
+        this.versionConfigured = versionConfigured;
+        this.cassandra = cassandra;
+        this.dse = dse;
+        this.scylla = scylla;
+      }
+    }
+
+    /**
+     * Resolves which flavor and version this builder will create, from the explicitly configured
+     * version (if any) and the globally configured defaults.
+     */
+    ResolvedVersions resolveVersions() {
+      boolean versionConfigured = this.version != null;
+      // No version was explicitly provided, fallback on global config.
+      if (!versionConfigured) {
+        return new ResolvedVersions(
+            false,
+            GLOBAL_CASSANDRA_VERSION_NUMBER,
+            GLOBAL_DSE_VERSION_NUMBER,
+            GLOBAL_SCYLLA_VERSION_NUMBER);
+      } else if (dse) {
+        // given version is the DSE version, base cassandra version on DSE version.
+        return new ResolvedVersions(true, getCassandraVersion(this.version), this.version, null);
+      } else if (scylla) {
+        // Versions from 5.1 to 6.2.0 seem to report release_version 3.0.8 in system_local
+        return new ResolvedVersions(true, VersionNumber.parse("3.0.8"), null, this.version);
+      } else {
+        // given version is cassandra version.
+        return new ResolvedVersions(true, this.version, null, null);
+      }
+    }
+
     public CCMBridge build() {
       // be careful NOT to alter internal state (hashCode/equals) during build!
       String clusterName = TestUtils.generateIdentifier("ccm_");
 
       if (providedClusterName != null) clusterName = providedClusterName;
 
-      VersionNumber dseVersion;
-      VersionNumber cassandraVersion;
-      VersionNumber scyllaVersion;
-      boolean versionConfigured = this.version != null;
-      // No version was explicitly provided, fallback on global config.
-      if (!versionConfigured) {
-        scyllaVersion = GLOBAL_SCYLLA_VERSION_NUMBER;
-        dseVersion = GLOBAL_DSE_VERSION_NUMBER;
-        cassandraVersion = GLOBAL_CASSANDRA_VERSION_NUMBER;
-      } else if (dse) {
-        // given version is the DSE version, base cassandra version on DSE version.
-        scyllaVersion = null;
-        dseVersion = this.version;
-        cassandraVersion = getCassandraVersion(dseVersion);
-      } else if (scylla) {
-        scyllaVersion = this.version;
-        dseVersion = null;
-        // Versions from 5.1 to 6.2.0 seem to report release_version 3.0.8 in system_local
-        cassandraVersion = VersionNumber.parse("3.0.8");
-      } else {
-        // given version is cassandra version.
-        scyllaVersion = null;
-        dseVersion = null;
-        cassandraVersion = this.version;
-      }
+      ResolvedVersions versions = resolveVersions();
+      VersionNumber dseVersion = versions.dse;
+      VersionNumber cassandraVersion = versions.cassandra;
+      VersionNumber scyllaVersion = versions.scylla;
 
       Map<String, Object> cassandraConfiguration = randomizePorts(this.cassandraConfiguration);
       int storagePort = Integer.parseInt(cassandraConfiguration.get("storage_port").toString());
@@ -1255,11 +1350,18 @@ public class CCMBridge implements CCMAccess {
           cassandraConfiguration.put("enable_sasi_indexes", true);
         }
       }
-      if (GLOBAL_SCYLLA_VERSION_NUMBER != null) {
+      if (scyllaVersion != null) {
         cassandraConfiguration.put("prometheus_port", RANDOM_PORT);
         cassandraConfiguration.put("api_port", RANDOM_PORT);
         cassandraConfiguration.put("native_shard_aware_transport_port", RANDOM_PORT);
         cassandraConfiguration = randomizePorts(cassandraConfiguration);
+      }
+      // Explicitly configured entries keep winning over these defaults, as they did when withSSL()
+      // wrote them at builder-configuration time and withCassandraConfiguration() ran after it.
+      for (Map.Entry<String, Object> option : buildClientEncryptionOptions(versions).entrySet()) {
+        if (!cassandraConfiguration.containsKey(option.getKey())) {
+          cassandraConfiguration.put(option.getKey(), option.getValue());
+        }
       }
       final CCMBridge ccm =
           new CCMBridge(
@@ -1273,7 +1375,8 @@ public class CCMBridge implements CCMAccess {
               binaryPort,
               generatedJmxPorts,
               joinJvmArgs(),
-              nodes);
+              nodes,
+              buildEnvironmentMap(versions));
 
       Runtime.getRuntime()
           .addShutdownHook(
@@ -1283,7 +1386,7 @@ public class CCMBridge implements CCMAccess {
                   ccm.close();
                 }
               });
-      ccm.execute(buildCreateCommand(clusterName, versionConfigured, cassandraVersion, dseVersion));
+      ccm.execute(buildCreateCommand(clusterName, versions));
       updateNodeConf(ccm);
       ccm.updateConfig(cassandraConfiguration);
       if (dseVersion != null) {
@@ -1347,11 +1450,7 @@ public class CCMBridge implements CCMAccess {
       return allJvmArgs.toString();
     }
 
-    private String buildCreateCommand(
-        String clusterName,
-        boolean versionConfigured,
-        VersionNumber cassandraVersion,
-        VersionNumber dseVersion) {
+    String buildCreateCommand(String clusterName, ResolvedVersions versions) {
       StringBuilder result = new StringBuilder(CCM_COMMAND + " create");
       result.append(" ").append(clusterName);
       result.append(" -i ").append(ipPrefix);
@@ -1366,21 +1465,90 @@ public class CCMBridge implements CCMAccess {
       }
 
       Set<String> lCreateOptions = new LinkedHashSet<String>(createOptions);
-      if (!versionConfigured) {
+      if (!versions.versionConfigured) {
         // If no version was provided, use the default install ags.
         lCreateOptions.addAll(CASSANDRA_INSTALL_ARGS);
       } else {
-        if (dseVersion != null) {
+        if (versions.dse != null) {
           lCreateOptions.add("--dse");
           lCreateOptions.add("-v");
-          lCreateOptions.add(dseVersion.toString());
+          lCreateOptions.add(versions.dse.toString());
+        } else if (versions.scylla != null) {
+          // Same shape as the Scylla entries of CASSANDRA_INSTALL_ARGS. Which repository this
+          // installs from is decided by buildEnvironmentMap.
+          lCreateOptions.add("--scylla");
+          lCreateOptions.add("-v");
+          lCreateOptions.add("release:" + versions.scylla);
         } else {
           lCreateOptions.add("-v");
-          lCreateOptions.add(cassandraVersion.toString());
+          lCreateOptions.add(versions.cassandra.toString());
         }
       }
       result.append(" ").append(Joiner.on(" ").join(randomizePorts(lCreateOptions)));
       return result.toString();
+    }
+
+    /**
+     * The client encryption yaml for a cluster with these versions, empty unless {@link #withSSL()}
+     * or {@link #withAuth()} was called.
+     *
+     * <p>Cassandra and DSE read a JKS keystore and truststore, Scylla reads a PEM certificate, key
+     * and truststore, so the flavor has to be resolved first — which is why this can't be decided
+     * in {@code withSSL()} itself.
+     */
+    Map<String, Object> buildClientEncryptionOptions(ResolvedVersions versions) {
+      if (!ssl) {
+        return ImmutableMap.of();
+      }
+      boolean isScylla = versions.scylla != null;
+      Map<String, Object> options = Maps.newLinkedHashMap();
+      options.put("client_encryption_options.enabled", "true");
+      if (isScylla) {
+        options.put(
+            "client_encryption_options.certificate",
+            DEFAULT_SERVER_CERT_CHAIN_FILE.getAbsolutePath());
+        options.put(
+            "client_encryption_options.keyfile", DEFAULT_SERVER_PRIVATE_KEY_FILE.getAbsolutePath());
+      } else {
+        options.put("client_encryption_options.optional", "false");
+        options.put(
+            "client_encryption_options.keystore", DEFAULT_SERVER_KEYSTORE_FILE.getAbsolutePath());
+        options.put(
+            "client_encryption_options.keystore_password", DEFAULT_SERVER_KEYSTORE_PASSWORD);
+      }
+      if (auth) {
+        options.put("client_encryption_options.require_client_auth", "true");
+        if (isScylla) {
+          options.put(
+              "client_encryption_options.truststore",
+              DEFAULT_SERVER_TRUSTSTORE_PEM_FILE.getAbsolutePath());
+        } else {
+          options.put(
+              "client_encryption_options.truststore",
+              DEFAULT_SERVER_TRUSTSTORE_FILE.getAbsolutePath());
+          options.put(
+              "client_encryption_options.truststore_password", DEFAULT_SERVER_TRUSTSTORE_PASSWORD);
+        }
+      }
+      return options;
+    }
+
+    /**
+     * The environment for the CCM commands of a cluster with these versions.
+     *
+     * <p>{@code SCYLLA_PRODUCT} has to follow the version this particular cluster installs, not the
+     * globally configured one: otherwise an explicitly configured Enterprise version would install
+     * from the OSS repository (and vice-versa).
+     */
+    static Map<String, String> buildEnvironmentMap(ResolvedVersions versions) {
+      if (!versions.versionConfigured) {
+        // The global environment is already derived from the same version.
+        return ENVIRONMENT_MAP;
+      } else if (versions.scylla != null && isScyllaEnterpriseVersion(versions.scylla.toString())) {
+        return withScyllaEnterprise(BASE_ENVIRONMENT_MAP);
+      } else {
+        return BASE_ENVIRONMENT_MAP;
+      }
     }
 
     /**
@@ -1478,6 +1646,10 @@ public class CCMBridge implements CCMAccess {
       if (ipPrefix != builder.ipPrefix) return false;
       if (dse != builder.dse) return false;
       if (scylla != builder.scylla) return false;
+      // Not reflected in cassandraConfiguration until build(), so they have to be compared here —
+      // otherwise an encrypted cluster could be reused for a test that expects a plaintext one.
+      if (ssl != builder.ssl) return false;
+      if (auth != builder.auth) return false;
       if (!Arrays.equals(nodes, builder.nodes)) return false;
       if (version != null ? !version.equals(builder.version) : builder.version != null)
         return false;
@@ -1493,6 +1665,9 @@ public class CCMBridge implements CCMAccess {
       // do not include start as it is not relevant to the settings of the cluster.
       int result = Arrays.hashCode(nodes);
       result = 31 * result + (dse ? 1 : 0);
+      result = 31 * result + (scylla ? 1 : 0);
+      result = 31 * result + (ssl ? 1 : 0);
+      result = 31 * result + (auth ? 1 : 0);
       result = 31 * result + ipPrefix.hashCode();
       result = 31 * result + (version != null ? version.hashCode() : 0);
       result = 31 * result + createOptions.hashCode();
