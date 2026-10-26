@@ -75,7 +75,7 @@ public class ProtocolFeatureStore {
       lwtInfo.populateStartupOptions(options);
     }
     if (tabletInfo != null && tabletInfo.isEnabled()) {
-      TabletInfo.populateStartupOptions(options);
+      tabletInfo.populateStartupOptions(options);
     }
     if (metadataIdEnabled) {
       MetadataIdInfo.populateStartupOptions(options);
@@ -98,10 +98,13 @@ public class ProtocolFeatureStore {
   }
 
   private ProtocolFeatures buildProtocolFeatures() {
+    ProtocolFeatures.Builder builder = new ProtocolFeatures.Builder();
     if (metadataIdEnabled) {
-      return new ProtocolFeatures.Builder().setScyllaUseMetadataId().build();
-    } else {
-      return ProtocolFeatures.EMPTY;
+      builder.setScyllaUseMetadataId();
     }
+    if (tabletInfo != null && tabletInfo.isVersion2()) {
+      builder.setScyllaTabletsRoutingV2();
+    }
+    return builder.build();
   }
 }

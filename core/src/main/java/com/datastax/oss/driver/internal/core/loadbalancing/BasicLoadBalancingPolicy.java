@@ -25,14 +25,18 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistanceEvaluator;
+import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.metadata.Tablet;
@@ -52,6 +56,7 @@ import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.MultiDcNodeSe
 import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.NodeSet;
 import com.datastax.oss.driver.internal.core.loadbalancing.nodeset.SingleDcNodeSet;
 import com.datastax.oss.driver.internal.core.metadata.token.TokenLong64;
+import com.datastax.oss.driver.internal.core.protocol.TabletRouting;
 import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.LazyQueryPlan;
@@ -79,6 +84,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntUnaryOperator;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
@@ -124,6 +130,11 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     REGULAR,
     PRESERVE_REPLICA_ORDER
   }
+
+  private static final Pattern SELECT =
+      Pattern.compile(
+          "\\A(?:\\s|/\\*.*?\\*/|--[^\\r\\n]*(?:\\r?\\n|\\z)|//[^\\r\\n]*(?:\\r?\\n|\\z))*SELECT\\b",
+          Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
   private static final Logger LOG = LoggerFactory.getLogger(BasicLoadBalancingPolicy.class);
 
@@ -346,13 +357,55 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
   @NonNull
   @Override
   public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    Queue<Node> plan;
     switch (getRequestRoutingMethod(request)) {
       case PRESERVE_REPLICA_ORDER:
-        return newQueryPlanPreserveReplicas(request, session);
+        plan = newQueryPlanPreserveReplicas(request, session);
+        break;
       case REGULAR:
       default:
-        return newQueryPlanRegular(request, session);
+        plan = newQueryPlanRegular(request, session);
     }
+    Node leader = getTabletLeader(request, session);
+    if (leader == null) {
+      return plan;
+    }
+    // Only reorder nodes admitted by the existing policy, preserving ignored-node and DC rules.
+    List<Node> nodes = new ArrayList<>(plan);
+    if (nodes.remove(leader)) {
+      nodes.add(0, leader);
+      return new SimpleQueryPlan(nodes.toArray());
+    }
+    return plan;
+  }
+
+  @Nullable
+  Node getTabletLeader(@Nullable Request request, @Nullable Session session) {
+    if (!(request instanceof BoundStatement || request instanceof SimpleStatement)
+        || session == null) {
+      return null;
+    }
+    Metadata metadata = context.getMetadataManager().getMetadata();
+    CqlIdentifier keyspace = TabletRouting.getKeyspace(request, session.getKeyspace().orElse(null));
+    KeyspaceMetadata keyspaceMetadata =
+        keyspace == null ? null : metadata.getKeyspace(keyspace).orElse(null);
+    if (keyspaceMetadata == null || !keyspaceMetadata.isGloballyConsistent()) {
+      return null;
+    }
+    Statement<?> statement = (Statement<?>) request;
+    String query =
+        statement instanceof BoundStatement
+            ? ((BoundStatement) statement).getPreparedStatement().getQuery()
+            : ((SimpleStatement) statement).getQuery();
+    ConsistencyLevel consistency = getEffectiveConsistency(statement);
+    if (query == null
+        || ((consistency == DefaultConsistencyLevel.ONE
+                || consistency == DefaultConsistencyLevel.LOCAL_ONE)
+            && SELECT.matcher(query).find())) {
+      return null;
+    }
+    Tablet tablet = TabletRouting.getTablet(request, session.getKeyspace().orElse(null), metadata);
+    return tablet == null || tablet.getTabletVersion() == null ? null : tablet.getLeader();
   }
 
   @NonNull
