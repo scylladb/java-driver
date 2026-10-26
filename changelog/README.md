@@ -24,7 +24,7 @@ under the License.
   3.x versions get published.
 -->
 
-## 3.13.0
+### 3.13.0
 - [bug] CASSJAVA-85: decode custom payload and warnings in correct order
 - [improvement] CASSJAVA-128: Update Netty to 4.1.138 and migrate to Java8
 
