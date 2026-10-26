@@ -722,8 +722,29 @@ public class ControlConnectionTest extends CCMTestsSupport {
               .build();
       cluster.connect();
 
-      assertThat(cluster.manager.getControlConnection().connectedHost().getBroadcastRpcAddress())
+      ControlConnection controlConnection = cluster.manager.getControlConnection();
+      assertThat(controlConnection.connectedHost().getBroadcastRpcAddress())
           .isEqualTo(new InetSocketAddress(expectedAddress, expectedPort));
+
+      // Later refreshes send the projected query; rpc_port must survive the projection. A new
+      // port proves the refresh ran, since it swallows query failures.
+      int refreshedPort = expectedPort + 1;
+      Set<String> interest = SystemColumnProjection.LOCAL_COLUMNS_OF_INTEREST;
+      org.scassandra.http.client.types.ColumnMetadata[] projected =
+          ScassandraCluster.projectedColumnMetadata(SELECT_LOCAL_RPC_ADDRESS_AND_PORT, interest);
+      Map<String, Object> refreshedRow = Maps.newHashMap(state.getLocalRow());
+      refreshedRow.put("rpc_port", refreshedPort);
+      refreshedRow.keySet().retainAll(interest);
+      primingClient.prime(
+          PrimingRequest.queryBuilder()
+              .withQuery(
+                  ScassandraCluster.projectedQueryString(projected, "system.local", "key='local'"))
+              .withThen(then().withColumnTypes(projected).withRows(refreshedRow).build())
+              .build());
+      controlConnection.refreshNodeListAndTokenMap();
+
+      assertThat(controlConnection.connectedHost().getBroadcastRpcAddress())
+          .isEqualTo(new InetSocketAddress(expectedAddress, refreshedPort));
     } finally {
       if (cluster != null) cluster.close();
       scassandras.stop();

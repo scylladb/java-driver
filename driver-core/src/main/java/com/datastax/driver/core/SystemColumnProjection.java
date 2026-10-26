@@ -91,6 +91,7 @@ class SystemColumnProjection {
           "native_transport_port",
           "native_transport_port_ssl",
           "rpc_address",
+          "rpc_port",
           "broadcast_address",
           "broadcast_port",
           "listen_address",
@@ -113,6 +114,7 @@ class SystemColumnProjection {
           "peer",
           "peer_port", // peers_v2 column; harmless to list here — absent on peers, excluded safely
           "rpc_address",
+          "rpc_port", // JAVA-3125; absent on Scylla, excluded safely
           "data_center",
           "rack",
           "release_version",
@@ -154,6 +156,7 @@ class SystemColumnProjection {
           "listen_address",
           "listen_port",
           "rpc_address", // legacy; guarded by contains() in code — harmless if absent
+          "rpc_port", // same
           "native_transport_address", // same
           "native_transport_port", // same
           "native_transport_port_ssl"); // same

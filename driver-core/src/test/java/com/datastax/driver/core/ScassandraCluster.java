@@ -844,8 +844,7 @@ public class ScassandraCluster {
   };
 
   /** Returns the subset of {@code full} whose names are in {@code interest}, preserving order. */
-  private static ColumnMetadata[] projectedColumnMetadata(
-      ColumnMetadata[] full, Set<String> interest) {
+  static ColumnMetadata[] projectedColumnMetadata(ColumnMetadata[] full, Set<String> interest) {
     List<ColumnMetadata> result = new ArrayList<>();
     for (ColumnMetadata col : full) {
       if (interest.contains(col.getName())) result.add(col);
@@ -854,8 +853,7 @@ public class ScassandraCluster {
   }
 
   /** Builds a projected SELECT query string from a ColumnMetadata array. */
-  private static String projectedQueryString(
-      ColumnMetadata[] cols, String table, String whereClause) {
+  static String projectedQueryString(ColumnMetadata[] cols, String table, String whereClause) {
     // Sort alphabetically to match the order produced by
     // SystemColumnProjection.buildProjectedQuery.
     List<String> names = new ArrayList<>();
