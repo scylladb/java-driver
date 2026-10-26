@@ -19,8 +19,10 @@ package com.datastax.oss.driver.api.core;
 
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import net.jcip.annotations.ThreadSafe;
 
 /** Thrown when an operation cannot be completed because its session is closing or closed. */
+@ThreadSafe
 public class SessionClosedException extends DriverException {
 
   public SessionClosedException() {
