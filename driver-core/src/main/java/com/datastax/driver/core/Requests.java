@@ -241,6 +241,9 @@ class Requests {
               CBUtil.writeShortBytes(bytes, dest);
             }
             msg.options.encode(dest, version);
+            if (featureStore != null && featureStore.usesTabletRoutingV2(version)) {
+              dest.writeByte(msg.tabletVersionBlock);
+            }
           }
 
           @Override
@@ -253,6 +256,9 @@ class Requests {
               size += CBUtil.sizeOfShortBytes(bytes);
             }
             size += msg.options.encodedSize(version);
+            if (featureStore != null && featureStore.usesTabletRoutingV2(version)) {
+              size++;
+            }
             return size;
           }
         };
@@ -260,27 +266,44 @@ class Requests {
     final MD5Digest statementId;
     final MD5Digest resultMetadataId;
     final QueryProtocolOptions options;
+    final byte tabletVersionBlock;
 
     Execute(
         MD5Digest statementId,
         MD5Digest resultMetadataId,
         QueryProtocolOptions options,
         boolean tracingRequested) {
+      this(
+          statementId, resultMetadataId, options, tracingRequested, TabletMap.randomVersionBlock());
+    }
+
+    Execute(
+        MD5Digest statementId,
+        MD5Digest resultMetadataId,
+        QueryProtocolOptions options,
+        boolean tracingRequested,
+        byte tabletVersionBlock) {
       super(Message.Request.Type.EXECUTE, tracingRequested);
       this.statementId = statementId;
       this.resultMetadataId = resultMetadataId;
       this.options = options;
+      this.tabletVersionBlock = tabletVersionBlock;
     }
 
     @Override
     protected Request copyInternal() {
-      return new Execute(statementId, resultMetadataId, options, isTracingRequested());
+      return new Execute(
+          statementId, resultMetadataId, options, isTracingRequested(), tabletVersionBlock);
     }
 
     @Override
     protected Request copyInternal(ConsistencyLevel newConsistencyLevel) {
       return new Execute(
-          statementId, resultMetadataId, options.copy(newConsistencyLevel), isTracingRequested());
+          statementId,
+          resultMetadataId,
+          options.copy(newConsistencyLevel),
+          isTracingRequested(),
+          tabletVersionBlock);
     }
 
     @Override

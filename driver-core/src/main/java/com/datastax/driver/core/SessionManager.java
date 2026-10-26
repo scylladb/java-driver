@@ -77,6 +77,27 @@ class SessionManager extends AbstractSession {
     this.poolsState = new HostConnectionPool.PoolState();
   }
 
+  byte tabletVersionBlock(
+      BoundStatement statement, ProtocolVersion protocolVersion, CodecRegistry codecRegistry) {
+    ColumnDefinitions variables = statement.preparedStatement().getVariables();
+    String keyspace = statement.getKeyspace();
+    if (keyspace == null) {
+      keyspace = poolsState.keyspace;
+    }
+    String table = variables.size() == 0 ? null : variables.getTable(0);
+    TabletMap.Tablet tablet =
+        cluster
+            .getMetadata()
+            .getTablet(
+                keyspace == null ? null : Metadata.quote(keyspace),
+                table == null ? null : Metadata.quote(table),
+                statement.getPartitioner(),
+                statement.getRoutingKey(protocolVersion, codecRegistry));
+    return tablet == null || tablet.getVersion() == null
+        ? TabletMap.randomVersionBlock()
+        : TabletMap.sampleVersionBlock(tablet.getVersion());
+  }
+
   @Override
   public Session init() {
     try {
@@ -689,7 +710,8 @@ class SessionManager extends AbstractSession {
               bs.statement.getPreparedId().boundValuesMetadata.id,
               bs.statement.getPreparedId().resultSetMetadata.id,
               options,
-              statement.isTracing());
+              statement.isTracing(),
+              tabletVersionBlock(bs, protocolVersion, codecRegistry));
     } else {
       assert statement instanceof BatchStatement : statement;
       assert pagingState == null;

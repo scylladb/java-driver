@@ -55,6 +55,7 @@ public class KeyspaceMetadata {
 
   // Scylla feature
   private boolean usesTablets = false;
+  private boolean globallyConsistent;
 
   @VisibleForTesting
   @Deprecated
@@ -395,6 +396,9 @@ public class KeyspaceMetadata {
       sb.append(", '").append(entry.getKey()).append("': '").append(entry.getValue()).append('\'');
     }
     sb.append(" } AND DURABLE_WRITES = ").append(durableWrites);
+    if (globallyConsistent) {
+      sb.append(" AND consistency = 'global'");
+    }
     sb.append(';');
     if (virtual) {
       sb.append("*/");
@@ -418,6 +422,7 @@ public class KeyspaceMetadata {
     KeyspaceMetadata that = (KeyspaceMetadata) o;
 
     if (durableWrites != that.durableWrites) return false;
+    if (globallyConsistent != that.globallyConsistent) return false;
     if (!name.equals(that.name)) return false;
     if (strategy != null ? !strategy.equals(that.strategy) : that.strategy != null) return false;
     if (!replication.equals(that.replication)) return false;
@@ -428,6 +433,7 @@ public class KeyspaceMetadata {
   public int hashCode() {
     int result = name.hashCode();
     result = 31 * result + (durableWrites ? 1 : 0);
+    result = 31 * result + (globallyConsistent ? 1 : 0);
     result = 31 * result + (strategy != null ? strategy.hashCode() : 0);
     result = 31 * result + replication.hashCode();
     result = 31 * result + tables.hashCode();
@@ -464,6 +470,26 @@ public class KeyspaceMetadata {
 
   void setUsesTablets(boolean predicate) {
     this.usesTablets = predicate;
+  }
+
+  void setScyllaOptions(Row row) {
+    usesTablets = false;
+    globallyConsistent = false;
+    if (row == null) {
+      return;
+    }
+    if (row.getColumnDefinitions().contains("initial_tablets") && !row.isNull("initial_tablets")) {
+      usesTablets = true;
+    }
+    globallyConsistent =
+        row.getColumnDefinitions().contains("consistency")
+            && !row.isNull("consistency")
+            && "global".equals(row.getString("consistency"));
+  }
+
+  /** Returns whether this keyspace uses Scylla's global strong consistency mode. */
+  public boolean isGloballyConsistent() {
+    return globallyConsistent;
   }
 
   public boolean usesTablets() {

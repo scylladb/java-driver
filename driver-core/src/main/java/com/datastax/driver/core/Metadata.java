@@ -605,7 +605,7 @@ public class Metadata {
     Token token = partitioner.hash(partitionKey);
 
     // Tablets:
-    KeyspaceMetadata ksMetadata = getKeyspace(keyspace);
+    KeyspaceMetadata ksMetadata = getKeyspace(quote(keyspace));
     if (ksMetadata != null && ksMetadata.usesTablets()) {
       if (keyspace != null && table != null) {
         assert (token instanceof Token.TokenLong64);
@@ -618,6 +618,30 @@ public class Metadata {
     // TokenMap:
     if (current == null) return EMPTY_LIST;
     return current.getReplicas(keyspace, token);
+  }
+
+  /**
+   * Returns cached tablet routing metadata for a partition, or null if unavailable. The version is
+   * present only for mappings learned through tablet routing V2.
+   */
+  @Beta
+  public TabletMap.Tablet getTablet(
+      String keyspace, String table, Token.Factory partitioner, ByteBuffer partitionKey) {
+    if (keyspace == null || table == null || partitionKey == null) {
+      return null;
+    }
+    TokenMap current = tokenMap;
+    if (partitioner == null && current != null) {
+      partitioner = current.factory;
+    }
+    if (partitioner == null) {
+      return null;
+    }
+    Token token = partitioner.hash(partitionKey);
+    if (!(token instanceof Token.TokenLong64)) {
+      return null;
+    }
+    return tabletMap.getTablet(handleId(keyspace), handleId(table), (long) token.getValue());
   }
 
   /**

@@ -59,6 +59,44 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
     return request;
   }
 
+  void cacheTabletRouting(Connection connection, Message.Response result, Statement statement) {
+    if (!(statement instanceof BoundStatement) || result.getCustomPayload() == null) {
+      return;
+    }
+    BoundStatement bound = (BoundStatement) statement;
+    ColumnDefinitions variables = bound.preparedStatement().getVariables();
+    if (variables.size() == 0) {
+      return;
+    }
+    String keyspace = statement.getKeyspace();
+    if (keyspace == null) {
+      keyspace = session.getLoggedKeyspace();
+    }
+    String table = variables.getTable(0);
+    if (keyspace == null || table == null) {
+      return;
+    }
+    ProtocolFeatureStore features = connection.getProtocolFeatureStore();
+    TabletInfo tabletInfo = features == null ? null : features.getTabletInfo();
+    if (tabletInfo == null || !tabletInfo.isEnabled()) {
+      return;
+    }
+    TabletMap tablets = session.getCluster().getMetadata().getTabletMap();
+    String payloadKey =
+        tabletInfo.isV2()
+            ? TabletInfo.TABLETS_ROUTING_V2_CUSTOM_PAYLOAD_KEY
+            : TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY;
+    if (result.getCustomPayload().containsKey(payloadKey)) {
+      if (tabletInfo.isV2()) {
+        tablets.processTabletsRoutingV2Payload(
+            keyspace, table, result.getCustomPayload().get(payloadKey));
+      } else {
+        tablets.processTabletsRoutingV1Payload(
+            keyspace, table, result.getCustomPayload().get(payloadKey));
+      }
+    }
+  }
+
   @Override
   public void onSet(
       Connection connection,
@@ -67,26 +105,10 @@ class DefaultResultSetFuture extends AbstractFuture<ResultSet>
       Statement statement,
       long latency) {
     try {
+      cacheTabletRouting(connection, response, statement);
       switch (response.type) {
         case RESULT:
           Responses.Result rm = (Responses.Result) response;
-
-          if (rm.getCustomPayload() != null
-              && rm.getCustomPayload().containsKey(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY)
-              && (statement instanceof BoundStatement)) {
-            BoundStatement st = (BoundStatement) statement;
-            String keyspace = statement.getKeyspace();
-            String table =
-                st.preparedStatement().getPreparedId().boundValuesMetadata.variables.getTable(0);
-            session
-                .getCluster()
-                .getMetadata()
-                .getTabletMap()
-                .processTabletsRoutingV1Payload(
-                    keyspace,
-                    table,
-                    rm.getCustomPayload().get(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY));
-          }
 
           switch (rm.kind) {
             case SET_KEYSPACE:

@@ -245,12 +245,7 @@ abstract class SchemaParser {
         keyspace.add(view);
       }
       Row scyllaKeyspacesRow = rows.scyllaKeyspaces.getOrDefault(keyspace.getName(), null);
-      if (scyllaKeyspacesRow != null) {
-        if (scyllaKeyspacesRow.getColumnDefinitions().contains("initial_tablets")
-            && !scyllaKeyspacesRow.isNull("initial_tablets")) {
-          keyspace.setUsesTablets(true);
-        }
-      }
+      keyspace.setScyllaOptions(scyllaKeyspacesRow);
       keyspaces.put(keyspace.getName(), keyspace);
     }
     if (rows.virtualKeyspaces != null) {
@@ -455,6 +450,11 @@ abstract class SchemaParser {
     }
     for (KeyspaceMetadata newKeyspace : newKeyspaces.values()) {
       KeyspaceMetadata oldKeyspace = oldKeyspaces.put(newKeyspace.getName(), newKeyspace);
+      if (oldKeyspace != null
+          && oldKeyspace.isGloballyConsistent() != newKeyspace.isGloballyConsistent()) {
+        // A replica order learned under the old mode does not identify a leader in the new mode.
+        metadata.getTabletMap().removeTableMappings(newKeyspace.getName());
+      }
       if (oldKeyspace == null) {
         metadata.triggerOnKeyspaceAdded(newKeyspace);
       } else if (!oldKeyspace.equals(newKeyspace)) {
@@ -1278,12 +1278,7 @@ abstract class SchemaParser {
       for (Row keyspaceRow : keyspacesData) {
         KeyspaceMetadata keyspace = KeyspaceMetadata.build(keyspaceRow, cassandraVersion);
         Row scyllaKeyspacesRow = scyllaKeyspacesData.getOrDefault(keyspace.getName(), null);
-        if (scyllaKeyspacesRow != null) {
-          if (scyllaKeyspacesRow.getColumnDefinitions().contains("initial_tablets")
-              && !scyllaKeyspacesRow.isNull("initial_tablets")) {
-            keyspace.setUsesTablets(true);
-          }
-        }
+        keyspace.setScyllaOptions(scyllaKeyspacesRow);
         keyspaces.put(keyspace.getName(), keyspace);
       }
 

@@ -5,6 +5,10 @@
   3.x versions get published.
 -->
 
+### Unreleased
+
+- [new feature] #1317 (DRIVER-1081): Negotiate tablet routing V2 and route globally consistent prepared operations to tablet leaders.
+
 ### 3.11.5
 - [improvement] JAVA-3114: Shade io.dropwizard.metrics:metrics-core in shaded driver
 - [improvement] JAVA-3115: SchemaChangeListener#onKeyspaceChanged can fire when keyspace has not changed if using SimpleStrategy replication

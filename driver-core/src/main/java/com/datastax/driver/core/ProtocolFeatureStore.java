@@ -62,7 +62,7 @@ public class ProtocolFeatureStore {
     if (tabletInfo != null
         && tabletInfo.isEnabled()
         && ProtocolFeatures.CUSTOM_PAYLOADS.isSupportedBy(protocolVersion)) {
-      TabletInfo.addOption(options);
+      tabletInfo.addNegotiatedOption(options);
     }
     if (useMetadataId) {
       MetadataIdInfo.addOption(options);
@@ -89,6 +89,16 @@ public class ProtocolFeatureStore {
 
   public LwtInfo getLwtInfo() {
     return lwtInfo;
+  }
+
+  public TabletInfo getTabletInfo() {
+    return tabletInfo;
+  }
+
+  boolean usesTabletRoutingV2(ProtocolVersion version) {
+    return tabletInfo != null
+        && tabletInfo.isV2()
+        && ProtocolFeatures.CUSTOM_PAYLOADS.isSupportedBy(version);
   }
 
   public boolean isUseMetadataId() {

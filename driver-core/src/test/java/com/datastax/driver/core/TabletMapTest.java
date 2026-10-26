@@ -16,14 +16,20 @@
 package com.datastax.driver.core;
 
 import static com.datastax.driver.core.Assertions.assertThat;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.datastax.driver.core.TabletMap.HostShardPair;
 import com.datastax.driver.core.TabletMap.KeyspaceTableNamePair;
 import com.datastax.driver.core.TabletMap.Tablet;
+import com.datastax.driver.core.policies.LoadBalancingPolicy;
+import com.datastax.driver.core.policies.TokenAwarePolicy;
+import com.google.common.collect.ImmutableMap;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.testng.annotations.AfterClass;
@@ -317,6 +323,117 @@ public class TabletMapTest {
     assertThat(tablet.compareTo(Tablet.malformedTablet(10L))).isEqualTo(0);
     assertThat(tablet.compareTo(Tablet.malformedTablet(11L))).isLessThan(0);
     assertThat(tablet.compareTo(Tablet.malformedTablet(9L))).isGreaterThan(0);
+  }
+
+  @Test(groups = "unit")
+  public void should_route_to_leader_in_quoted_keyspace_and_table_with_real_metadata() {
+    String keyspace = "Ks";
+    String table = "Table";
+    Metadata metadata = manager.metadata;
+    TabletMap realMap = metadata.getTabletMap();
+    KeyspaceMetadata keyspaceMetadata =
+        new KeyspaceMetadata(
+            keyspace, true, ImmutableMap.of("class", "SimpleStrategy", "replication_factor", "2"));
+    ColumnDefinitions scyllaColumns =
+        new ColumnDefinitions(
+            new ColumnDefinitions.Definition[] {
+              new ColumnDefinitions.Definition(
+                  "system_schema", "scylla_keyspaces", "consistency", DataType.text()),
+              new ColumnDefinitions.Definition(
+                  "system_schema", "scylla_keyspaces", "initial_tablets", DataType.cint())
+            },
+            CodecRegistry.DEFAULT_INSTANCE);
+    keyspaceMetadata.setScyllaOptions(
+        ArrayBackedRow.fromData(
+            scyllaColumns,
+            Token.M3PToken.FACTORY,
+            ProtocolVersion.V4,
+            Arrays.asList(
+                TypeCodec.varchar().serialize("global", ProtocolVersion.V4),
+                TypeCodec.cint().serialize(1, ProtocolVersion.V4))));
+    metadata.keyspaces.put(keyspace, keyspaceMetadata);
+    host1.setUp();
+    host2.setUp();
+    try {
+      List<TupleValue> replicas =
+          Arrays.asList(
+              realMap.getPayloadInnerTuple().newValue(HOST2_ID, 2),
+              realMap.getPayloadInnerTuple().newValue(HOST1_ID, 1));
+      TupleType type = (TupleType) realMap.getTabletV2PayloadCodec().getCqlType();
+      realMap.processTabletsRoutingV2Payload(
+          keyspace,
+          table,
+          realMap
+              .getTabletV2PayloadCodec()
+              .serialize(
+                  type.newValue(Long.MIN_VALUE, Long.MAX_VALUE, replicas, 0L), ProtocolVersion.V4));
+      ByteBuffer key = ByteBuffer.wrap(new byte[] {1, 2, 3});
+      assertThat(
+              metadata.getReplicasList(
+                  Metadata.quote(keyspace), Metadata.quote(table), Token.M3PToken.FACTORY, key))
+          .containsExactly(host2, host1);
+      assertThat(
+              metadata
+                  .getTablet(
+                      Metadata.quote(keyspace), Metadata.quote(table), Token.M3PToken.FACTORY, key)
+                  .getVersion())
+          .isEqualTo(0L);
+      BoundStatement bound = mock(BoundStatement.class);
+      PreparedStatement prepared = mock(PreparedStatement.class);
+      ColumnDefinitions variables =
+          new ColumnDefinitions(
+              new ColumnDefinitions.Definition[] {
+                new ColumnDefinitions.Definition(keyspace, table, "pk", DataType.cint())
+              },
+              CodecRegistry.DEFAULT_INSTANCE);
+      when(bound.getKeyspace()).thenReturn(keyspace);
+      when(bound.getRoutingKey(any(ProtocolVersion.class), any(CodecRegistry.class)))
+          .thenReturn(key);
+      when(bound.getPartitioner()).thenReturn(Token.M3PToken.FACTORY);
+      when(bound.preparedStatement()).thenReturn(prepared);
+      when(prepared.getVariables()).thenReturn(variables);
+      when(prepared.getQueryString()).thenReturn("SELECT * FROM \"Ks\".\"Table\" WHERE pk = ?");
+      when(bound.getConsistencyLevel()).thenReturn(ConsistencyLevel.QUORUM);
+      LoadBalancingPolicy child = mock(LoadBalancingPolicy.class);
+      when(child.distance(any(Host.class))).thenReturn(HostDistance.LOCAL);
+      when(child.newQueryPlan(keyspace, bound))
+          .thenAnswer(invocation -> Arrays.asList(host1, host2).iterator());
+      TokenAwarePolicy policy =
+          new TokenAwarePolicy(child, TokenAwarePolicy.ReplicaOrdering.NEUTRAL);
+      // Avoid initializing network connections while exercising the real schema and tablet maps.
+      Cluster policyCluster = mock(Cluster.class);
+      when(policyCluster.getMetadata()).thenReturn(metadata);
+      when(policyCluster.getConfiguration()).thenReturn(cluster.getConfiguration());
+      policy.init(policyCluster, Arrays.asList(host1, host2));
+      assertThat(policy.newQueryPlan(keyspace, bound)).containsExactly(host2, host1);
+      when(bound.getConsistencyLevel()).thenReturn(ConsistencyLevel.ONE);
+      assertThat(policy.newQueryPlan(keyspace, bound)).containsExactly(host1, host2);
+    } finally {
+      realMap.removeTableMappings(keyspace);
+      metadata.keyspaces.remove(keyspace);
+    }
+  }
+
+  @Test(groups = "unit")
+  public void should_decode_v2_version_and_replace_it_with_v1_unknown_version() {
+    TupleType type = (TupleType) tabletMap.getTabletV2PayloadCodec().getCqlType();
+    List<TupleValue> replicas = new ArrayList<>();
+    replicas.add(tabletMap.getPayloadInnerTuple().newValue(HOST2_ID, 2));
+    replicas.add(tabletMap.getPayloadInnerTuple().newValue(HOST1_ID, 1));
+    for (long version : new long[] {0L, Long.MIN_VALUE, -1L}) {
+      ByteBuffer payload =
+          tabletMap
+              .getTabletV2PayloadCodec()
+              .serialize(type.newValue(0L, 10L, replicas, version), ProtocolVersion.V4);
+      tabletMap.processTabletsRoutingV2Payload("ks", "tbl", payload);
+      assertThat(tabletMap.getTablet("ks", "tbl", 5L).getVersion()).isEqualTo(version);
+      assertThat(tabletMap.getReplicas("ks", "tbl", 5L)).containsExactly(host2, host1);
+      assertThat(tabletMap.getTablet("ks", "tbl", 0L)).isNull();
+      assertThat(tabletMap.getTablet("ks", "tbl", 11L)).isNull();
+    }
+    addTablet("ks", "tbl", 0L, 10L, HOST1_ID, HOST2_ID);
+    assertThat(tabletMap.getTablet("ks", "tbl", 5L).getVersion()).isNull();
+    assertThat(tabletMap.getReplicas("ks", "tbl", 5L)).containsExactly(host1, host2);
   }
 
   private Host addHost(UUID hostId, String address) {

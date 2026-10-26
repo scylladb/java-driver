@@ -13,6 +13,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.slf4j.Logger;
@@ -20,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Holds currently known tablet mappings. Updated lazily through received custom payloads described
- * in Scylla's CQL protocol extensions (tablets-routing-v1).
+ * in Scylla's CQL protocol extensions (tablets-routing-v1 and tablets-routing-v2).
  */
 @Beta
 public class TabletMap {
@@ -35,6 +36,7 @@ public class TabletMap {
 
   private TupleType payloadOuterTuple = null;
   private TupleType payloadInnerTuple = null;
+  private volatile TypeCodec<TupleValue> tabletV2PayloadCodec;
   private TypeCodec<TupleValue> tabletPayloadCodec = null;
 
   public TabletMap(
@@ -122,14 +124,24 @@ public class TabletMap {
    * @param payload the payload to be deserialized and processed
    */
   void processTabletsRoutingV1Payload(String keyspace, String table, ByteBuffer payload) {
-    TupleValue tupleValue = getTabletPayloadCodec().deserialize(payload, cluster.protocolVersion());
+    processTabletPayload(keyspace, table, payload, false);
+  }
+
+  void processTabletsRoutingV2Payload(String keyspace, String table, ByteBuffer payload) {
+    processTabletPayload(keyspace, table, payload, true);
+  }
+
+  private void processTabletPayload(String keyspace, String table, ByteBuffer payload, boolean v2) {
+    TypeCodec<TupleValue> codec = v2 ? getTabletV2PayloadCodec() : getTabletPayloadCodec();
+    TupleValue tupleValue = codec.deserialize(payload, cluster.protocolVersion());
     KeyspaceTableNamePair ktPair = new KeyspaceTableNamePair(keyspace, table);
 
     long firstToken = tupleValue.getLong(0);
     long lastToken = tupleValue.getLong(1);
 
     logger.trace(
-        "Received tablets routing V1 payload: {}.{} range {}-{}",
+        "Received tablets routing V{} payload: {}.{} range {}-{}",
+        v2 ? 2 : 1,
         keyspace,
         table,
         firstToken,
@@ -141,7 +153,8 @@ public class TabletMap {
       HostShardPair hostShardPair = new HostShardPair(tuple.getUUID(0), tuple.getInt(1));
       replicas.add(hostShardPair);
     }
-    Tablet newTablet = new Tablet(firstToken, lastToken, replicas);
+    Tablet newTablet =
+        new Tablet(firstToken, lastToken, replicas, v2 ? tupleValue.getLong(3) : null);
 
     TabletSet tabletSet = mapping.computeIfAbsent(ktPair, k -> new TabletSet());
     Lock writeLock = tabletSet.lock.writeLock();
@@ -182,6 +195,50 @@ public class TabletMap {
     } finally {
       writeLock.unlock();
     }
+  }
+
+  /** Returns cached routing metadata for the token, or null when unknown. */
+  public Tablet getTablet(String keyspace, String table, long token) {
+    TabletSet set =
+        mapping == null ? null : mapping.get(new KeyspaceTableNamePair(keyspace, table));
+    if (set == null) {
+      return null;
+    }
+    Lock readLock = set.lock.readLock();
+    readLock.lock();
+    try {
+      Tablet tablet = set.tablets.ceiling(Tablet.malformedTablet(token));
+      return tablet != null && tablet.firstToken < token ? tablet : null;
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+  static byte randomVersionBlock() {
+    return (byte) ThreadLocalRandom.current().nextInt(256);
+  }
+
+  static byte sampleVersionBlock(long version) {
+    int block = ThreadLocalRandom.current().nextInt(16);
+    return (byte) ((block << 4) | ((version >>> (block * 4)) & 15));
+  }
+
+  TypeCodec<TupleValue> getTabletV2PayloadCodec() {
+    TypeCodec<TupleValue> codec = tabletV2PayloadCodec;
+    if (codec == null) {
+      codec =
+          cluster
+              .configuration
+              .getCodecRegistry()
+              .codecFor(
+                  cluster.metadata.newTupleType(
+                      DataType.bigint(),
+                      DataType.bigint(),
+                      DataType.list(getPayloadInnerTuple()),
+                      DataType.bigint()));
+      tabletV2PayloadCodec = codec;
+    }
+    return codec;
   }
 
   public TupleType getPayloadOuterTuple() {
@@ -310,19 +367,25 @@ public class TabletMap {
   }
 
   /**
-   * Represents a single tablet created from tablets-routing-v1 custom payload. Its {@code
-   * compareTo} implementation intentionally relies solely on {@code lastToken} in order to allow
-   * for quick lookup on sorted Collections based just on the token value.
+   * Represents a single tablet created from a tablet routing custom payload. Its {@code compareTo}
+   * implementation intentionally relies solely on {@code lastToken} in order to allow for quick
+   * lookup on sorted Collections based just on the token value.
    */
   public static class Tablet implements Comparable<Tablet> {
     private final long firstToken;
     private final long lastToken;
     private final List<HostShardPair> replicas;
+    private final Long version;
 
     private Tablet(long firstToken, long lastToken, List<HostShardPair> replicas) {
+      this(firstToken, lastToken, replicas, null);
+    }
+
+    private Tablet(long firstToken, long lastToken, List<HostShardPair> replicas, Long version) {
       this.firstToken = firstToken;
       this.lastToken = lastToken;
       this.replicas = replicas;
+      this.version = version;
     }
 
     /**
@@ -334,6 +397,11 @@ public class TabletMap {
      */
     public static Tablet malformedTablet(long lastToken) {
       return new Tablet(lastToken, lastToken, null);
+    }
+
+    /** Raw 64-bit V2 version, or null for mappings learned through V1. */
+    public Long getVersion() {
+      return version;
     }
 
     public long getFirstToken() {
@@ -367,12 +435,13 @@ public class TabletMap {
       Tablet that = (Tablet) o;
       return firstToken == that.firstToken
           && lastToken == that.lastToken
-          && Objects.equals(replicas, that.replicas);
+          && Objects.equals(replicas, that.replicas)
+          && Objects.equals(version, that.version);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(firstToken, lastToken, replicas);
+      return Objects.hash(firstToken, lastToken, replicas, version);
     }
 
     @Override

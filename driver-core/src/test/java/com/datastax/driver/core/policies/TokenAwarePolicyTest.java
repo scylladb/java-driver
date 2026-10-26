@@ -39,8 +39,10 @@ import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.CodecRegistry;
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.Configuration;
+import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
+import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolOptions;
@@ -55,13 +57,16 @@ import com.datastax.driver.core.Session;
 import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.SortingLoadBalancingPolicy;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.TabletMap;
 import com.datastax.driver.core.TestUtils;
 import com.datastax.driver.core.TypeCodec;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 import org.assertj.core.util.Sets;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -170,7 +175,8 @@ public class TokenAwarePolicyTest {
   public void should_use_table_name_from_bound_statement_for_tablet_routing() {
     // given
     BoundStatement bound = newBoundStatement("tablets_table", routingKey);
-    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey))
+    when(metadata.getReplicasList(
+            Metadata.quote(KEYSPACE), Metadata.quote("tablets_table"), null, routingKey))
         .thenReturn(Lists.newArrayList(host1, host2));
     when(childPolicy.newQueryPlan(KEYSPACE, bound))
         .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
@@ -183,7 +189,9 @@ public class TokenAwarePolicyTest {
 
     // then
     assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
-    verify(metadata).getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey);
+    verify(metadata)
+        .getReplicasList(
+            Metadata.quote(KEYSPACE), Metadata.quote("tablets_table"), null, routingKey);
   }
 
   @Test(groups = "unit")
@@ -193,7 +201,8 @@ public class TokenAwarePolicyTest {
     BoundStatement routedBound = newBoundStatement("tablets_table", routingKey);
 
     BatchStatement batch = new BatchStatement().add(skippedBound).add(routedBound);
-    when(metadata.getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey))
+    when(metadata.getReplicasList(
+            Metadata.quote(KEYSPACE), Metadata.quote("tablets_table"), null, routingKey))
         .thenReturn(Lists.newArrayList(host1, host2));
     when(childPolicy.newQueryPlan(KEYSPACE, batch))
         .thenReturn(Lists.newArrayList(host4, host3, host2, host1).iterator());
@@ -206,9 +215,131 @@ public class TokenAwarePolicyTest {
 
     // then
     assertThat(queryPlan).containsExactly(host1, host2, host4, host3);
-    verify(metadata).getReplicasList(Metadata.quote(KEYSPACE), "tablets_table", null, routingKey);
+    verify(metadata)
+        .getReplicasList(
+            Metadata.quote(KEYSPACE), Metadata.quote("tablets_table"), null, routingKey);
     verify(metadata, never())
-        .getReplicasList(Metadata.quote(KEYSPACE), "ignored_table", null, routingKey);
+        .getReplicasList(
+            Metadata.quote(KEYSPACE), Metadata.quote("ignored_table"), null, routingKey);
+  }
+
+  private BoundStatement globalBoundStatement(String query, Long version) {
+    BoundStatement bound = newBoundStatement("tbl", routingKey);
+    when(bound.preparedStatement().getQueryString()).thenReturn(query);
+    when(metadata.getReplicasList(
+            Metadata.quote(KEYSPACE), Metadata.quote("tbl"), null, routingKey))
+        .thenReturn(Lists.newArrayList(host1, host2));
+    KeyspaceMetadata keyspace = mock(KeyspaceMetadata.class);
+    when(keyspace.isGloballyConsistent()).thenReturn(true);
+    when(metadata.getKeyspace(Metadata.quote(KEYSPACE))).thenReturn(keyspace);
+    TabletMap.Tablet tablet = mock(TabletMap.Tablet.class);
+    UUID leaderId = new UUID(0, 2);
+    when(host2.getHostId()).thenReturn(leaderId);
+    when(tablet.getReplicas())
+        .thenReturn(Collections.singletonList(new TabletMap.HostShardPair(leaderId, 0)));
+    when(tablet.getVersion()).thenReturn(version);
+    when(metadata.getTablet(Metadata.quote(KEYSPACE), Metadata.quote("tbl"), null, routingKey))
+        .thenReturn(tablet);
+    when(childPolicy.newQueryPlan(KEYSPACE, bound))
+        .thenReturn(Lists.newArrayList(host4, host3, host1, host2).iterator());
+    return bound;
+  }
+
+  @Test(groups = "unit", dataProvider = "shuffleProvider")
+  public void should_prioritize_global_leader_with_every_replica_ordering(
+      TokenAwarePolicy.ReplicaOrdering ordering) {
+    BoundStatement bound = globalBoundStatement("SELECT * FROM tbl WHERE pk = ?", 0L);
+    when(bound.getConsistencyLevel()).thenReturn(ConsistencyLevel.QUORUM);
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, ordering);
+    policy.init(cluster, null);
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host2, host1, host4, host3);
+  }
+
+  @DataProvider
+  public Object[][] globalOperations() {
+    return new Object[][] {
+      {"SELECT * FROM tbl WHERE pk = ?", ConsistencyLevel.ONE, false},
+      {
+        " /* comment */ -- comment\n // comment\n SeLeCt * FROM tbl WHERE pk = ?",
+        ConsistencyLevel.LOCAL_ONE,
+        false
+      },
+      {"SELECT * FROM tbl WHERE pk = ?", ConsistencyLevel.QUORUM, true},
+      {"UPDATE tbl SET v = ? WHERE pk = ?", ConsistencyLevel.ONE, true},
+      {"DELETE FROM tbl WHERE pk = ?", ConsistencyLevel.LOCAL_ONE, true},
+      {"INSERT INTO tbl (pk, v) VALUES (?, ?)", ConsistencyLevel.LOCAL_ONE, true}
+    };
+  }
+
+  @Test(groups = "unit", dataProvider = "globalOperations")
+  public void should_use_leader_for_strong_reads_and_all_writes(
+      String query, ConsistencyLevel cl, boolean leaderFirst) {
+    BoundStatement bound = globalBoundStatement(query, 42L);
+    when(bound.getConsistencyLevel()).thenReturn(cl);
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+    if (leaderFirst) {
+      assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host2, host1, host4, host3);
+    } else {
+      assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host2, host4, host3);
+    }
+  }
+
+  @Test(groups = "unit")
+  public void should_use_default_consistency_for_global_reads() {
+    BoundStatement bound = globalBoundStatement("SELECT * FROM tbl WHERE pk = ?", 1L);
+    when(queryOptions.getConsistencyLevel()).thenReturn(ConsistencyLevel.LOCAL_ONE);
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host2, host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_keep_v1_replica_order_for_global_keyspace() {
+    BoundStatement bound = globalBoundStatement("UPDATE tbl SET v = ? WHERE pk = ?", null);
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host2, host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_keep_eventual_keyspace_routing_with_v2_metadata() {
+    BoundStatement bound = globalBoundStatement("UPDATE tbl SET v = ? WHERE pk = ?", 1L);
+    when(metadata.getKeyspace(Metadata.quote(KEYSPACE)).isGloballyConsistent()).thenReturn(false);
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host2, host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_prioritize_remote_leader_only_when_child_plan_allows_it() {
+    BoundStatement bound = globalBoundStatement("UPDATE tbl SET v = ? WHERE pk = ?", 1L);
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.REMOTE);
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host2, host1, host4, host3);
+    when(childPolicy.newQueryPlan(KEYSPACE, bound))
+        .thenReturn(Lists.newArrayList(host4, host3, host1).iterator());
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host4, host3);
+  }
+
+  @Test(groups = "unit")
+  public void should_not_promote_down_or_ignored_or_excluded_leader() {
+    BoundStatement bound = globalBoundStatement("UPDATE tbl SET v = ? WHERE pk = ?", 1L);
+    TokenAwarePolicy policy = new TokenAwarePolicy(childPolicy, TOPOLOGICAL);
+    policy.init(cluster, null);
+    when(childPolicy.newQueryPlan(KEYSPACE, bound))
+        .thenReturn(Lists.newArrayList(host4, host3, host1).iterator());
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host4, host3);
+    when(childPolicy.newQueryPlan(KEYSPACE, bound))
+        .thenReturn(Lists.newArrayList(host4, host3, host1, host2).iterator());
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.IGNORED);
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host4, host3);
+    when(childPolicy.newQueryPlan(KEYSPACE, bound))
+        .thenReturn(Lists.newArrayList(host4, host3, host1, host2).iterator());
+    when(childPolicy.distance(host2)).thenReturn(HostDistance.LOCAL);
+    when(host2.isUp()).thenReturn(false);
+    assertThat(policy.newQueryPlan(KEYSPACE, bound)).containsExactly(host1, host4, host3, host2);
   }
 
   private BoundStatement newBoundStatement(String table, ByteBuffer routingKey) {

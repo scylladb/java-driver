@@ -29,11 +29,13 @@ import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Host;
 import com.datastax.driver.core.HostDistance;
+import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Metadata;
 import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.QueryOptions;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.TabletMap;
 import com.datastax.driver.core.Token;
 import com.google.common.annotations.Beta;
 import com.google.common.collect.AbstractIterator;
@@ -46,6 +48,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 
 /**
  * A wrapper load balancing policy that adds token awareness to a child policy.
@@ -71,6 +74,11 @@ import java.util.concurrent.ThreadLocalRandom;
  * be considered having priority. For example, if you wrap {@link DCAwareRoundRobinPolicy} with this
  * token aware policy, replicas from remote data centers may only be returned after all the hosts of
  * the local data center.
+ *
+ * <p>For prepared statements in globally consistent Scylla keyspaces, tablet routing V2 identifies
+ * the leader as the first cached replica. This policy prioritizes that leader when it is up and
+ * included in the child policy's plan. Reads at ONE or LOCAL_ONE retain normal replica routing;
+ * writes at those levels still prioritize the leader. Batches use the existing routing behavior.
  *
  * <h3>Lightweight Transaction (LWT) Routing</h3>
  *
@@ -120,6 +128,13 @@ import java.util.concurrent.ThreadLocalRandom;
  * @see QueryOptions.RequestRoutingMethod
  */
 public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
+
+  // Skip CQL comments as well as whitespace before the statement keyword. Unknown operations are
+  // conservatively treated as writes, including at ONE/LOCAL_ONE.
+  private static final Pattern SELECT =
+      Pattern.compile(
+          "\\A\\s*(?:(?:/\\*.*?\\*/|--[^\\r\\n]*|//[^\\r\\n]*)\\s*)*SELECT\\b",
+          Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
 
   /** Strategies for replica ordering. */
   public enum ReplicaOrdering {
@@ -448,7 +463,33 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
 
     final List<Host> replicas =
         clusterMetadata.getReplicasList(
-            Metadata.quote(keyspace), tableName, statement.getPartitioner(), partitionKey);
+            Metadata.quote(keyspace),
+            tableName == null ? null : Metadata.quote(tableName),
+            statement.getPartitioner(),
+            partitionKey);
+
+    KeyspaceMetadata keyspaceMetadata = clusterMetadata.getKeyspace(Metadata.quote(keyspace));
+    if (statement instanceof BoundStatement
+        && keyspaceMetadata != null
+        && keyspaceMetadata.isGloballyConsistent()
+        && requiresLeader((BoundStatement) statement)) {
+      TabletMap.Tablet tablet =
+          clusterMetadata.getTablet(
+              Metadata.quote(keyspace),
+              tableName == null ? null : Metadata.quote(tableName),
+              statement.getPartitioner(),
+              partitionKey);
+      if (tablet != null && tablet.getVersion() != null && !tablet.getReplicas().isEmpty()) {
+        Host leader = null;
+        for (Host replica : replicas) {
+          if (tablet.getReplicas().get(0).getHost().equals(replica.getHostId())) {
+            leader = replica;
+            break;
+          }
+        }
+        return newQueryPlanWithLeader(keyspace, statement, replicas, leader);
+      }
+    }
 
     QueryOptions.RequestRoutingMethod routing =
         defaultLwtRequestRoutingMethod != null
@@ -461,6 +502,60 @@ public class TokenAwarePolicy implements ChainableLoadBalancingPolicy {
       default:
         return newQueryPlanRegular(keyspace, statement, replicas);
     }
+  }
+
+  private boolean requiresLeader(BoundStatement statement) {
+    ConsistencyLevel cl = statement.getConsistencyLevel();
+    if (cl == null && queryOptions != null) {
+      cl = queryOptions.getConsistencyLevel();
+    }
+    if (cl != ConsistencyLevel.ONE && cl != ConsistencyLevel.LOCAL_ONE) {
+      return true;
+    }
+    String query = statement.preparedStatement().getQueryString();
+    return query == null || !SELECT.matcher(query).find();
+  }
+
+  private Iterator<Host> newQueryPlanWithLeader(
+      String keyspace, Statement statement, List<Host> replicas, Host leader) {
+    // Use the child's actual plan for eligibility. In particular, distance(REMOTE) alone does
+    // not authorize crossing a DC boundary (LOCAL_* consistency can exclude remote hosts).
+    List<Host> child = new ArrayList<>();
+    Iterator<Host> childPlan = childPolicy.newQueryPlan(keyspace, statement);
+    while (childPlan.hasNext()) {
+      Host host = childPlan.next();
+      if (childPolicy.distance(host) != HostDistance.IGNORED) {
+        child.add(host);
+      }
+    }
+    List<Host> local = new ArrayList<>();
+    List<Host> source = replicaOrdering == ReplicaOrdering.NEUTRAL ? child : replicas;
+    for (Host host : source) {
+      if (replicas.contains(host)
+          && child.contains(host)
+          && host.isUp()
+          && childPolicy.distance(host) == HostDistance.LOCAL
+          && !local.contains(host)) {
+        local.add(host);
+      }
+    }
+    if (replicaOrdering == ReplicaOrdering.RANDOM) {
+      Collections.shuffle(local, ThreadLocalRandom.current());
+    }
+    if (leader != null
+        && leader.isUp()
+        && child.contains(leader)
+        && childPolicy.distance(leader) != HostDistance.IGNORED) {
+      local.remove(leader);
+      local.add(0, leader);
+    }
+    List<Host> plan = new ArrayList<>(local);
+    for (Host host : child) {
+      if (!plan.contains(host)) {
+        plan.add(host);
+      }
+    }
+    return plan.iterator();
   }
 
   private String getRoutingTable(Statement statement) {
