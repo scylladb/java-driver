@@ -46,6 +46,14 @@ public interface KeyspaceMetadata extends Describable {
 
   default void setUsingTablets(boolean predicate) {}
 
+  /** Whether this keyspace uses ScyllaDB global consistency and tablet leaders. */
+  default boolean isGloballyConsistent() {
+    return false;
+  }
+
+  /** Sets the consistency mode while building schema metadata. */
+  default void setGloballyConsistent(boolean globallyConsistent) {}
+
   /** The replication options defined for this keyspace. */
   @NonNull
   Map<String, String> getReplication();

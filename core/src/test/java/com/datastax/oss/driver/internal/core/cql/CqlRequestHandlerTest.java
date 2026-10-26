@@ -41,9 +41,15 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
+import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
+import com.datastax.oss.protocol.internal.Frame;
+import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.request.Prepare;
+import com.datastax.oss.protocol.internal.response.Error;
 import com.datastax.oss.protocol.internal.response.error.Unprepared;
 import com.datastax.oss.protocol.internal.response.result.Prepared;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
@@ -61,6 +67,44 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 
 public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_accept_v2_feedback_on_error_before_completing_request() {
+    CqlIdentifier keyspace = CqlIdentifier.fromInternal("ks");
+    CqlIdentifier table = CqlIdentifier.fromInternal("t");
+    PreparedStatement prepared = mock(PreparedStatement.class);
+    ColumnDefinitions columns = mock(ColumnDefinitions.class);
+    when(prepared.getId()).thenReturn(ByteBuffer.allocate(4));
+    when(prepared.getResultSetDefinitions()).thenReturn(columns);
+    BoundStatement statement = mock(BoundStatement.class);
+    when(statement.getPreparedStatement()).thenReturn(prepared);
+    when(statement.getValues()).thenReturn(Collections.emptyList());
+    when(statement.getRoutingKeyspace()).thenReturn(keyspace);
+    when(statement.getRoutingTable()).thenReturn(table);
+    when(statement.getNowInSeconds()).thenReturn(Statement.NO_NOW_IN_SECONDS);
+    Map<String, ByteBuffer> payload = ImmutableMap.of("tablets-routing-v2", ByteBuffer.allocate(0));
+    Frame error =
+        Frame.forResponse(
+            4,
+            0,
+            null,
+            payload,
+            Collections.emptyList(),
+            new Error(ProtocolConstants.ErrorCode.INVALID, "mock error"));
+    RequestHandlerTestHarness.Builder builder = RequestHandlerTestHarness.builder();
+    builder.withResponse(node1, error);
+    try (RequestHandlerTestHarness harness = builder.build()) {
+      when(harness.getChannel(node1).getSupportedFeatures())
+          .thenReturn(
+              ProtocolFeatureStore.parseSupportedOptions(
+                  ImmutableMap.of("TABLETS_ROUTING_V2_EXPERIMENTAL", ImmutableList.of())));
+      CompletionStage<AsyncResultSet> future =
+          new CqlRequestHandler(statement, harness.getSession(), harness.getContext(), "test")
+              .handle();
+      assertThatStage(future).isFailed();
+      verify(harness.metadataManager).addTabletFromPayload(keyspace, table, payload);
+    }
+  }
 
   @Test
   public void should_complete_result_if_first_node_replies_immediately() {

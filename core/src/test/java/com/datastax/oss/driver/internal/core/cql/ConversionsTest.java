@@ -124,6 +124,15 @@ public class ConversionsTest {
     assertThat(execute.options.positionalValues).isEqualTo(values);
   }
 
+  @Test
+  public void should_preserve_sampled_tablet_version_in_execute() {
+    Execute message =
+        (Execute)
+            Conversions.toMessage(
+                boundStatement(ImmutableList.of()), profile(), context(), (byte) 0xf7);
+    assertThat(message.tabletVersionBlock).isEqualTo((byte) 0xf7);
+  }
+
   private BoundStatement boundStatement(List<ByteBuffer> values) {
     // Built before the stubbing below: variables() mocks in turn, and nesting that inside a when()
     // argument leaves Mockito with an unfinished stubbing.

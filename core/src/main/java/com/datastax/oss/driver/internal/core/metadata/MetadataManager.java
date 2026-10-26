@@ -88,6 +88,7 @@ public class MetadataManager implements AsyncAutoCloseable {
   private volatile boolean wasImplicitContactPoint;
 
   private volatile TypeCodec<TupleValue> tabletPayloadCodec = null;
+  private volatile TypeCodec<TupleValue> tabletPayloadCodecV2 = null;
 
   public MetadataManager(InternalDriverContext context) {
     this(context, DefaultMetadata.EMPTY);
@@ -611,7 +612,21 @@ public class MetadataManager implements AsyncAutoCloseable {
     return null;
   }
 
-  private TypeCodec<TupleValue> getTabletPayloadCodec() {
+  private TypeCodec<TupleValue> getTabletPayloadCodec(boolean version2) {
+    if (version2) {
+      if (tabletPayloadCodecV2 == null) {
+        tabletPayloadCodecV2 =
+            context
+                .getCodecRegistry()
+                .codecFor(
+                    DataTypes.tupleOf(
+                        DataTypes.BIGINT,
+                        DataTypes.BIGINT,
+                        DataTypes.listOf(DataTypes.tupleOf(DataTypes.UUID, DataTypes.INT)),
+                        DataTypes.BIGINT));
+      }
+      return tabletPayloadCodecV2;
+    }
     if (tabletPayloadCodec == null) {
       TupleType payloadOuterTuple =
           DataTypes.tupleOf(
@@ -627,11 +642,15 @@ public class MetadataManager implements AsyncAutoCloseable {
       CqlIdentifier keyspace,
       CqlIdentifier table,
       @NonNull Map<String, ByteBuffer> incomingPayload) {
-    // Assumes payload is present
+    boolean version2 =
+        incomingPayload.containsKey(TabletInfo.TABLETS_ROUTING_V2_CUSTOM_PAYLOAD_KEY);
     TupleValue tabletTuple =
-        getTabletPayloadCodec()
+        getTabletPayloadCodec(version2)
             .decode(
-                incomingPayload.get(TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY),
+                incomingPayload.get(
+                    version2
+                        ? TabletInfo.TABLETS_ROUTING_V2_CUSTOM_PAYLOAD_KEY
+                        : TabletInfo.TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY),
                 context.getProtocolVersion());
     if (tabletTuple == null) {
       LOG.warn(
@@ -642,7 +661,11 @@ public class MetadataManager implements AsyncAutoCloseable {
       return;
     }
     DefaultTabletMap.DefaultTablet tabletToAdd =
-        DefaultTabletMap.DefaultTablet.parseTabletPayloadV1(tabletTuple, getMetadata().getNodes());
+        version2
+            ? DefaultTabletMap.DefaultTablet.parseTabletPayloadV2(
+                tabletTuple, getMetadata().getNodes())
+            : DefaultTabletMap.DefaultTablet.parseTabletPayloadV1(
+                tabletTuple, getMetadata().getNodes());
     RunOrSchedule.on(adminExecutor, () -> singleThreaded.addTablet(keyspace, table, tabletToAdd));
   }
 }
