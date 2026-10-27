@@ -136,18 +136,28 @@ class TargetTests(unittest.TestCase):
                         target.blockers(major)
                     self.assertIn('--paginate', query.call_args.args[0])
 
-    def test_readme_stamps_effective_version(self):
+    def stamp(self, readme, release):
         previous = Path.cwd()
         with tempfile.TemporaryDirectory() as directory:
             os.chdir(directory)
             try:
-                Path('README.md').write_text('Use 3.11.5.20 and 3.11.5.20, with Java 8.\n')
-                with patch.dict(os.environ, {'RELEASE_VERSION': '3.11.6.1'}), patch.object(target, 'git'):
+                Path('README.md').write_text(readme)
+                with patch.dict(os.environ, {'RELEASE_VERSION': release}), patch.object(target, 'git'):
                     target.stamp_readme()
-                self.assertEqual(Path('README.md').read_text(),
-                                 'Use 3.11.6.1 and 3.11.6.1, with Java 8.\n')
+                return Path('README.md').read_text()
             finally:
                 os.chdir(previous)
+
+    def test_readme_stamps_effective_version(self):
+        self.assertEqual(self.stamp('Use 3.11.5.20 and 3.11.5.20, with Java 8.\n', '3.11.6.1'),
+                         'Use 3.11.6.1 and 3.11.6.1, with Java 8.\n')
+
+    def test_readme_stamp_moves_badge_to_release_line(self):
+        readme = ('[badge](https://img.shields.io/maven-central/v/x?versionPrefix=3.11.5)\n'
+                  'Use 3.11.5.20; 4.x starts at 4.7.2.0.\n')
+        self.assertEqual(self.stamp(readme, '3.12.1.0'),
+                         '[badge](https://img.shields.io/maven-central/v/x?versionPrefix=3.12.1)\n'
+                         'Use 3.12.1.0; 4.x starts at 4.7.2.0.\n')
 
     def test_approval_is_after_validation_and_matrix_and_has_no_shared_cache(self):
         workflow = (ROOT / '.github/workflows/release.yml').read_text()

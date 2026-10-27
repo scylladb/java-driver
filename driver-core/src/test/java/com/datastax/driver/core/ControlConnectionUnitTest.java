@@ -50,6 +50,7 @@ public class ControlConnectionUnitTest {
             "native_address",
             "dse_version",
             "rpc_address",
+            "rpc_port",
             "schema_version",
             "data_center",
             "rack",
@@ -59,8 +60,8 @@ public class ControlConnectionUnitTest {
 
   @Test(groups = "unit")
   public void testLocalColumnsOfInterestSize() {
-    // 21 columns as documented in the constant declaration
-    assertThat(SystemColumnProjection.LOCAL_COLUMNS_OF_INTEREST).hasSize(21);
+    // 22 columns as documented in the constant declaration
+    assertThat(SystemColumnProjection.LOCAL_COLUMNS_OF_INTEREST).hasSize(22);
   }
 
   @Test(groups = "unit")
@@ -71,6 +72,7 @@ public class ControlConnectionUnitTest {
             "peer",
             "peer_port",
             "rpc_address",
+            "rpc_port",
             "tokens",
             "native_address",
             "native_port",
@@ -83,8 +85,8 @@ public class ControlConnectionUnitTest {
 
   @Test(groups = "unit")
   public void testPeersColumnsOfInterestSize() {
-    // 19 columns: original 16 + peer_port, native_address, native_port
-    assertThat(SystemColumnProjection.PEERS_COLUMNS_OF_INTEREST).hasSize(19);
+    // 20 columns: original 16 + peer_port, native_address, native_port, rpc_port
+    assertThat(SystemColumnProjection.PEERS_COLUMNS_OF_INTEREST).hasSize(20);
   }
 
   @Test(groups = "unit")
@@ -97,6 +99,7 @@ public class ControlConnectionUnitTest {
             "native_address",
             "native_port",
             "rpc_address",
+            "rpc_port",
             "native_transport_address",
             "native_transport_port",
             "native_transport_port_ssl",
@@ -109,8 +112,8 @@ public class ControlConnectionUnitTest {
 
   @Test(groups = "unit")
   public void testPeersV2ColumnsOfInterestSize() {
-    // 19 columns: original 15 + rpc_address, native_transport_address/port/port_ssl
-    assertThat(SystemColumnProjection.PEERS_V2_COLUMNS_OF_INTEREST).hasSize(19);
+    // 20 columns: original 15 + rpc_address, rpc_port, native_transport_address/port/port_ssl
+    assertThat(SystemColumnProjection.PEERS_V2_COLUMNS_OF_INTEREST).hasSize(20);
   }
 
   @Test(groups = "unit")

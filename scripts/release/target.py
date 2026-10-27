@@ -107,6 +107,9 @@ def stamp_readme():
     text, count = re.subn(r'(?<![\d.])3\.[0-9]+\.[0-9]+\.[0-9]+(?![\d.])', release, path.read_text())
     if not count:
         raise Invalid('README does not contain a driver version to stamp.')
+    # The Maven Central badge filters by release line, which an upstream sync moves.
+    text = re.sub(r'versionPrefix=3\.[0-9]+\.[0-9]+(?![\d.])',
+                  'versionPrefix=' + release.rsplit('.', 1)[0], text)
     path.write_text(text)
     git('add', 'README.md')
 

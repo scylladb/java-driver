@@ -1,12 +1,14 @@
 <!--
 
-    Copyright DataStax, Inc.
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
 
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
+        http://www.apache.org/licenses/LICENSE-2.0
 
     Unless required by applicable law or agreed to in writing, software
     distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +28,7 @@
     <parent>
         <groupId>com.scylladb</groupId>
         <artifactId>scylla-driver-parent</artifactId>
-        <version>3.11.5.21-SNAPSHOT</version>
+        <version>3.12.1.0-SNAPSHOT</version>
     </parent>
 
     <artifactId>scylla-driver-tests-parent</artifactId>
@@ -41,9 +43,7 @@
     </modules>
 
     <build>
-
         <plugins>
-
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>clirr-maven-plugin</artifactId>
@@ -51,28 +51,24 @@
                     <skip>true</skip>
                 </configuration>
             </plugin>
-
             <plugin>
                 <artifactId>maven-source-plugin</artifactId>
                 <configuration>
                     <skipSource>true</skipSource>
                 </configuration>
             </plugin>
-
             <plugin>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <configuration>
                     <skip>true</skip>
                 </configuration>
             </plugin>
-
             <plugin>
                 <artifactId>maven-gpg-plugin</artifactId>
                 <configuration>
                     <skip>true</skip>
                 </configuration>
             </plugin>
-
             <plugin>
                 <artifactId>maven-install-plugin</artifactId>
                 <configuration>
@@ -86,9 +82,7 @@
                     <skip>true</skip>
                 </configuration>
             </plugin>
-
         </plugins>
-
     </build>
 
 </project>
