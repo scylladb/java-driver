@@ -117,14 +117,17 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
    *
    * <p>They will be appended in the iteration order of the provided map. If an ordering was already
    * defined for a given identifier, it will be removed and the new ordering will appear in its
-   * position in the provided map.
+   * position in the provided map. If the query currently orders by {@code ANN OF}, that ordering is
+   * replaced. An empty map leaves the query unchanged.
    */
   @NonNull
   Select orderByIds(@NonNull Map<CqlIdentifier, ClusteringOrder> orderings);
 
   /**
    * Shortcut for {@link #orderByIds(Map)} with the columns specified as case-insensitive names.
-   * They will be wrapped with {@link CqlIdentifier#fromCql(String)}.
+   * They will be wrapped with {@link CqlIdentifier#fromCql(String)}. As with {@link
+   * #orderByIds(Map)}, an {@code ANN OF} ordering is replaced, and an empty map leaves the query
+   * unchanged.
    *
    * <p>Note that it's possible for two different case-insensitive names to resolve to the same
    * identifier, for example "foo" and "Foo"; if this happens, a runtime exception will be thrown.

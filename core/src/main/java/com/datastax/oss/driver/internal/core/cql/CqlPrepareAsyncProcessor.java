@@ -63,7 +63,7 @@ public class CqlPrepareAsyncProcessor
   }
 
   public CqlPrepareAsyncProcessor(@NonNull Optional<? extends DefaultDriverContext> context) {
-    // Use weakValues to evict prepared statements from the cache as soon are they are
+    // Use weakValues to evict prepared statements from the cache as soon as they are
     // no longer referenced elsewhere.
     this(context, CacheBuilder::weakValues);
   }

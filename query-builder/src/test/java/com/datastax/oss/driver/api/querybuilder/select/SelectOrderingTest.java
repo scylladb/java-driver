@@ -107,4 +107,15 @@ public class SelectOrderingTest {
                 .orderBy("c2", ASC))
         .hasCql("SELECT * FROM foo WHERE k=1 ORDER BY c2 ASC");
   }
+
+  @Test
+  public void should_keep_ann_ordering_when_map_is_empty() {
+    assertThat(
+            selectFrom("foo")
+                .all()
+                .where(Relation.column("k").isEqualTo(literal(1)))
+                .orderByAnnOf("c1", CqlVector.newInstance(0.1, 0.2, 0.3))
+                .orderBy(ImmutableMap.of()))
+        .hasCql("SELECT * FROM foo WHERE k=1 ORDER BY c1 ANN OF [0.1, 0.2, 0.3]");
+  }
 }

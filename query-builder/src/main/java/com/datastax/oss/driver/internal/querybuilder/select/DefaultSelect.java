@@ -322,6 +322,9 @@ public class DefaultSelect implements SelectFrom, Select {
   @NonNull
   @Override
   public Select orderByIds(@NonNull Map<CqlIdentifier, ClusteringOrder> newOrderings) {
+    if (newOrderings.isEmpty()) {
+      return this;
+    }
     ColumnsOrderingClause coc = getColumnOrderingClause();
     return withOrderingClause(coc.add(newOrderings));
   }
