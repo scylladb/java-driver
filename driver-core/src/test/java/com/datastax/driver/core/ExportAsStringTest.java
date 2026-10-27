@@ -264,7 +264,9 @@ public class ExportAsStringTest extends CCMTestsSupport {
       while ((line = in.readLine()) != null) {
 
         String trimmedLine = line.trim();
-        if (trimmedLine.startsWith("/*") || trimmedLine.startsWith("*")) continue;
+        if (trimmedLine.startsWith("/*") || trimmedLine.startsWith("*")) {
+          continue;
+        }
         out.write(line);
         out.write(System.getProperty("line.separator"));
       }
