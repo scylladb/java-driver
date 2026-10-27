@@ -1,0 +1,8 @@
+# Every filename must match the support union; Maven build inputs stay visible.
+omit-from-release-notes:
+  - changed-files:
+      - all-globs-to-all-files:
+          - "{docs/**,manual/**,faq/**,upgrade_guide/**,changelog/**,ci/**,\
+            .github/**,**/src/test/**,README.md,README-dev.md,CONTRIBUTING.md,\
+            codecov.yml,.gitignore,.editorconfig}"
+          - '!**/pom.xml'
