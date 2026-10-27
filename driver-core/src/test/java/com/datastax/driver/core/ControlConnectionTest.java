@@ -182,9 +182,9 @@ public class ControlConnectionTest extends CCMTestsSupport {
     int hostCount = 5;
     int iterations = 100;
     ScassandraCluster scassandras = ScassandraCluster.builder().withNodes(hostCount).build();
-    scassandras.init();
 
     try {
+      scassandras.init();
       Collection<InetAddress> contactPoints = newArrayList();
       for (int i = 1; i <= hostCount; i++) {
         contactPoints.add(scassandras.address(i).getAddress());
@@ -414,18 +414,18 @@ public class ControlConnectionTest extends CCMTestsSupport {
   public void should_fetch_whole_peers_table_if_broadcast_address_changed()
       throws UnknownHostException {
     ScassandraCluster scassandras = ScassandraCluster.builder().withNodes(2).build();
-    scassandras.init();
-
-    InetSocketAddress node2RpcAddress = scassandras.address(2);
-
-    Cluster cluster =
-        Cluster.builder()
-            .addContactPoints(scassandras.address(1).getAddress())
-            .withPort(scassandras.getBinaryPort())
-            .withNettyOptions(nonQuietClusterCloseOptions)
-            .build();
-
+    Cluster cluster = null;
     try {
+      scassandras.init();
+
+      InetSocketAddress node2RpcAddress = scassandras.address(2);
+
+      cluster =
+          Cluster.builder()
+              .addContactPoints(scassandras.address(1).getAddress())
+              .withPort(scassandras.getBinaryPort())
+              .withNettyOptions(nonQuietClusterCloseOptions)
+              .build();
 
       cluster.init();
 
@@ -500,7 +500,9 @@ public class ControlConnectionTest extends CCMTestsSupport {
       assertThat(host2.getEndPoint().resolve()).isEqualTo(node2RpcAddress);
 
     } finally {
-      cluster.close();
+      if (cluster != null) {
+        cluster.close();
+      }
       scassandras.stop();
     }
   }
@@ -699,10 +701,10 @@ public class ControlConnectionTest extends CCMTestsSupport {
 
     ScassandraCluster scassandras =
         ScassandraCluster.builder().withNodes(2).withPeersV2(state.usePeersV2()).build();
-    scassandras.init();
 
     Cluster cluster = null;
     try {
+      scassandras.init();
       scassandras.node(1).primingClient().clearAllPrimes();
       PrimingClient primingClient = scassandras.node(1).primingClient();
       primingClient.prime(
@@ -746,7 +748,9 @@ public class ControlConnectionTest extends CCMTestsSupport {
       assertThat(controlConnection.connectedHost().getBroadcastRpcAddress())
           .isEqualTo(new InetSocketAddress(expectedAddress, refreshedPort));
     } finally {
-      if (cluster != null) cluster.close();
+      if (cluster != null) {
+        cluster.close();
+      }
       scassandras.stop();
     }
   }
@@ -755,10 +759,10 @@ public class ControlConnectionTest extends CCMTestsSupport {
 
     ScassandraCluster scassandras =
         ScassandraCluster.builder().withNodes(2).withPeersV2(state.usePeersV2()).build();
-    scassandras.init();
 
     Cluster cluster = null;
     try {
+      scassandras.init();
 
       scassandras.node(1).primingClient().clearAllPrimes();
 
@@ -819,7 +823,9 @@ public class ControlConnectionTest extends CCMTestsSupport {
               });
       assertThat(hostEndPoints).contains(state.getExpectedEndPoint(scassandras));
     } finally {
-      if (cluster != null) cluster.close();
+      if (cluster != null) {
+        cluster.close();
+      }
       scassandras.stop();
     }
   }
