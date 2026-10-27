@@ -143,6 +143,21 @@ associated tag, commits, and Maven artifacts carry the Publisher GPG signatures.
 The 3.x Release does not replace the repository's latest Release. Historical targets
 never push refs, create GitHub Releases, or publish docs.
 
+Before starting a release, complete the manual PR classification and intended-label checks in
+[GitHub release notes](../../CONTRIBUTING.md#github-release-notes). Preview the intended tag/source
+snapshot with GitHub's automatic previous-tag selection; do not force `previous_tag_name` or save
+a draft, tag or release. Verify the actual boundary and every associated PR, including entries
+omitted from generated notes. Stop if the boundary or complete PR set cannot be established.
+Dispatch needed backfills from `scylla-4.x`, wait for successful current classification, and verify
+labels against current files and rename origins. Re-preview after classification; repeat checks
+on mismatches or relevant source, tag, release, PR or label changes before releasing.
+
+The preview is a point-in-time check, not input bound to later publication. Release preparation
+may add commits after its source snapshot. No atomicity, race freedom or exact future-range
+identity is guaranteed. Publication remains asynchronous; there is no automated classification
+barrier. Missed or stale verification can leave permanent omissions or unwanted support entries
+in immutable notes. Later label backfill does not repair an existing published release.
+
 ## Partial release recovery and key rotation
 
 If validation or approval fails, fix the cause and start a new dispatch. If preparation
