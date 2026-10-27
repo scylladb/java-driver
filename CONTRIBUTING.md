@@ -637,3 +637,88 @@ instead of replaying commits that are already merged.
   same way, as [#1281](https://github.com/scylladb/java-driver/pull/1281) did. Otherwise merge the
   tag normally; `-s ours` would hide its changes from every later sync. GitHub doesn't flag a
   squashed repair, which lands an empty commit; the workflow does.
+
+## GitHub release notes
+
+The `scylla-4.x` release workflow creates GitHub releases after Maven publication and the
+verified signed tag have been pushed. Generated notes omit PRs with **omit-from-release-notes**.
+Existing immutable releases are preserved on recovery; dry runs never create releases.
+
+The **Classify release notes** workflow retains pinned `actions/labeler` with `sync-labels: true`.
+Its guard and the action read the same canonical `.github/labeler.yml`. Every changed filename
+must match the support-path union: documentation, `src/test` code/fixtures, CI configuration,
+or listed development-only files. Maven manifests remain visible even inside support paths.
+Production, build/packaging and unknown paths remain visible. Authors, titles and broad `chore`
+or `dependencies` labels do not decide exclusion.
+
+The workflow confirms its target is a PR before checkout or dependency setup. It checks out
+trusted launch tooling at `github.sha`, never PR code. Supplemental checks validate complete,
+nonempty file metadata, including rename origins, and compare revisions, counts and file
+snapshots around classification. The final check verifies the actual logical omission label,
+including case variants. A production-origin rename stays visible. Failed or skipped
+classification attempts omission-label removal only for a confirmed PR, even if setup failed.
+Cleanup can fail during outages; before/after reads do not provide atomicity or race freedom.
+
+Updates, base edits and closed/merged PR events recheck classification. Manual dispatch from
+the default `scylla-4.x` branch accepts the `pull-request` input for already merged PRs.
+The marker is only for GitHub release notes: the repository-local Jira caller ignores its
+`labeled` and `unlabeled` events and forwards other events. Existing Jira copies are not
+cleaned, and other synchronization paths may restore previously copied metadata.
+
+Before starting a release:
+
+1. Identify the intended new release version and full `scylla-4.x` source commit SHA. Preview
+   GitHub's generated notes with automatic previous-tag selection, as the publisher does. For
+   example, replace both placeholder values before running this content-only request:
+
+   ```sh
+   RELEASE_VERSION=4.x.y.z
+   SOURCE_SHA=REPLACE_WITH_FULL_SOURCE_SHA
+   gh api --method POST --hostname github.com \
+     repos/scylladb/java-driver/releases/generate-notes \
+     -f tag_name="$RELEASE_VERSION" -f target_commitish="$SOURCE_SHA" --jq '.body'
+   ```
+
+   Do not pass `previous_tag_name`: forcing a previous tag would preview a different selection
+   from the unchanged publisher. This endpoint returns generated content without saving a draft,
+   creating a tag, or publishing a release. In the GitHub release form, leave **Previous tag** at
+   **auto** when generating a preview; do not save or publish the form. If the intended tag already
+   exists, `target_commitish` is ignored: verify that tag points to the intended snapshot.
+
+   Establish the actual starting boundary from the preview's full-changelog link, when present,
+   and inspect the repository comparison and associated PRs for that range. Do not assume the
+   previous release is on the same major line or that the notes list every PR: exclusion labels
+   can omit entries. Account for every associated PR, including omitted entries and older PRs,
+   rather than only recently updated PRs. If the automatic boundary or complete PR set cannot be
+   verified, stop; the manual prerequisite is not satisfied. If the actual range differs from one
+   already checked, inspect and classify the actual range, then generate a fresh preview.
+2. For each PR needing backfill or a current result, run **Classify release notes** from
+   `scylla-4.x` with its PR number. For example, replace `PR_NUMBER` before running:
+
+   ```sh
+   gh workflow run label-release-notes.yml --repo scylladb/java-driver \
+     --ref scylla-4.x -f pull-request=PR_NUMBER
+   ```
+
+3. Open each matching run and wait for successful classification. Compare its logged head, base
+   and changed-file count with the PR's current head, base and complete file list. Inspect every
+   current filename and each rename's previous filename against `.github/labeler.yml`. Check the
+   actual omission label: it must be present only for support-only PRs and absent for production,
+   Maven, build or unknown paths. The workflow recomputes and checks the snapshot digest
+   automatically. Re-run after changed revisions/files; resolve failed or stale runs and
+   incorrect labels before proceeding.
+4. Generate another automatic-range preview after classification and label verification. Repeat
+   the range and label checks if the source branch/commit, tags, releases, PR associations or
+   relevant labels change, or if the preview's boundary or entries differ. Stop if the boundary
+   cannot be verified. Start the existing release process only after these checks.
+
+This is a point-in-time manual check. The publisher generates notes again and does not bind them
+to a retained preview. Release preparation may add commits after the selected source snapshot;
+changes after verification can invalidate the preview. There is no guarantee of atomicity, race
+freedom or exact equality between the preview range and later published notes. Publication remains
+asynchronous, with no automated barrier waiting for classification. If verification is missed or
+becomes stale, immutable notes can retain omissions or unwanted support entries. Later backfill
+does not rewrite published notes, and no automated synchronization follow-up is scheduled.
+
+The separate `scylla-3.x` release branch needs the corresponding change before using filtered
+notes. This change does not alter existing historical-release or signing/publication gates.

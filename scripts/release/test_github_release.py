@@ -93,7 +93,8 @@ class GitHubReleaseTests(unittest.TestCase):
                 creates = [call for call in self.calls(root) if call[:2] == ['release', 'create']]
                 self.assertEqual(len(creates), 1)
                 self.assertIn('--verify-tag', creates[0])
-                self.assertIn('--notes-from-tag', creates[0])
+                self.assertIn('--generate-notes', creates[0])
+                self.assertNotIn('--notes-from-tag', creates[0])
                 self.assertIn('github.com/scylladb/java-driver', creates[0])
                 self.assertIn('--latest' if major == '4' else '--latest=false', creates[0])
                 self.assertNotIn('--draft', creates[0])

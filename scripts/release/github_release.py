@@ -69,7 +69,7 @@ def publish():
     existing = release(repository, version)
     if existing is None:
         gh('release', 'create', version, '--repo', 'github.com/' + repository,
-           '--verify-tag', '--notes-from-tag', '--title', f'ScyllaDB Java Driver {version}',
+           '--verify-tag', '--generate-notes', '--title', f'ScyllaDB Java Driver {version}',
            '--latest' if major == '4' else '--latest=false')
         existing = release(repository, version)
     # Accept a matching immutable release on recovery without editing it. Refuse
