@@ -669,3 +669,35 @@ test('non-array label metadata is rejected and attempts cleanup', async () => {
     assert.deepEqual([...f.labels], []);
   }
 });
+
+test('actual Jira condition filters only logical marker add/remove events', () => {
+  const jira = yaml.load(readFileSync(join(__dirname, '../workflows/call_jira_sync.yml'), 'utf8'));
+  const condition = jira.jobs['jira-sync'].if.replace(/^\$\{\{\s*|\s*\}\}$/g, '');
+  const evaluate = (action, name) => {
+    const values = {'github.event.action': action, 'github.event.label.name': name};
+    // GitHub expression string comparisons are case-insensitive. Evaluate the
+    // actual bounded condition rather than copying it into a separate predicate.
+    const expression = condition.replace(
+      /(github\.[\w.]+)\s*(==|!=)\s*'([^']*)'/g,
+      (_, key, op, value) =>
+        JSON.stringify(values[key]?.toLowerCase()) +
+        (op === '==' ? '===' : '!==') +
+        JSON.stringify(value.toLowerCase())
+    );
+    assert.ok(!expression.includes('github.'));
+    return new Function(`return (${expression})`)();
+  };
+  for (const action of jira.on.pull_request_target.types) {
+    for (const name of [label, 'Omit-From-Release-Notes', 'other', label + '-extra', undefined]) {
+      const expected = !(
+        ['labeled', 'unlabeled'].includes(action) &&
+        [label, 'Omit-From-Release-Notes'].includes(name)
+      );
+      assert.equal(evaluate(action, name), expected, `${action}/${name}`);
+    }
+  }
+  assert.equal(jira.jobs['jira-sync'].with.caller_action, '${{ github.event.action }}');
+  assert.deepEqual(jira.jobs['jira-sync'].secrets, {
+    caller_jira_auth: '${{ secrets.USER_AND_KEY_FOR_JIRA_AUTOMATION }}'
+  });
+});
