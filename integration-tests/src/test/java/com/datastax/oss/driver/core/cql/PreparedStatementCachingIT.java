@@ -276,6 +276,10 @@ public class PreparedStatementCachingIT {
       await()
           .atMost(30, TimeUnit.SECONDS)
           .untilAsserted(() -> assertThat(getPreparedCacheSize(session)).isEqualTo(1));
+      // Guava lowers the size before it calls the removal listener
+      await()
+          .atMost(30, TimeUnit.SECONDS)
+          .untilAsserted(() -> assertThat(removedQueryIds.get()).contains(queryId2));
 
       assertThat(session.prepare(preparedStmtQueryType1)).isSameAs(statement1);
       assertThat(getPreparedCacheSize(session)).isEqualTo(1);
@@ -284,7 +288,6 @@ public class PreparedStatementCachingIT {
       assertThat(getPreparedCacheSize(session)).isEqualTo(2);
 
       assertThat(changedTypes.keySet()).isEqualTo(expectedChangedTypes);
-      assertThat(removedQueryIds.get()).isNotEmpty().get().isEqualTo(queryId2);
 
       // check no errors were seen in callback (and report those as fail msgs)
       // if something is broken these may still succeed due to timing
