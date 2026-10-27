@@ -103,6 +103,7 @@ class GitHubReleaseTests(unittest.TestCase):
                 self.assertIn('--generate-notes', creates[0])
                 self.assertEqual(creates[0][creates[0].index('--notes-start-tag') + 1], major + '.1.2.2')
                 self.assertNotIn('--title', creates[0])
+                self.assertNotIn('--notes-from-tag', creates[0])
                 self.assertIn('github.com/scylladb/java-driver', creates[0])
                 self.assertIn('--latest' if major == '4' else '--latest=false', creates[0])
                 self.assertNotIn('--draft', creates[0])
