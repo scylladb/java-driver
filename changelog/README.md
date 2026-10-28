@@ -21,19 +21,20 @@ under the License.
 
 <!-- Note: contrary to 3.x, insert new entries *first* in their section -->
 
-### 4.19.2.3
+### 4.19.4
 
-- [bug] Escape string literals in function, keyspace, and index metadata descriptions, and handle
-  function bodies containing single quotes and dollar-quote delimiters in schema builders (#1238)
-- [breaking] Remove DSE Graph execution support and TinkerPop integration (#1028). Restore
-  deprecated Graph API stubs; Graph construction and execution throw
-  `UnsupportedOperationException` with migration guidance.
-- [breaking] Remove DSE geometry and DateRange codec support (#1029). Retain deprecated geometry
-  and DateRange value types for local operations, with the optional ESRI dependency for geometry.
-  `DseDataTypes` and `DseTypeCodecs` retain compatibility signatures; DSE codec operations throw
-  `UnsupportedOperationException`.
-- [breaking] Remove DSE metadata and schema runtime support; public metadata and query-builder APIs
-  remain as deprecated compatibility shells. DSE connections are unsupported (#1031, #1238)
+- [improvement] CASSJAVA-137: Bump Netty to 4.1.138
+- [bug] CASSJAVA-136: Ninja fix to correct geometry equality actually broke geometry equality
+
+### 4.19.3
+
+- [bug] CASSJAVA-3: Fix ordering of LIMIT and PER PARTITION LIMIT clauses
+- [bug] PR 2050: Fix race condition in ClockSeqAndNodeContainer
+- [improvement] CASSJAVA-108: Update ESRI (and remove org.json) dependencies
+- [improvement] PR 2076: Bump Jackson to 2.20.1
+- [improvement] PR 2047: Re-work ordering clause support in query builder
+- [improvement] PR 2051: Bump logback to 1.3.15, slf4j to 2.0.16
+- [improvement] CASSJAVA-113: Bump LZ4 to 1.10.1, Netty to 4.1.130.Final
 
 ### 4.19.2
 

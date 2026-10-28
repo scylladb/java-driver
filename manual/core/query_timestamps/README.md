@@ -148,7 +148,7 @@ implementation class from the configuration.
 
 #### Using multiple generators
 
-The timestamp generator can be overridden in [execution profiles](../configuration/#profiles):
+The timestamp generator can be overridden in [execution profiles](../configuration/#execution-profiles):
 
 ```
 datastax-java-driver {

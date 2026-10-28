@@ -112,7 +112,7 @@ sales), then a manual configuration change is good enough.
 
 To get a connection to a node, client code calls `ChannelPool.next()`. This returns the less busy
 connection, based on the the `getAvailableIds()` counter exposed by
-[InFlightHandler](netty_pipeline/#in-flight-handler).
+[InFlightHandler](../netty_pipeline/#inflighthandler).
 
 If all connections are busy, there is no queuing; the driver moves to the next node immediately. The
 rationale is that it's better to try another node that might be ready to reply, instead of

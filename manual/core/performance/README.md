@@ -104,9 +104,9 @@ reduce network traffic.
 Each query is assigned a [timestamp](../query_timestamps/) to order them relative to each other.
 
 By default, this is done driver-side with
-[AtomicTimestampGenerator](../query_timestamps/#atomic-timestamp-generator). This is a very simple
+[AtomicTimestampGenerator](../query_timestamps/#atomictimestampgenerator). This is a very simple
 operation so unlikely to be a bottleneck, but note that there are other options, such as a
-[thread-local](../query_timestamps/#thread-local-timestamp-generator) variant that creates slightly
+[thread-local](../query_timestamps/#threadlocaltimestampgenerator) variant that creates slightly
 less contention, writing your own implementation or letting the server assign timestamps.
 
 #### Tracing
@@ -319,7 +319,7 @@ You should group your schema changes as much as possible.
 
 Every change made from a client will be pushed to all other clients, causing them to refresh their
 metadata. If you have multiple client instances, it might be a good idea to
-[deactivate the metadata](../metadata/schema/#enabling-disabling) on all clients while you apply the
+[deactivate the metadata](../metadata/schema/#enablingdisabling) on all clients while you apply the
 updates, and reactivate it at the end (reactivating will trigger an immediate refresh, so you might
 want to ramp up clients to avoid a "thundering herd" effect).
 

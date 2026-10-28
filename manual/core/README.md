@@ -123,7 +123,7 @@ datastax-java-driver {
 ```
 
 For more details about the local datacenter, refer to the [load balancing
-policy](load_balancing/#local-only) section.
+policy](load_balancing/#datacenter-locality) section.
 
 ##### Keyspace
 
