@@ -136,6 +136,14 @@ class TargetTests(unittest.TestCase):
                         target.blockers(major)
                     self.assertIn('--paginate', query.call_args.args[0])
 
+    def test_blocker_message_keeps_links_bare(self):
+        urls = ['https://example.invalid/issues/1', 'https://example.invalid/issues/2']
+        payload = json.dumps([[{'html_url': url, 'labels': []} for url in urls]])
+        with patch.object(subprocess, 'check_output', return_value=payload):
+            with self.assertRaises(target.Invalid) as raised:
+                target.blockers('4')
+        self.assertEqual(str(raised.exception).splitlines()[1:], urls)
+
     def test_readme_stamps_effective_version(self):
         previous = Path.cwd()
         with tempfile.TemporaryDirectory() as directory:
