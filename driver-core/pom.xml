@@ -28,7 +28,7 @@
     <parent>
         <groupId>com.scylladb</groupId>
         <artifactId>scylla-driver-parent</artifactId>
-        <version>3.12.1.0</version>
+        <version>3.12.1.1-SNAPSHOT</version>
     </parent>
 
     <artifactId>scylla-driver-core</artifactId>
