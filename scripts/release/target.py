@@ -98,7 +98,8 @@ def blockers(major):
                     f'area/Driver_-_java-driver-{major}.x' in labels):
                 matches.append(issue['html_url'])
     if matches:
-        raise Invalid('Release blocked by open issues: ' + ', '.join(matches))
+        # One URL per line: linkifiers would swallow a separating comma into the link.
+        raise Invalid('Release blocked by open issues:\n' + '\n'.join(matches))
 
 
 def stamp_readme():
