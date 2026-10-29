@@ -27,7 +27,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.scylladb</groupId>
   <artifactId>java-driver-parent</artifactId>
-  <version>4.19.2.4-SNAPSHOT</version>
+  <version>4.19.4.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Java Driver for Scylla and Apache Cassandra</name>
   <description>A driver for Scylla and Apache Cassandra(R) 2.1+ that works exclusively with the Cassandra Query Language version 3 (CQL3) and Cassandra's native protocol versions 3 and above.</description>
@@ -70,17 +70,17 @@
     <hdrhistogram.version>2.2.2</hdrhistogram.version>
     <metrics.version>4.2.40</metrics.version>
     <netty.version>4.1.138.Final</netty.version>
-    <esri.version>1.2.1</esri.version>
+    <esri.version>2.2.4</esri.version>
     <!-- Needed only to compile deprecated Graph compatibility signatures. -->
     <tinkerpop.version>3.5.6</tinkerpop.version>
     <!-- when changing version also update version in LICENSE_binary  -->
-    <slf4j.version>2.0.18</slf4j.version>
+    <slf4j.version>2.0.20</slf4j.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <reactive-streams.version>1.0.4</reactive-streams.version>
     <jackson.version>2.22.4</jackson.version>
     <!-- optional dependencies -->
-    <snappy.version>1.1.10.8</snappy.version>
-    <lz4.version>1.11.4</lz4.version>
+    <snappy.version>1.1.10.12</snappy.version>
+    <lz4.version>1.12.1</lz4.version>
     <!-- test dependencies -->
     <assertj.version>3.27.7</assertj.version>
     <commons-exec.version>1.6.0</commons-exec.version>
@@ -206,7 +206,7 @@
         <!-- Version of Guava used in shaded module and for integration tests. -->
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>33.6.0-jre</version>
+        <version>33.7.1-jre</version>
       </dependency>
       <dependency>
         <groupId>com.typesafe</groupId>
@@ -320,7 +320,7 @@
       <dependency>
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy</artifactId>
-        <version>1.18.15-jdk5</version>
+        <version>1.18.16-jdk5</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -487,12 +487,12 @@
       <dependency>
         <groupId>io.projectreactor.tools</groupId>
         <artifactId>blockhound</artifactId>
-        <version>1.0.17.RELEASE</version>
+        <version>1.0.18.RELEASE</version>
       </dependency>
       <dependency>
         <groupId>io.projectreactor.tools</groupId>
         <artifactId>blockhound-junit-platform</artifactId>
-        <version>1.0.17.RELEASE</version>
+        <version>1.0.18.RELEASE</version>
       </dependency>
       <dependency>
         <groupId>org.burningwave</groupId>
@@ -609,7 +609,7 @@
         <plugin>
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
-          <version>0.8.14</version>
+          <version>0.8.16</version>
         </plugin>
         <plugin>
           <groupId>org.apache.felix</groupId>
@@ -987,6 +987,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </profile>
     <profile>
       <id>release</id>
+      <properties>
+        <!-- Distribution archives are excluded from Central and have no assembly descriptors. -->
+        <assembly.skipAssembly>true</assembly.skipAssembly>
+      </properties>
       <build>
         <plugins>
           <plugin>

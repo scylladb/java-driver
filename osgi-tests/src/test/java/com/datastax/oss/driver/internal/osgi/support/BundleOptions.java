@@ -34,12 +34,14 @@ public class BundleOptions {
   public static CompositeOption commonBundles() {
     return () ->
         options(
-            mavenBundle("org.apache.cassandra", "java-driver-guava-shaded").versionAsInProject(),
-            mavenBundle("io.dropwizard.metrics", "metrics-core").versionAsInProject(),
-            mavenBundle("org.slf4j", "slf4j-api").versionAsInProject(),
-            mavenBundle("org.hdrhistogram", "HdrHistogram").versionAsInProject(),
-            mavenBundle("com.typesafe", "config").versionAsInProject(),
-            mavenBundle("com.scylladb", "native-protocol").versionAsInProject(),
+            mavenBundle("com.scylladb", "java-driver-guava-shaded")
+                .versionAsInProject()
+                .startLevel(1),
+            mavenBundle("io.dropwizard.metrics", "metrics-core").versionAsInProject().startLevel(1),
+            mavenBundle("org.slf4j", "slf4j-api").versionAsInProject().startLevel(1),
+            mavenBundle("org.hdrhistogram", "HdrHistogram").versionAsInProject().startLevel(1),
+            mavenBundle("com.typesafe", "config").versionAsInProject().startLevel(1),
+            mavenBundle("com.scylladb", "native-protocol").versionAsInProject().startLevel(1),
             logbackBundles(),
             debugOptions());
   }
@@ -50,7 +52,7 @@ public class BundleOptions {
             systemProperty("cassandra.contactpoints").value("127.0.0.1"),
             systemProperty("cassandra.port").value("9042"),
             systemProperty("cassandra.keyspace").value("test_osgi"),
-            bundle("reference:file:target/classes"));
+            bundle("reference:file:target/classes").startLevel(3));
   }
 
   public static UrlProvisionOption driverCoreBundle() {
@@ -58,15 +60,15 @@ public class BundleOptions {
   }
 
   public static UrlProvisionOption driverCoreShadedBundle() {
-    return bundle("reference:file:../core-shaded/target/classes");
+    return bundle("reference:file:../core-shaded/target/classes").startLevel(1);
   }
 
   public static UrlProvisionOption driverQueryBuilderBundle() {
-    return bundle("reference:file:../query-builder/target/classes");
+    return bundle("reference:file:../query-builder/target/classes").startLevel(2);
   }
 
   public static UrlProvisionOption driverMapperRuntimeBundle() {
-    return bundle("reference:file:../mapper-runtime/target/classes");
+    return bundle("reference:file:../mapper-runtime/target/classes").startLevel(2);
   }
 
   public static UrlProvisionOption driverTestInfraBundle() {
@@ -117,6 +119,9 @@ public class BundleOptions {
     return () ->
         options(
             mavenBundle("at.yawk.lz4", "lz4-java").versionAsInProject(),
+            // at.yawk.lz4 requires sun.misc package
+            mavenBundle("com.diffplug.osgi", "com.diffplug.osgi.extension.sun.misc")
+                .version("0.0.0"),
             systemProperty("cassandra.compression").value("LZ4"));
   }
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Points a local tag named after each version in conf.py's RELEASE_LINES at that line's newest
 release, so scylla-4.19.2.x builds from the newest 4.19.2.N tag and a patch release
-needs no conf.py change. The aliases are scratch refs: never push them.
+needs no conf.py change. A new line does: create fails while a major has releases of a
+newer line than RELEASE_LINES lists. The aliases are scratch refs: never push them.
 
   alias-tags.py create   (re)create one alias per RELEASE_LINES entry
   alias-tags.py delete   remove them again
@@ -45,6 +46,30 @@ def newest_release(line):
     return "%s.%d" % (line, max(patches)) if patches else None
 
 
+def newest_line(major):
+    # X.Y.Z.N only: release candidates and upstream's three-part tags never match.
+    release = re.compile(re.escape(major) + r"\.(\d+)\.(\d+)\.\d+")
+    lines = [(int(m.group(1)), int(m.group(2)))
+             for m in map(release.fullmatch, git("tag", "-l", major + ".*").split()) if m]
+    return (int(major),) + max(lines) if lines else None
+
+
+def check_registered(lines):
+    # An upstream sync starts a new line; without this its docs silently never publish.
+    registered = {}
+    for line in lines:
+        key = tuple(int(part) for part in line.split("."))
+        registered[key[0]] = max(registered.get(key[0], key), key)
+    for major, current in sorted(registered.items()):
+        newest = newest_line(str(major))
+        if newest and newest > current:
+            fail("%s has releases, but RELEASE_LINES lists scylla-%s.x for %d.x: add "
+                 "scylla-%s.x to RELEASE_LINES, move scylla-%s.x to BRANCHES, and update "
+                 "LATEST_VERSION, DEPRECATED_VERSIONS and javadoc-multiversion.sh to match"
+                 % ("%d.%d.%d.N" % newest, "%d.%d.%d" % current, major,
+                    "%d.%d.%d" % newest, "%d.%d.%d" % current))
+
+
 def create(versions):
     # Resolve every entry before tagging, so a failure leaves no alias behind.
     aliases = []
@@ -56,6 +81,7 @@ def create(versions):
         if not newest:
             fail("No release tag matches %s.N for %s" % (match.group(1), version))
         aliases.append((version, newest))
+    check_registered([ALIAS.fullmatch(version).group(1) for version in versions])
     for version, newest in aliases:
         git("tag", "-f", version, newest + "^{commit}")
         print("%s -> %s" % (version, newest))
