@@ -73,7 +73,7 @@ class GitHubReleaseTests(unittest.TestCase):
                     'GH_TOKEN': 'test-only-github-token', 'STATE': str(root / 'state.json'),
                     'TRACE': str(root / 'trace.jsonl'),
                     'CLI_FAIL': '', 'MUTABLE': '',
-            }), patch.object(signing, 'verify_prepared') as verify:
+            }), patch.object(signing, 'verify_release') as verify:
                 os.chdir(repo)
                 try:
                     yield root, git, verify
@@ -90,6 +90,7 @@ class GitHubReleaseTests(unittest.TestCase):
                 github_release.publish()
                 github_release.publish()
                 self.assertEqual(verify.call_count, 2)
+                verify.assert_called_with(major + '.1.2.3')
                 creates = [call for call in self.calls(root) if call[:2] == ['release', 'create']]
                 self.assertEqual(len(creates), 1)
                 self.assertIn('--verify-tag', creates[0])

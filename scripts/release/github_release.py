@@ -64,7 +64,8 @@ def publish():
         raise Invalid('Unexpected driver release repository.')
     version = target.version(major, os.environ['RELEASE_VERSION'])
     # This uses only the public certificate and the original preparation baseline.
-    signing.verify_prepared()
+    # release:perform has deleted release.properties, so check the validated version's tag.
+    signing.verify_release(version)
     verify_remote_tag(version)
     existing = release(repository, version)
     if existing is None:
