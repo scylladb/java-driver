@@ -69,8 +69,11 @@ def publish():
     verify_remote_tag(version)
     existing = release(repository, version)
     if existing is None:
+        # Like earlier releases: notes generated since this line's previous release, titled
+        # by the tag. Four parts skip upstream tags; gh rejects --notes-from-tag with --repo.
+        since = target.git('describe', '--tags', '--abbrev=0', '--match', f'{major}.*.*.*', version + '^')
         gh('release', 'create', version, '--repo', 'github.com/' + repository,
-           '--verify-tag', '--notes-from-tag', '--title', f'ScyllaDB Java Driver {version}',
+           '--verify-tag', '--generate-notes', '--notes-start-tag', since,
            '--latest' if major == '4' else '--latest=false')
         existing = release(repository, version)
     # Accept a matching immutable release on recovery without editing it. Refuse
