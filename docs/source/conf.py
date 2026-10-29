@@ -15,11 +15,12 @@ from redirects_cli import cli as redirects_cli
 # branch.
 RELEASE_LINES = [
     'scylla-4.19.2.x',
-    'scylla-3.11.5.x'
+    'scylla-3.12.1.x'
 ]
 BRANCHES = [
     'scylla-4.18.1.x',
-    'scylla-4.19.0.x'
+    'scylla-4.19.0.x',
+    'scylla-3.11.5.x'
 ]
 # Set the latest version.
 LATEST_VERSION = 'scylla-4.19.2.x'
@@ -27,7 +28,8 @@ LATEST_VERSION = 'scylla-4.19.2.x'
 UNSTABLE_VERSIONS = []
 # Set which versions are deprecated
 DEPRECATED_VERSIONS = [
-    'scylla-3.11.5.x'
+    'scylla-3.11.5.x',
+    'scylla-3.12.1.x'
 ]
 
 # Add any Sphinx extension module names here, as strings. They can be
