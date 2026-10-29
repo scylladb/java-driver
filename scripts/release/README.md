@@ -160,8 +160,8 @@ reconcile the actual Central state first. If publication succeeded but SCM push 
 verify and push that exact signed history after reconciling branch advancement. Do not
 prepare another release under the same version. If GitHub Release publication fails after
 the push, preserve the existing tag and reconcile the published Central state first.
-Restore `release.properties` with `scm.tag=VERSION`, the original `RELEASE_BASE_COMMIT`,
-and the recovered signed history. Set `RELEASE_MAJOR`, `RELEASE_VERSION`,
+Check out the recovered signed history and set the original `RELEASE_BASE_COMMIT`;
+`release.properties` is not needed. Set `RELEASE_MAJOR`, `RELEASE_VERSION`,
 `RELEASE_TARGET_TAG=scylla-MAJOR.x`, `RELEASE_DRY_RUN=false`, and
 `GITHUB_REPOSITORY=scylladb/java-driver`, then run `python3 scripts/release/github_release.py`
 with the trusted launch SHA's helper scripts and public certificate. The helper accepts an
