@@ -64,12 +64,16 @@ def publish():
         raise Invalid('Unexpected driver release repository.')
     version = target.version(major, os.environ['RELEASE_VERSION'])
     # This uses only the public certificate and the original preparation baseline.
-    signing.verify_prepared()
+    # release:perform has deleted release.properties, so check the validated version's tag.
+    signing.verify_release(version)
     verify_remote_tag(version)
     existing = release(repository, version)
     if existing is None:
+        # Like earlier releases: notes generated since this line's previous release, titled
+        # by the tag. Four parts skip upstream tags; gh rejects --notes-from-tag with --repo.
+        since = target.git('describe', '--tags', '--abbrev=0', '--match', f'{major}.*.*.*', version + '^')
         gh('release', 'create', version, '--repo', 'github.com/' + repository,
-           '--verify-tag', '--notes-from-tag', '--title', f'ScyllaDB Java Driver {version}',
+           '--verify-tag', '--generate-notes', '--notes-start-tag', since,
            '--latest' if major == '4' else '--latest=false')
         existing = release(repository, version)
     # Accept a matching immutable release on recovery without editing it. Refuse
