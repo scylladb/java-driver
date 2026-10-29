@@ -17,17 +17,12 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
+import static com.datastax.oss.driver.internal.core.cql.PreparedStatementTestHelper.newPreparedStatement;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
-import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
-import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
-import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
-import com.datastax.oss.protocol.internal.util.Bytes;
-import java.util.Collections;
 import org.junit.Test;
 
 public class DefaultPreparedStatementTest {
@@ -74,39 +69,5 @@ public class DefaultPreparedStatementTest {
         preparedStatement.bind().setConsistencyLevel(DefaultConsistencyLevel.ONE);
 
     assertThat(boundStatement.getRequestRoutingType()).isEqualTo(RequestRoutingType.LWT);
-  }
-
-  private DefaultPreparedStatement newPreparedStatement(
-      ConsistencyLevel consistencyLevel,
-      ConsistencyLevel serialConsistencyLevel,
-      RequestRoutingType requestRoutingType) {
-    ColumnDefinitions variableDefinitions =
-        DefaultColumnDefinitions.valueOf(Collections.emptyList());
-    return new DefaultPreparedStatement(
-        Bytes.fromHexString("0x"),
-        "SELECT * FROM test.foo WHERE pk = ?",
-        variableDefinitions,
-        Collections.emptyList(),
-        null,
-        null,
-        null,
-        null,
-        Collections.emptyMap(),
-        null,
-        null,
-        null,
-        null,
-        null,
-        Collections.emptyMap(),
-        null,
-        null,
-        null,
-        Integer.MIN_VALUE,
-        consistencyLevel,
-        serialConsistencyLevel,
-        false,
-        CodecRegistry.DEFAULT,
-        DefaultProtocolVersion.DEFAULT,
-        requestRoutingType);
   }
 }
