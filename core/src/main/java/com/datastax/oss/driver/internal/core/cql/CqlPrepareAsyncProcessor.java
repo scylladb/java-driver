@@ -162,15 +162,15 @@ public class CqlPrepareAsyncProcessor
                 .whenComplete(
                     (preparedStatement, error) -> {
                       if (error != null) {
-                        mine.completeExceptionally(error);
                         cache.invalidate(request); // Make sure failure isn't cached indefinitely
+                        mine.completeExceptionally(error);
                       } else {
                         mine.complete(preparedStatement);
                       }
                     });
           } catch (RuntimeException e) {
-            mine.completeExceptionally(e);
             cache.invalidate(request); // Make sure failure isn't cached indefinitely
+            mine.completeExceptionally(e);
           }
         }
       }

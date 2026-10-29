@@ -34,6 +34,7 @@ import io.netty.util.Timer;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -116,6 +117,41 @@ public class CqlPrepareAsyncProcessorTest {
           processor.process(request, harness.getSession(), harness.getContext(), "test");
 
       assertThatStage(retry).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(cache.getIfPresent(request)).isNull();
+    }
+  }
+
+  @Test
+  public void should_invalidate_before_notifying_joined_callers_when_construction_fails() {
+    PrepareRequest request = new DefaultPrepareRequest("SELECT 1");
+    IllegalArgumentException failure = new IllegalArgumentException("mock timer failure");
+    IllegalArgumentException retryFailure = new IllegalArgumentException("retry timer failure");
+    AtomicReference<CompletionStage<PreparedStatement>> retry = new AtomicReference<>();
+
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      Timer timer = mock(Timer.class);
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+      when(timer.newTimeout(any(), anyLong(), any()))
+          .thenAnswer(
+              invocation -> {
+                // Join the cached future before failing construction; retry as its callback.
+                CompletionStage<PreparedStatement> joinedCall =
+                    processor.process(request, harness.getSession(), harness.getContext(), "test");
+                joinedCall.whenComplete(
+                    (preparedStatement, error) ->
+                        retry.set(
+                            processor.process(
+                                request, harness.getSession(), harness.getContext(), "test")));
+                throw failure;
+              })
+          .thenThrow(retryFailure);
+
+      CompletionStage<PreparedStatement> first =
+          processor.process(request, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(first).isFailed(error -> assertThat(error).isSameAs(failure));
+      // the retry finds no cached future, starts a new attempt, and hits Mockito’s second timer behavior, which throws retryFailure
+      assertThatStage(retry.get()).isFailed(error -> assertThat(error).isSameAs(retryFailure));
       assertThat(cache.getIfPresent(request)).isNull();
     }
   }

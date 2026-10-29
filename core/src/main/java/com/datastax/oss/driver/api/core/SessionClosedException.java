@@ -19,6 +19,7 @@ package com.datastax.oss.driver.api.core;
 
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import net.jcip.annotations.ThreadSafe;
 
 /** Thrown when an operation cannot be completed because its session is closing or closed. */
@@ -33,7 +34,8 @@ public class SessionClosedException extends DriverException {
     this(message, null);
   }
 
-  private SessionClosedException(String message, ExecutionInfo executionInfo) {
+  private SessionClosedException(
+      @NonNull String message, @Nullable ExecutionInfo executionInfo) {
     super(message, executionInfo, null, true);
   }
 
