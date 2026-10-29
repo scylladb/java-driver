@@ -45,6 +45,8 @@ class GitHubReleaseTests(unittest.TestCase):
                 ' print("HTTP/2.0 200 OK\\nContent-Type: application/json\\n")\n'
                 ' print(state.read_text())\n'
                 'elif args[:2] == ["release", "create"]:\n'
+                ' if "--notes-from-tag" in args and "--repo" in args:\n'
+                '  raise SystemExit(1)\n'
                 ' state.write_text(json.dumps({"tag_name": args[2], "draft": False,\n'
                 '  "immutable": os.environ.get("MUTABLE") != "true"}))\n'
                 'else:\n'
@@ -59,6 +61,10 @@ class GitHubReleaseTests(unittest.TestCase):
                     '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', *args,
                 ], cwd=repo, text=True, stderr=subprocess.PIPE).strip()
             git('init', '-q')
+            git('commit', '--allow-empty', '-qm', 'Previous release')
+            git('tag', '-a', major + '.1.2.2', '-m', 'Previous release')
+            git('commit', '--allow-empty', '-qm', 'Upstream release')
+            git('tag', '-a', major + '.1.3', '-m', 'Upstream three-part tag')
             git('commit', '--allow-empty', '-qm', 'Fixture')
             version = major + '.1.2.3'
             git('tag', '-a', version, '-m', 'Prepared release')
@@ -94,7 +100,9 @@ class GitHubReleaseTests(unittest.TestCase):
                 creates = [call for call in self.calls(root) if call[:2] == ['release', 'create']]
                 self.assertEqual(len(creates), 1)
                 self.assertIn('--verify-tag', creates[0])
-                self.assertIn('--notes-from-tag', creates[0])
+                self.assertIn('--generate-notes', creates[0])
+                self.assertEqual(creates[0][creates[0].index('--notes-start-tag') + 1], major + '.1.2.2')
+                self.assertNotIn('--title', creates[0])
                 self.assertIn('github.com/scylladb/java-driver', creates[0])
                 self.assertIn('--latest' if major == '4' else '--latest=false', creates[0])
                 self.assertNotIn('--draft', creates[0])
