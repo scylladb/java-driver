@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -150,7 +151,8 @@ public class CqlPrepareAsyncProcessorTest {
           processor.process(request, harness.getSession(), harness.getContext(), "test");
 
       assertThatStage(first).isFailed(error -> assertThat(error).isSameAs(failure));
-      // the retry finds no cached future, starts a new attempt, and hits Mockito’s second timer behavior, which throws retryFailure
+      await().until(() -> retry.get() != null);
+      // The retry starts a new attempt and hits Mockito's second timer behavior.
       assertThatStage(retry.get()).isFailed(error -> assertThat(error).isSameAs(retryFailure));
       assertThat(cache.getIfPresent(request)).isNull();
     }
