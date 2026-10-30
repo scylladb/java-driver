@@ -49,7 +49,7 @@ Maven dependency:
 <dependency>
     <groupId>at.yawk.lz4</groupId>
     <artifactId>lz4-java</artifactId>
-    <version>1.11.3</version>
+    <version>1.12.1</version>
 </dependency>
 ```
 
