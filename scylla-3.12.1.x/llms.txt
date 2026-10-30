@@ -1,0 +1,64 @@
+# Scylla Java Driver
+
+> Scylla Java Driver  documentation
+
+
+2026, ScyllaDB. All rights reserved.
+
+## Pages
+
+- [Scylla Java Driver for Scylla and Apache Cassandra®](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/index.md): [![Maven Central](https://img.shields.io/maven-central/v/com.scylladb/scylla-driver-core?versionPref...
+- [Changelog](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/changelog/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Upgrade guide](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/upgrade_guide/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Manual](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Frequently Asked Questions](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/faq/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Frequently Asked Questions - OSGi](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/faq/osgi/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Object Mapper](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/object_mapper/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Retries](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/retries/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Custom Codecs](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/custom_codecs/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Control connection](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/control_connection/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Load balancing](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/load_balancing/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Authentication](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/auth/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Metrics](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/metrics/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Reconnection](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/reconnection/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Connection pooling](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/pooling/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query idempotence](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/idempotence/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Connectivity](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/connectivity/index.md): How the driver reaches the nodes of a cluster, and what each kind of network needs configured.
+- [Logging](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/logging/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [User-defined types](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/udts/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Using Tuples with the Java Driver](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/tuples/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Query timestamps](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/query_timestamps/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Connecting to ScyllaDB Cloud Serverless](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/serverless/index.md): With ScyllaDB Cloud, you can deploy [serverless databases](https://cloud.docs.scylladb.com/stable/se...
+- [Statements](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/statements/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Metadata](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/metadata/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Paging](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/paging/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [SSL](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/ssl/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Native protocol](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/native_protocol/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Speculative query execution](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/speculative_execution/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Compression](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/compression/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Address resolution](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/address_resolution/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Custom Payloads](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/custom_payloads/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Using the shaded JAR](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/shaded_jar/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Socket options](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/socket_options/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Asynchronous programming](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/async/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [OSGi](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/osgi/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Batch statements](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/statements/batch/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Built statements](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/statements/built/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Prepared statements](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/statements/prepared/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Simple statements](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/statements/simple/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Client routes (private networking)](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/connectivity/client_routes/index.md): Reach a cluster that is only exposed through a cloud private endpoint, where the cluster publishes a
+- [VPC peering, Transit Gateway and direct connections](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/connectivity/vpc_peering/index.md): The common case: every node is reachable at the address it broadcasts, so the driver needs no
+- [Optional codecs](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/custom_codecs/extras/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Using custom codecs](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/object_mapper/custom_codecs/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Definition of mapped classes](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/object_mapper/creating/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Using the mapper](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/manual/object_mapper/using/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Migrating from Astyanax](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/upgrade_guide/migrating_from_astyanax/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Configuration](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/upgrade_guide/migrating_from_astyanax/configuration/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Language change : from Thrift to CQL](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/upgrade_guide/migrating_from_astyanax/language_level_changes/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [Queries and Results](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/upgrade_guide/migrating_from_astyanax/queries_and_results/index.md): Licensed to the Apache Software Foundation (ASF) under one
+- [API Documentation](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/api.md): Page content
+- [Contents](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/contents.md): Page content
+
+---
+
+For more comprehensive documentation, see [llms-full.txt](https://java-driver.docs.scylladb.com/scylla-3.12.1.x/llms-full.txt)

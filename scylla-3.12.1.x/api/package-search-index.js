@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","url":"allpackages-index.html"},{"l":"com.datastax.driver.core"},{"l":"com.datastax.driver.core.exceptions"},{"l":"com.datastax.driver.core.policies"},{"l":"com.datastax.driver.core.querybuilder"},{"l":"com.datastax.driver.core.schemabuilder"},{"l":"com.datastax.driver.core.utils"}]
