@@ -28,6 +28,11 @@ Java Driver 4.x rather than between 3.x versions, see the
 [4.x migration guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/) instead.
 :::
 
+### 3.13.0
+
+The driver requires Java 8 to build and run. Nothing changes for the ScyllaDB fork, which has
+required Java 8 since 3.11.2.5; upstream raised its floor from Java 6 in this release.
+
 ### 3.11.5.19
 
 1.  `ColumnDefinitions` now reports a double-quoted name whose case matches no definition as absent,
