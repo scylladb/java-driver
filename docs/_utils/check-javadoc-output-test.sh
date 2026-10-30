@@ -33,7 +33,7 @@ ALL="scylla-4.17.0.x scylla-4.18.1.x scylla-4.19.0.x stable"
 # with a copy of the guard's own parser makes this case pass when that parser breaks.
 # RELEASE_LINES order, then BRANCHES order, then the smv_rename_latest_version alias. Changing
 # the published set is meant to land here too.
-REAL_ALL="scylla-4.19.2.x scylla-3.12.1.x scylla-4.18.1.x scylla-4.19.0.x scylla-3.11.5.x stable"
+REAL_ALL="scylla-4.19.4.x scylla-3.12.1.x scylla-4.18.1.x scylla-4.19.0.x scylla-4.19.2.x scylla-3.11.5.x stable"
 REAL_ALL="$(echo $REAL_ALL)"
 
 failures=0
@@ -190,8 +190,8 @@ real_full="$TMP/real-full"
 mkdir -p "$real_full"
 for version in $REAL_ALL; do make_version "$real_full" "$version" ok; done
 run_case "real conf.py, everything built" 0 "" "" "$real_full" "$REAL_CONF"
-assert_summary "real conf.py, everything built" "All 5 documented versions"
-assert_summary "real conf.py, everything built" "6 directories, including .stable."
+assert_summary "real conf.py, everything built" "All 6 documented versions"
+assert_summary "real conf.py, everything built" "7 directories, including .stable."
 
 # Run by hand, neither variable exists and the report goes to stdout.
 plain="$(build_tree plain ok ok ok ok)"

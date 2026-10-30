@@ -14,16 +14,17 @@ from redirects_cli import cli as redirects_cli
 # local alias tag of the same name (docs/_utils/alias-tags.py). BRANCHES build from their
 # branch.
 RELEASE_LINES = [
-    'scylla-4.19.2.x',
+    'scylla-4.19.4.x',
     'scylla-3.12.1.x'
 ]
 BRANCHES = [
     'scylla-4.18.1.x',
     'scylla-4.19.0.x',
+    'scylla-4.19.2.x',
     'scylla-3.11.5.x'
 ]
 # Set the latest version.
-LATEST_VERSION = 'scylla-4.19.2.x'
+LATEST_VERSION = 'scylla-4.19.4.x'
 # Set which versions are not released yet.
 UNSTABLE_VERSIONS = []
 # Set which versions are deprecated
