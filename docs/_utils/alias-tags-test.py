@@ -89,6 +89,26 @@ class AliasTagsTest(unittest.TestCase):
         self.run_script("delete", "RELEASE_LINES = ['4.19.2.1']")
         self.assertEqual("4.19.2.1", self.git("tag", "-l", "4.19.2.1"))
 
+    def test_a_newer_line_with_a_release_fails_before_aliasing(self):
+        self.git("tag", "4.20.0.0", self.second)
+        self.assertEqual(1, self.run_script("create", "RELEASE_LINES = ['scylla-4.19.2.x']"))
+        self.assertEqual("", self.aliases())
+
+    def test_a_registered_newer_line_passes(self):
+        self.git("tag", "4.20.0.0", self.second)
+        self.assertEqual(0, self.run_script("create", "RELEASE_LINES = ['scylla-4.20.0.x']"))
+
+    def test_newer_candidates_and_three_part_tags_are_not_releases(self):
+        self.git("tag", "4.20.0.0-rc1", self.second)
+        self.git("tag", "4.20.0", self.second)
+        self.assertEqual(0, self.run_script("create", "RELEASE_LINES = ['scylla-4.19.2.x']"))
+
+    def test_each_major_is_checked_on_its_own(self):
+        self.git("tag", "4.20.0.0", self.second)
+        self.git("tag", "3.12.1.0", self.second)
+        self.assertEqual(1, self.run_script("create", "RELEASE_LINES = ['scylla-4.20.0.x', 'scylla-3.11.5.x']"))
+        self.assertEqual(0, self.run_script("create", "RELEASE_LINES = ['scylla-4.20.0.x', 'scylla-3.12.1.x']"))
+
     def test_a_malformed_entry_fails(self):
         self.assertEqual(1, self.run_script("create", "RELEASE_LINES = ['stable']"))
 

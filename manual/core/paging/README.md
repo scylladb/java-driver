@@ -50,7 +50,7 @@ datastax-java-driver.basic.request.page-size = 5000
 
 It can be changed at runtime (the new value will be used for requests issued after the change). If
 you have categories of queries that require different page sizes, use
-[configuration profiles](../configuration#profiles).
+[configuration profiles](../configuration/#execution-profiles).
 
 Note that the page size is merely a hint; the server will not always return the exact number of
 rows, it might decide to return slightly more or less.

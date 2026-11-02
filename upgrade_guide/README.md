@@ -19,6 +19,15 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.3
+
+#### Ordering of points in DefaultPolygon
+
+This version includes an update to the ESRI dependency which appears to be more strict about following the OGC
+requirement that points of a polygon should be returned in counter-clockwise order.  It's possible that
+previous versions of the driver could have returned these points in a different order so if your application
+relies on the ordering of points in a polygon make sure to test this behaviour when upgrading.
+
 ### 4.19.2.3
 
 #### DSE runtime was removed; deprecated API shells remain
@@ -515,7 +524,7 @@ If you were building a native image for your application, please verify your nat
 configuration. Most of the extra configuration required until now is likely to not be necessary
 anymore.
 
-Refer to this [manual page](../manual/core/graalvm) for details.
+Refer to this [manual page](../manual/core/graalvm/) for details.
 
 #### Registration of multiple listeners and trackers
 
@@ -610,8 +619,8 @@ row or in the target statement, *leaving unmatched properties untouched*.
 This new, lenient behavior allows to achieve the equivalent of driver 3.x 
 [lenient mapping](https://docs.datastax.com/en/developer/java-driver/3.10/manual/object_mapper/using/#manual-mapping).
 
-Read the manual pages on [@GetEntity](../manual/mapper/daos/getentity) methods and
-[@SetEntity](../manual/mapper/daos/setentity) methods for more details and examples of lenient mode.
+Read the manual pages on [@GetEntity](../manual/mapper/daos/getentity/) methods and
+[@SetEntity](../manual/mapper/daos/setentity/) methods for more details and examples of lenient mode.
 
 ### 4.11.0
 

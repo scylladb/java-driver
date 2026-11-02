@@ -222,7 +222,7 @@ directly to the user. These include:
 
 ### Using multiple policies
 
-The retry policy can be overridden in [execution profiles](../configuration/#profiles):
+The retry policy can be overridden in [execution profiles](../configuration/#execution-profiles):
 
 ```
 datastax-java-driver {

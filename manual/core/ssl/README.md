@@ -238,7 +238,7 @@ CqlSession session = CqlSession.builder()
 
 Netty supports native integration with OpenSSL / boringssl. The driver does not provide this out of
 the box, but with a bit of custom development it is fairly easy to add. See
-[SslHandlerFactory](../../developer/netty_pipeline/#ssl-handler-factory) in the developer docs.
+[SslHandlerFactory](../../developer/netty_pipeline/#sslhandlerfactory) in the developer docs.
 
 
 [dsClientToNode]: https://docs.datastax.com/en/cassandra/3.0/cassandra/configuration/secureSSLClientToNode.html

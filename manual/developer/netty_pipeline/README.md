@@ -95,7 +95,7 @@ have full control over their network configuration.
 `HeartbeatHandler` is based on Netty's built-in `IdleStateHandler`, so there's not much in there
 apart from the details of the control request.
 
-### In-Flight Handler
+### InFlightHandler
 
 This handler is where most of the connection logic resides. It is responsible for:
 
@@ -121,7 +121,7 @@ with each other.
 
 In particular, a big difference from driver 3 is that stream ids are assigned within the event loop,
 instead of from client code before writing to the channel (see also [connection
-pooling](../request_execution/#connection_pooling)). `StreamIdGenerator` is not thread-safe.
+pooling](../request_execution/#connection-pooling)). `StreamIdGenerator` is not thread-safe.
 
 All communication between the handler and the outside world must be done through messages or channel
 events. There are 3 exceptions to this rule: `getAvailableIds`, `getInflight` and `getOrphanIds`,

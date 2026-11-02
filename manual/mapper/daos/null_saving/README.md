@@ -65,7 +65,7 @@ This applies to [@Insert](../insert/), [@Query](../query/), [@SetEntity](../sete
 
 ### DAO level
 
-Annotate your [DAO](../../daos/) interface with [@DefaultNullSavingStrategy]. Any method that does
+Annotate your [DAO](../) interface with [@DefaultNullSavingStrategy]. Any method that does
 not explicitly define its strategy inherits the DAO-level one:
 
 ```java

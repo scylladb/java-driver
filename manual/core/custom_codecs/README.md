@@ -246,7 +246,7 @@ be of type `int`.
 
     If you really want to use integer codes for storage efficiency, implement an explicit mapping
     (for example with a `toCode()` method on your enum type). It is then fairly straightforward to
-    implement a codec with [MappingCodec](#creating-custom-java-to-cql-mappings-with-mapping-codec),
+    implement a codec with [MappingCodec](#creating-custom-java-to-cql-mappings-with-mappingcodec),
     using `TypeCodecs#INT` as the "inner" codec.
 
 For example, assuming the following enum:

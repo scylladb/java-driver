@@ -117,14 +117,17 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
    *
    * <p>They will be appended in the iteration order of the provided map. If an ordering was already
    * defined for a given identifier, it will be removed and the new ordering will appear in its
-   * position in the provided map.
+   * position in the provided map. If the query currently orders by {@code ANN OF}, that ordering is
+   * replaced. An empty map leaves the query unchanged.
    */
   @NonNull
   Select orderByIds(@NonNull Map<CqlIdentifier, ClusteringOrder> orderings);
 
   /**
    * Shortcut for {@link #orderByIds(Map)} with the columns specified as case-insensitive names.
-   * They will be wrapped with {@link CqlIdentifier#fromCql(String)}.
+   * They will be wrapped with {@link CqlIdentifier#fromCql(String)}. As with {@link
+   * #orderByIds(Map)}, an {@code ANN OF} ordering is replaced, and an empty map leaves the query
+   * unchanged.
    *
    * <p>Note that it's possible for two different case-insensitive names to resolve to the same
    * identifier, for example "foo" and "Foo"; if this happens, a runtime exception will be thrown.
@@ -140,7 +143,8 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
    * Adds the provided ORDER BY clause to the query.
    *
    * <p>If an ordering was already defined for this identifier, it will be removed and the new
-   * clause will be appended at the end of the current list for this query.
+   * clause will be appended at the end of the current list for this query. If the query currently
+   * orders by {@code ANN OF}, that ordering is replaced.
    */
   @NonNull
   Select orderBy(@NonNull CqlIdentifier columnId, @NonNull ClusteringOrder order);
@@ -161,7 +165,10 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
   @NonNull
   Select orderByAnnOf(@NonNull String columnName, @NonNull CqlVector<?> ann);
 
-  /** Adds the ORDER BY ... ANN OF ... clause, usually used for vector search */
+  /**
+   * Adds the ORDER BY ... ANN OF ... clause, usually used for vector search. It replaces any
+   * ordering already defined for this query.
+   */
   @NonNull
   Select orderByAnnOf(@NonNull CqlIdentifier columnId, @NonNull CqlVector<?> ann);
   /**

@@ -1169,8 +1169,8 @@ public enum DefaultDriverOption implements DriverOption {
    * }
    * </pre>
    *
-   * Note: subnets must be represented as prefix blocks, see {@code
-   * inet.ipaddr.Address#isPrefixBlock()}.
+   * Note: subnets must be represented as prefix blocks, see <a
+   * href="https://seancfoley.github.io/IPAddress/ipaddress.html#parsing-addresses-with-prefix-length">inet.ipaddr.Address.isPrefixBlock()</a>
    *
    * <p>Value type: {@link java.util.Map Map}&#60;{@link String},{@link String}&#62;
    */
