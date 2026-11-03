@@ -75,6 +75,35 @@ public class ChannelPoolInitTest extends ChannelPoolTestBase {
   }
 
   @Test
+  public void should_sum_in_flight_across_all_shards() throws Exception {
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    final DriverChannel channel1 = newMockDriverChannel(1);
+    final DriverChannel channel2 = newMockDriverChannel(2);
+    final DriverChannel channel3 = newMockDriverChannel(3);
+    final MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).success(node, channel1).build();
+
+    final ChannelPool pool =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test")
+            .toCompletableFuture()
+            .get();
+    factoryHelper.waitForCalls(node, 1);
+
+    final ChannelSet shard0 = new ChannelSet();
+    shard0.add(channel1);
+    shard0.add(channel2);
+    final ChannelSet shard1 = new ChannelSet();
+    shard1.add(channel3);
+    pool.channels = new ChannelSet[] {shard0, shard1, new ChannelSet()};
+    when(channel1.getInFlight()).thenReturn(1);
+    when(channel2.getInFlight()).thenReturn(2);
+    when(channel3.getInFlight()).thenReturn(4);
+
+    assertThat(pool.getInFlight()).isEqualTo(7);
+  }
+
+  @Test
   public void should_initialize_when_all_channels_fail() throws Exception {
     when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(3);
 
