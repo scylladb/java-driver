@@ -237,7 +237,12 @@ public class ChannelPool implements AsyncAutoCloseable {
     if (!singleThreaded.initialized) {
       return 0;
     }
-    return Arrays.stream(channels).mapToInt(ChannelSet::getInFlight).sum();
+    // Called by load balancing policies for every query plan, so avoid the overhead of a stream
+    int inFlight = 0;
+    for (final ChannelSet channelSet : channels) {
+      inFlight += channelSet.getInFlight();
+    }
+    return inFlight;
   }
 
   /**
