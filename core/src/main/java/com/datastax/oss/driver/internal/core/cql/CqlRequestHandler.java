@@ -470,6 +470,7 @@ public class CqlRequestHandler implements Throttled {
     } else {
       boolean writeSubmitted = false;
       Throwable setupFailure = null;
+      NodeResponseCallback nodeResponseCallback = null;
       try {
         Statement finalStatement = statement;
         String nodeRequestId =
@@ -481,7 +482,7 @@ public class CqlRequestHandler implements Throttled {
                 .map((g) -> g.getDecoratedStatement(finalStatement, nodeRequestId))
                 .orElse(finalStatement);
 
-        NodeResponseCallback nodeResponseCallback =
+        nodeResponseCallback =
             new NodeResponseCallback(
                 statement,
                 node,
@@ -496,6 +497,11 @@ public class CqlRequestHandler implements Throttled {
             channel.write(
                 message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback);
         writeSubmitted = true;
+        inFlightCallbacks.add(nodeResponseCallback);
+        if (result.isDone()) {
+          nodeResponseCallback.cancel();
+          return;
+        }
         writeFuture.addListener(nodeResponseCallback);
       } catch (Throwable t) {
         setupFailure = t;
@@ -513,7 +519,21 @@ public class CqlRequestHandler implements Throttled {
         }
       }
       if (setupFailure != null) {
-        handleRequestSetupFailure(statement, setupFailure, currentExecutionIndex);
+        if (writeSubmitted) {
+          // Listener registration may have already advanced this execution. Terminate the whole
+          // request instead of counting this execution as finished a second time.
+          try {
+            setFinalError(statement, setupFailure, null, currentExecutionIndex);
+          } finally {
+            // Also cancel directly if adding this callback to inFlightCallbacks failed.
+            nodeResponseCallback.cancel();
+          }
+          if (setupFailure instanceof java.lang.Error) {
+            throw (java.lang.Error) setupFailure;
+          }
+        } else {
+          handleRequestSetupFailure(statement, setupFailure, currentExecutionIndex);
+        }
       }
     }
   }
@@ -526,8 +546,8 @@ public class CqlRequestHandler implements Throttled {
           handlerLogPrefix,
           error);
     } else if (activeExecutionsCount.decrementAndGet() == 0) {
-      // Synchronous setup or write-listener registration failed. Treat this as a session-level
-      // failure and cancel any submitted callback through normal terminal cleanup.
+      // Setup failed before channel.write() accepted a node request, so this is a session-level
+      // failure rather than a failed node attempt.
       setFinalError(statement, error, null, execution);
     } else {
       Loggers.warnWithException(
@@ -846,6 +866,7 @@ public class CqlRequestHandler implements Throttled {
     @Override
     public void operationComplete(Future<java.lang.Void> future) throws Exception {
       if (!future.isSuccess()) {
+        inFlightCallbacks.remove(this);
         Throwable error = future.cause();
         if (error instanceof EncoderException
             && error.getCause() instanceof FrameTooLongException) {
@@ -877,7 +898,6 @@ public class CqlRequestHandler implements Throttled {
           // don't know if cancelScheduledTasks() has run yet
           cancel();
         } else {
-          inFlightCallbacks.add(this);
           if (scheduleNextExecution
               && Conversions.resolveIdempotence(statement, executionProfile)) {
             int nextExecution = execution + 1;

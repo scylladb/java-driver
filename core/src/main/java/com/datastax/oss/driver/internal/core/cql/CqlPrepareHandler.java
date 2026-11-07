@@ -184,9 +184,6 @@ public class CqlPrepareHandler implements Throttled {
             setFinalError(
                 new DriverTimeoutException(
                     "Query timed out after " + timeoutDuration, diagnostics));
-            if (initialCallback != null) {
-              initialCallback.cancel();
-            }
           },
           timeoutDuration.toNanos(),
           TimeUnit.NANOSECONDS);
@@ -246,10 +243,25 @@ public class CqlPrepareHandler implements Throttled {
 
         Prepare message = toPrepareMessage(request);
 
+        initialCallback = initialPrepareCallback;
         Future<Void> writeFuture =
             channel.write(message, false, request.getCustomPayload(), initialPrepareCallback);
         writeSubmitted = true;
-        writeFuture.addListener(initialPrepareCallback);
+        if (result.isDone()) {
+          initialPrepareCallback.cancel();
+          return;
+        }
+        try {
+          writeFuture.addListener(initialPrepareCallback);
+        } catch (Throwable t) {
+          try {
+            setFinalError(t);
+          } finally {
+            // A listener can start a retry before throwing; cancel this original callback too.
+            initialPrepareCallback.cancel();
+          }
+          throw t;
+        }
       } finally {
         if (!writeSubmitted) {
           channel.cancelPreAcquireId();
@@ -378,6 +390,9 @@ public class CqlPrepareHandler implements Throttled {
   private void setFinalError(Throwable error) {
     if (result.completeExceptionally(error)) {
       cancelTimeout();
+      if (initialCallback != null) {
+        initialCallback.cancel();
+      }
       if (error instanceof DriverTimeoutException) {
         throttler.signalTimeout(this);
       } else if (!(error instanceof CancellationException)
@@ -431,7 +446,6 @@ public class CqlPrepareHandler implements Throttled {
           cancel();
         } else {
           LOG.trace("[{}] Request sent to {}", logPrefix, node);
-          initialCallback = this;
         }
       }
     }

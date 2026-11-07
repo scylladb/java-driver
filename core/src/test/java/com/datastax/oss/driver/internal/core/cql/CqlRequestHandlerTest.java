@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -65,6 +66,9 @@ import com.datastax.oss.protocol.internal.response.result.Prepared;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import io.netty.util.Timer;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.ImmediateEventExecutor;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
@@ -744,6 +748,62 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
       node1Behavior.verifyPreAcquireCancelled();
       assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
       verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_cancel_submitted_request_if_write_listener_registration_fails() {
+    for (boolean notified : new boolean[] {false, true}) {
+      for (boolean fatal : new boolean[] {false, true}) {
+        Throwable failure =
+            fatal
+                ? new AssertionError("listener failure")
+                : new IllegalStateException("listener failure");
+        RequestThrottler throttler = mock(RequestThrottler.class);
+        RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+        PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+        AtomicReference<ResponseCallback> callback = new AtomicReference<>();
+        Future<Void> writeFuture = mock(Future.class);
+        doAnswer(
+                invocation -> {
+                  if (notified) {
+                    GenericFutureListener<Future<Void>> listener = invocation.getArgument(0);
+                    listener.operationComplete(
+                        ImmediateEventExecutor.INSTANCE.newSucceededFuture(null));
+                  }
+                  throw failure;
+                })
+            .when(writeFuture)
+            .addListener(any());
+        when(node1Behavior.getChannel().write(any(), anyBoolean(), anyMap(), any()))
+            .thenAnswer(
+                invocation -> {
+                  callback.set(invocation.getArgument(3));
+                  return writeFuture;
+                });
+        try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+          when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+          CqlRequestHandler handler =
+              new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test");
+
+          if (fatal) {
+            assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+          } else {
+            handler.onThrottleReady(false);
+          }
+
+          assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+          verify(node1Behavior.getChannel(), atLeastOnce()).cancel(callback.get());
+          node1Behavior.verifyPreAcquireNotCancelled();
+          assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+          callback.get().onFailure(new IllegalStateException("late channel failure"));
+          verify(throttler).signalError(handler, failure);
+        }
+      }
     }
   }
 
