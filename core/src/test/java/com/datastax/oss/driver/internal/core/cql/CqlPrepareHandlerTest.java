@@ -25,7 +25,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,6 +43,8 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.OverloadedException;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
@@ -360,22 +364,53 @@ public class CqlPrepareHandlerTest {
   }
 
   @Test
+  public void should_rethrow_fatal_prepare_setup_failure_after_cleanup() {
+    AssertionError failure = new AssertionError("fatal prepare setup failure");
+    DefaultPrepareRequest prepareRequest = spy(new DefaultPrepareRequest("mock query"));
+    doThrow(failure).when(prepareRequest).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlPrepareHandler handler =
+          new CqlPrepareHandler(prepareRequest, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
   public void should_cancel_pre_acquired_id_if_initial_prepare_payload_access_fails() {
     RuntimeException failure = new RuntimeException("mock failure");
     DefaultPrepareRequest prepareRequest = spy(new DefaultPrepareRequest("mock query"));
     doThrow(failure).when(prepareRequest).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
     RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
     PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
 
     try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
-      assertThatThrownBy(
-              () ->
-                  new CqlPrepareHandler(
-                      prepareRequest, harness.getSession(), harness.getContext(), "test"))
-          .isSameAs(failure);
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlPrepareHandler handler =
+          new CqlPrepareHandler(prepareRequest, harness.getSession(), harness.getContext(), "test");
 
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
+      verify(throttler).signalError(handler, failure);
     }
   }
 
