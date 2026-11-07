@@ -20,6 +20,7 @@ package com.datastax.oss.driver.internal.core.cql;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static com.datastax.oss.driver.internal.core.cql.CqlRequestHandlerTestBase.defaultFrameOf;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -359,6 +360,29 @@ public class CqlPrepareHandlerTest {
       verify(node3Behavior.channel)
           .write(any(Prepare.class), anyBoolean(), eq(payload), any(ResponseCallback.class));
       assertThatStage(prepareFuture).isSuccess(CqlPrepareHandlerTest::assertMatchesSimplePrepared);
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_prepare_setup_failure_after_cleanup() {
+    AssertionError failure = new AssertionError("fatal prepare setup failure");
+    DefaultPrepareRequest prepareRequest = spy(new DefaultPrepareRequest("mock query"));
+    doThrow(failure).when(prepareRequest).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlPrepareHandler handler =
+          new CqlPrepareHandler(prepareRequest, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
     }
   }
 

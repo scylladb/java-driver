@@ -166,6 +166,9 @@ public class CqlPrepareHandler implements Throttled {
       // request can't interrupt queue draining. Complete through the normal terminal path to
       // release this request's permit before returning to the throttler.
       setFinalError(t);
+      if (t instanceof java.lang.Error) {
+        throw (java.lang.Error) t;
+      }
     }
   }
 

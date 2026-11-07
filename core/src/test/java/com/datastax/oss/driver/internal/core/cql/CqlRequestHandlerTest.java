@@ -26,11 +26,13 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
@@ -50,6 +52,7 @@ import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
+import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.protocol.internal.request.Prepare;
 import com.datastax.oss.protocol.internal.response.error.Unprepared;
@@ -536,6 +539,118 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
       verify(throttler, never()).signalTimeout(handler);
       verify(throttler, never()).signalSuccess(handler);
       assertThat(timeout.isCancelled()).isTrue();
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_query_plan_failure_after_cleanup() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal query plan failure");
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(harness.getContext().getLoadBalancingPolicyWrapper().newQueryPlan(any(), any(), any()))
+          .thenThrow(failure);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_request_setup_failure_after_cleanup() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal request setup failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_log_throttler_exception_when_admitting_completed_request() {
+    should_log_throttler_failure_when_admitting_completed_request(
+        new IllegalStateException("throttler failure"));
+  }
+
+  @Test
+  public void should_log_throttler_error_when_admitting_completed_request() {
+    should_log_throttler_failure_when_admitting_completed_request(
+        new AssertionError("fatal throttler failure"));
+  }
+
+  private void should_log_throttler_failure_when_admitting_completed_request(Throwable failure) {
+    for (Throwable outcome :
+        new Throwable[] {
+          null,
+          new CancellationException("cancelled"),
+          new DriverTimeoutException("timed out"),
+          new IllegalStateException("request failure")
+        }) {
+      RequestThrottler throttler = mock(RequestThrottler.class);
+      doThrow(failure).when(throttler).signalSuccess(any());
+      doThrow(failure).when(throttler).signalCancel(any());
+      doThrow(failure).when(throttler).signalTimeout(any());
+      doThrow(failure).when(throttler).signalError(any(), any());
+      LoggerTest.LoggerSetup logger =
+          LoggerTest.setupTestLogger(CqlRequestHandler.class, Level.WARN);
+      try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+        when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+        CqlRequestHandler handler =
+            new CqlRequestHandler(
+                UNDEFINED_IDEMPOTENCE_STATEMENT,
+                harness.getSession(),
+                harness.getContext(),
+                "test");
+        // Run admission before the handler's original cancellation listener.
+        handler.result.whenComplete((ignored, error) -> handler.onThrottleReady(true));
+
+        if (outcome == null) {
+          assertThat(handler.result.complete(null)).isTrue();
+        } else {
+          assertThat(handler.result.completeExceptionally(outcome)).isTrue();
+        }
+
+        handler.onThrottleReady(true);
+        verify(logger.appender).doAppend(logger.loggingEventCaptor.capture());
+        assertThat(logger.loggingEventCaptor.getValue().getLevel()).isEqualTo(Level.WARN);
+        assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+            .contains(
+                "Uncaught exception", failure.getClass().getSimpleName(), failure.getMessage());
+        if (outcome == null) {
+          verify(throttler).signalSuccess(handler);
+        } else if (outcome instanceof CancellationException) {
+          verify(throttler).signalCancel(handler);
+        } else if (outcome instanceof DriverTimeoutException) {
+          verify(throttler).signalTimeout(handler);
+        } else {
+          verify(throttler).signalError(handler, outcome);
+        }
+      } finally {
+        logger.close();
+      }
     }
   }
 

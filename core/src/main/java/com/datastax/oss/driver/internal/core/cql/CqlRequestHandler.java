@@ -264,9 +264,12 @@ public class CqlRequestHandler implements Throttled {
       sendRequest(initialStatement, null, queryPlan, 0, 0, true);
     } catch (Throwable t) {
       // Throttlers invoke this callback synchronously after admitting the request. Contain setup
-      // failures so the normal terminal path releases the permit and scheduled work, and so a
-      // delayed request can't throw through the completion path of the request that admitted it.
+      // failures so the normal terminal path releases the permit and scheduled work. Ordinary
+      // exceptions must not interrupt the unrelated request whose completion admitted this one.
       setFinalError(initialStatement, t, null, -1);
+      if (t instanceof java.lang.Error) {
+        throw (java.lang.Error) t;
+      }
     }
   }
 
@@ -520,9 +523,7 @@ public class CqlRequestHandler implements Throttled {
           "[{}] Request setup failed after the request had completed",
           handlerLogPrefix,
           error);
-      return;
-    }
-    if (activeExecutionsCount.decrementAndGet() == 0) {
+    } else if (activeExecutionsCount.decrementAndGet() == 0) {
       // Setup failed before channel.write() accepted a node request, so this is a session-level
       // failure rather than a failed node attempt.
       setFinalError(statement, error, null, execution);
@@ -532,6 +533,9 @@ public class CqlRequestHandler implements Throttled {
           "[{}] Request setup failed, another execution is still active",
           handlerLogPrefix,
           error);
+    }
+    if (error instanceof java.lang.Error) {
+      throw (java.lang.Error) error;
     }
   }
 
@@ -750,7 +754,14 @@ public class CqlRequestHandler implements Throttled {
   private void releaseThrottlerForCompletedResult() {
     // Read the outcome from the result itself: completion callbacks may not have run yet, and
     // a competing error may have lost the race against cancellation or a successful response.
-    result.whenComplete((ignored, error) -> releaseThrottler(error));
+    result.whenComplete(
+        (ignored, error) -> {
+          try {
+            releaseThrottler(error);
+          } catch (Throwable t) {
+            Loggers.warnWithException(LOG, "[{}] Uncaught exception", handlerLogPrefix, t);
+          }
+        });
   }
 
   private void releaseThrottler(@Nullable Throwable error) {
