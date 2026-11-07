@@ -23,10 +23,12 @@
  */
 package com.datastax.oss.driver.internal.core.session;
 
+import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.AsyncAutoCloseable;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.ProtocolVersion;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.loadbalancing.LoadBalancingPolicy;
@@ -99,6 +101,18 @@ public class DefaultSession implements CqlSession {
     return new DefaultSession(context, contactPoints).init(keyspace);
   }
 
+  /**
+   * Returns {@link SessionClosedException} for an empty plan during shutdown
+   * (scylladb/java-driver#846); otherwise delegates to {@link AllNodesFailedException#fromErrors}.
+   */
+  @NonNull
+  public Throwable queryPlanExhaustedError(@Nullable List<Map.Entry<Node, Throwable>> errors) {
+    if ((errors == null || errors.isEmpty()) && (isClosing() || isClosed())) {
+      return new SessionClosedException();
+    }
+    return AllNodesFailedException.fromErrors(errors);
+  }
+
   private final InternalDriverContext context;
   private final EventExecutor adminExecutor;
   private final String logPrefix;
@@ -107,6 +121,10 @@ public class DefaultSession implements CqlSession {
   private final RequestProcessorRegistry processorRegistry;
   private final PoolManager poolManager;
   private final SessionMetricUpdater metricUpdater;
+
+  // Flipped before scheduling close on adminExecutor so handlers see shutdown before closeFuture
+  // completes.
+  private volatile boolean closing;
 
   private DefaultSession(InternalDriverContext context, Set<EndPoint> contactPoints) {
     int instanceCount = INSTANCE_COUNT.incrementAndGet();
@@ -236,8 +254,8 @@ public class DefaultSession implements CqlSession {
       @NonNull RequestT request, @NonNull GenericType<ResultT> resultType) {
     RequestProcessor<RequestT, ResultT> processor =
         processorRegistry.processorFor(request, resultType);
-    return isClosed()
-        ? processor.newFailure(new IllegalStateException("Session is closed"))
+    return (isClosed() || isClosing())
+        ? processor.newFailure(new SessionClosedException())
         : processor.process(request, this, context, logPrefix);
   }
 
@@ -296,13 +314,20 @@ public class DefaultSession implements CqlSession {
   @NonNull
   @Override
   public CompletionStage<Void> closeAsync() {
+    closing = true;
     return closeSafely(singleThreaded::close);
   }
 
   @NonNull
   @Override
   public CompletionStage<Void> forceCloseAsync() {
+    closing = true;
     return closeSafely(singleThreaded::forceClose);
+  }
+
+  /** Whether close has been initiated; flips before {@link #isClosed()} does. */
+  public boolean isClosing() {
+    return closing;
   }
 
   private CompletionStage<Void> closeSafely(Runnable action) {

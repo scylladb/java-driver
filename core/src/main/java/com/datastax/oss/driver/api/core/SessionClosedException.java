@@ -1,0 +1,47 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.datastax.oss.driver.api.core;
+
+import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
+import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
+import net.jcip.annotations.ThreadSafe;
+
+/** Thrown when an operation cannot be completed because its session is closing or closed. */
+@ThreadSafe
+public class SessionClosedException extends DriverException {
+
+  public SessionClosedException() {
+    this("Session is closed", null);
+  }
+
+  public SessionClosedException(@NonNull String message) {
+    this(message, null);
+  }
+
+  private SessionClosedException(
+      @NonNull String message, @Nullable ExecutionInfo executionInfo) {
+    super(message, executionInfo, null, true);
+  }
+
+  @NonNull
+  @Override
+  public DriverException copy() {
+    return new SessionClosedException(getMessage(), getExecutionInfo());
+  }
+}

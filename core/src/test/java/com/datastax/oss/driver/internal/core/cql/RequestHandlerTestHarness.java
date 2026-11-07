@@ -172,6 +172,7 @@ public class RequestHandlerTestHarness implements AutoCloseable {
               return pools.get(node).next();
             });
     when(session.getRepreparePayloads()).thenReturn(new ConcurrentHashMap<>());
+    when(session.queryPlanExhaustedError(any())).thenCallRealMethod();
 
     when(session.setKeyspace(any(CqlIdentifier.class)))
         .thenReturn(CompletableFuture.completedFuture(null));

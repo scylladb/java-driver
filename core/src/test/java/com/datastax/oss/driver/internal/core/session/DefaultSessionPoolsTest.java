@@ -29,12 +29,16 @@ import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.addresstranslation.AddressTranslator;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.ReconnectionPolicy;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.loadbalancing.NodeDistance;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
 import com.datastax.oss.driver.api.core.metadata.Node;
@@ -42,9 +46,11 @@ import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.metadata.NodeStateListener;
 import com.datastax.oss.driver.api.core.metadata.schema.SchemaChangeListener;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
+import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
+import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
@@ -739,6 +745,9 @@ public class DefaultSessionPoolsTest {
             .success(node3, KEYSPACE, NodeDistance.LOCAL, pool3)
             .build();
 
+    // execute() delegates to this registry; the fake processor avoids needing a server or network.
+    when(context.getRequestProcessorRegistry())
+        .thenReturn(new RequestProcessorRegistry("test", new AsyncStatementProcessor()));
     CompletionStage<CqlSession> initFuture = newSession();
 
     factoryHelper.waitForCall(node1, KEYSPACE, NodeDistance.LOCAL);
@@ -747,8 +756,37 @@ public class DefaultSessionPoolsTest {
     assertThatStage(initFuture).isSuccess();
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
+    // While open, execute() reaches the fake processor, which returns a completed result.
+    assertThatStage(
+            ((DefaultSession) session)
+                .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC))
+        .isSuccess(result -> assertThat(result).isNotNull());
+
+    // Keep shutdown in progress so execute() is tested while the session is closing.
+    CompletableFuture<Void> pool1CloseFuture = new CompletableFuture<>();
+    when(pool1.closeAsync()).thenReturn(pool1CloseFuture);
+
+    assertThat(((DefaultSession) session).isClosing()).isFalse();
     CompletionStage<Void> closeFuture = session.closeAsync();
+    assertThat(((DefaultSession) session).isClosing()).isTrue();
+    assertThatStage(closeFuture).isNotDone();
+
+    // While closing, DefaultSession rejects execute() before it reaches the fake processor.
+    CompletionStage<AsyncResultSet> executeFuture =
+        ((DefaultSession) session)
+            .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC);
+    assertThatStage(executeFuture)
+        .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
+
+    pool1CloseFuture.complete(null);
     assertThatStage(closeFuture).isSuccess();
+
+    // After close completes, DefaultSession rejects execute() before it reaches the fake processor.
+    CompletionStage<AsyncResultSet> executeAfterCloseFuture =
+        ((DefaultSession) session)
+            .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC);
+    assertThatStage(executeAfterCloseFuture)
+        .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
 
     verify(pool1, VERIFY_TIMEOUT).closeAsync();
     verify(pool2, VERIFY_TIMEOUT).closeAsync();
@@ -775,7 +813,9 @@ public class DefaultSessionPoolsTest {
     assertThatStage(initFuture).isSuccess();
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
+    assertThat(((DefaultSession) session).isClosing()).isFalse();
     CompletionStage<Void> closeFuture = session.forceCloseAsync();
+    assertThat(((DefaultSession) session).isClosing()).isTrue();
     assertThatStage(closeFuture).isSuccess();
 
     verify(pool1, VERIFY_TIMEOUT).forceCloseAsync();
@@ -960,5 +1000,28 @@ public class DefaultSessionPoolsTest {
     when(node.getDistance()).thenReturn(NodeDistance.LOCAL);
     when(node.toString()).thenReturn("node" + i);
     return node;
+  }
+
+  private static class AsyncStatementProcessor
+      implements RequestProcessor<Statement, CompletionStage<AsyncResultSet>> {
+
+    @Override
+    public boolean canProcess(Request request, GenericType<?> resultType) {
+      return request instanceof Statement && Statement.ASYNC.equals(resultType);
+    }
+
+    @Override
+    public CompletionStage<AsyncResultSet> process(
+        Statement request,
+        DefaultSession session,
+        InternalDriverContext context,
+        String sessionLogPrefix) {
+      return CompletableFuture.completedFuture(mock(AsyncResultSet.class));
+    }
+
+    @Override
+    public CompletionStage<AsyncResultSet> newFailure(RuntimeException error) {
+      return CompletableFuture.failedFuture(error);
+    }
   }
 }

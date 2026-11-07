@@ -28,6 +28,21 @@ requirement that points of a polygon should be returned in counter-clockwise ord
 previous versions of the driver could have returned these points in a different order so if your application
 relies on the ordering of points in a polygon make sure to test this behaviour when upgrading.
 
+### 4.19.2.4
+
+#### Session shutdown failures use `SessionClosedException`
+
+Requests submitted after session shutdown begins, or whose query plans are exhausted during
+shutdown, now fail with `SessionClosedException`. This replaces `IllegalStateException` for
+requests rejected by `execute()` and `NoNodeAvailableException` when an empty query plan is caused
+by shutdown. Catch `SessionClosedException` to identify these cases. Other failures, including
+`AllNodesFailedException` when node errors were recorded, are unchanged.
+
+After `execute()` accepts a request, a stopped timer used to produce `IllegalStateException` in the
+request execution and prepared-statement handlers. Those paths now report
+`SessionClosedException` as well. Callers that previously relied on the old timer failure must
+handle this new exception type when shutdown races with request handling.
+
 ### 4.19.2.3
 
 #### DSE runtime was removed; deprecated API shells remain
