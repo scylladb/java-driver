@@ -499,6 +499,47 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
+  public void should_signal_cancellation_when_admitted_before_cancellation_callback_runs() {
+    should_signal_cancellation_when_admitted_during_completion(false);
+  }
+
+  @Test
+  public void should_signal_cancellation_when_timeout_loses_completion_race() {
+    should_signal_cancellation_when_admitted_during_completion(true);
+  }
+
+  private void should_signal_cancellation_when_admitted_during_completion(boolean fireTimeout) {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+      CapturedTimeout timeout = harness.nextScheduledTimeout();
+      // CompletableFuture runs this newer dependent before the handler's cancellation callback.
+      handler.result.whenComplete(
+          (ignored, error) -> {
+            if (fireTimeout) {
+              try {
+                timeout.task().run(timeout);
+              } catch (Exception e) {
+                throw new AssertionError(e);
+              }
+            }
+            handler.onThrottleReady(true);
+          });
+
+      assertThat(handler.result.cancel(false)).isTrue();
+
+      verify(throttler).signalCancel(handler);
+      verify(throttler, never()).signalError(eq(handler), any());
+      verify(throttler, never()).signalTimeout(handler);
+      verify(throttler, never()).signalSuccess(handler);
+      assertThat(timeout.isCancelled()).isTrue();
+    }
+  }
+
+  @Test
   public void should_release_cancelled_request_only_once() {
     RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
     RequestThrottler throttler = mock(RequestThrottler.class);

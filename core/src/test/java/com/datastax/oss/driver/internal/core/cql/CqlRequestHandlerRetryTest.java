@@ -99,6 +99,11 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
               .handle();
 
       assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(setupFailure));
+      verify(nodeMetricUpdater1).incrementCounter(DefaultNodeMetric.ABORTED_REQUESTS, "default");
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(DefaultNodeMetric.RETRIES), anyString());
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(DefaultNodeMetric.RETRIES_ON_ABORTED), anyString());
       verify(verdict).getRetryDecision();
       verify(requestTracker, times(1))
           .onNodeError(

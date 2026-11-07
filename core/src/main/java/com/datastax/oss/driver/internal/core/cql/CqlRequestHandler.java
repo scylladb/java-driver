@@ -113,7 +113,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,7 +155,6 @@ public class CqlRequestHandler implements Throttled {
   private volatile boolean admitted;
   private final AtomicBoolean registrationComplete = new AtomicBoolean();
   private final AtomicBoolean throttlerReleased = new AtomicBoolean();
-  private final AtomicReference<Throwable> terminalError = new AtomicReference<>();
 
   // The errors on the nodes that were already tried (lazily initialized on the first error).
   // We don't use a map because nodes can appear multiple times.
@@ -192,7 +190,6 @@ public class CqlRequestHandler implements Throttled {
         t -> {
           try {
             if (t instanceof CancellationException) {
-              terminalError.compareAndSet(null, t);
               cancelScheduledTasks();
               releaseThrottler(t);
             }
@@ -231,7 +228,7 @@ public class CqlRequestHandler implements Throttled {
       // request. Once registration returns, finish any release that had to be deferred until the
       // throttler was known to own the request.
       if (result.isDone()) {
-        releaseThrottler(terminalError.get());
+        releaseThrottlerForCompletedResult();
       }
     }
   }
@@ -240,7 +237,7 @@ public class CqlRequestHandler implements Throttled {
   public void onThrottleReady(boolean wasDelayed) {
     admitted = true;
     if (result.isDone()) {
-      releaseThrottler(terminalError.get());
+      releaseThrottlerForCompletedResult();
       return;
     }
     try {
@@ -717,7 +714,6 @@ public class CqlRequestHandler implements Throttled {
 
   private void setFinalError(
       Statement<?> statement, Throwable error, Node node, int execution, boolean releaseThrottler) {
-    terminalError.compareAndSet(null, error);
     if (error instanceof DriverException) {
       ((DriverException) error)
           .setExecutionInfo(
@@ -751,6 +747,12 @@ public class CqlRequestHandler implements Throttled {
     }
   }
 
+  private void releaseThrottlerForCompletedResult() {
+    // Read the outcome from the result itself: completion callbacks may not have run yet, and
+    // a competing error may have lost the race against cancellation or a successful response.
+    result.whenComplete((ignored, error) -> releaseThrottler(error));
+  }
+
   private void releaseThrottler(@Nullable Throwable error) {
     if (!admitted && !registrationComplete.get()) {
       // A timeout can race with register(), but signaling before registration has completed can
@@ -768,9 +770,10 @@ public class CqlRequestHandler implements Throttled {
       // Before admission this removes a queued request. If admission raced with this call, the
       // throttler treats it as completion of the transferred permit.
       throttler.signalCancel(this);
+    } else if (error == null) {
+      throttler.signalSuccess(this);
     } else {
-      throttler.signalError(
-          this, error == null ? new IllegalStateException("Request failed") : error);
+      throttler.signalError(this, error);
     }
   }
 
@@ -1131,9 +1134,13 @@ public class CqlRequestHandler implements Throttled {
         }
         RetryDecision decision = getRetryDecisionOrHandleFailure(verdict, error);
         if (decision != null) {
+          boolean processed = processRetryVerdict(verdict, decision, error);
           updateErrorMetrics(
-              metricUpdater, decision, errorMetric, retriesOnErrorMetric, ignoresOnErrorMetric);
-          processRetryVerdict(verdict, decision, error);
+              metricUpdater,
+              processed ? decision : RetryDecision.RETHROW,
+              errorMetric,
+              retriesOnErrorMetric,
+              ignoresOnErrorMetric);
         }
       }
     }
@@ -1159,7 +1166,7 @@ public class CqlRequestHandler implements Throttled {
       handleRequestSetupFailure(statement, setupFailure, execution);
     }
 
-    private void processRetryVerdict(
+    private boolean processRetryVerdict(
         RetryVerdict verdict, RetryDecision decision, Throwable error) {
       LOG.trace("[{}] Processing retry decision {}", logPrefix, decision);
       Statement<?> retryStatement = null;
@@ -1168,7 +1175,7 @@ public class CqlRequestHandler implements Throttled {
           retryStatement = verdict.getRetryRequest(statement);
         } catch (Throwable t) {
           handleRetrySetupFailure(error, t);
-          return;
+          return false;
         }
       }
       switch (decision) {
@@ -1190,6 +1197,7 @@ public class CqlRequestHandler implements Throttled {
           setFinalResult(Void.INSTANCE, null, true, this);
           break;
       }
+      return true;
     }
 
     private void updateErrorMetrics(
@@ -1242,10 +1250,10 @@ public class CqlRequestHandler implements Throttled {
       if (decision == null) {
         return;
       }
-      processRetryVerdict(verdict, decision, error);
+      boolean processed = processRetryVerdict(verdict, decision, error);
       updateErrorMetrics(
           ((DefaultNode) node).getMetricUpdater(),
-          decision,
+          processed ? decision : RetryDecision.RETHROW,
           DefaultNodeMetric.ABORTED_REQUESTS,
           DefaultNodeMetric.RETRIES_ON_ABORTED,
           DefaultNodeMetric.IGNORES_ON_ABORTED);

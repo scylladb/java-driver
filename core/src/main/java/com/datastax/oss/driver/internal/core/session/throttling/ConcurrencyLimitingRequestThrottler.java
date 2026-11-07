@@ -104,7 +104,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
       int newConcurrent = concurrentRequests.incrementAndGet();
       if (newConcurrent <= maxConcurrentRequests) {
         LOG.trace("[{}] Starting newly registered request", logPrefix);
-        notifyReady(request, false);
+        invokeReady(request, false);
         return;
       } else {
         // We exceeded the limit, decrement the count and fall through to the queuing logic
@@ -199,10 +199,27 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
     ReadyCallbackState state = new ReadyCallbackState(this, previous);
     READY_CALLBACKS.set(state);
     try {
-      invokeReady(request, wasDelayed);
-      ReadyCallback callback;
-      while ((callback = state.poll()) != null) {
-        invokeReady(callback.request, callback.wasDelayed);
+      Error fatalError = null;
+      while (true) {
+        try {
+          invokeReady(request, wasDelayed);
+        } catch (Error error) {
+          // Finish already-admitted callbacks before propagating fatal failures to the caller.
+          if (fatalError == null) {
+            fatalError = error;
+          } else if (fatalError != error) {
+            fatalError.addSuppressed(error);
+          }
+        }
+        ReadyCallback callback = state.poll();
+        if (callback == null) {
+          break;
+        }
+        request = callback.request;
+        wasDelayed = callback.wasDelayed;
+      }
+      if (fatalError != null) {
+        throw fatalError;
       }
     } finally {
       if (previous == null) {
@@ -216,7 +233,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
   private void invokeReady(Throttled request, boolean wasDelayed) {
     try {
       request.onThrottleReady(wasDelayed);
-    } catch (Throwable t) {
+    } catch (Exception t) {
       // A callback can synchronously complete its request and enqueue more ready callbacks before
       // throwing. Keep draining those already-admitted requests, and don't propagate a request's
       // failure through the unrelated request whose completion triggered the drain.

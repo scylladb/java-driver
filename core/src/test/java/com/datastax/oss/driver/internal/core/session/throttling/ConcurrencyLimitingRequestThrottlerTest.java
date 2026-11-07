@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.session.throttling;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
@@ -222,7 +223,7 @@ public class ConcurrencyLimitingRequestThrottlerTest {
             maximumDepth.accumulateAndGet(currentDepth, Math::max);
             try {
               completed.incrementAndGet();
-              throttler.register(nestedOnFirst);
+              throttler.signalSuccess(this);
             } finally {
               depth.decrementAndGet();
             }
@@ -239,7 +240,7 @@ public class ConcurrencyLimitingRequestThrottlerTest {
             maximumDepth.accumulateAndGet(currentDepth, Math::max);
             try {
               completed.incrementAndGet();
-              other.register(onOther);
+              other.signalSuccess(this);
             } finally {
               depth.decrementAndGet();
             }
@@ -249,7 +250,18 @@ public class ConcurrencyLimitingRequestThrottlerTest {
           public void onThrottleFailure(RequestThrottlingException error) {}
         };
 
+    MockThrottled active = new MockThrottled();
+    throttler.register(active);
+    MockThrottled otherActive = new MockThrottled();
+    other.register(otherActive);
+    for (int i = 0; i < 4; i++) {
+      throttler.register(new MockThrottled());
+      other.register(new MockThrottled());
+    }
     throttler.register(onFirst);
+    throttler.register(nestedOnFirst);
+    other.register(onOther);
+    throttler.signalSuccess(active);
 
     assertThat(completed).hasValue(3);
     assertThat(maximumDepth).hasValue(2);
@@ -257,20 +269,31 @@ public class ConcurrencyLimitingRequestThrottlerTest {
 
   @Test
   public void should_keep_draining_ready_callbacks_after_one_throws() {
+    should_keep_draining_ready_callbacks_after_one_throws(new RuntimeException("mock failure"));
+  }
+
+  @Test
+  public void should_propagate_fatal_error_after_draining_ready_callbacks() {
+    should_keep_draining_ready_callbacks_after_one_throws(new AssertionError("mock fatal error"));
+  }
+
+  private void should_keep_draining_ready_callbacks_after_one_throws(Throwable failure) {
     MockThrottled active = new MockThrottled();
     throttler.register(active);
     for (int i = 0; i < 4; i++) {
       throttler.register(new MockThrottled());
     }
 
-    RuntimeException failure = new RuntimeException("mock failure");
     AtomicInteger completed = new AtomicInteger();
     throttler.register(
         new Throttled() {
           @Override
           public void onThrottleReady(boolean wasDelayed) {
             throttler.signalError(this, failure);
-            throw failure;
+            if (failure instanceof Error) {
+              throw (Error) failure;
+            }
+            throw (RuntimeException) failure;
           }
 
           @Override
@@ -287,11 +310,42 @@ public class ConcurrencyLimitingRequestThrottlerTest {
           public void onThrottleFailure(RequestThrottlingException error) {}
         });
 
-    throttler.signalSuccess(active);
+    if (failure instanceof Error) {
+      assertThatThrownBy(() -> throttler.signalSuccess(active)).isSameAs(failure);
+    } else {
+      throttler.signalSuccess(active);
+    }
 
     assertThat(completed).hasValue(1);
     assertThat(throttler.getQueue()).isEmpty();
     assertThat(throttler.getConcurrentRequests()).isEqualTo(5);
+  }
+
+  @Test
+  public void should_start_reentrant_registration_before_register_returns() {
+    MockThrottled active = new MockThrottled();
+    throttler.register(active);
+    for (int i = 0; i < 4; i++) {
+      throttler.register(new MockThrottled());
+    }
+    AtomicInteger completed = new AtomicInteger();
+    throttler.register(
+        new Throttled() {
+          @Override
+          public void onThrottleReady(boolean wasDelayed) {
+            // Free capacity while this dequeue callback is still being drained.
+            throttler.signalSuccess(this);
+            MockThrottled nested = new MockThrottled();
+            throttler.register(nested);
+            assertThatStage(nested.ended).isSuccess(delayed -> assertThat(delayed).isFalse());
+            completed.incrementAndGet();
+          }
+
+          @Override
+          public void onThrottleFailure(RequestThrottlingException error) {}
+        });
+    throttler.signalSuccess(active);
+    assertThat(completed).hasValue(1);
   }
 
   private void should_dequeue_when_active_completes(Consumer<Throttled> completeCallback) {
