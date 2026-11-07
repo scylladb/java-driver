@@ -142,8 +142,11 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
     } catch (Throwable t) {
       cancelExternalReservation();
       if (admitted) {
-        setFinalError(t);
-        cancelSubmittedRequest();
+        try {
+          setFinalError(t);
+        } finally {
+          cancelSubmittedRequest();
+        }
       } else {
         // Registration failed before admission, so there is no throttler permit to release.
         super.setFinalError(t);
@@ -168,8 +171,11 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
       super.start();
     } catch (Throwable t) {
       cancelExternalReservation();
-      setFinalError(t);
-      cancelSubmittedRequest();
+      try {
+        setFinalError(t);
+      } finally {
+        cancelSubmittedRequest();
+      }
       if (t instanceof java.lang.Error) {
         throw (java.lang.Error) t;
       }

@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -44,8 +45,11 @@ import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.request.Query;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoop;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.ScheduledFuture;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -178,6 +182,75 @@ public class ThrottledAdminRequestHandlerTest {
 
     verify(channel, atLeastOnce()).cancel(handler);
     verify(channel.eventLoop(), never()).schedule(any(Runnable.class), anyLong(), any());
+  }
+
+  @Test
+  public void should_cancel_submitted_write_when_registration_cleanup_throws() {
+    verifySubmittedRequestCleanup(true, Duration.ZERO);
+  }
+
+  @Test
+  public void should_cancel_submitted_write_and_timeout_when_registration_cleanup_throws() {
+    verifySubmittedRequestCleanup(true, Duration.ofSeconds(1));
+  }
+
+  @Test
+  public void should_cancel_submitted_write_when_admission_cleanup_throws() {
+    verifySubmittedRequestCleanup(false, Duration.ZERO);
+  }
+
+  @Test
+  public void should_cancel_submitted_write_and_timeout_when_admission_cleanup_throws() {
+    verifySubmittedRequestCleanup(false, Duration.ofSeconds(1));
+  }
+
+  private void verifySubmittedRequestCleanup(boolean registrationFailure, Duration timeout) {
+    RuntimeException failure = new RuntimeException("mock setup failure");
+    AssertionError fatal = new AssertionError("fatal next callback failure");
+    ThrottledAdminRequestHandler<AdminResult> handler = newHandler(timeout);
+    ScheduledFuture<?> timeoutFuture = mock(ScheduledFuture.class);
+    EventLoop eventLoop = channel.eventLoop();
+    doReturn(timeoutFuture)
+        .when(eventLoop)
+        .schedule(any(Runnable.class), anyLong(), any(TimeUnit.class));
+    Future<Void> successfulWrite = ImmediateEventExecutor.INSTANCE.newSucceededFuture(null);
+    if (registrationFailure) {
+      when(channel.write(any(), anyBoolean(), anyMap(), eq(handler))).thenReturn(successfulWrite);
+    } else {
+      Future<Void> writeFuture = mock(Future.class);
+      doAnswer(
+              invocation -> {
+                GenericFutureListener<Future<Void>> listener = invocation.getArgument(0);
+                listener.operationComplete(successfulWrite);
+                throw failure;
+              })
+          .when(writeFuture)
+          .addListener(any());
+      when(channel.write(any(), anyBoolean(), anyMap(), eq(handler))).thenReturn(writeFuture);
+    }
+    doAnswer(
+            invocation -> {
+              handler.onThrottleReady(false);
+              if (registrationFailure) {
+                throw failure;
+              }
+              return null;
+            })
+        .when(throttler)
+        .register(handler);
+    doThrow(fatal).when(throttler).signalError(handler, failure);
+
+    assertThatThrownBy(handler::start).isSameAs(fatal);
+
+    assertThatStage(handler.result).isFailed(error -> assertThat(error).isSameAs(failure));
+    verify(channel, atLeastOnce()).cancel(handler);
+    verify(channel, never()).cancelPreAcquireId();
+    verify(throttler).signalError(handler, failure);
+    if (timeout.isZero()) {
+      verify(channel.eventLoop(), never()).schedule(any(Runnable.class), anyLong(), any());
+    } else {
+      verify(timeoutFuture, atLeastOnce()).cancel(true);
+    }
   }
 
   @Test
