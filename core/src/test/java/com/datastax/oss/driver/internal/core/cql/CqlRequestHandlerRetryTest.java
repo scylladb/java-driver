@@ -65,6 +65,7 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -184,6 +185,46 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
               isNull(),
               anyString());
       verifyNoMoreInteractions(requestTracker);
+    }
+  }
+
+  @Test
+  @UseDataProvider("serverErrorAndInvalidVerdict")
+  public void should_count_server_error_when_retry_decision_cannot_be_read(
+      FailureScenario failureScenario, String failureMode) {
+    RuntimeException setupFailure = new RuntimeException("mock decision failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    if (failureMode.equals("throw")) {
+      when(verdict.getRetryDecision()).thenThrow(setupFailure);
+    }
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    failureScenario.mockRequestError(harnessBuilder, node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      failureScenario.mockRetryPolicyVerdict(
+          harness.getContext().getRetryPolicy(anyString()),
+          failureMode.equals("null-verdict") ? null : verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result)
+          .isFailed(
+              error -> {
+                if (failureMode.equals("throw")) {
+                  assertThat(error).isSameAs(setupFailure);
+                } else {
+                  assertThat(error).isInstanceOf(NullPointerException.class);
+                }
+              });
+      verify(nodeMetricUpdater1).incrementCounter(failureScenario.errorMetric, "default");
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(DefaultNodeMetric.RETRIES), anyString());
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(failureScenario.retryMetric), anyString());
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(failureScenario.ignoreMetric), anyString());
     }
   }
 
@@ -712,6 +753,19 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
                 .thenReturn(verdict);
           }
         });
+  }
+
+  @DataProvider
+  public static Object[][] serverErrorAndInvalidVerdict() {
+    Object[][] serverErrors =
+        Arrays.stream(failure())
+            .filter(
+                scenario ->
+                    ((FailureScenario) scenario[0]).errorMetric
+                        != DefaultNodeMetric.ABORTED_REQUESTS)
+            .toArray(Object[][]::new);
+    return TestDataProviders.combine(
+        serverErrors, TestDataProviders.fromList("throw", "null-decision", "null-verdict"));
   }
 
   @DataProvider

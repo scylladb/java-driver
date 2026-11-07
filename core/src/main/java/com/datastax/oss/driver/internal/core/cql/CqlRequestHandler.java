@@ -1141,6 +1141,9 @@ public class CqlRequestHandler implements Throttled {
               errorMetric,
               retriesOnErrorMetric,
               ignoresOnErrorMetric);
+        } else {
+          // The response still counts as a node error when its retry decision cannot be read.
+          metricUpdater.incrementCounter(errorMetric, executionProfile.getName());
         }
       }
     }
