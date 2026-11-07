@@ -352,16 +352,11 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
           .when(throttler)
           .register(any());
 
-      assertThatThrownBy(
-              () ->
-                  new CqlRequestHandler(
-                      UNDEFINED_IDEMPOTENCE_STATEMENT,
-                      harness.getSession(),
-                      harness.getContext(),
-                      "test"))
-          .isSameAs(failure);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
 
-      CqlRequestHandler handler = admittedHandler.get();
+      assertThat(handler).isSameAs(admittedHandler.get());
       assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
       assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
       node1Behavior.verifyWrite();
@@ -385,20 +380,67 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
     try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
       when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
 
-      assertThatThrownBy(
-              () ->
-                  new CqlRequestHandler(
-                      UNDEFINED_IDEMPOTENCE_STATEMENT,
-                      harness.getSession(),
-                      harness.getContext(),
-                      "test"))
-          .isSameAs(failure);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
 
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
       assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
       verify(throttler, never()).signalSuccess(any());
       verify(throttler, never()).signalError(any(), any());
       verify(throttler, never()).signalTimeout(any());
       verify(throttler, never()).signalCancel(any());
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_registration_failure_after_cleanup() {
+    for (boolean admitted : new boolean[] {false, true}) {
+      RequestThrottler throttler = mock(RequestThrottler.class);
+      AssertionError failure = new AssertionError("fatal registration failure");
+      AtomicReference<CqlRequestHandler> registeredHandler = new AtomicReference<>();
+      RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+      PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+      try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+        when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+        doAnswer(
+                invocation -> {
+                  CqlRequestHandler handler = invocation.getArgument(0);
+                  registeredHandler.set(handler);
+                  if (admitted) {
+                    handler.onThrottleReady(false);
+                    node1Behavior.setWriteSuccess();
+                  }
+                  throw failure;
+                })
+            .when(throttler)
+            .register(any());
+
+        assertThatThrownBy(
+                () ->
+                    new CqlRequestHandler(
+                        UNDEFINED_IDEMPOTENCE_STATEMENT,
+                        harness.getSession(),
+                        harness.getContext(),
+                        "test"))
+            .isSameAs(failure);
+
+        CqlRequestHandler handler = registeredHandler.get();
+        assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+        assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+        if (admitted) {
+          node1Behavior.verifyWrite();
+          node1Behavior.verifyCancellation();
+          verify(throttler).signalError(handler, failure);
+        } else {
+          node1Behavior.verifyNoWrite();
+          verify(throttler, never()).signalError(any(), any());
+        }
+        verify(throttler, never()).signalSuccess(any());
+        verify(throttler, never()).signalTimeout(any());
+        verify(throttler, never()).signalCancel(any());
+      }
     }
   }
 

@@ -222,7 +222,9 @@ public class CqlRequestHandler implements Throttled {
           // Registration failed before admission, so there is no throttler permit to release.
           setFinalErrorWithoutThrottlerRelease(initialStatement, t, null, -1);
         }
-        throw t;
+        if (t instanceof java.lang.Error) {
+          throw (java.lang.Error) t;
+        }
       }
       // The timeout can fire while register() is still deciding whether to admit or enqueue the
       // request. Once registration returns, finish any release that had to be deferred until the
