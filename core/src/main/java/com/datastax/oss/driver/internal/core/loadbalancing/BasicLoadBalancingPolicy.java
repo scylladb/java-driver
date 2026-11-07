@@ -56,6 +56,7 @@ import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.collection.CompositeQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.LazyQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.RotatedQueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.base.Predicates;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
@@ -364,8 +365,9 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     int replicaCount = 0; // in currentNodes
 
     if (!allReplicas.isEmpty()) {
-      // Move replicas to the beginning
-      for (int i = 0; i < currentNodes.length; i++) {
+      // Move replicas to the beginning, stopping once all of them have been found
+      int allReplicasCount = allReplicas.size();
+      for (int i = 0; i < currentNodes.length && replicaCount < allReplicasCount; i++) {
         Node node = (Node) currentNodes[i];
         if (allReplicas.contains(node)) {
           ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
@@ -381,13 +383,11 @@ public class BasicLoadBalancingPolicy implements LoadBalancingPolicy {
     LOG.trace("[{}] Prioritizing {} local replicas", logPrefix, replicaCount);
 
     // Round-robin the remaining nodes
-    ArrayUtils.rotate(
-        currentNodes,
-        replicaCount,
-        currentNodes.length - replicaCount,
-        roundRobinAmount.getAndUpdate(INCREMENT));
-
-    QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
+    QueryPlan plan =
+        currentNodes.length == 0
+            ? QueryPlan.EMPTY
+            : new RotatedQueryPlan(
+                currentNodes, replicaCount, roundRobinAmount.getAndUpdate(INCREMENT));
     return maybeAddDcFailover(request, plan);
   }
 

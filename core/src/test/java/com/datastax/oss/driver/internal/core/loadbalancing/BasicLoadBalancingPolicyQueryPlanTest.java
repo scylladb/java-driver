@@ -41,6 +41,7 @@ import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.metadata.Metadata;
+import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.session.Request;
@@ -50,7 +51,10 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.Before;
@@ -266,6 +270,20 @@ public class BasicLoadBalancingPolicyQueryPlanTest extends LoadBalancingPolicyTe
     verify(policy, times(3)).shuffleHead(any(), eq(2));
     // No power of two choices with only two replicas
     verify(session, never()).getPools();
+  }
+
+  @Test
+  public void should_stop_looking_for_replicas_once_all_are_found() {
+    List<Node> replicas = spy(new ArrayList<>(Arrays.asList(node1, node2)));
+    when(request.getRoutingKeyspace()).thenReturn(KEYSPACE);
+    when(request.getRoutingKey()).thenReturn(ROUTING_KEY);
+    when(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY)).thenReturn(replicas);
+
+    assertThat(policy.newQueryPlan(request, session)).startsWith(node1, node2, node3);
+
+    verify(replicas).contains(node1);
+    verify(replicas).contains(node2);
+    verify(replicas, never()).contains(node3);
   }
 
   protected BasicLoadBalancingPolicy createAndInitPolicy() {
