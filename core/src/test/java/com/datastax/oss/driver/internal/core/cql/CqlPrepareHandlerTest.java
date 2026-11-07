@@ -387,6 +387,32 @@ public class CqlPrepareHandlerTest {
   }
 
   @Test
+  public void should_preserve_fatal_prepare_failure_when_permit_release_also_fails() {
+    AssertionError failure = new AssertionError("fatal prepare setup failure");
+    AssertionError cleanupFailure = new AssertionError("fatal next callback failure");
+    DefaultPrepareRequest prepareRequest = spy(new DefaultPrepareRequest("mock query"));
+    doThrow(failure).when(prepareRequest).getCustomPayload();
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    doThrow(cleanupFailure).when(throttler).signalError(any(), eq(failure));
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlPrepareHandler handler =
+          new CqlPrepareHandler(prepareRequest, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(failure.getSuppressed()).containsExactly(cleanupFailure);
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
   public void should_cancel_pre_acquired_id_if_initial_prepare_payload_access_fails() {
     RuntimeException failure = new RuntimeException("mock failure");
     DefaultPrepareRequest prepareRequest = spy(new DefaultPrepareRequest("mock query"));

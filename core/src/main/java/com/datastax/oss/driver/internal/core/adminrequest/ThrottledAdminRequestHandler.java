@@ -211,7 +211,17 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
       if (error instanceof DriverTimeoutException) {
         throttler.signalTimeout(this);
       } else if (admitted) {
-        throttler.signalError(this, error);
+        try {
+          throttler.signalError(this, error);
+        } catch (Throwable cleanupFailure) {
+          if (error instanceof java.lang.Error) {
+            if (cleanupFailure != error) {
+              error.addSuppressed(cleanupFailure);
+            }
+            throw (java.lang.Error) error;
+          }
+          throw cleanupFailure;
+        }
       }
     }
     return wasSet;

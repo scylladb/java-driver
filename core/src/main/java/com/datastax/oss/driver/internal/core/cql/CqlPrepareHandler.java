@@ -382,7 +382,17 @@ public class CqlPrepareHandler implements Throttled {
         throttler.signalTimeout(this);
       } else if (!(error instanceof CancellationException)
           && (admitted || !(error instanceof RequestThrottlingException))) {
-        throttler.signalError(this, error);
+        try {
+          throttler.signalError(this, error);
+        } catch (Throwable cleanupFailure) {
+          if (error instanceof java.lang.Error) {
+            if (cleanupFailure != error) {
+              error.addSuppressed(cleanupFailure);
+            }
+            throw (java.lang.Error) error;
+          }
+          throw cleanupFailure;
+        }
       }
     }
   }

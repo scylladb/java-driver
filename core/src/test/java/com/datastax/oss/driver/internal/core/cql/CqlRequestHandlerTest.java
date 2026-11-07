@@ -703,6 +703,51 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
+  public void should_preserve_fatal_setup_failure_when_permit_release_also_fails() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal request setup failure");
+    AssertionError cleanupFailure = new AssertionError("fatal next callback failure");
+    AtomicReference<CqlRequestHandler> registeredHandler = new AtomicReference<>();
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+    doThrow(cleanupFailure).when(throttler).signalError(any(), eq(failure));
+    doAnswer(
+            invocation -> {
+              CqlRequestHandler handler = invocation.getArgument(0);
+              registeredHandler.set(handler);
+              handler.onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+
+      assertThatThrownBy(
+              () ->
+                  new CqlRequestHandler(
+                      UNDEFINED_IDEMPOTENCE_STATEMENT,
+                      harness.getSession(),
+                      harness.getContext(),
+                      "test"))
+          .isSameAs(failure);
+
+      CqlRequestHandler handler = registeredHandler.get();
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(failure.getSuppressed()).containsExactly(cleanupFailure);
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
   public void should_log_throttler_exception_when_admitting_completed_request() {
     should_log_throttler_failure_when_admitting_completed_request(
         new IllegalStateException("throttler failure"));

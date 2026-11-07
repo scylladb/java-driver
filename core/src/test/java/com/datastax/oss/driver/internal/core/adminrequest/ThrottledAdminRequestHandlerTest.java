@@ -205,7 +205,25 @@ public class ThrottledAdminRequestHandlerTest {
   }
 
   private void verifySubmittedRequestCleanup(boolean registrationFailure, Duration timeout) {
-    RuntimeException failure = new RuntimeException("mock setup failure");
+    verifySubmittedRequestCleanup(registrationFailure, timeout, false);
+  }
+
+  @Test
+  public void should_preserve_fatal_registration_failure_when_permit_release_also_fails() {
+    verifySubmittedRequestCleanup(true, Duration.ofSeconds(1), true);
+  }
+
+  @Test
+  public void should_preserve_fatal_admission_failure_when_permit_release_also_fails() {
+    verifySubmittedRequestCleanup(false, Duration.ofSeconds(1), true);
+  }
+
+  private void verifySubmittedRequestCleanup(
+      boolean registrationFailure, Duration timeout, boolean fatalOriginal) {
+    Throwable failure =
+        fatalOriginal
+            ? new AssertionError("fatal setup failure")
+            : new RuntimeException("mock setup failure");
     AssertionError fatal = new AssertionError("fatal next callback failure");
     ThrottledAdminRequestHandler<AdminResult> handler = newHandler(timeout);
     ScheduledFuture<?> timeoutFuture = mock(ScheduledFuture.class);
@@ -240,9 +258,12 @@ public class ThrottledAdminRequestHandlerTest {
         .register(handler);
     doThrow(fatal).when(throttler).signalError(handler, failure);
 
-    assertThatThrownBy(handler::start).isSameAs(fatal);
+    assertThatThrownBy(handler::start).isSameAs(fatalOriginal ? failure : fatal);
 
     assertThatStage(handler.result).isFailed(error -> assertThat(error).isSameAs(failure));
+    if (fatalOriginal) {
+      assertThat(failure.getSuppressed()).containsExactly(fatal);
+    }
     verify(channel, atLeastOnce()).cancel(handler);
     verify(channel, never()).cancelPreAcquireId();
     verify(throttler).signalError(handler, failure);

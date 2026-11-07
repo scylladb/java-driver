@@ -526,8 +526,8 @@ public class CqlRequestHandler implements Throttled {
           handlerLogPrefix,
           error);
     } else if (activeExecutionsCount.decrementAndGet() == 0) {
-      // Setup failed before channel.write() accepted a node request, so this is a session-level
-      // failure rather than a failed node attempt.
+      // Synchronous setup or write-listener registration failed. Treat this as a session-level
+      // failure and cancel any submitted callback through normal terminal cleanup.
       setFinalError(statement, error, null, execution);
     } else {
       Loggers.warnWithException(
@@ -786,7 +786,18 @@ public class CqlRequestHandler implements Throttled {
     } else if (error == null) {
       throttler.signalSuccess(this);
     } else {
-      throttler.signalError(this, error);
+      try {
+        throttler.signalError(this, error);
+      } catch (Throwable cleanupFailure) {
+        // Returning the permit can admit another request with its own fatal setup failure.
+        if (error instanceof java.lang.Error) {
+          if (cleanupFailure != error) {
+            error.addSuppressed(cleanupFailure);
+          }
+          throw (java.lang.Error) error;
+        }
+        throw cleanupFailure;
+      }
     }
   }
 
