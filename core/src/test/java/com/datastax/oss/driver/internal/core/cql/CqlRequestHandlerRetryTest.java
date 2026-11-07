@@ -190,12 +190,18 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
 
   @Test
   @UseDataProvider("serverErrorAndInvalidVerdict")
-  public void should_count_server_error_when_retry_decision_cannot_be_read(
+  public void should_count_server_error_when_retry_verdict_setup_fails(
       FailureScenario failureScenario, String failureMode) {
-    RuntimeException setupFailure = new RuntimeException("mock decision failure");
+    Throwable setupFailure =
+        failureMode.startsWith("fatal")
+            ? new AssertionError("fatal retry setup failure")
+            : new RuntimeException("mock decision failure");
     RetryVerdict verdict = mock(RetryVerdict.class);
-    if (failureMode.equals("throw")) {
+    if (failureMode.equals("throw") || failureMode.equals("fatal-decision")) {
       when(verdict.getRetryDecision()).thenThrow(setupFailure);
+    } else if (failureMode.equals("fatal-request")) {
+      when(verdict.getRetryDecision()).thenReturn(RetryDecision.RETRY_NEXT);
+      when(verdict.getRetryRequest(any(Statement.class))).thenThrow(setupFailure);
     }
     RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
     failureScenario.mockRequestError(harnessBuilder, node1);
@@ -212,7 +218,7 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
       assertThatStage(result)
           .isFailed(
               error -> {
-                if (failureMode.equals("throw")) {
+                if (failureMode.equals("throw") || failureMode.startsWith("fatal")) {
                   assertThat(error).isSameAs(setupFailure);
                 } else {
                   assertThat(error).isInstanceOf(NullPointerException.class);
@@ -765,7 +771,9 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
                         != DefaultNodeMetric.ABORTED_REQUESTS)
             .toArray(Object[][]::new);
     return TestDataProviders.combine(
-        serverErrors, TestDataProviders.fromList("throw", "null-decision", "null-verdict"));
+        serverErrors,
+        TestDataProviders.fromList(
+            "throw", "null-decision", "null-verdict", "fatal-decision", "fatal-request"));
   }
 
   @DataProvider

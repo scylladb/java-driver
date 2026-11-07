@@ -1143,18 +1143,16 @@ public class CqlRequestHandler implements Throttled {
           retriesOnErrorMetric = DefaultNodeMetric.RETRIES_ON_OTHER_ERROR;
           ignoresOnErrorMetric = DefaultNodeMetric.IGNORES_ON_OTHER_ERROR;
         }
+        // Count the received response before retry setup can fail or propagate a fatal error.
+        metricUpdater.incrementCounter(errorMetric, executionProfile.getName());
         RetryDecision decision = getRetryDecisionOrHandleFailure(verdict, error);
         if (decision != null) {
           boolean processed = processRetryVerdict(verdict, decision, error);
-          updateErrorMetrics(
+          updateRetryMetrics(
               metricUpdater,
               processed ? decision : RetryDecision.RETHROW,
-              errorMetric,
               retriesOnErrorMetric,
               ignoresOnErrorMetric);
-        } else {
-          // The response still counts as a node error when its retry decision cannot be read.
-          metricUpdater.incrementCounter(errorMetric, executionProfile.getName());
         }
       }
     }
@@ -1221,6 +1219,14 @@ public class CqlRequestHandler implements Throttled {
         DefaultNodeMetric retriesOnError,
         DefaultNodeMetric ignoresOnError) {
       metricUpdater.incrementCounter(error, executionProfile.getName());
+      updateRetryMetrics(metricUpdater, decision, retriesOnError, ignoresOnError);
+    }
+
+    private void updateRetryMetrics(
+        @NonNull NodeMetricUpdater metricUpdater,
+        @NonNull RetryDecision decision,
+        @NonNull DefaultNodeMetric retriesOnError,
+        @NonNull DefaultNodeMetric ignoresOnError) {
       switch (decision) {
         case RETRY_SAME:
         case RETRY_NEXT:
