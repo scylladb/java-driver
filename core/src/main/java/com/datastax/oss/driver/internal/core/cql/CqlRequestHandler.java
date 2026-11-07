@@ -1167,7 +1167,13 @@ public class CqlRequestHandler implements Throttled {
         }
         return decision;
       } catch (Throwable setupFailure) {
-        handleRetrySetupFailure(requestError, setupFailure);
+        if (setupFailure instanceof java.lang.Error) {
+          // When handling a response, onResponse's catch owns the fatal notification.
+          recordError(node, requestError);
+          handleRequestSetupFailure(statement, setupFailure, execution);
+        } else {
+          handleRetrySetupFailure(requestError, setupFailure);
+        }
         return null;
       }
     }

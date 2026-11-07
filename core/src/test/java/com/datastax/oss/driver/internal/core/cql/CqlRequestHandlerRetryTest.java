@@ -189,6 +189,57 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
+  @UseDataProvider("failure")
+  public void should_preserve_tracker_notifications_for_fatal_retry_decision(
+      FailureScenario failureScenario) {
+    AssertionError failure = new AssertionError("fatal retry decision failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    when(verdict.getRetryDecision()).thenThrow(failure);
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    failureScenario.mockRequestError(harnessBuilder, node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      RequestTracker tracker = mock(RequestTracker.class);
+      when(harness.getContext().getRequestTracker()).thenReturn(tracker);
+      failureScenario.mockRetryPolicyVerdict(
+          harness.getContext().getRetryPolicy(anyString()), verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(failure));
+      // The response error boundary reports fatal decision failures once. Transport-abort
+      // callbacks have no such boundary and retain their pre-existing notification behavior.
+      int expectedNotifications =
+          failureScenario.errorMetric == DefaultNodeMetric.ABORTED_REQUESTS ? 0 : 1;
+      verify(tracker, times(expectedNotifications))
+          .onNodeError(
+              any(), any(), anyLong(), any(DriverExecutionProfile.class), any(), anyString());
+      if (expectedNotifications == 1) {
+        verify(tracker)
+            .onNodeError(
+                eq(IDEMPOTENT_STATEMENT),
+                eq(failure),
+                anyLong(),
+                any(DriverExecutionProfile.class),
+                eq(node1),
+                anyString());
+      }
+      verify(tracker)
+          .onError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(failure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              isNull(),
+              anyString());
+      verifyNoMoreInteractions(tracker);
+    }
+  }
+
+  @Test
   @UseDataProvider("serverErrorAndInvalidVerdict")
   public void should_count_server_error_when_retry_verdict_setup_fails(
       FailureScenario failureScenario, String failureMode) {
