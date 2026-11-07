@@ -10,6 +10,7 @@ import com.datastax.oss.driver.shaded.guava.common.annotations.Beta;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -162,6 +163,8 @@ public class DefaultTabletMap implements TabletMap {
     private final long lastToken;
     @NonNull private final ImmutableList<Node> replicaNodes;
     @NonNull private final Map<Node, Integer> replicaShards;
+    @Nullable private final Long tabletVersion;
+    @Nullable private final Node leader;
 
     @VisibleForTesting
     DefaultTablet(
@@ -169,6 +172,18 @@ public class DefaultTabletMap implements TabletMap {
         long lastToken,
         @NonNull List<Node> replicaNodes,
         @NonNull Map<Node, Integer> replicaShards) {
+      this(firstToken, lastToken, replicaNodes, replicaShards, null, null);
+    }
+
+    private DefaultTablet(
+        long firstToken,
+        long lastToken,
+        @NonNull List<Node> replicaNodes,
+        @NonNull Map<Node, Integer> replicaShards,
+        @Nullable Long tabletVersion,
+        @Nullable Node leader) {
+      this.tabletVersion = tabletVersion;
+      this.leader = leader;
       this.firstToken = firstToken;
       this.lastToken = lastToken;
       this.replicaNodes = ImmutableList.copyOf(replicaNodes);
@@ -184,6 +199,15 @@ public class DefaultTabletMap implements TabletMap {
      */
     public static DefaultTablet parseTabletPayloadV1(TupleValue tupleValue, Map<UUID, Node> nodes) {
 
+      return parseTabletPayload(tupleValue, nodes, false);
+    }
+
+    public static DefaultTablet parseTabletPayloadV2(TupleValue tupleValue, Map<UUID, Node> nodes) {
+      return parseTabletPayload(tupleValue, nodes, true);
+    }
+
+    private static DefaultTablet parseTabletPayload(
+        TupleValue tupleValue, Map<UUID, Node> nodes, boolean version2) {
       long firstToken = tupleValue.getLong(0);
       long lastToken = tupleValue.getLong(1);
 
@@ -202,7 +226,11 @@ public class DefaultTabletMap implements TabletMap {
         }
       }
 
-      return new DefaultTablet(firstToken, lastToken, replicaNodes, replicaShards);
+      // An unknown first replica must not turn the next known replica into the leader.
+      Node leader = version2 && !list.isEmpty() ? nodes.get(list.get(0).getUuid(0)) : null;
+      Long tabletVersion = version2 && !tupleValue.isNull(3) ? tupleValue.getLong(3) : null;
+      return new DefaultTablet(
+          firstToken, lastToken, replicaNodes, replicaShards, tabletVersion, leader);
     }
 
     /**
@@ -255,6 +283,18 @@ public class DefaultTabletMap implements TabletMap {
     }
 
     @Override
+    @Nullable
+    public Long getTabletVersion() {
+      return tabletVersion;
+    }
+
+    @Override
+    @Nullable
+    public Node getLeader() {
+      return leader;
+    }
+
+    @Override
     public String toString() {
       return "DefaultTablet{"
           + "firstToken="
@@ -276,12 +316,15 @@ public class DefaultTabletMap implements TabletMap {
       return firstToken == that.firstToken
           && lastToken == that.lastToken
           && replicaNodes.equals(that.replicaNodes)
-          && replicaShards.equals(that.replicaShards);
+          && replicaShards.equals(that.replicaShards)
+          && Objects.equals(tabletVersion, that.tabletVersion)
+          && Objects.equals(leader, that.leader);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(firstToken, lastToken, replicaNodes, replicaShards);
+      return Objects.hash(
+          firstToken, lastToken, replicaNodes, replicaShards, tabletVersion, leader);
     }
 
     @Override

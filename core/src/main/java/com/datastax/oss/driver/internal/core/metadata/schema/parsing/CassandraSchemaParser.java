@@ -81,6 +81,10 @@ public class CassandraSchemaParser implements SchemaParser {
           && !scyllaRow.isNull("initial_tablets")) {
         keyspace.setUsingTablets(true);
       }
+      if (scyllaRow != null && scyllaRow.contains("consistency")) {
+        keyspace.setGloballyConsistent(
+            "global".equalsIgnoreCase(scyllaRow.getString("consistency")));
+      }
       keyspacesBuilder.put(keyspace.getName(), keyspace);
     }
     for (AdminRow row : rows.virtualKeyspaces()) {

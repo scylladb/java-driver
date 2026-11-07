@@ -71,7 +71,9 @@ import com.datastax.oss.driver.internal.core.metadata.token.TokenLong64;
 import com.datastax.oss.driver.internal.core.metrics.NodeMetricUpdater;
 import com.datastax.oss.driver.internal.core.metrics.SessionMetricUpdater;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
+import com.datastax.oss.driver.internal.core.protocol.ProtocolFeatureStore;
 import com.datastax.oss.driver.internal.core.protocol.TabletInfo;
+import com.datastax.oss.driver.internal.core.protocol.TabletRouting;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.tracker.NoopRequestTracker;
@@ -431,7 +433,14 @@ public class CqlRequestHandler implements Throttled {
                 retryCount,
                 scheduleNextExecution,
                 logPrefixJoiner.join(this.sessionName, nodeRequestId, currentExecutionIndex));
-        Message message = Conversions.toMessage(statement, executionProfile, context);
+        Message message =
+            Conversions.toMessage(
+                statement,
+                executionProfile,
+                context,
+                TabletRouting.versionBlock(
+                    TabletRouting.getTablet(
+                        statement, keyspace, context.getMetadataManager().getMetadata())));
         Future<java.lang.Void> writeFuture =
             channel.write(
                 message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback);
@@ -802,6 +811,20 @@ public class CqlRequestHandler implements Throttled {
         return;
       }
       try {
+        // Feedback can accompany an error that triggers a retry, not only a successful result.
+        ProtocolFeatureStore features = channel.getSupportedFeatures();
+        if (features != null
+            && features.getProtocolFeatures().isScyllaTabletsRoutingV2()
+            && responseFrame.customPayload.containsKey(
+                TabletInfo.TABLETS_ROUTING_V2_CUSTOM_PAYLOAD_KEY)) {
+          CqlIdentifier routingKeyspace = TabletRouting.getKeyspace(statement, keyspace);
+          CqlIdentifier routingTable = statement.getRoutingTable();
+          if (routingKeyspace != null && routingTable != null) {
+            context
+                .getMetadataManager()
+                .addTabletFromPayload(routingKeyspace, routingTable, responseFrame.customPayload);
+          }
+        }
         Message responseMessage = responseFrame.message;
         if (responseMessage instanceof SchemaChange) {
           SchemaChange schemaChange = (SchemaChange) responseMessage;

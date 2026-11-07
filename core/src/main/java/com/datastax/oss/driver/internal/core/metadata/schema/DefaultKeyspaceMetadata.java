@@ -46,6 +46,7 @@ public class DefaultKeyspaceMetadata implements KeyspaceMetadata, Serializable {
   @NonNull private final Map<FunctionSignature, FunctionMetadata> functions;
   @NonNull private final Map<FunctionSignature, AggregateMetadata> aggregates;
   private boolean usingTablets = false;
+  private boolean globallyConsistent = false;
 
   public DefaultKeyspaceMetadata(
       @NonNull CqlIdentifier name,
@@ -131,6 +132,16 @@ public class DefaultKeyspaceMetadata implements KeyspaceMetadata, Serializable {
   }
 
   @Override
+  public boolean isGloballyConsistent() {
+    return globallyConsistent;
+  }
+
+  @Override
+  public void setGloballyConsistent(boolean globallyConsistent) {
+    this.globallyConsistent = globallyConsistent;
+  }
+
+  @Override
   public boolean equals(Object other) {
     if (other == this) {
       return true;
@@ -139,6 +150,8 @@ public class DefaultKeyspaceMetadata implements KeyspaceMetadata, Serializable {
       return Objects.equals(this.name, that.getName())
           && this.durableWrites == that.isDurableWrites()
           && this.virtual == that.isVirtual()
+          && this.usingTablets == that.isUsingTablets()
+          && this.globallyConsistent == that.isGloballyConsistent()
           && Objects.equals(this.replication, that.getReplication())
           && Objects.equals(this.types, that.getUserDefinedTypes())
           && Objects.equals(this.tables, that.getTables())
@@ -153,7 +166,17 @@ public class DefaultKeyspaceMetadata implements KeyspaceMetadata, Serializable {
   @Override
   public int hashCode() {
     return Objects.hash(
-        name, durableWrites, virtual, replication, types, tables, views, functions, aggregates);
+        name,
+        durableWrites,
+        virtual,
+        usingTablets,
+        globallyConsistent,
+        replication,
+        types,
+        tables,
+        views,
+        functions,
+        aggregates);
   }
 
   @Override

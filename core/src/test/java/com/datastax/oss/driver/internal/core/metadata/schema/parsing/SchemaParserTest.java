@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.internal.core.metadata.schema.parsing;
 
 import static com.datastax.oss.driver.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
@@ -25,6 +26,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.FunctionSignature;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
+import com.datastax.oss.driver.internal.core.adminrequest.AdminRow;
 import com.datastax.oss.driver.internal.core.metadata.MetadataRefresh;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.CassandraSchemaRows;
 import com.datastax.oss.driver.internal.core.metadata.schema.queries.SchemaRows;
@@ -99,6 +101,32 @@ public class SchemaParserTest extends SchemaParserTestBase {
         .hasSize(1)
         .containsKey(
             new FunctionSignature(CqlIdentifier.fromInternal("sum_and_to_string"), DataTypes.INT));
+  }
+
+  @Test
+  public void should_parse_global_consistency_and_invalidate_schema_identity() {
+    AdminRow scyllaRow = mock(AdminRow.class);
+    when(scyllaRow.getString("keyspace_name")).thenReturn("ks");
+    when(scyllaRow.contains("consistency")).thenReturn(true);
+    when(scyllaRow.getString("consistency")).thenReturn("GLOBAL");
+    SchemaRefresh global =
+        (SchemaRefresh)
+            parse(
+                rows ->
+                    rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks")))
+                        .withScyllaKeyspaces(ImmutableList.of(scyllaRow)));
+    KeyspaceMetadata globalKeyspace = global.newKeyspaces.get(KEYSPACE_ID);
+    assertThat(globalKeyspace.isGloballyConsistent()).isTrue();
+    when(scyllaRow.getString("consistency")).thenReturn(null);
+    SchemaRefresh eventual =
+        (SchemaRefresh)
+            parse(
+                rows ->
+                    rows.withKeyspaces(ImmutableList.of(mockModernKeyspaceRow("ks")))
+                        .withScyllaKeyspaces(ImmutableList.of(scyllaRow)));
+    KeyspaceMetadata eventualKeyspace = eventual.newKeyspaces.get(KEYSPACE_ID);
+    assertThat(eventualKeyspace.isGloballyConsistent()).isFalse();
+    assertThat(eventualKeyspace).isNotEqualTo(globalKeyspace);
   }
 
   // Common assertions, the keyspace has the same info in all of our single keyspace examples

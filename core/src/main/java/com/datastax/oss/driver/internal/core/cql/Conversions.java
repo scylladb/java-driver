@@ -77,6 +77,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.data.ValuesHelper;
 import com.datastax.oss.driver.internal.core.metadata.PartitionerFactory;
 import com.datastax.oss.driver.internal.core.protocol.LwtInfo;
+import com.datastax.oss.driver.internal.core.protocol.TabletRouting;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.primitives.Ints;
@@ -131,6 +132,14 @@ public class Conversions {
 
   public static Message toMessage(
       Statement<?> statement, DriverExecutionProfile config, InternalDriverContext context) {
+    return toMessage(statement, config, context, TabletRouting.versionBlock(null));
+  }
+
+  public static Message toMessage(
+      Statement<?> statement,
+      DriverExecutionProfile config,
+      InternalDriverContext context,
+      byte tabletVersionBlock) {
     ConsistencyLevelRegistry consistencyLevelRegistry = context.getConsistencyLevelRegistry();
     ConsistencyLevel consistency = statement.getConsistencyLevel();
     int consistencyCode =
@@ -222,7 +231,8 @@ public class Conversions {
       return new Execute(
           Bytes.getArray(id),
           (resultMetadataId == null) ? null : Bytes.getArray(resultMetadataId),
-          queryOptions);
+          queryOptions,
+          tabletVersionBlock);
     } else if (statement instanceof BatchStatement) {
       BatchStatement batchStatement = (BatchStatement) statement;
       if (!protocolVersionRegistry.supports(

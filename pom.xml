@@ -195,7 +195,7 @@
       <dependency>
         <groupId>com.scylladb</groupId>
         <artifactId>native-protocol</artifactId>
-        <version>1.5.2.2</version>
+        <version>1.5.2.3-SNAPSHOT</version>
       </dependency>
       <dependency>
         <groupId>io.netty</groupId>

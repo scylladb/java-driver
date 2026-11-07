@@ -290,6 +290,37 @@ public class DefaultTabletMapTest {
     assertThat(tablet.getShardForNode(node)).isEqualTo(2);
   }
 
+  @Test
+  public void should_preserve_v2_version_zero_and_first_replica_leader() {
+    DefaultNode node = newNode(1);
+    TupleValue payload = payload(0, 10, replica(node.getHostId(), 1));
+    Tablet tablet =
+        DefaultTabletMap.DefaultTablet.parseTabletPayloadV2(
+            payload, ImmutableMap.of(node.getHostId(), node));
+    assertThat(tablet.getTabletVersion()).isZero();
+    assertThat(tablet.getLeader()).isSameAs(node);
+    Tablet oldTablet =
+        DefaultTabletMap.DefaultTablet.parseTabletPayloadV1(
+            payload, ImmutableMap.of(node.getHostId(), node));
+    assertThat(oldTablet.getTabletVersion()).isNull();
+    assertThat(oldTablet.getLeader()).isNull();
+    assertThat(tablet).isNotEqualTo(oldTablet);
+  }
+
+  @Test
+  public void should_not_promote_follower_if_v2_leader_unknown() {
+    DefaultNode follower = newNode(1);
+    TupleValue payload =
+        payload(0, 10, replica(UUID.randomUUID(), 3), replica(follower.getHostId(), 7));
+    when(payload.getLong(3)).thenReturn(Long.MIN_VALUE);
+    Tablet tablet =
+        DefaultTabletMap.DefaultTablet.parseTabletPayloadV2(
+            payload, ImmutableMap.of(follower.getHostId(), follower));
+    assertThat(tablet.getTabletVersion()).isEqualTo(Long.MIN_VALUE);
+    assertThat(tablet.getLeader()).isNull();
+    assertThat(tablet.getReplicaNodesList()).containsExactly(follower);
+  }
+
   private static DefaultNode newNode(int lastIpByte) {
     InternalDriverContext context = mock(InternalDriverContext.class);
     when(context.getMetricsFactory()).thenReturn(mock(MetricsFactory.class));

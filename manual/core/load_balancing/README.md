@@ -72,6 +72,19 @@ return plans that:
 * only contain nodes that are known to be able to process queries, i.e. neither ignored nor down;
 * favor local nodes over remote ones.
 
+### ScyllaDB tablet leaders
+
+Connections prefer `TABLETS_ROUTING_V2_EXPERIMENTAL` when the server advertises it, and fall back to
+V1 tablet routing otherwise. V2 feedback records each tablet's version and replica order. Every
+prepared execution over a V2 connection includes a sampled version block, allowing the server to
+refresh stale routing information.
+
+For keyspaces with `consistency = 'global'`, the built-in policies prefer the first V2 replica, the
+tablet leader, for writes and strong reads. `SELECT` at `ONE` or `LOCAL_ONE` keeps normal replica
+balancing. Leader preference never adds a node excluded by node filters or datacenter failover
+settings. Until V2 feedback arrives, normal replica routing applies. Batch leader routing is not
+implemented.
+
 ### Built-in policies
 
 In previous versions, the driver provided a wide variety of built-in load balancing policies; in

@@ -2,32 +2,43 @@ package com.datastax.oss.driver.internal.core.protocol;
 
 import java.util.List;
 import java.util.Map;
+import net.jcip.annotations.Immutable;
 
+@Immutable
 public class TabletInfo {
-  private static final String SCYLLA_TABLETS_STARTUP_OPTION_KEY = "TABLETS_ROUTING_V1";
-  private static final String SCYLLA_TABLETS_STARTUP_OPTION_VALUE = "";
+  private static final String V1 = "TABLETS_ROUTING_V1";
+  private static final String V2 = "TABLETS_ROUTING_V2_EXPERIMENTAL";
   public static final String TABLETS_ROUTING_V1_CUSTOM_PAYLOAD_KEY = "tablets-routing-v1";
+  public static final String TABLETS_ROUTING_V2_CUSTOM_PAYLOAD_KEY = "tablets-routing-v2";
 
-  private boolean enabled = false;
+  private final int version;
 
-  private TabletInfo(boolean enabled) {
-    this.enabled = enabled;
+  private TabletInfo(int version) {
+    this.version = version;
   }
 
-  // Currently pertains only to TABLETS_ROUTING_V1
   public boolean isEnabled() {
-    return enabled;
+    return version != 0;
+  }
+
+  public boolean isVersion2() {
+    return version == 2;
   }
 
   public static TabletInfo loadFromSupportedOptions(Map<String, List<String>> supported) {
-    List<String> values = supported.get(SCYLLA_TABLETS_STARTUP_OPTION_KEY);
-    return new TabletInfo(
-        values != null
-            && values.size() == 1
-            && values.get(0).equals(SCYLLA_TABLETS_STARTUP_OPTION_VALUE));
+    return new TabletInfo(isSupported(supported, V2) ? 2 : isSupported(supported, V1) ? 1 : 0);
   }
 
-  public static void populateStartupOptions(Map<String, String> options) {
-    options.put(SCYLLA_TABLETS_STARTUP_OPTION_KEY, SCYLLA_TABLETS_STARTUP_OPTION_VALUE);
+  private static boolean isSupported(Map<String, List<String>> supported, String key) {
+    List<String> values = supported.get(key);
+    return values != null
+        && ((key.equals(V2) && values.isEmpty())
+            || (values.size() == 1 && values.get(0).isEmpty()));
+  }
+
+  public void populateStartupOptions(Map<String, String> options) {
+    if (isEnabled()) {
+      options.put(isVersion2() ? V2 : V1, "");
+    }
   }
 }

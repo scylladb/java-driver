@@ -26,11 +26,18 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfig;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.data.TupleValue;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.type.DataTypes;
+import com.datastax.oss.driver.api.core.type.TupleType;
+import com.datastax.oss.driver.api.core.type.codec.TypeCodec;
+import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
 import com.datastax.oss.driver.internal.core.context.EventBus;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.context.NettyOptions;
@@ -488,6 +495,34 @@ public class MetadataManagerTest {
     org.assertj.core.api.Assertions.assertThatThrownBy(() -> metadataManager.registerNode(nodeInfo))
         .isInstanceOf(NullPointerException.class)
         .hasMessageContaining("Cannot register node without hostId");
+  }
+
+  @Test
+  public void should_decode_and_schedule_versioned_tablet_payload() {
+    when(context.getCodecRegistry()).thenReturn(CodecRegistry.DEFAULT);
+    when(context.getProtocolVersion()).thenReturn(DefaultProtocolVersion.V4);
+    TupleType type =
+        DataTypes.tupleOf(
+            DataTypes.BIGINT,
+            DataTypes.BIGINT,
+            DataTypes.listOf(DataTypes.tupleOf(DataTypes.UUID, DataTypes.INT)),
+            DataTypes.BIGINT);
+    TupleValue value = type.newValue(0L, 10L, Collections.emptyList(), Long.MIN_VALUE);
+    TypeCodec<TupleValue> codec = CodecRegistry.DEFAULT.codecFor(type);
+    CqlIdentifier keyspace = CqlIdentifier.fromInternal("ks");
+    CqlIdentifier table = CqlIdentifier.fromInternal("t");
+    metadataManager.addTabletFromPayload(
+        keyspace,
+        table,
+        Collections.singletonMap(
+            "tablets-routing-v2", codec.encode(value, DefaultProtocolVersion.V4)));
+    waitForPendingAdminTasks(() -> metadataManager.refreshes.size() == 1);
+    AddTabletRefresh refresh = (AddTabletRefresh) metadataManager.refreshes.get(0);
+    assertThat(refresh.keyspace).isEqualTo(keyspace);
+    assertThat(refresh.table).isEqualTo(table);
+    assertThat(refresh.tablet.getFirstToken()).isEqualTo(0);
+    assertThat(refresh.tablet.getLastToken()).isEqualTo(10);
+    assertThat(refresh.tablet.getTabletVersion()).isEqualTo(Long.MIN_VALUE);
   }
 
   private static class TestMetadataManager extends MetadataManager {

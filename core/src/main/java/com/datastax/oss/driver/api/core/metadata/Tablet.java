@@ -1,6 +1,7 @@
 package com.datastax.oss.driver.api.core.metadata;
 
 import com.datastax.oss.driver.shaded.guava.common.annotations.Beta;
+import edu.umd.cs.findbugs.annotations.Nullable;
 import java.util.List;
 import java.util.Set;
 
@@ -52,4 +53,19 @@ public interface Tablet extends Comparable<Tablet> {
    * @return Shard number for the replica or -1 if no such Node found.
    */
   public int getShardForNode(Node node);
+
+  /** The version hash reported by V2 routing, or null for tablets learned over V1. */
+  @Nullable
+  default Long getTabletVersion() {
+    return null;
+  }
+
+  /**
+   * The first replica reported by V2, or null if it is unknown. This is a leader only for a
+   * globally consistent keyspace.
+   */
+  @Nullable
+  default Node getLeader() {
+    return null;
+  }
 }
