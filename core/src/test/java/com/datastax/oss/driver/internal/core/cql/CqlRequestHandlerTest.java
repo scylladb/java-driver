@@ -525,6 +525,7 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
           new CqlRequestHandler(
               UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
       CapturedTimeout timeout = harness.nextScheduledTimeout();
+      AtomicBoolean admissionCompleted = new AtomicBoolean();
       // CompletableFuture runs this newer dependent before the handler's cancellation callback.
       handler.result.whenComplete(
           (ignored, error) -> {
@@ -536,10 +537,12 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
               }
             }
             handler.onThrottleReady(true);
+            admissionCompleted.set(true);
           });
 
       assertThat(handler.result.cancel(false)).isTrue();
 
+      assertThat(admissionCompleted.get()).isTrue();
       verify(throttler).signalCancel(handler);
       verify(throttler, never()).signalError(eq(handler), any());
       verify(throttler, never()).signalTimeout(handler);
