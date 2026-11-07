@@ -29,8 +29,9 @@ import net.jcip.annotations.ThreadSafe;
 
 /**
  * Query plan over a fixed array, where the elements from a start index to the end are rotated to
- * the left (round-robin): with a rotated range of length {@code n}, the element at {@code
- * startIndex + amount % n} comes first in that range.
+ * the left (round-robin): with a rotated range of length {@code n > 0} and a positive rotation
+ * amount, the element at {@code startIndex + amount % n} comes first in that range. Zero or a
+ * negative amount leaves the range in its original order.
  *
  * <p>The elements are not moved. Instead, positions are mapped as nodes are polled. This makes
  * building the plan independent of the size of the rotated range, at a small constant cost per node
@@ -95,7 +96,7 @@ public class RotatedQueryPlan extends AbstractQueue<Node> implements QueryPlan {
     if (index < startIndex) {
       return index;
     }
-    int mapped = index + amount;
-    return (mapped < nodes.length) ? mapped : mapped - (nodes.length - startIndex);
+    int wrapIndex = nodes.length - amount;
+    return (index < wrapIndex) ? index + amount : startIndex + (index - wrapIndex);
   }
 }

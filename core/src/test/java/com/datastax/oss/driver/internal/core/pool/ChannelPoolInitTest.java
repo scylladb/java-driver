@@ -43,6 +43,7 @@ import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.mockito.InOrder;
 
@@ -87,7 +88,7 @@ public class ChannelPoolInitTest extends ChannelPoolTestBase {
     final ChannelPool pool =
         ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test")
             .toCompletableFuture()
-            .get();
+            .get(2, TimeUnit.SECONDS);
     factoryHelper.waitForCalls(node, 1);
 
     final ChannelSet shard0 = new ChannelSet();
