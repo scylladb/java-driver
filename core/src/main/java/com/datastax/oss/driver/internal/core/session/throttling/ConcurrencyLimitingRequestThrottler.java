@@ -293,10 +293,10 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @Immutable
   private static final class ReadyCallback {
-    private final Throttled request;
+    @NonNull private final Throttled request;
     private final boolean wasDelayed;
 
-    private ReadyCallback(Throttled request, boolean wasDelayed) {
+    private ReadyCallback(@NonNull Throttled request, boolean wasDelayed) {
       this.request = request;
       this.wasDelayed = wasDelayed;
     }
@@ -304,17 +304,18 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
 
   @NotThreadSafe
   private static final class ReadyCallbackState {
-    private final ConcurrencyLimitingRequestThrottler throttler;
+    @NonNull private final ConcurrencyLimitingRequestThrottler throttler;
     @Nullable private final ReadyCallbackState previous;
     @Nullable private Deque<ReadyCallback> callbacks;
 
     private ReadyCallbackState(
-        ConcurrencyLimitingRequestThrottler throttler, @Nullable ReadyCallbackState previous) {
+        @NonNull ConcurrencyLimitingRequestThrottler throttler,
+        @Nullable ReadyCallbackState previous) {
       this.throttler = throttler;
       this.previous = previous;
     }
 
-    private void add(Throttled request, boolean wasDelayed) {
+    private void add(@NonNull Throttled request, boolean wasDelayed) {
       if (callbacks == null) {
         callbacks = new ArrayDeque<>();
       }
