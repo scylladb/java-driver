@@ -523,7 +523,13 @@ public class CqlRequestHandler implements Throttled {
           // Listener registration may have already advanced this execution. Terminate the whole
           // request instead of counting this execution as finished a second time.
           try {
-            setFinalError(statement, setupFailure, null, currentExecutionIndex);
+            if (!setFinalError(statement, setupFailure, null, currentExecutionIndex)) {
+              Loggers.warnWithException(
+                  LOG,
+                  "[{}] Request setup failed after the request had completed",
+                  handlerLogPrefix,
+                  setupFailure);
+            }
           } finally {
             // Also cancel directly if adding this callback to inFlightCallbacks failed.
             nodeResponseCallback.cancel();
@@ -729,8 +735,8 @@ public class CqlRequestHandler implements Throttled {
     setFinalError(initialStatement, error, null, -1);
   }
 
-  private void setFinalError(Statement<?> statement, Throwable error, Node node, int execution) {
-    setFinalError(statement, error, node, execution, true);
+  private boolean setFinalError(Statement<?> statement, Throwable error, Node node, int execution) {
+    return setFinalError(statement, error, node, execution, true);
   }
 
   private void setFinalErrorWithoutThrottlerRelease(
@@ -738,7 +744,7 @@ public class CqlRequestHandler implements Throttled {
     setFinalError(statement, error, node, execution, false);
   }
 
-  private void setFinalError(
+  private boolean setFinalError(
       Statement<?> statement, Throwable error, Node node, int execution, boolean releaseThrottler) {
     if (error instanceof DriverException) {
       ((DriverException) error)
@@ -770,7 +776,9 @@ public class CqlRequestHandler implements Throttled {
         sessionMetricUpdater.incrementCounter(
             DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, executionProfile.getName());
       }
+      return true;
     }
+    return false;
   }
 
   private void releaseThrottlerForCompletedResult() {

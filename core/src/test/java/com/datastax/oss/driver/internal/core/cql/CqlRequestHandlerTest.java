@@ -808,6 +808,71 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
+  public void should_log_listener_registration_failure_after_request_completed() {
+    for (String outcome : new String[] {"success", "timeout", "cancel"}) {
+      IllegalStateException failure = new IllegalStateException("late listener failure");
+      RequestThrottler throttler = mock(RequestThrottler.class);
+      RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+      PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+      AtomicReference<ResponseCallback> callback = new AtomicReference<>();
+      Future<Void> writeFuture = mock(Future.class);
+      when(node1Behavior.getChannel().write(any(), anyBoolean(), anyMap(), any()))
+          .thenAnswer(
+              invocation -> {
+                callback.set(invocation.getArgument(3));
+                return writeFuture;
+              });
+      LoggerTest.LoggerSetup logger =
+          LoggerTest.setupTestLogger(CqlRequestHandler.class, Level.WARN);
+      try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+        when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+        CqlRequestHandler handler =
+            new CqlRequestHandler(
+                UNDEFINED_IDEMPOTENCE_STATEMENT,
+                harness.getSession(),
+                harness.getContext(),
+                "test");
+        CapturedTimeout timeout = harness.nextScheduledTimeout();
+        doAnswer(
+                invocation -> {
+                  if (outcome.equals("success")) {
+                    callback.get().onResponse(defaultFrameOf(singleRow()));
+                  } else if (outcome.equals("timeout")) {
+                    timeout.task().run(timeout);
+                  } else {
+                    handler.result.cancel(false);
+                  }
+                  throw failure;
+                })
+            .when(writeFuture)
+            .addListener(any());
+
+        handler.onThrottleReady(false);
+
+        if (outcome.equals("success")) {
+          assertThatStage(handler.handle()).isSuccess();
+          verify(throttler).signalSuccess(handler);
+        } else if (outcome.equals("timeout")) {
+          assertThatStage(handler.handle())
+              .isFailed(error -> assertThat(error).isInstanceOf(DriverTimeoutException.class));
+          verify(throttler).signalTimeout(handler);
+        } else {
+          assertThat(handler.result.isCancelled()).isTrue();
+          verify(throttler).signalCancel(handler);
+        }
+        verify(throttler, never()).signalError(eq(handler), any());
+        verify(node1Behavior.getChannel(), atLeastOnce()).cancel(callback.get());
+        verify(logger.appender).doAppend(logger.loggingEventCaptor.capture());
+        assertThat(logger.loggingEventCaptor.getValue().getLevel()).isEqualTo(Level.WARN);
+        assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+            .contains("Request setup failed after the request had completed", failure.getMessage());
+      } finally {
+        logger.close();
+      }
+    }
+  }
+
+  @Test
   public void should_log_throttler_exception_when_admitting_completed_request() {
     should_log_throttler_failure_when_admitting_completed_request(
         new IllegalStateException("throttler failure"));
