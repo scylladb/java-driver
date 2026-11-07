@@ -100,6 +100,27 @@ public class ThrottledAdminRequestHandlerTest {
   }
 
   @Test
+  public void should_rethrow_fatal_admission_failure_after_cleanup() {
+    AssertionError failure = new AssertionError("fatal metric failure");
+    ThrottledAdminRequestHandler<AdminResult> handler = newHandler();
+    handler.start();
+    doThrow(failure)
+        .when(metricUpdater)
+        .updateTimer(
+            eq(DefaultSessionMetric.THROTTLING_DELAY),
+            isNull(),
+            anyLong(),
+            eq(TimeUnit.NANOSECONDS));
+
+    assertThatThrownBy(() -> handler.onThrottleReady(true)).isSameAs(failure);
+
+    assertThat(availableIds.get()).isEqualTo(1);
+    verify(throttler).signalError(handler, failure);
+    verify(channel, never()).write(any(), anyBoolean(), anyMap(), any());
+    assertThatStage(handler.result).isFailed(error -> assertThat(error).isSameAs(failure));
+  }
+
+  @Test
   public void should_release_permit_when_synchronous_write_throws() {
     RuntimeException failure = new RuntimeException("mock failure");
     ThrottledAdminRequestHandler<AdminResult> handler = newHandler();

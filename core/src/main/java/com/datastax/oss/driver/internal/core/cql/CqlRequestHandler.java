@@ -431,7 +431,7 @@ public class CqlRequestHandler implements Throttled {
                   handlerLogPrefix,
                   routingToken,
                   getShardFromTabletMap(statement, node, routingToken));
-        } catch (Throwable t) {
+        } catch (Exception t) {
           recordError(node, t);
         }
       }
@@ -444,7 +444,7 @@ public class CqlRequestHandler implements Throttled {
                     handlerLogPrefix,
                     routingToken,
                     getShardFromTabletMap(statement, node, routingToken));
-          } catch (Throwable t) {
+          } catch (Exception t) {
             recordError(node, t);
             continue;
           }

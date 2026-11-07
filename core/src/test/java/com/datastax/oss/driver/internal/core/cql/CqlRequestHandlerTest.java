@@ -21,7 +21,9 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -40,6 +42,7 @@ import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
@@ -48,9 +51,11 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
+import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
 import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
@@ -74,6 +79,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
@@ -539,6 +545,68 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
       verify(throttler, never()).signalTimeout(handler);
       verify(throttler, never()).signalSuccess(handler);
       assertThat(timeout.isCancelled()).isTrue();
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_channel_selection_failure_after_cleanup() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal channel selection failure");
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(harness.getSession().getChannel(eq(node1), anyString(), any(), any()))
+          .thenThrow(failure);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+      node1Behavior.verifyNoWrite();
+      node2Behavior.verifyNoWrite();
+      verify(harness.getSession(), never()).getChannel(eq(node2), anyString(), any(), any());
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_retry_channel_selection_failure_after_cleanup() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal retry channel selection failure");
+    HeartbeatException requestFailure = mock(HeartbeatException.class);
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(harness.getSession().getChannel(eq(node1), anyString(), any(), any()))
+          .thenReturn(node1Behavior.getChannel())
+          .thenThrow(failure);
+      when(harness
+              .getContext()
+              .getRetryPolicy(anyString())
+              .onRequestAbortedVerdict(any(), eq(requestFailure), eq(0)))
+          .thenReturn(RetryVerdict.RETRY_SAME);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test");
+      handler.onThrottleReady(false);
+      node1Behavior.setWriteSuccess();
+      ArgumentCaptor<ResponseCallback> callback = ArgumentCaptor.forClass(ResponseCallback.class);
+      verify(node1Behavior.getChannel()).write(any(), anyBoolean(), anyMap(), callback.capture());
+
+      assertThatThrownBy(() -> callback.getValue().onFailure(requestFailure)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+      node2Behavior.verifyNoWrite();
+      verify(harness.getSession(), never()).getChannel(eq(node2), anyString(), any(), any());
     }
   }
 

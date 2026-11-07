@@ -31,6 +31,8 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import net.jcip.annotations.Immutable;
+import net.jcip.annotations.NotThreadSafe;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -289,6 +291,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
     request.onThrottleFailure(new RequestThrottlingException(message));
   }
 
+  @Immutable
   private static final class ReadyCallback {
     private final Throttled request;
     private final boolean wasDelayed;
@@ -299,6 +302,7 @@ public class ConcurrencyLimitingRequestThrottler implements RequestThrottler {
     }
   }
 
+  @NotThreadSafe
   private static final class ReadyCallbackState {
     private final ConcurrencyLimitingRequestThrottler throttler;
     @Nullable private final ReadyCallbackState previous;

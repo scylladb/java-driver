@@ -170,6 +170,9 @@ public class ThrottledAdminRequestHandler<ResultT> extends AdminRequestHandler<R
       cancelExternalReservation();
       setFinalError(t);
       cancelSubmittedRequest();
+      if (t instanceof java.lang.Error) {
+        throw (java.lang.Error) t;
+      }
     }
   }
 
