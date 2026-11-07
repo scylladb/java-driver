@@ -29,7 +29,9 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +70,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -466,6 +469,65 @@ public class CqlPrepareHandlerTest {
           callback.get().onFailure(new IllegalStateException("late channel failure"));
           verify(throttler).signalError(handler, failure);
         }
+      }
+    }
+  }
+
+  @Test
+  public void should_not_release_prepare_permit_twice_if_listener_fails_after_response() {
+    for (boolean fatal : new boolean[] {false, true}) {
+      Throwable failure =
+          fatal
+              ? new AssertionError("listener failure")
+              : new IllegalStateException("listener failure");
+      RequestThrottler throttler = mock(RequestThrottler.class);
+      RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+      PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+      PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+      AtomicReference<ResponseCallback> callback = new AtomicReference<>();
+      Future<Void> writeFuture = mock(Future.class);
+      when(node1Behavior.getChannel().write(any(), anyBoolean(), any(), any()))
+          .thenAnswer(
+              invocation -> {
+                callback.set(invocation.getArgument(3));
+                return writeFuture;
+              });
+      try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+        when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+        CqlPrepareHandler handler =
+            new CqlPrepareHandler(
+                PREPARE_REQUEST, harness.getSession(), harness.getContext(), "test");
+        doAnswer(
+                invocation -> {
+                  callback.get().onResponse(defaultFrameOf(simplePrepared()));
+                  assertThatStage(handler.handle()).isNotDone();
+                  throw failure;
+                })
+            .when(writeFuture)
+            .addListener(any());
+
+        if (fatal) {
+          assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+        } else {
+          handler.onThrottleReady(false);
+        }
+
+        assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+        verify(throttler).signalSuccess(handler);
+        verify(throttler, never()).signalError(eq(handler), any());
+        verify(node1Behavior.getChannel(), atLeastOnce()).cancel(callback.get());
+        node1Behavior.verifyPreAcquireNotCancelled();
+        assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+        // Finish the queued fan-out request and check that it cannot replace the failure.
+        ArgumentCaptor<Throttled> requests = ArgumentCaptor.forClass(Throttled.class);
+        verify(throttler, times(2)).register(requests.capture());
+        requests.getAllValues().get(1).onThrottleReady(false);
+        node2Behavior.verifyWrite();
+        node2Behavior.setWriteSuccess();
+        node2Behavior.setResponseSuccess(defaultFrameOf(simplePrepared()));
+        assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+        verify(throttler).signalSuccess(handler);
+        verify(throttler, never()).signalError(eq(handler), any());
       }
     }
   }

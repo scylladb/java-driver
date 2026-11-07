@@ -76,6 +76,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,6 +99,7 @@ public class CqlPrepareHandler implements Throttled {
   private final RequestThrottler throttler;
   private final Boolean prepareOnAllNodes;
   private final DriverExecutionProfile executionProfile;
+  private final AtomicBoolean throttlerReleased = new AtomicBoolean();
   private volatile boolean admitted;
   private volatile InitialPrepareCallback initialCallback;
 
@@ -130,7 +132,9 @@ public class CqlPrepareHandler implements Throttled {
           try {
             if (t instanceof CancellationException) {
               cancelTimeout();
-              context.getRequestThrottler().signalCancel(this);
+              if (throttlerReleased.compareAndSet(false, true)) {
+                context.getRequestThrottler().signalCancel(this);
+              }
             }
           } catch (Throwable t2) {
             Loggers.warnWithException(LOG, "[{}] Uncaught exception", logPrefix, t2);
@@ -299,8 +303,11 @@ public class CqlPrepareHandler implements Throttled {
 
   private void setFinalResult(PrepareRequest request, Prepared response, DriverChannel channel) {
 
-    // Whatever happens below, we're done with this stream id
-    throttler.signalSuccess(this);
+    // Return the initial permit before all-node preparation completes. A later failure or
+    // cancellation must not return it again while the public result is still pending.
+    if (throttlerReleased.compareAndSet(false, true)) {
+      throttler.signalSuccess(this);
+    }
 
     DefaultPreparedStatement preparedStatement =
         Conversions.toPreparedStatement(response, request, context, channel.getLwtInfo());
@@ -392,6 +399,9 @@ public class CqlPrepareHandler implements Throttled {
       cancelTimeout();
       if (initialCallback != null) {
         initialCallback.cancel();
+      }
+      if (!throttlerReleased.compareAndSet(false, true)) {
+        return;
       }
       if (error instanceof DriverTimeoutException) {
         throttler.signalTimeout(this);
