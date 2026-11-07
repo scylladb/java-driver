@@ -1,0 +1,54 @@
+name: Reuse queue coverage after merge
+
+on:
+  push:
+    branches: [scylla-4.x]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  coverage:
+    if: github.repository == 'scylladb/java-driver'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout merged source for Codecov paths
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Find and verify queue reports
+        id: reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGED_SHA: ${{ github.sha }}
+        run: python3 .github/scripts/reuse-queue-coverage.py
+
+      - name: Upload unit coverage under merged SHA
+        if: steps.reports.outputs.found == 'true'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: queue-coverage/unit.xml
+          flags: unit
+          name: unit-jdk-11
+          override_commit: ${{ github.sha }}
+          disable_search: true
+          plugins: noop
+          fail_ci_if_error: true
+
+      - name: Upload reduced coverage under merged SHA
+        if: steps.reports.outputs.found == 'true'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: queue-coverage/reduced.xml
+          flags: reduced
+          name: reduced-jdk-11
+          override_commit: ${{ github.sha }}
+          disable_search: true
+          plugins: noop
+          fail_ci_if_error: true
