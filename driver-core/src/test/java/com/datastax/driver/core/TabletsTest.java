@@ -2,7 +2,13 @@ package com.datastax.driver.core;
 
 import com.datastax.driver.core.utils.ScyllaOnly;
 import com.datastax.driver.core.utils.ScyllaVersion;
+import java.io.File;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,6 +20,8 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 @CCMConfig(
@@ -121,6 +129,56 @@ public class TabletsTest extends CCMTestsSupport {
 
   private static final SimpleStatement STMT_DELETE_IF_EXISTS =
       buildStatement("DELETE FROM %s.%s WHERE pk = ? AND ck = ? IF EXISTS");
+
+  private URL tabletBalancingUrl;
+  private boolean tabletBalancingChanged;
+
+  @BeforeClass(groups = "short")
+  public void disableTabletBalancing() throws IOException {
+    // Coordinator counts and once-only hints require stable replicas throughout each query loop.
+    // Disable balancing before creating the tablet table; the API waits for ongoing moves to end.
+    File config = new File(ccm().getNodeConfDir(1), "scylla.yaml");
+    for (String line : Files.readAllLines(config.toPath(), StandardCharsets.UTF_8)) {
+      if (line.startsWith("api_port:")) {
+        int port = Integer.parseInt(line.substring("api_port:".length()).trim());
+        tabletBalancingUrl =
+            new URL(
+                "http://"
+                    + ccm().addressOfNode(1).getAddress().getHostAddress()
+                    + ":"
+                    + port
+                    + "/storage_service/tablets/balancing?enabled=");
+        break;
+      }
+    }
+    Assert.assertNotNull(tabletBalancingUrl, "Missing api_port in generated Scylla configuration");
+    // Restore even if the disable request reaches Scylla but reading its response fails.
+    tabletBalancingChanged = true;
+    setTabletBalancingEnabled(false);
+  }
+
+  @AfterClass(groups = "short", alwaysRun = true)
+  public void restoreTabletBalancing() throws IOException {
+    if (tabletBalancingChanged) {
+      setTabletBalancingEnabled(true);
+    }
+  }
+
+  private void setTabletBalancingEnabled(boolean enabled) throws IOException {
+    HttpURLConnection connection =
+        (HttpURLConnection) new URL(tabletBalancingUrl.toString() + enabled).openConnection();
+    try {
+      connection.setRequestMethod("POST");
+      connection.setConnectTimeout(5000);
+      connection.setReadTimeout(30000);
+      Assert.assertEquals(
+          connection.getResponseCode(),
+          HttpURLConnection.HTTP_OK,
+          "Setting tablet balancing to " + enabled);
+    } finally {
+      connection.disconnect();
+    }
+  }
 
   public void prepareCluster() {
     session().execute(DROP_KEYSPACE_QUERY);
