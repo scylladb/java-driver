@@ -20,8 +20,14 @@ package com.datastax.oss.driver.internal.core.cql;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -34,18 +40,119 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
 import com.datastax.oss.driver.api.core.specex.SpeculativeExecutionPolicy;
+import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
+import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Error;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.ImmediateEventExecutor;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 
 public class CqlRequestHandlerSpeculativeExecutionTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_keep_initial_execution_running_if_speculative_setup_fails() throws Exception {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RuntimeException setupFailure = new RuntimeException("mock failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node1", "node2");
+    doReturn(IDEMPOTENT_STATEMENT)
+        .doThrow(setupFailure)
+        .when(requestIdGenerator)
+        .getDecoratedStatement(any(), any());
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      SpeculativeExecutionPolicy speculativeExecutionPolicy =
+          harness.getContext().getSpeculativeExecutionPolicy(DriverExecutionProfile.DEFAULT_NAME);
+      when(speculativeExecutionPolicy.nextExecution(
+              any(Node.class), eq(null), eq(IDEMPOTENT_STATEMENT), eq(1)))
+          .thenReturn(100L);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+      node1Behavior.setWriteSuccess();
+
+      harness.nextScheduledTimeout(); // Discard the request timeout.
+      CapturedTimeout speculativeExecution = harness.nextScheduledTimeout();
+      speculativeExecution.task().run(speculativeExecution);
+
+      node2Behavior.verifyNoWrite();
+      node2Behavior.verifyPreAcquireCancelled();
+      assertThatStage(result).isNotDone();
+
+      node1Behavior.setResponseSuccess(defaultFrameOf(singleRow()));
+      assertThatStage(result).isSuccess();
+    }
+  }
+
+  @Test
+  public void should_terminate_request_if_speculative_write_listener_registration_fails()
+      throws Exception {
+    RuntimeException failure = new IllegalStateException("listener failure");
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+    AtomicReference<ResponseCallback> callback = new AtomicReference<>();
+    Future<Void> writeFuture = mock(Future.class);
+    doAnswer(
+            invocation -> {
+              GenericFutureListener<Future<Void>> listener = invocation.getArgument(0);
+              listener.operationComplete(ImmediateEventExecutor.INSTANCE.newSucceededFuture(null));
+              throw failure;
+            })
+        .when(writeFuture)
+        .addListener(any());
+    when(node2Behavior.getChannel().write(any(), anyBoolean(), anyMap(), any()))
+        .thenAnswer(
+            invocation -> {
+              callback.set(invocation.getArgument(3));
+              return writeFuture;
+            });
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      SpeculativeExecutionPolicy policy =
+          harness.getContext().getSpeculativeExecutionPolicy(DriverExecutionProfile.DEFAULT_NAME);
+      when(policy.nextExecution(any(Node.class), eq(null), eq(IDEMPOTENT_STATEMENT), eq(1)))
+          .thenReturn(100L);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test");
+      handler.onThrottleReady(false);
+      node1Behavior.setWriteSuccess();
+      CapturedTimeout requestTimeout = harness.nextScheduledTimeout();
+      CapturedTimeout speculativeExecution = harness.nextScheduledTimeout();
+
+      speculativeExecution.task().run(speculativeExecution);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(requestTimeout.isCancelled()).isTrue();
+      node1Behavior.verifyCancellation();
+      verify(node2Behavior.getChannel(), atLeastOnce()).cancel(callback.get());
+      node2Behavior.verifyPreAcquireNotCancelled();
+      callback.get().onFailure(new IllegalStateException("late channel failure"));
+      node1Behavior.setResponseSuccess(defaultFrameOf(singleRow()));
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      verify(throttler).signalError(handler, failure);
+    }
+  }
 
   @Test
   @UseDataProvider("nonIdempotentConfig")
