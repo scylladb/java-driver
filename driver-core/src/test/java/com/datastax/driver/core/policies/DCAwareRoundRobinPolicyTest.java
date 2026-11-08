@@ -26,8 +26,10 @@ package com.datastax.driver.core.policies;
 import static com.datastax.driver.core.Assertions.assertThat;
 import static com.datastax.driver.core.ScassandraCluster.datacenter;
 import static com.datastax.driver.core.TestUtils.findHost;
+import static com.datastax.driver.core.TestUtils.findOrWaitForControlConnection;
 import static com.datastax.driver.core.TestUtils.nonQuietClusterCloseOptions;
 import static com.google.common.collect.Lists.newArrayList;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.spy;
 import static org.mockito.MockitoAnnotations.initMocks;
@@ -43,6 +45,7 @@ import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.google.common.collect.Lists;
 import java.util.Collection;
+import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.mockito.ArgumentCaptor;
@@ -359,7 +362,23 @@ public class DCAwareRoundRobinPolicyTest {
 
       // when: A query is made and all nodes in the local dc are down.
       sCluster.stopDC(cluster, 1);
-      assertThat(cluster).controlHost().isNotNull();
+      // Hosts are marked DOWN before their session pools have been removed.
+      // Wait for pool removal and control reconnection before counting requests.
+      Collection<Host> remoteHosts =
+          Lists.newArrayList(sCluster.host(cluster, 3, 1), sCluster.host(cluster, 3, 2));
+      await()
+          .atMost(10, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                Collection<Host> connectedHosts = session.getState().getConnectedHosts();
+                Host controlHost =
+                    findOrWaitForControlConnection(cluster, 1, TimeUnit.MILLISECONDS);
+                return connectedHosts.size() == remoteHosts.size()
+                    && connectedHosts.containsAll(remoteHosts)
+                    && controlHost != null
+                    && datacenter(3).equals(controlHost.getDatacenter());
+              });
+      assertThat(cluster).controlHost().isInDatacenter(datacenter(3));
       queryTracker.reset();
       queryTracker.query(session, 20);
 
