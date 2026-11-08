@@ -20,12 +20,13 @@ package com.datastax.driver.mapping;
 import static com.datastax.driver.core.ConsistencyLevel.ONE;
 import static com.datastax.driver.mapping.Mapper.Option.consistencyLevel;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 import com.datastax.driver.core.BatchStatement;
 import com.datastax.driver.core.CCMTestsSupport;
+import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.NettyOptions;
 import com.datastax.driver.core.ProtocolVersion;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Session;
@@ -43,23 +44,37 @@ import com.datastax.driver.mapping.annotations.QueryParameters;
 import com.datastax.driver.mapping.annotations.Table;
 import com.google.common.base.Function;
 import com.google.common.base.Throwables;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
+import io.netty.channel.EventLoopGroup;
 import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
 /** Basic tests for the mapping module. */
 @SuppressWarnings({"unused", "WeakerAccess"})
 public class MapperTest extends CCMTestsSupport {
 
-  Logger logger = LoggerFactory.getLogger(MapperTest.class);
+  private EventLoopGroup ioEventLoopGroup;
+
+  @Override
+  public Cluster.Builder createClusterBuilder() {
+    return super.createClusterBuilder()
+        .withNettyOptions(
+            new NettyOptions() {
+              @Override
+              public EventLoopGroup eventLoopGroup(ThreadFactory threadFactory) {
+                ioEventLoopGroup = super.eventLoopGroup(threadFactory);
+                return ioEventLoopGroup;
+              }
+            });
+  }
 
   @Override
   public void onTestContextInitialized() {
@@ -399,12 +414,8 @@ public class MapperTest extends CCMTestsSupport {
     MappingManager manager = new MappingManager(session());
     final Mapper<User> mapper = manager.mapper(User.class);
     final User u = new User("Paul", "paul@yahoo.com");
-    ListenableFuture<Void> f = mapper.saveAsync(u);
-
     // Get function
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -414,8 +425,6 @@ public class MapperTest extends CCMTestsSupport {
         });
     // GetQuery function
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -425,8 +434,6 @@ public class MapperTest extends CCMTestsSupport {
         });
     // Save functions
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -435,8 +442,6 @@ public class MapperTest extends CCMTestsSupport {
           }
         });
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -446,8 +451,6 @@ public class MapperTest extends CCMTestsSupport {
         });
     // SaveQuery functions
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -457,8 +460,6 @@ public class MapperTest extends CCMTestsSupport {
         });
 
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -468,8 +469,6 @@ public class MapperTest extends CCMTestsSupport {
         });
     // Delete functions
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -478,8 +477,6 @@ public class MapperTest extends CCMTestsSupport {
           }
         });
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -490,8 +487,6 @@ public class MapperTest extends CCMTestsSupport {
 
     // DeleteQuery functions
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -500,8 +495,6 @@ public class MapperTest extends CCMTestsSupport {
           }
         });
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -510,8 +503,6 @@ public class MapperTest extends CCMTestsSupport {
           }
         });
     executeFunctionAndTestForException(
-        u,
-        mapper,
         new Function<Void, Thread>() {
           @Override
           public Thread apply(Void v) {
@@ -521,22 +512,25 @@ public class MapperTest extends CCMTestsSupport {
         });
   }
 
-  private void executeFunctionAndTestForException(
-      User u, Mapper<User> mapper, Function<Void, Thread> f2) {
-    ListenableFuture<Void> f = mapper.saveAsync(u);
-    ListenableFuture<Thread> toTest = Futures.transform(f, f2, MoreExecutors.directExecutor());
+  private void executeFunctionAndTestForException(final Function<Void, Thread> function)
+      throws Exception {
+    // Use the cluster's actual I/O executor instead of racing callback registration against
+    // completion of a mapper future, which may complete on a worker thread.
     try {
-      Thread executedThread = toTest.get();
-      if (executedThread == Thread.currentThread()) {
-        // Callback was invoked on the same thread, which indicates that the future completed
-        // before the transform callback was registered. Try again to produce case where callback
-        // is called on io thread.
-        logger.warn("Future completed before transform callback registered, will try again.");
-        executeFunctionAndTestForException(u, mapper, f2);
-      } else {
-        fail("Expected a failed future, callback was executed on " + executedThread);
-      }
-    } catch (Exception e) {
+      Thread executedThread =
+          ioEventLoopGroup
+              .next()
+              .submit(
+                  new Callable<Thread>() {
+                    @Override
+                    public Thread call() {
+                      return function.apply(null);
+                    }
+                  })
+              .get(10, TimeUnit.SECONDS);
+      throw new AssertionError(
+          "Expected a failed future, callback was executed on " + executedThread);
+    } catch (ExecutionException e) {
       assertThat(Throwables.getRootCause(e))
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("Detected a synchronous call on an I/O thread");
