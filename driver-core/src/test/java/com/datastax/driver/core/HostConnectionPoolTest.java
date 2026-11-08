@@ -1150,6 +1150,8 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
           throws ExecutionException, TimeoutException {
     Cluster cluster = createClusterBuilder().build();
     List<MockRequest> requests = newArrayList();
+    SettableConnectionFuture useFuture =
+        new SettableConnectionFuture(new Requests.Query("USE \"slowks\""));
     try {
       HostConnectionPool pool = createPool(cluster, 1, 1);
       // Limit requests per connection to 100 so we don't exhaust stream ids.
@@ -1174,13 +1176,13 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
         Uninterruptibles.getUninterruptibly(request.connectionFuture, 5, TimeUnit.SECONDS);
       }
 
-      // Respond to setting as slowks very slowly.
-      primingClient.prime(
-          PrimingRequest.queryBuilder()
-              .withQuery("USE \"slowks\"")
-              .withThen(PrimingRequest.then().withFixedDelay(5000L)));
-      Connection connection = pool.connections[0].get(0);
-      connection.setKeyspaceAsync("slowks");
+      Connection connection = spy(pool.connections[0].get(0));
+      pool.connections[0].set(0, connection);
+
+      // Keep the first keyspace attempt pending until the dequeue assertions finish.
+      doReturn(useFuture).when(connection).write(any(Message.Request.class));
+      ListenableFuture<Connection> keyspaceFuture = connection.setKeyspaceAsync("slowks");
+      assertThat(keyspaceFuture.isDone()).isFalse();
 
       // Simulate change of keyspace on pool.
       pool.manager.poolsState.setKeyspace("newkeyspace");
@@ -1197,10 +1199,12 @@ public class HostConnectionPoolTest extends ScassandraTestBase.PerClassCluster {
             .contains(
                 "Aborting attempt to set keyspace to 'newkeyspace' since there is already an in flight attempt to set keyspace to 'slowks'.");
       }
+      assertThat(keyspaceFuture.isDone()).isFalse();
       assertThat(connection.inFlight.get()).isEqualTo(0);
       assertThat(pool.totalInFlight.get()).isEqualTo(0);
       assertThat(pool.pendingBorrowCount.get()).isEqualTo(0);
     } finally {
+      useFuture.cancel(false);
       MockRequest.completeAll(requests);
       cluster.close();
     }
