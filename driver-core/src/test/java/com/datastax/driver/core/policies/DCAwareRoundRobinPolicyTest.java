@@ -42,9 +42,11 @@ import com.datastax.driver.core.MemoryAppender;
 import com.datastax.driver.core.QueryTracker;
 import com.datastax.driver.core.ScassandraCluster;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.SimpleStatement;
 import com.datastax.driver.core.exceptions.NoHostAvailableException;
 import com.google.common.collect.Lists;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -133,15 +135,18 @@ public class DCAwareRoundRobinPolicyTest {
     // given: a 10 node 2 DC cluster with DC policy with 2 remote hosts.
     ScassandraCluster sCluster = ScassandraCluster.builder().withNodes(5, 5).build();
     @SuppressWarnings("deprecation")
+    DCAwareRoundRobinPolicy policy =
+        DCAwareRoundRobinPolicy.builder()
+            .withLocalDc(datacenter(1))
+            .withUsedHostsPerRemoteDc(2)
+            .build();
     Cluster cluster =
         builder()
-            .addContactPoints(sCluster.address(1, 1).getAddress())
+            // Keep the control connection on a surviving node: reconnecting it would advance the
+            // policy's round-robin counter while the test measures request distribution.
+            .addContactPoints(sCluster.address(1, 2).getAddress())
             .withPort(sCluster.getBinaryPort())
-            .withLoadBalancingPolicy(
-                DCAwareRoundRobinPolicy.builder()
-                    .withLocalDc(datacenter(1))
-                    .withUsedHostsPerRemoteDc(2)
-                    .build())
+            .withLoadBalancingPolicy(policy)
             .build();
 
     try {
@@ -153,7 +158,23 @@ public class DCAwareRoundRobinPolicyTest {
       sCluster.stop(cluster, 1, 5);
       sCluster.stop(cluster, 1, 3);
       sCluster.stop(cluster, 1, 1);
-      assertThat(cluster).controlHost().isNotNull();
+      assertThat(cluster).usesControlHost(2);
+      // The host is marked DOWN before the policy receives its onDown callback. Wait until all
+      // stopped local hosts have left the policy so query plans use a stable local host list.
+      await()
+          .atMost(10, TimeUnit.SECONDS)
+          .pollDelay(0, TimeUnit.MILLISECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .until(
+              () -> {
+                List<Host> localHosts =
+                    newArrayList(
+                        policy.newQueryPlan(null, new SimpleStatement(QueryTracker.QUERY)));
+                localHosts.removeIf(host -> !datacenter(1).equals(host.getDatacenter()));
+                return localHosts.size() == 2
+                    && localHosts.contains(sCluster.host(cluster, 1, 2))
+                    && localHosts.contains(sCluster.host(cluster, 1, 4));
+              });
       queryTracker.query(session, 20);
 
       // then: all requests should be distributed to the remaining up nodes in local DC.
