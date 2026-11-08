@@ -27,6 +27,7 @@ import static com.datastax.driver.core.ScassandraCluster.rack;
 import static com.datastax.driver.core.TestUtils.findHost;
 import static com.datastax.driver.core.TestUtils.nonQuietClusterCloseOptions;
 import static com.google.common.collect.Lists.newArrayList;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -41,6 +42,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -558,7 +560,8 @@ public class RackAwareRoundRobinPolicyTest {
     @SuppressWarnings("deprecation")
     Cluster cluster =
         builder()
-            .addContactPoints(sCluster.address(1, 1).getAddress())
+            // Keep control reconnections from advancing the round-robin counter during queries.
+            .addContactPoints(sCluster.address(1, 2).getAddress())
             .withPort(sCluster.getBinaryPort())
             .withLoadBalancingPolicy(
                 RackAwareRoundRobinPolicy.builder()
@@ -576,7 +579,27 @@ public class RackAwareRoundRobinPolicyTest {
       sCluster.stop(cluster, 1, 5);
       sCluster.stop(cluster, 1, 3);
       sCluster.stop(cluster, 1, 1);
-      assertThat(cluster).controlHost().isNotNull();
+      // Host.DOWN is visible before the policy finishes removing the stopped hosts.
+      Statement localQuery =
+          new SimpleStatement("irrelevant").setConsistencyLevel(ConsistencyLevel.LOCAL_ONE);
+      await()
+          .atMost(60, TimeUnit.SECONDS)
+          .pollDelay(0, TimeUnit.MILLISECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .until(
+              () -> {
+                List<Host> plan =
+                    newArrayList(
+                        cluster
+                            .getConfiguration()
+                            .getPolicies()
+                            .getLoadBalancingPolicy()
+                            .newQueryPlan(null, localQuery));
+                return plan.size() == 2
+                    && plan.contains(findHost(cluster, 2))
+                    && plan.contains(findHost(cluster, 4));
+              });
+      assertThat(cluster).usesControlHost(2);
       queryTracker.query(session, 20);
 
       // then: all requests should be distributed to the remaining up nodes in local DC.
