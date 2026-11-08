@@ -247,9 +247,23 @@ public class DCAwareRoundRobinPolicyTest {
 
       sCluster.stopDC(cluster, 1);
 
-      // Wait for control connection to be re-established, needed as
-      // control connection attempts increment LBP counter.
-      assertThat(cluster).controlHost().isNotNull();
+      // Hosts become DOWN before their session pools have been removed.
+      // Wait for remote pools and control reconnection before measuring routing.
+      Collection<Host> remoteHosts =
+          newArrayList(sCluster.host(cluster, 2, 1), sCluster.host(cluster, 2, 2));
+      await()
+          .atMost(10, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                Collection<Host> connectedHosts = session.getState().getConnectedHosts();
+                Host controlHost =
+                    findOrWaitForControlConnection(cluster, 1, TimeUnit.MILLISECONDS);
+                return connectedHosts.size() == remoteHosts.size()
+                    && connectedHosts.containsAll(remoteHosts)
+                    && controlHost != null
+                    && datacenter(2).equals(controlHost.getDatacenter());
+              });
+      assertThat(cluster).controlHost().isInDatacenter(datacenter(2));
 
       // when: a query is executed 20 times and all hosts are down in local DC.
       // then: expect a NHAE for a local CL since no local replicas available.
