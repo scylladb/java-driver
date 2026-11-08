@@ -450,7 +450,23 @@ public class DCAwareRoundRobinPolicyTest {
 
       // when: A query is made and all nodes in the local dc are down.
       sCluster.stopDC(cluster, 1);
-      assertThat(cluster).controlHost().isNotNull();
+      // Hosts are marked DOWN before their session pools have been removed.
+      // Wait for pool removal and control reconnection before counting requests.
+      Collection<Host> allowedHosts =
+          Lists.newArrayList(sCluster.host(cluster, 2, 1), sCluster.host(cluster, 2, 2));
+      await()
+          .atMost(10, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                Collection<Host> connectedHosts = session.getState().getConnectedHosts();
+                Host controlHost =
+                    findOrWaitForControlConnection(cluster, 1, TimeUnit.MILLISECONDS);
+                return connectedHosts.size() == allowedHosts.size()
+                    && connectedHosts.containsAll(allowedHosts)
+                    && controlHost != null
+                    && datacenter(2).equals(controlHost.getDatacenter());
+              });
+      assertThat(cluster).controlHost().isInDatacenter(datacenter(2));
       queryTracker.reset();
       queryTracker.query(session, 20);
 
