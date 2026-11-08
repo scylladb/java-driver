@@ -558,7 +558,8 @@ public class RackAwareRoundRobinPolicyTest {
     @SuppressWarnings("deprecation")
     Cluster cluster =
         builder()
-            .addContactPoints(sCluster.address(1, 1).getAddress())
+            // Keep control reconnections from advancing the round-robin counter during queries.
+            .addContactPoints(sCluster.address(1, 2).getAddress())
             .withPort(sCluster.getBinaryPort())
             .withLoadBalancingPolicy(
                 RackAwareRoundRobinPolicy.builder()
@@ -576,7 +577,7 @@ public class RackAwareRoundRobinPolicyTest {
       sCluster.stop(cluster, 1, 5);
       sCluster.stop(cluster, 1, 3);
       sCluster.stop(cluster, 1, 1);
-      assertThat(cluster).controlHost().isNotNull();
+      assertThat(cluster).usesControlHost(2);
       queryTracker.query(session, 20);
 
       // then: all requests should be distributed to the remaining up nodes in local DC.
