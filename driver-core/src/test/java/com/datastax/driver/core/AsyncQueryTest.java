@@ -25,7 +25,9 @@ package com.datastax.driver.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.awaitility.Awaitility.await;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 import com.datastax.driver.core.exceptions.InvalidQueryException;
@@ -38,6 +40,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -76,18 +79,77 @@ public class AsyncQueryTest extends CCMTestsSupport {
 
   /** Checks that a cancelled query releases the connection (JAVA-407). */
   @Test(groups = "short")
-  public void cancelled_query_should_release_the_connection() throws InterruptedException {
-    ResultSetFuture future =
-        session().executeAsync("select release_version from system.local where key='local'");
-    future.cancel(true);
-    assertTrue(future.isCancelled());
+  public void cancelled_query_should_release_the_connection() {
+    // This test holds responses, so heartbeats must not time out and release the request instead.
+    try (Cluster cluster =
+            createClusterBuilder()
+                .withPoolingOptions(new PoolingOptions().setHeartbeatIntervalSeconds(0))
+                .build();
+        Session session = cluster.connect()) {
+      HostConnectionPool pool = getPool(session);
+      int coreConnections =
+          cluster
+              .getConfiguration()
+              .getPoolingOptions()
+              .getCoreConnectionsPerHost(HostDistance.LOCAL);
+      int connectionsPerShard =
+          (coreConnections + pool.connections.length - 1) / pool.connections.length;
+      // Pool initialization can finish before background tasks fill every Scylla shard.
+      await()
+          .pollDelay(0, TimeUnit.MILLISECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .atMost(60, TimeUnit.SECONDS)
+          .until(
+              () -> {
+                for (List<Connection> shardConnections : pool.connections) {
+                  if (shardConnections.size() < connectionsPerShard) {
+                    return false;
+                  }
+                }
+                return true;
+              });
+      List<Connection> connections = new ArrayList<>();
+      for (List<Connection> shardConnections : pool.connections) {
+        connections.addAll(shardConnections);
+      }
+      try {
+        // Hold responses until cancellation, even when the server answers before cancel is called.
+        for (Connection connection : connections) {
+          connection
+              .channel
+              .eventLoop()
+              .submit(() -> connection.channel.config().setAutoRead(false))
+              .syncUninterruptibly();
+        }
+        ResultSetFuture future =
+            session.executeAsync(
+                new SimpleStatement("select release_version from system.local where key='local'")
+                    .setReadTimeoutMillis(0));
+        await()
+            .pollDelay(0, TimeUnit.MILLISECONDS)
+            .pollInterval(500, TimeUnit.MILLISECONDS)
+            .atMost(60, TimeUnit.SECONDS)
+            .until(() -> pool.totalInFlight.get() == 1);
+        assertTrue(future.cancel(true));
+        assertTrue(future.isCancelled());
 
-    TimeUnit.MILLISECONDS.sleep(100);
-
-    HostConnectionPool pool = getPool(session());
-    for (List<Connection> shardConnections : pool.connections) {
-      for (Connection connection : shardConnections) {
-        assertEquals(connection.inFlight.get(), 0);
+        await()
+            .pollDelay(0, TimeUnit.MILLISECONDS)
+            .pollInterval(500, TimeUnit.MILLISECONDS)
+            .atMost(60, TimeUnit.SECONDS)
+            .until(() -> pool.totalInFlight.get() == 0);
+        for (Connection connection : connections) {
+          assertFalse(connection.isClosed());
+          assertEquals(connection.inFlight.get(), 0);
+        }
+      } finally {
+        for (Connection connection : connections) {
+          connection
+              .channel
+              .eventLoop()
+              .submit(() -> connection.channel.config().setAutoRead(true))
+              .syncUninterruptibly();
+        }
       }
     }
   }
