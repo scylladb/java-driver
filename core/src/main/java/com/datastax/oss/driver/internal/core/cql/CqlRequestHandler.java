@@ -258,9 +258,7 @@ public class CqlRequestHandler implements Throttled {
         // If we raced with session shutdown the timer might be closed already, rethrow with a more
         // explicit message
         result.completeExceptionally(
-            "cannot be started once stopped".equals(e.getMessage())
-                ? new SessionClosedException()
-                : e);
+            CqlTimerUtils.isStoppedTimerException(e) ? new SessionClosedException() : e);
       }
     }
     return null;
@@ -777,7 +775,7 @@ public class CqlRequestHandler implements Throttled {
       } catch (IllegalStateException e) {
         // If we're racing with session shutdown, the timer might be stopped already. We don't want
         // to schedule more executions anyway, so swallow the error.
-        if (!"cannot be started once stopped".equals(e.getMessage())) {
+        if (!CqlTimerUtils.isStoppedTimerException(e)) {
           Loggers.warnWithException(
               LOG, "[{}] Error while scheduling speculative execution", logPrefix, e);
         }

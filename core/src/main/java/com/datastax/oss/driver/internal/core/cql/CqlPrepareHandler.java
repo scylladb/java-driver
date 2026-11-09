@@ -182,7 +182,7 @@ public class CqlPrepareHandler implements Throttled {
             timeoutDuration.toNanos(),
             TimeUnit.NANOSECONDS);
       } catch (IllegalStateException e) {
-        if ("cannot be started once stopped".equals(e.getMessage())) {
+        if (CqlTimerUtils.isStoppedTimerException(e)) {
           throw new SessionClosedException();
         }
         throw e;

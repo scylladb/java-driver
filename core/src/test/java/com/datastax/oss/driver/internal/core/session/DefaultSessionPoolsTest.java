@@ -72,6 +72,7 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.util.concurrent.DefaultPromise;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import java.time.Duration;
 import java.util.Collections;
@@ -79,6 +80,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
@@ -768,17 +770,20 @@ public class DefaultSessionPoolsTest {
 
     assertThat(((DefaultSession) session).isClosing()).isFalse();
     CompletionStage<Void> closeFuture = session.closeAsync();
-    assertThat(((DefaultSession) session).isClosing()).isTrue();
-    assertThatStage(closeFuture).isNotDone();
+    try {
+      assertThat(((DefaultSession) session).isClosing()).isTrue();
+      assertThatStage(closeFuture).isNotDone();
 
-    // While closing, DefaultSession rejects execute() before it reaches the fake processor.
-    CompletionStage<AsyncResultSet> executeFuture =
-        ((DefaultSession) session)
-            .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC);
-    assertThatStage(executeFuture)
-        .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
+      // While closing, DefaultSession rejects execute() before it reaches the fake processor.
+      CompletionStage<AsyncResultSet> executeFuture =
+          ((DefaultSession) session)
+              .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC);
+      assertThatStage(executeFuture)
+          .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
+    } finally {
+      pool1CloseFuture.complete(null);
+    }
 
-    pool1CloseFuture.complete(null);
     assertThatStage(closeFuture).isSuccess();
 
     // After close completes, DefaultSession rejects execute() before it reaches the fake processor.
@@ -794,7 +799,7 @@ public class DefaultSessionPoolsTest {
   }
 
   @Test
-  public void should_force_close_all_pools_when_force_closing() {
+  public void should_force_close_all_pools_when_force_closing() throws InterruptedException {
     ChannelPool pool1 = mockPool(node1);
     ChannelPool pool2 = mockPool(node2);
     ChannelPool pool3 = mockPool(node3);
@@ -813,9 +818,25 @@ public class DefaultSessionPoolsTest {
     assertThatStage(initFuture).isSuccess();
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
-    assertThat(((DefaultSession) session).isClosing()).isFalse();
-    CompletionStage<Void> closeFuture = session.forceCloseAsync();
-    assertThat(((DefaultSession) session).isClosing()).isTrue();
+    EventExecutor adminExecutor = nettyOptions.adminEventExecutorGroup().next();
+    CountDownLatch adminActionStarted = new CountDownLatch(1);
+    CompletableFuture<Void> releaseAdminAction = new CompletableFuture<>();
+    adminExecutor.execute(
+        () -> {
+          adminActionStarted.countDown();
+          releaseAdminAction.join();
+        });
+
+    CompletionStage<Void> closeFuture;
+    try {
+      assertThat(adminActionStarted.await(5, TimeUnit.SECONDS)).isTrue();
+      assertThat(((DefaultSession) session).isClosing()).isFalse();
+      closeFuture = session.forceCloseAsync();
+      assertThat(((DefaultSession) session).isClosing()).isTrue();
+    } finally {
+      releaseAdminAction.complete(null);
+    }
+
     assertThatStage(closeFuture).isSuccess();
 
     verify(pool1, VERIFY_TIMEOUT).forceCloseAsync();
