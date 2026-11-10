@@ -18,11 +18,15 @@
  */
 package com.datastax.oss.driver.internal.core.cql;
 
+import edu.umd.cs.findbugs.annotations.NonNull;
+
 final class CqlTimerUtils {
+
+  private static final String STOPPED_TIMER_MESSAGE = "cannot be started once stopped";
 
   private CqlTimerUtils() {}
 
-  static boolean isStoppedTimerException(IllegalStateException error) {
-    return "cannot be started once stopped".equals(error.getMessage());
+  static boolean isStoppedTimerException(@NonNull IllegalStateException error) {
+    return STOPPED_TIMER_MESSAGE.equals(error.getMessage());
   }
 }
