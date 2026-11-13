@@ -85,14 +85,40 @@ public class QueryOptionsUnitTest {
   }
 
   @Test(groups = "unit")
-  public void should_throw_npe_in_equals_when_serial_consistency_is_null() {
-    // Pins current behaviour (#1188): equals dereferences serialConsistency, which may be null.
-    QueryOptions withNull = new QueryOptions().setSerialConsistencyLevel(null);
-    assertThat(new QueryOptions().equals(withNull)).isFalse();
+  public void should_reject_a_null_default_serial_consistency() {
+    // A null default used to be accepted here and then NPE on every statement that did not set its
+    // own serial level (#993). Rejecting it also means equals can no longer meet a null
+    // serialConsistency (#1188).
     try {
-      withNull.equals(new QueryOptions());
-      fail("Expected NullPointerException");
-    } catch (NullPointerException expected) {
+      new QueryOptions().setSerialConsistencyLevel(null);
+      fail("Expected a NullPointerException");
+    } catch (NullPointerException e) {
+      assertThat(e).hasMessage("serialConsistencyLevel cannot be null");
+    }
+  }
+
+  @Test(groups = "unit")
+  public void should_reject_a_non_serial_default_serial_consistency() {
+    // Same contract as Statement.setSerialConsistencyLevel (#993).
+    for (ConsistencyLevel level : ConsistencyLevel.values()) {
+      if (level.isSerial()) {
+        continue;
+      }
+      try {
+        new QueryOptions().setSerialConsistencyLevel(level);
+        fail("Expected an IllegalArgumentException for " + level);
+      } catch (IllegalArgumentException e) {
+        assertThat(e).hasMessage("Supplied consistency level is not serial: " + level);
+      }
+    }
+  }
+
+  @Test(groups = "unit")
+  public void should_accept_serial_default_serial_consistencies() {
+    for (ConsistencyLevel level :
+        new ConsistencyLevel[] {ConsistencyLevel.SERIAL, ConsistencyLevel.LOCAL_SERIAL}) {
+      assertThat(new QueryOptions().setSerialConsistencyLevel(level).getSerialConsistencyLevel())
+          .isEqualTo(level);
     }
   }
 

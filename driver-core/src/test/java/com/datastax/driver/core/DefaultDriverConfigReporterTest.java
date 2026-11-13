@@ -604,14 +604,17 @@ public class DefaultDriverConfigReporterTest {
 
   @Test(groups = "unit")
   public void should_omit_a_non_serial_default_serial_consistency() throws Exception {
-    // QueryOptions, unlike Statement, does not check that the level is serial, so a non-serial one
-    // reaches the reporter. serial-consistency is optional, so it is omitted rather than emitted as
-    // a value the schema's SERIAL/LOCAL_SERIAL enum rejects.
-    JsonNode report =
-        report(
-            Cluster.builder()
-                .withQueryOptions(
-                    new QueryOptions().setSerialConsistencyLevel(ConsistencyLevel.QUORUM)));
+    // With the setter rejecting non-serial levels, only a QueryOptions subclass overriding the
+    // getter can still hand the reporter one. serial-consistency is optional, so it is omitted
+    // rather than emitted as a value the schema's SERIAL/LOCAL_SERIAL enum rejects.
+    QueryOptions queryOptions =
+        new QueryOptions() {
+          @Override
+          public ConsistencyLevel getSerialConsistencyLevel() {
+            return ConsistencyLevel.QUORUM;
+          }
+        };
+    JsonNode report = report(Cluster.builder().withQueryOptions(queryOptions));
 
     assertThat(queryDefaults(report).has("serial-consistency")).isFalse();
     assertConformsToSchema(report);
