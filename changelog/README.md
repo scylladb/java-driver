@@ -25,6 +25,7 @@ under the License.
 -->
 
 ### 3.13.0
+- [improvement] #1413: Default application requests to LOCAL_QUORUM and LOCAL_SERIAL.
 - [bug] CASSJAVA-85: decode custom payload and warnings in correct order
 - [improvement] CASSJAVA-128: Update Netty to 4.1.138 and migrate to Java8
 

@@ -33,6 +33,23 @@ import org.testng.annotations.Test;
 public class QueryOptionsUnitTest {
 
   @Test(groups = "unit")
+  public void should_default_to_local_quorum_and_local_serial() {
+    QueryOptions options = new QueryOptions();
+    assertThat(options.getConsistencyLevel()).isEqualTo(ConsistencyLevel.LOCAL_QUORUM);
+    assertThat(options.getSerialConsistencyLevel()).isEqualTo(ConsistencyLevel.LOCAL_SERIAL);
+  }
+
+  @Test(groups = "unit")
+  public void should_preserve_explicit_previous_defaults() {
+    QueryOptions options =
+        new QueryOptions()
+            .setConsistencyLevel(ConsistencyLevel.LOCAL_ONE)
+            .setSerialConsistencyLevel(ConsistencyLevel.SERIAL);
+    assertThat(options.getConsistencyLevel()).isEqualTo(ConsistencyLevel.LOCAL_ONE);
+    assertThat(options.getSerialConsistencyLevel()).isEqualTo(ConsistencyLevel.SERIAL);
+  }
+
+  @Test(groups = "unit")
   public void should_be_equal_to_itself_and_to_default_instance() {
     QueryOptions options = new QueryOptions();
     assertThat(options).isEqualTo(options);
@@ -57,7 +74,7 @@ public class QueryOptionsUnitTest {
   @Test(groups = "unit")
   public void should_not_be_equal_when_any_compared_field_differs() {
     assertDiffers(new QueryOptions().setConsistencyLevel(ConsistencyLevel.QUORUM));
-    assertDiffers(new QueryOptions().setSerialConsistencyLevel(ConsistencyLevel.LOCAL_SERIAL));
+    assertDiffers(new QueryOptions().setSerialConsistencyLevel(ConsistencyLevel.SERIAL));
     assertDiffers(new QueryOptions().setFetchSize(42));
     assertDiffers(new QueryOptions().setDefaultIdempotence(true));
     assertDiffers(new QueryOptions().setMetadataEnabled(false));

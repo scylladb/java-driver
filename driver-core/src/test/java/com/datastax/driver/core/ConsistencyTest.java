@@ -71,7 +71,7 @@ public class ConsistencyTest {
 
   /**
    * This method checks the expected/sent serial consistency level against that which is received.
-   * ConsistencyLevel.SERIAL is the default serial consistency level, so even when sent it will
+   * ConsistencyLevel.SERIAL is the protocol default serial consistency, so even when set it will
    * return as null.
    */
   public void checkSerialCLMatch(ConsistencyLevel expected, String received) {
@@ -136,7 +136,7 @@ public class ConsistencyTest {
   }
 
   /**
-   * When no consistency level is defined the default of LOCAL_ONE should be used.
+   * When no consistency levels are defined LOCAL_QUORUM and LOCAL_SERIAL should be used.
    *
    * @test_category consistency
    */
@@ -151,17 +151,20 @@ public class ConsistencyTest {
       // Check to ensure
       String queryString = "default_cl";
       Query clQuery = executeSimple(session, queryString, null, null);
-      assertTrue(clQuery.getConsistency().equals(ConsistencyLevel.LOCAL_ONE.toString()));
+      assertTrue(clQuery.getConsistency().equals(ConsistencyLevel.LOCAL_QUORUM.toString()));
+      checkSerialCLMatch(ConsistencyLevel.LOCAL_SERIAL, clQuery.getSerialConsistency());
 
       // Check prepared statement default CL
       String prepareString = "prepared_default_cl";
       PreparedStatementExecution pse = executePrepared(session, prepareString, null, null);
-      assertTrue(pse.getConsistency().equals(ConsistencyLevel.LOCAL_ONE.toString()));
+      assertTrue(pse.getConsistency().equals(ConsistencyLevel.LOCAL_QUORUM.toString()));
+      checkSerialCLMatch(ConsistencyLevel.LOCAL_SERIAL, pse.getSerialConsistency());
 
       // Check batch statement default CL
       String batchStateString = "batch_default_cl";
       BatchExecution batch = executeBatch(session, batchStateString, null, null);
-      assertTrue(batch.getConsistency().equals(ConsistencyLevel.LOCAL_ONE.toString()));
+      assertTrue(batch.getConsistency().equals(ConsistencyLevel.LOCAL_QUORUM.toString()));
+      checkSerialCLMatch(ConsistencyLevel.LOCAL_SERIAL, batch.getSerialConsistency());
     } finally {
       cluster.close();
     }
@@ -308,7 +311,7 @@ public class ConsistencyTest {
       Session session = cluster.connect();
       // Construct unique query, with no CL defined.
       String queryString = "serial_query_cl";
-      Query clQuery = executeSimple(session, queryString, null, cl);
+      Query clQuery = executeSimple(session, queryString, null, null);
       checkSerialCLMatch(cl, clQuery.getSerialConsistency());
 
       // Check prepared statement CL

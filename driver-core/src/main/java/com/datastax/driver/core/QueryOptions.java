@@ -27,13 +27,15 @@ import com.google.common.util.concurrent.MoreExecutors;
 /** Options related to defaults for individual queries. */
 public class QueryOptions {
 
-  /** The default consistency level for queries: {@link ConsistencyLevel#LOCAL_ONE}. */
-  public static final ConsistencyLevel DEFAULT_CONSISTENCY_LEVEL = ConsistencyLevel.LOCAL_ONE;
+  /** The default consistency level for queries: {@link ConsistencyLevel#LOCAL_QUORUM}. */
+  public static final ConsistencyLevel DEFAULT_CONSISTENCY_LEVEL = ConsistencyLevel.LOCAL_QUORUM;
 
   /**
-   * The default serial consistency level for conditional updates: {@link ConsistencyLevel#SERIAL}.
+   * The default serial consistency level for conditional updates: {@link
+   * ConsistencyLevel#LOCAL_SERIAL}.
    */
-  public static final ConsistencyLevel DEFAULT_SERIAL_CONSISTENCY_LEVEL = ConsistencyLevel.SERIAL;
+  public static final ConsistencyLevel DEFAULT_SERIAL_CONSISTENCY_LEVEL =
+      ConsistencyLevel.LOCAL_SERIAL;
 
   /** The default fetch size for SELECT queries: 5000. */
   public static final int DEFAULT_FETCH_SIZE = 5000;
