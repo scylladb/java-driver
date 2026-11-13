@@ -504,6 +504,48 @@ public class NodeStateManagerTest {
   }
 
   @Test
+  public void should_keep_node_forced_down_if_reconnection_starts_with_no_connections() {
+    new NodeStateManager(context);
+    node1.state = NodeState.UP;
+    node1.openConnections = 1;
+
+    eventBus.fire(TopologyEvent.forceDown(node1.getBroadcastRpcAddress().get()));
+    waitForPendingAdminTasks();
+    eventBus.fire(ChannelEvent.channelClosed(node1));
+    eventBus.fire(ChannelEvent.reconnectionStarted(node1));
+    waitForPendingAdminTasks();
+
+    assertThat(node1.state).isEqualTo(NodeState.FORCED_DOWN);
+    assertThat(node1.openConnections).isEqualTo(0);
+    assertThat(node1.reconnections).isEqualTo(1);
+    assertThat(node1.getUpSinceMillis()).isEqualTo(-1);
+    verify(eventBus).fire(NodeStateEvent.changed(NodeState.UP, NodeState.FORCED_DOWN, node1));
+    verify(eventBus, never())
+        .fire(NodeStateEvent.changed(NodeState.FORCED_DOWN, NodeState.DOWN, node1));
+  }
+
+  @Test
+  public void should_keep_node_forced_down_if_last_connection_closes_while_reconnecting() {
+    new NodeStateManager(context);
+    node1.state = NodeState.UP;
+    node1.openConnections = 1;
+
+    eventBus.fire(ChannelEvent.reconnectionStarted(node1));
+    eventBus.fire(TopologyEvent.forceDown(node1.getBroadcastRpcAddress().get()));
+    waitForPendingAdminTasks();
+    eventBus.fire(ChannelEvent.channelClosed(node1));
+    waitForPendingAdminTasks();
+
+    assertThat(node1.state).isEqualTo(NodeState.FORCED_DOWN);
+    assertThat(node1.openConnections).isEqualTo(0);
+    assertThat(node1.reconnections).isEqualTo(1);
+    assertThat(node1.getUpSinceMillis()).isEqualTo(-1);
+    verify(eventBus).fire(NodeStateEvent.changed(NodeState.UP, NodeState.FORCED_DOWN, node1));
+    verify(eventBus, never())
+        .fire(NodeStateEvent.changed(NodeState.FORCED_DOWN, NodeState.DOWN, node1));
+  }
+
+  @Test
   public void should_keep_node_up_if_reconnection_starts_with_some_connections() {
     new NodeStateManager(context);
 

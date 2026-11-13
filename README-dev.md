@@ -76,25 +76,21 @@ matches none of the classes.
 an error rather than a silent "off", because a run that quietly skipped the agent only shows up
 much later, when `make coverage-report` finds nothing to aggregate.
 
-In CI, the unit and integration lanes in `tests@v1.yml` run with `COVERAGE=true` and upload their
-execution data; the "Coverage report" job aggregates it and writes both the lanes it actually
-received data from and the resulting percentage to its job summary, then attaches the HTML report
-as an artifact. That job is `continue-on-error`, so a flaky integration test costs the metric some
-data rather than adding a second failure to the pull request. Collecting from the existing lanes
-rather than a dedicated workflow keeps the Scylla suite from being run twice.
+CI uses JDK 11 for PR unit coverage and combined reduced-suite queue coverage. Full runs collect
+coverage only on JDK 17. Reports are labelled `unit`, `reduced`, and `full`; PR comparisons use
+unit coverage. Every report checks its expected lanes, module execution data, and compiler JDK
+before publishing. Failed test runs retain diagnostic artifacts. Coverage percentages are
+informational, while missing data or a failed upload fails the coverage job.
 
-When every test lane passed and handed over execution data, the next job uploads that `jacoco.xml`
-to [Codecov](https://codecov.io/gh/scylladb/java-driver), which comments the coverage delta on the
-pull request. Its statuses are informational, so a drop never blocks a merge. The upload runs only
-in scylladb/java-driver; a fork's push runs skip it.
+After merging, a small workflow reuses successful queue coverage only when its provenance,
+checksums, and Git tree match the merged commit. It never reruns tests and skips direct pushes
+without matching queue evidence. See [CI and merge queue rollout](.github/CI.md) for triggers,
+release skip inputs, and activation prerequisites.
 
-Only the lanes on `COVERAGE_JAVA_VERSION` (a workflow-level variable, JDK 17) are instrumented.
 javac 11 and javac 17 do not emit the same bytes for the same source even under `--release 11` --
 they order the constant pool differently -- so the class ids differ, and a report rendered against
-one compiler's classes cannot see the other's execution data. Instrumenting the JDK 11 lanes would
-not have added anything to the number; it would only have slowed them down. Each lane records the
-JDK it ran on alongside its execution data and the aggregating job refuses anything that does not
-match its own, so a future matrix change cannot quietly reintroduce the mismatch.
+one compiler's classes cannot see the other's execution data. Each lane records its JDK alongside
+its execution data, and the aggregating job refuses anything that does not match its own.
 
 JaCoCo matches execution data to classes by an id derived from the compiled bytes, so the data has
 to come from the same build of the classes the report is rendered against. When they diverge it

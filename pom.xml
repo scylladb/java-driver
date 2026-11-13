@@ -27,7 +27,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.scylladb</groupId>
   <artifactId>java-driver-parent</artifactId>
-  <version>4.19.4.0-SNAPSHOT</version>
+  <version>4.19.4.1-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Java Driver for Scylla and Apache Cassandra</name>
   <description>A driver for Scylla and Apache Cassandra(R) 2.1+ that works exclusively with the Cassandra Query Language version 3 (CQL3) and Cassandra's native protocol versions 3 and above.</description>
@@ -65,11 +65,11 @@
         rejects as an option.
     -->
     <argLine/>
-    <config.version>1.4.9</config.version>
+    <config.version>1.4.10</config.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <hdrhistogram.version>2.2.2</hdrhistogram.version>
     <metrics.version>4.2.40</metrics.version>
-    <netty.version>4.1.138.Final</netty.version>
+    <netty.version>4.2.20.Final</netty.version>
     <esri.version>2.2.4</esri.version>
     <!-- Needed only to compile deprecated Graph compatibility signatures. -->
     <tinkerpop.version>3.5.6</tinkerpop.version>
@@ -77,15 +77,15 @@
     <slf4j.version>2.0.20</slf4j.version>
     <!-- when changing version also update version in LICENSE_binary  -->
     <reactive-streams.version>1.0.4</reactive-streams.version>
-    <jackson.version>2.22.4</jackson.version>
+    <jackson.version>2.23.0</jackson.version>
     <!-- optional dependencies -->
     <snappy.version>1.1.10.12</snappy.version>
-    <lz4.version>1.12.1</lz4.version>
+    <lz4.version>1.14.0</lz4.version>
     <!-- test dependencies -->
     <assertj.version>3.27.7</assertj.version>
     <commons-exec.version>1.6.0</commons-exec.version>
     <junit.version>4.13.2</junit.version>
-    <logback.version>1.5.32</logback.version>
+    <logback.version>1.6.6</logback.version>
     <osgi.version>6.0.0</osgi.version>
     <felix.version>7.0.5</felix.version>
     <pax-exam.version>4.13.4</pax-exam.version>
@@ -206,7 +206,7 @@
         <!-- Version of Guava used in shaded module and for integration tests. -->
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>33.7.1-jre</version>
+        <version>33.8.0-jre</version>
       </dependency>
       <dependency>
         <groupId>com.typesafe</groupId>
@@ -237,7 +237,7 @@
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
         <!-- when changing version also update jnr-* and asm versions in LICENSE_binary  -->
-        <version>3.1.22</version>
+        <version>3.2.8</version>
       </dependency>
       <dependency>
         <groupId>io.dropwizard.metrics</groupId>
@@ -295,7 +295,7 @@
       <dependency>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-annotations</artifactId>
-        <version>4.9.8</version>
+        <version>4.10.5</version>
       </dependency>
       <dependency>
         <groupId>com.squareup</groupId>
@@ -320,7 +320,7 @@
       <dependency>
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy</artifactId>
-        <version>1.18.16-jdk5</version>
+        <version>1.18.17-jdk5</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -440,7 +440,7 @@
       <dependency>
         <groupId>com.google.testing.compile</groupId>
         <artifactId>compile-testing</artifactId>
-        <version>0.23.0</version>
+        <version>0.24.0</version>
       </dependency>
       <dependency>
         <groupId>org.awaitility</groupId>
@@ -465,7 +465,7 @@
       <dependency>
         <groupId>io.micrometer</groupId>
         <artifactId>micrometer-core</artifactId>
-        <version>1.15.12</version>
+        <version>1.17.2</version>
       </dependency>
       <dependency>
         <groupId>org.eclipse.microprofile.metrics</groupId>
@@ -516,7 +516,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.15.0</version>
+          <version>3.16.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -553,7 +553,7 @@
         <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
-          <version>4.9.10</version>
+          <version>4.10.0</version>
           <configuration>
             <scalaVersion>2.11</scalaVersion>
             <args>
@@ -584,11 +584,11 @@
         </plugin>
         <plugin>
           <artifactId>maven-install-plugin</artifactId>
-          <version>3.1.4</version>
+          <version>3.2.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-deploy-plugin</artifactId>
-          <version>3.1.4</version>
+          <version>3.2.0</version>
           <configuration>
             <deployAtEnd>true</deployAtEnd>
           </configuration>
@@ -604,7 +604,7 @@
         </plugin>
         <plugin>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>3.10.0</version>
+          <version>3.11.0</version>
         </plugin>
         <plugin>
           <groupId>org.jacoco</groupId>
@@ -658,7 +658,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
-          <version>3.5.0</version>
+          <version>3.7.0</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -919,7 +919,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           <dependency>
             <groupId>org.apache.maven.scm</groupId>
             <artifactId>maven-scm-provider-gitexe</artifactId>
-            <version>1.9.5</version>
+            <version>1.13.0</version>
+          </dependency>
+          <dependency>
+            <groupId>org.apache.maven.scm</groupId>
+            <artifactId>maven-scm-api</artifactId>
+            <version>1.13.0</version>
           </dependency>
         </dependencies>
       </plugin>
