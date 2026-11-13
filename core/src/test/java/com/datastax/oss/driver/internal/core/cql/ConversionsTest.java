@@ -22,14 +22,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.datastax.oss.driver.api.core.ConsistencyLevel;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.config.OptionsMap;
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinition;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
+import com.datastax.oss.driver.api.core.cql.DefaultBatchType;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.schema.ColumnMetadata;
 import com.datastax.oss.driver.api.core.time.TimestampGenerator;
@@ -39,8 +46,13 @@ import com.datastax.oss.driver.internal.core.ProtocolVersionRegistry;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.protocol.internal.Message;
+import com.datastax.oss.protocol.internal.ProtocolConstants;
+import com.datastax.oss.protocol.internal.request.Batch;
 import com.datastax.oss.protocol.internal.request.Execute;
+import com.datastax.oss.protocol.internal.request.Query;
+import com.datastax.oss.protocol.internal.request.query.QueryOptions;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.List;
 import org.junit.Test;
 
@@ -122,6 +134,77 @@ public class ConversionsTest {
     Execute execute = (Execute) message;
     assertThat(execute.options.namedValues).isEmpty();
     assertThat(execute.options.positionalValues).isEqualTo(values);
+  }
+
+  @Test
+  public void should_apply_bundled_and_map_defaults_to_query_execute_and_batch() {
+    for (DriverConfigLoader loader :
+        new DriverConfigLoader[] {
+          DriverConfigLoader.fromString(""), DriverConfigLoader.fromMap(OptionsMap.driverDefaults())
+        }) {
+      DriverExecutionProfile profile = loader.getInitialConfig().getDefaultProfile();
+      for (Statement<?> statement : statements(null, null)) {
+        assertConsistency(
+            Conversions.toMessage(statement, profile, context()),
+            ProtocolConstants.ConsistencyLevel.LOCAL_QUORUM,
+            ProtocolConstants.ConsistencyLevel.LOCAL_SERIAL);
+      }
+      for (Statement<?> statement :
+          statements(DefaultConsistencyLevel.LOCAL_ONE, DefaultConsistencyLevel.SERIAL)) {
+        assertConsistency(
+            Conversions.toMessage(statement, profile, context()),
+            ProtocolConstants.ConsistencyLevel.LOCAL_ONE,
+            ProtocolConstants.ConsistencyLevel.SERIAL);
+      }
+    }
+  }
+
+  @Test
+  public void should_preserve_execution_profile_overrides() {
+    DriverConfigLoader loader =
+        DriverConfigLoader.fromString(
+            "datastax-java-driver.profiles.legacy.basic.request {"
+                + "consistency = LOCAL_ONE, serial-consistency = SERIAL }");
+    InternalDriverContext context = context();
+    when(context.getConfig()).thenReturn(loader.getInitialConfig());
+    Statement<?> statement =
+        SimpleStatement.newInstance("INSERT INTO t (k) VALUES (1) IF NOT EXISTS")
+            .setExecutionProfileName("legacy");
+    assertConsistency(
+        Conversions.toMessage(
+            statement, Conversions.resolveExecutionProfile(statement, context), context),
+        ProtocolConstants.ConsistencyLevel.LOCAL_ONE,
+        ProtocolConstants.ConsistencyLevel.SERIAL);
+  }
+
+  private List<Statement<?>> statements(ConsistencyLevel consistency, ConsistencyLevel serial) {
+    SimpleStatement simple =
+        SimpleStatement.newInstance("INSERT INTO t (k) VALUES (1) IF NOT EXISTS");
+    BoundStatement bound = boundStatement(Collections.emptyList());
+    BatchStatement batch = BatchStatement.newInstance(DefaultBatchType.LOGGED, simple);
+    if (consistency != null) {
+      simple = simple.setConsistencyLevel(consistency);
+      when(bound.getConsistencyLevel()).thenReturn(consistency);
+      batch = batch.setConsistencyLevel(consistency);
+    }
+    if (serial != null) {
+      simple = simple.setSerialConsistencyLevel(serial);
+      when(bound.getSerialConsistencyLevel()).thenReturn(serial);
+      batch = batch.setSerialConsistencyLevel(serial);
+    }
+    return ImmutableList.of(simple, bound, batch);
+  }
+
+  private void assertConsistency(Message message, int consistency, int serial) {
+    if (message instanceof Batch) {
+      assertThat(((Batch) message).consistency).isEqualTo(consistency);
+      assertThat(((Batch) message).serialConsistency).isEqualTo(serial);
+    } else {
+      QueryOptions options =
+          message instanceof Query ? ((Query) message).options : ((Execute) message).options;
+      assertThat(options.consistency).isEqualTo(consistency);
+      assertThat(options.serialConsistency).isEqualTo(serial);
+    }
   }
 
   private BoundStatement boundStatement(List<ByteBuffer> values) {

@@ -22,6 +22,7 @@ under the License.
 <!-- Note: contrary to 3.x, insert new entries *first* in their section -->
 
 ### 4.19.4
+- [improvement] #1413: Default application requests to LOCAL_QUORUM and LOCAL_SERIAL.
 
 - [improvement] CASSJAVA-137: Bump Netty to 4.1.138
 - [bug] CASSJAVA-136: Ninja fix to correct geometry equality actually broke geometry equality
