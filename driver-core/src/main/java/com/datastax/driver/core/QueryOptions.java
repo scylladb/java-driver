@@ -627,7 +627,7 @@ public class QueryOptions {
     QueryOptions other = (QueryOptions) that;
 
     return (this.consistency.equals(other.consistency)
-            && this.serialConsistency.equals(other.serialConsistency)
+            && this.serialConsistency == other.serialConsistency
             && this.fetchSize == other.fetchSize
             && this.defaultIdempotence == other.defaultIdempotence
             && this.metadataEnabled == other.metadataEnabled
