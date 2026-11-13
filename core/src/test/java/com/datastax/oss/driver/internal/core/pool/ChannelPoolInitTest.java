@@ -43,6 +43,7 @@ import com.datastax.oss.driver.internal.core.metadata.TopologyEvent;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.mockito.InOrder;
 
@@ -72,6 +73,35 @@ public class ChannelPoolInitTest extends ChannelPoolTestBase {
     verify(eventBus, VERIFY_TIMEOUT.times(3)).fire(ChannelEvent.channelOpened(node));
 
     factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_sum_in_flight_across_all_shards() throws Exception {
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    final DriverChannel channel1 = newMockDriverChannel(1);
+    final DriverChannel channel2 = newMockDriverChannel(2);
+    final DriverChannel channel3 = newMockDriverChannel(3);
+    final MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory).success(node, channel1).build();
+
+    final ChannelPool pool =
+        ChannelPool.init(node, null, NodeDistance.LOCAL, context, "test")
+            .toCompletableFuture()
+            .get(2, TimeUnit.SECONDS);
+    factoryHelper.waitForCalls(node, 1);
+
+    final ChannelSet shard0 = new ChannelSet();
+    shard0.add(channel1);
+    shard0.add(channel2);
+    final ChannelSet shard1 = new ChannelSet();
+    shard1.add(channel3);
+    pool.channels = new ChannelSet[] {shard0, shard1, new ChannelSet()};
+    when(channel1.getInFlight()).thenReturn(1);
+    when(channel2.getInFlight()).thenReturn(2);
+    when(channel3.getInFlight()).thenReturn(4);
+
+    assertThat(pool.getInFlight()).isEqualTo(7);
   }
 
   @Test

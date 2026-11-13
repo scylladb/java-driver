@@ -1,0 +1,750 @@
+name: 'Tests (Driver 4.x)'
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches: [scylla-4.x]
+  merge_group:
+    branches: [scylla-4.x]
+    types: [checks_requested]
+  workflow_dispatch:
+    inputs:
+      full-suite:
+        type: boolean
+        description: Run the full two-JDK and Cassandra/Scylla matrix
+        default: true
+  workflow_call:
+    inputs:
+      test-ref:
+        type: string
+        description: Resolved commit to test
+        default: ''
+      driver-version:
+        type: string
+        description: Effective version to build and test
+        default: ''
+      full-suite:
+        type: boolean
+        default: true
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+
+# PR updates supersede that PR's work. Queue candidates never cancel each other.
+concurrency:
+  group: tests-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}-${{ inputs.test-ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# JaCoCo class IDs depend on javac's output. Never merge data across JDKs.
+env:
+  COVERAGE_JAVA_VERSION: ${{ inputs.full-suite && '17' || '11' }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        java-version: ${{ fromJSON(inputs.full-suite && '[11,17]' || '[11]') }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.test-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Set effective driver version
+        if: inputs.driver-version != ''
+        env:
+          DRIVER_VERSION: ${{ inputs.driver-version }}
+        run: |
+          mvn -B -ntp versions:set "-DnewVersion=$DRIVER_VERSION" -DgenerateBackupPoms=false
+          mvn -B -ntp xml-format:xml-format
+
+      - name: Get POM hash
+        id: get-pom-hash
+        run: echo "value=${{ hashFiles('**/pom.xml') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: java-cache
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
+
+      - name: Compile source and tests
+        run: make compile-all
+
+      - name: Download test dependencies
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        run: make download-all-dependencies
+
+      - name: Save maven repository cache
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: steps.java-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ steps.get-pom-hash.outputs.value }}
+
+  verify:
+    name: Full verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        java-version: ${{ fromJSON(inputs.full-suite && '[11,17]' || '[11]') }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.test-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Set effective driver version
+        if: inputs.driver-version != ''
+        env:
+          DRIVER_VERSION: ${{ inputs.driver-version }}
+        run: |
+          mvn -B -ntp versions:set "-DnewVersion=$DRIVER_VERSION" -DgenerateBackupPoms=false
+          mvn -B -ntp xml-format:xml-format
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Full verify
+        run: make check
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      matrix:
+        java-version: ${{ fromJSON(inputs.full-suite && '[11,17]' || '[11]') }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.test-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Set effective driver version
+        if: inputs.driver-version != ''
+        env:
+          DRIVER_VERSION: ${{ inputs.driver-version }}
+        run: |
+          mvn -B -ntp versions:set "-DnewVersion=$DRIVER_VERSION" -DgenerateBackupPoms=false
+          mvn -B -ntp xml-format:xml-format
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Run unit tests
+        env:
+          COVERAGE: ${{ matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: make test-unit
+
+      # Flattened to one file per module so the artifact layout does not depend
+      # on how many modules happened to produce data, and named per lane so the
+      # aggregating job can keep each lane's contribution apart.
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: |
+          shopt -s nullglob
+          mkdir -p coverage-exec
+          # Read back by the aggregating job, which refuses data compiled by a
+          # different javac than the one it renders the report against.
+          echo '${{ matrix.java-version }}' > coverage-exec/jdk.txt
+          for exec_file in */target/jacoco.exec metrics/*/target/jacoco.exec; do
+            module="${exec_file%/target/jacoco.exec}"
+            cp "$exec_file" "coverage-exec/${module//\//-}.exec"
+          done
+          ls -l coverage-exec
+
+      - name: Upload coverage execution data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        with:
+          name: coverage-exec-unit-${{ matrix.java-version }}
+          path: coverage-exec/
+          if-no-files-found: warn
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: test-results-${{ matrix.java-version }}
+          path: "*/**/target/*-reports/*.xml"
+
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
+        if: always()
+        with:
+          check_name: Unit tests report (JDK ${{ matrix.java-version }})
+          require_tests: true
+          report_paths: "*/**/target/*-reports/TEST-*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
+
+  cassandra-integration-tests:
+    if: inputs.full-suite
+    name: Cassandra ITs
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    strategy:
+      matrix:
+        cassandra-version: [3-LATEST, 4-LATEST]
+        java-version: [11, 17]
+        test-group: [parallelizable, serial, isolated]
+        exclude:
+          - cassandra-version: 3-LATEST
+            java-version: 17
+          - cassandra-version: 4-LATEST
+            java-version: 11
+      fail-fast: false
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.test-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Set effective driver version
+        if: inputs.driver-version != ''
+        env:
+          DRIVER_VERSION: ${{ inputs.driver-version }}
+        run: |
+          mvn -B -ntp versions:set "-DnewVersion=$DRIVER_VERSION" -DgenerateBackupPoms=false
+          mvn -B -ntp xml-format:xml-format
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Setup Python 3
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+
+      - name: Setup environment
+        run: make install-cassandra-ccm
+
+      - name: Get cassandra version
+        id: cassandra-version
+        env:
+          CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
+          GET_VERSION_VERSION: 0.4.5
+          GH_TOKEN: ${{ github.token }}
+        run: make resolve-cassandra-version
+
+      - name: Pull CCM image from the cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: ccm-cache
+        with:
+          path: ~/.ccm/repository
+          key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
+
+      - name: Download Cassandra (${{ steps.cassandra-version.outputs.value }}) image
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        env:
+          CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+          GET_VERSION_VERSION: 0.4.5
+        run: make download-cassandra
+
+      - name: Save CCM image into the cache
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.ccm/repository
+          key: ccm-cassandra-${{ runner.os }}-${{ steps.cassandra-version.outputs.value }}
+
+      - name: Determine test skip args
+        id: test-skip-args
+        run: |
+          case "${{ matrix.test-group }}" in
+            parallelizable) echo "value=-DskipSerialITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            serial)         echo "value=-DskipParallelizableITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            isolated)       echo "value=-DskipParallelizableITs=true -DskipSerialITs=true" >> "$GITHUB_OUTPUT" ;;
+            all)            echo "value=" >> "$GITHUB_OUTPUT" ;;
+            *)              exit 1 ;;
+          esac
+
+      - name: Run integration tests on Cassandra (${{ steps.cassandra-version.outputs.value }}) - ${{ matrix.test-group }}
+        id: run-integration-tests
+        env:
+          CASSANDRA_VERSION: ${{ matrix.cassandra-version }}
+          CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
+          GET_VERSION_VERSION: 0.4.5
+          GH_TOKEN: ${{ github.token }}
+          MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
+          COVERAGE: ${{ matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: make test-integration-cassandra
+
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: |
+          shopt -s nullglob
+          mkdir -p coverage-exec
+          # Read back by the aggregating job, which refuses data compiled by a
+          # different javac than the one it renders the report against.
+          echo '${{ matrix.java-version }}' > coverage-exec/jdk.txt
+          for exec_file in */target/jacoco.exec metrics/*/target/jacoco.exec; do
+            module="${exec_file%/target/jacoco.exec}"
+            cp "$exec_file" "coverage-exec/${module//\//-}.exec"
+          done
+          ls -l coverage-exec
+
+      - name: Upload coverage execution data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        with:
+          name: coverage-exec-cassandra-${{ matrix.cassandra-version }}-${{ matrix.java-version }}-${{ matrix.test-group }}
+          path: coverage-exec/
+          if-no-files-found: warn
+
+      - name: Upload test results
+        if: failure() && steps.run-integration-tests.outcome == 'failure'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results-${{ matrix.java-version }}-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
+          path: "*/**/target/*-reports/*.xml"
+
+      - name: Upload CCM logs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: ccm-log-cassandra-${{ matrix.java-version }}-${{ matrix.cassandra-version }}-${{ matrix.test-group }}
+          path: /tmp/ccm*/ccm*/node*/logs/*
+
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
+        if: always()
+        with:
+          check_name: Integration tests report for Cassandra ${{ steps.cassandra-version.outputs.value }} (${{ matrix.test-group }}, JDK ${{ matrix.java-version }})
+          require_tests: true
+          report_paths: "*/**/target/*-reports/TEST-*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
+
+  scylla-integration-tests:
+    if: github.event_name != 'pull_request' || inputs.full-suite
+    name: Scylla ITs
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    strategy:
+      matrix:
+        include: >-
+          ${{ fromJSON(inputs.full-suite &&
+          '[
+          {"scylla-version":"LTS-LATEST","java-version":11,"test-group":"parallelizable"},
+          {"scylla-version":"LTS-LATEST","java-version":11,"test-group":"serial"},
+          {"scylla-version":"LTS-LATEST","java-version":11,"test-group":"isolated"},
+          {"scylla-version":"LTS-PRIOR","java-version":11,"test-group":"parallelizable"},
+          {"scylla-version":"LTS-PRIOR","java-version":11,"test-group":"serial"},
+          {"scylla-version":"LTS-PRIOR","java-version":11,"test-group":"isolated"},
+          {"scylla-version":"LATEST","java-version":17,"test-group":"parallelizable"},
+          {"scylla-version":"LATEST","java-version":17,"test-group":"serial"},
+          {"scylla-version":"LATEST","java-version":17,"test-group":"isolated"}
+          ]' ||
+          '[
+          {"scylla-version":"LTS-PRIOR","java-version":11,"test-group":"all"},
+          {"scylla-version":"LATEST","java-version":11,"test-group":"all"}
+          ]') }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.test-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+
+      - name: Set effective driver version
+        if: inputs.driver-version != ''
+        env:
+          DRIVER_VERSION: ${{ inputs.driver-version }}
+        run: |
+          mvn -B -ntp versions:set "-DnewVersion=$DRIVER_VERSION" -DgenerateBackupPoms=false
+          mvn -B -ntp xml-format:xml-format
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ matrix.java-version }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Setup Python 3
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.13'
+
+      - name: Install CCM
+        run: make install-scylla-ccm
+
+      - name: Get scylla version
+        id: scylla-version
+        env:
+          SCYLLA_VERSION: ${{ matrix.scylla-version }}
+          GH_TOKEN: ${{ github.token }}
+        run: make resolve-scylla-version
+
+      - name: Pull CCM image from the cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        id: ccm-cache
+        with:
+          path: ~/.ccm/scylla-repository
+          key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
+
+      - name: Download Scylla (${{ steps.scylla-version.outputs.value }}) image
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        env:
+          SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
+        run: make download-scylla
+
+      - name: Save CCM image into the cache
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: steps.ccm-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.ccm/scylla-repository
+          key: ccm-scylla-${{ runner.os }}-${{ steps.scylla-version.outputs.value }}
+
+      - name: Determine test skip args
+        id: test-skip-args
+        run: |
+          case "${{ matrix.test-group }}" in
+            parallelizable) echo "value=-DskipSerialITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            serial)         echo "value=-DskipParallelizableITs=true -DskipIsolatedITs=true" >> "$GITHUB_OUTPUT" ;;
+            isolated)       echo "value=-DskipParallelizableITs=true -DskipSerialITs=true" >> "$GITHUB_OUTPUT" ;;
+            all)            echo "value=" >> "$GITHUB_OUTPUT" ;;
+            *)              exit 1 ;;
+          esac
+
+      - name: Reserve shard-aware test source ports
+        if: matrix.test-group == 'isolated' || matrix.test-group == 'all'
+        run: |
+          reserved="$(cat /proc/sys/net/ipv4/ip_local_reserved_ports)"
+          range="20000-22000"
+          if [[ -n "$reserved" ]]; then
+            range="$reserved,$range"
+          fi
+          echo "$range" | sudo tee /proc/sys/net/ipv4/ip_local_reserved_ports
+
+      - name: Run integration tests on Scylla (${{ steps.scylla-version.outputs.value }}) - ${{ matrix.test-group }}
+        id: run-integration-tests
+        env:
+          SCYLLA_VERSION_RESOLVED: ${{ steps.scylla-version.outputs.value }}
+          MAVEN_EXTRA_ARGS: ${{ steps.test-skip-args.outputs.value }}
+          COVERAGE: ${{ matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: make test-integration-scylla
+
+      - name: Collect coverage execution data
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        run: |
+          shopt -s nullglob
+          mkdir -p coverage-exec
+          # Read back by the aggregating job, which refuses data compiled by a
+          # different javac than the one it renders the report against.
+          echo '${{ matrix.java-version }}' > coverage-exec/jdk.txt
+          for exec_file in */target/jacoco.exec metrics/*/target/jacoco.exec; do
+            module="${exec_file%/target/jacoco.exec}"
+            cp "$exec_file" "coverage-exec/${module//\//-}.exec"
+          done
+          ls -l coverage-exec
+
+      - name: Upload coverage execution data
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() && matrix.java-version == env.COVERAGE_JAVA_VERSION }}
+        with:
+          name: coverage-exec-scylla-${{ matrix.scylla-version }}-${{ matrix.java-version }}-${{ matrix.test-group }}
+          path: coverage-exec/
+          if-no-files-found: warn
+
+      - name: Upload test results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure() && steps.run-integration-tests.outcome == 'failure'
+        with:
+          name: test-results-${{ matrix.java-version }}-${{ matrix.scylla-version }}-${{ matrix.test-group }}
+          path: "*/**/target/*-reports/*.xml"
+
+      - name: Upload CCM logs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: ccm-log-scylla-${{ matrix.java-version }}-${{ matrix.scylla-version }}-${{ matrix.test-group }}
+          path: /tmp/ccm*/ccm*/node*/logs/*
+
+      - name: Parse test results
+        uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
+        if: always()
+        with:
+          check_name: Integration tests report for Scylla ${{ steps.scylla-version.outputs.value }} (${{ matrix.test-group }}, JDK ${{ matrix.java-version }})
+          require_tests: true
+          report_paths: "*/**/target/*-reports/TEST-*.xml"
+          follow_symlink: true
+          detailed_summary: true
+          updateComment: false
+          skip_annotations: true
+
+  release-credential-safety:
+    uses: ./.github/workflows/release-credential-safety.yml
+    with:
+      test-ref: ${{ github.sha }}
+    permissions:
+      contents: read
+
+  release-notes-guard:
+    uses: ./.github/workflows/release-notes-guard.yml
+    with:
+      test-ref: ${{ github.sha }}
+    permissions:
+      contents: read
+
+  gate:
+    name: CI gate
+    runs-on: ubuntu-latest
+    needs: [build, verify, unit-tests, cassandra-integration-tests, scylla-integration-tests, release-credential-safety, release-notes-guard, coverage-report]
+    if: always()
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Require every expected job to pass
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          FULL_SUITE: ${{ inputs.full-suite || false }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          results = json.loads(os.environ['RESULTS'])
+          required = ['build', 'verify', 'unit-tests', 'release-credential-safety',
+                      'release-notes-guard', 'coverage-report']
+          full = os.environ['FULL_SUITE'] == 'true'
+          if full or os.environ['EVENT'] != 'pull_request':
+              required.append('scylla-integration-tests')
+          if full:
+              required.append('cassandra-integration-tests')
+          failed = [job for job in required if results.get(job, {}).get('result') != 'success']
+          for job in failed:
+              print(f"::error::{job}: {results.get(job, {}).get('result', 'missing')}")
+          sys.exit(bool(failed))
+          PY
+
+  coverage-report:
+    name: Coverage (${{ matrix.profile }}, JDK ${{ inputs.full-suite && '17' || '11' }})
+    runs-on: ubuntu-latest
+    needs: [unit-tests, cassandra-integration-tests, scylla-integration-tests]
+    if: ${{ !cancelled() }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: ${{ fromJSON((github.event_name == 'pull_request' && !inputs.full-suite) && '["unit"]' || '["unit","combined"]') }}
+    env:
+      FULL_SUITE: ${{ inputs.full-suite || false }}
+      PROFILE: ${{ matrix.profile == 'unit' && 'unit' || (inputs.full-suite && 'full' || 'reduced') }}
+      RESULTS: ${{ toJSON(needs) }}
+      MVNCMD: mvn -B -ntp
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.test-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Set up coverage JDK
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: ${{ env.COVERAGE_JAVA_VERSION }}
+          distribution: temurin
+
+      - name: Set effective driver version
+        if: inputs.driver-version != ''
+        env:
+          DRIVER_VERSION: ${{ inputs.driver-version }}
+        run: |
+          mvn -B -ntp versions:set "-DnewVersion=$DRIVER_VERSION" -DgenerateBackupPoms=false
+          mvn -B -ntp xml-format:xml-format
+
+      - name: Restore maven repository cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-${{ env.COVERAGE_JAVA_VERSION }}-maven-${{ hashFiles('**/pom.xml') }}
+
+      - name: Download coverage execution data
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: ${{ matrix.profile == 'unit' && 'coverage-exec-unit-*' || 'coverage-exec-*' }}
+          path: coverage-exec
+
+      - name: Validate and place coverage execution data
+        id: lanes
+        run: |
+          python3 - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+          jdk = os.environ['COVERAGE_JAVA_VERSION']
+          full = os.environ['FULL_SUITE'] == 'true'
+          profile = os.environ['PROFILE']
+          expected = {f'coverage-exec-unit-{jdk}'}
+          required = ['unit-tests']
+          if profile != 'unit':
+              required.append('scylla-integration-tests')
+              if full:
+                  required.append('cassandra-integration-tests')
+                  expected |= {f'coverage-exec-{db}-{version}-17-{group}'
+                               for db, version in [('cassandra', '4-LATEST'), ('scylla', 'LATEST')]
+                               for group in ['parallelizable', 'serial', 'isolated']}
+              else:
+                  expected |= {f'coverage-exec-scylla-{v}-11-all' for v in ['LTS-PRIOR', 'LATEST']}
+          lanes = {p.name: p for p in Path('coverage-exec').iterdir() if p.is_dir()}
+          errors = []
+          if set(lanes) != expected:
+              errors.append(f'Incomplete coverage: expected {sorted(expected)}, got {sorted(lanes)}')
+          unit_modules = {'core', 'query-builder', 'mapper-runtime', 'mapper-processor',
+                          'metrics-micrometer', 'metrics-microprofile', 'test-infra'}
+          modules = {p.parent.as_posix().replace('/', '-'): p.parent
+                     for p in list(Path('.').glob('*/pom.xml')) + list(Path('metrics').glob('*/pom.xml'))}
+          for name, lane in lanes.items():
+              if name not in expected:
+                  continue
+              if (lane / 'jdk.txt').read_text().strip() != jdk:
+                  errors.append(f'{name}: coverage JDK mismatch')
+                  continue
+              data = {p.stem: p for p in lane.glob('*.exec') if p.stat().st_size}
+              needed = unit_modules if name.startswith('coverage-exec-unit-') else {'integration-tests'}
+              if not needed <= data.keys():
+                  errors.append(f'{name}: missing execution data for {sorted(needed - data.keys())}')
+              for module, source in data.items():
+                  if module not in modules:
+                      errors.append(f'{name}: unknown execution module {module}')
+                      continue
+                  target = modules[module] / 'target'
+                  target.mkdir(exist_ok=True)
+                  shutil.copyfile(source, target / f'jacoco-{name}.exec')
+          if errors:
+              raise SystemExit('\n'.join(errors))
+          results = json.loads(os.environ['RESULTS'])
+          passed = all(results[job]['result'] == 'success' for job in required)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              print(f'passed={str(passed).lower()}', file=output)
+          PY
+
+      - name: Aggregate coverage
+        if: ${{ !cancelled() && steps.lanes.outcome != 'skipped' }}
+        run: make coverage-report
+
+      - name: Retain diagnostic coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: coverage-diagnostic-${{ env.PROFILE }}
+          path: coverage-report/target/site/jacoco-aggregate
+          if-no-files-found: ignore
+
+      - name: Prepare verified report and provenance
+        if: steps.lanes.outputs.passed == 'true'
+        env:
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          TEST_EVENT: ${{ github.event_name }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, shutil, subprocess
+          from pathlib import Path
+          def git(ref):
+              return subprocess.check_output(['git', 'rev-parse', ref], text=True).strip()
+          dest = Path('verified-coverage')
+          dest.mkdir()
+          report = dest / 'jacoco.xml'
+          shutil.copyfile('coverage-report/target/site/jacoco-aggregate/jacoco.xml', report)
+          manifest = dict(repository=os.environ['GITHUB_REPOSITORY'],
+                          run_id=int(os.environ['GITHUB_RUN_ID']),
+                          run_attempt=int(os.environ['GITHUB_RUN_ATTEMPT']),
+                          workflow_ref=os.environ['WORKFLOW_REF'],
+                          workflow_sha=os.environ['WORKFLOW_SHA'], event=os.environ['TEST_EVENT'],
+                          tested_sha=git('HEAD'), tree=git('HEAD^{tree}'),
+                          profile=os.environ['PROFILE'], jdk=os.environ['COVERAGE_JAVA_VERSION'],
+                          reports={'jacoco.xml': hashlib.sha256(report.read_bytes()).hexdigest()})
+          (dest / 'manifest.json').write_text(json.dumps(manifest, sort_keys=True) + '\n')
+          PY
+
+      - name: Upload verified coverage report
+        if: steps.lanes.outputs.passed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-verified-${{ env.PROFILE }}-${{ github.run_attempt }}
+          path: verified-coverage/
+          if-no-files-found: error
+
+      - name: Upload coverage to Codecov
+        if: steps.lanes.outputs.passed == 'true' && github.repository == 'scylladb/java-driver'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          override_commit: ${{ inputs.test-ref || github.event.pull_request.head.sha || github.sha }}
+          files: verified-coverage/jacoco.xml
+          flags: ${{ env.PROFILE }}
+          name: ${{ env.PROFILE }}-jdk-${{ env.COVERAGE_JAVA_VERSION }}
+          disable_search: true
+          plugins: noop
+          fail_ci_if_error: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}

@@ -145,13 +145,15 @@ public class NodeStateManager implements AsyncAutoCloseable {
           break;
         case CLOSED:
           node.openConnections -= 1;
-          if (node.openConnections == 0 && node.reconnections > 0) {
+          if (node.state != NodeState.FORCED_DOWN
+              && node.openConnections == 0
+              && node.reconnections > 0) {
             setState(node, NodeState.DOWN, "it was reconnecting and lost its last connection");
           }
           break;
         case RECONNECTION_STARTED:
           node.reconnections += 1;
-          if (node.openConnections == 0) {
+          if (node.state != NodeState.FORCED_DOWN && node.openConnections == 0) {
             setState(node, NodeState.DOWN, "it has no connections and started reconnecting");
           }
           break;

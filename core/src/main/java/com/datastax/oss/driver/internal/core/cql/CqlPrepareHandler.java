@@ -76,6 +76,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -98,6 +99,8 @@ public class CqlPrepareHandler implements Throttled {
   private final RequestThrottler throttler;
   private final Boolean prepareOnAllNodes;
   private final DriverExecutionProfile executionProfile;
+  private final AtomicBoolean throttlerReleased = new AtomicBoolean();
+  private volatile boolean admitted;
   private volatile InitialPrepareCallback initialCallback;
 
   // The errors on the nodes that were already tried (lazily initialized on the first error).
@@ -129,7 +132,9 @@ public class CqlPrepareHandler implements Throttled {
           try {
             if (t instanceof CancellationException) {
               cancelTimeout();
-              context.getRequestThrottler().signalCancel(this);
+              if (throttlerReleased.compareAndSet(false, true)) {
+                context.getRequestThrottler().signalCancel(this);
+              }
             }
           } catch (Throwable t2) {
             Loggers.warnWithException(LOG, "[{}] Uncaught exception", logPrefix, t2);
@@ -148,18 +153,27 @@ public class CqlPrepareHandler implements Throttled {
 
   @Override
   public void onThrottleReady(boolean wasDelayed) {
-    DriverExecutionProfile executionProfile =
-        Conversions.resolveExecutionProfile(initialRequest, context);
-    if (wasDelayed) {
-      session
-          .getMetricUpdater()
-          .updateTimer(
-              DefaultSessionMetric.THROTTLING_DELAY,
-              executionProfile.getName(),
-              System.nanoTime() - startTimeNanos,
-              TimeUnit.NANOSECONDS);
+    admitted = true;
+    try {
+      if (wasDelayed) {
+        session
+            .getMetricUpdater()
+            .updateTimer(
+                DefaultSessionMetric.THROTTLING_DELAY,
+                executionProfile.getName(),
+                System.nanoTime() - startTimeNanos,
+                TimeUnit.NANOSECONDS);
+      }
+      sendRequest(initialRequest, null, 0);
+    } catch (Throwable t) {
+      // Concurrency-limiting throttlers contain exceptions from ready callbacks so that a failed
+      // request can't interrupt queue draining. Complete through the normal terminal path to
+      // release this request's permit before returning to the throttler.
+      setFinalError(t);
+      if (t instanceof java.lang.Error) {
+        throw (java.lang.Error) t;
+      }
     }
-    sendRequest(initialRequest, null, 0);
   }
 
   public CompletableFuture<PreparedStatement> handle() {
@@ -175,9 +189,6 @@ public class CqlPrepareHandler implements Throttled {
               setFinalError(
                   new DriverTimeoutException(
                       "Query timed out after " + timeoutDuration, diagnostics));
-              if (initialCallback != null) {
-                initialCallback.cancel();
-              }
             },
             timeoutDuration.toNanos(),
             TimeUnit.NANOSECONDS);
@@ -243,10 +254,25 @@ public class CqlPrepareHandler implements Throttled {
 
         Prepare message = toPrepareMessage(request);
 
+        initialCallback = initialPrepareCallback;
         Future<Void> writeFuture =
             channel.write(message, false, request.getCustomPayload(), initialPrepareCallback);
         writeSubmitted = true;
-        writeFuture.addListener(initialPrepareCallback);
+        if (result.isDone()) {
+          initialPrepareCallback.cancel();
+          return;
+        }
+        try {
+          writeFuture.addListener(initialPrepareCallback);
+        } catch (Throwable t) {
+          try {
+            setFinalError(t);
+          } finally {
+            // A listener can start a retry before throwing; cancel this original callback too.
+            initialPrepareCallback.cancel();
+          }
+          throw t;
+        }
       } finally {
         if (!writeSubmitted) {
           channel.cancelPreAcquireId();
@@ -284,8 +310,11 @@ public class CqlPrepareHandler implements Throttled {
 
   private void setFinalResult(PrepareRequest request, Prepared response, DriverChannel channel) {
 
-    // Whatever happens below, we're done with this stream id
-    throttler.signalSuccess(this);
+    // Return the initial permit before all-node preparation completes. A later failure or
+    // cancellation must not return it again while the public result is still pending.
+    if (throttlerReleased.compareAndSet(false, true)) {
+      throttler.signalSuccess(this);
+    }
 
     DefaultPreparedStatement preparedStatement =
         Conversions.toPreparedStatement(response, request, context, channel.getLwtInfo());
@@ -375,10 +404,27 @@ public class CqlPrepareHandler implements Throttled {
   private void setFinalError(Throwable error) {
     if (result.completeExceptionally(error)) {
       cancelTimeout();
+      if (initialCallback != null) {
+        initialCallback.cancel();
+      }
+      if (!throttlerReleased.compareAndSet(false, true)) {
+        return;
+      }
       if (error instanceof DriverTimeoutException) {
         throttler.signalTimeout(this);
-      } else if (!(error instanceof RequestThrottlingException)) {
-        throttler.signalError(this, error);
+      } else if (!(error instanceof CancellationException)
+          && (admitted || !(error instanceof RequestThrottlingException))) {
+        try {
+          throttler.signalError(this, error);
+        } catch (Throwable cleanupFailure) {
+          if (error instanceof java.lang.Error) {
+            if (cleanupFailure != error) {
+              error.addSuppressed(cleanupFailure);
+            }
+            throw (java.lang.Error) error;
+          }
+          throw cleanupFailure;
+        }
       }
     }
   }
@@ -417,7 +463,6 @@ public class CqlPrepareHandler implements Throttled {
           cancel();
         } else {
           LOG.trace("[{}] Request sent to {}", logPrefix, node);
-          initialCallback = this;
         }
       }
     }

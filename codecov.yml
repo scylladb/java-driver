@@ -1,5 +1,5 @@
 # Codecov configuration for the upload in the "Upload coverage to Codecov" job
-# of .github/workflows/tests@v1.yml.
+# of .github/workflows/tests.yml and coverage-after-merge.yml.
 # Reference: https://docs.codecov.com/docs/codecov-yaml
 #
 # There are no path fixes: each package/sourcefile pair in jacoco.xml names
@@ -27,18 +27,38 @@ parsers:
     # fully toward patch coverage. The report artifact still shows it.
     partials_as_hits: true
 
+flags:
+  unit:
+    carryforward: false
+  reduced:
+    carryforward: false
+  full:
+    carryforward: false
+
 coverage:
   status:
-    # Informational: report the delta, never fail a pull request on it. The
-    # integration suites run against live Scylla and Cassandra clusters, so
-    # which lines they reach depends on cluster timing as well as on the diff.
     project:
-      default:
+      default: false
+      unit:
+        flags: [unit]
         target: auto
         threshold: 1%
+        informational: true
+      reduced:
+        flags: [reduced]
+        target: auto
+        informational: true
+      full:
+        flags: [full]
+        target: auto
         informational: true
     patch:
-      default:
+      default: false
+      unit:
+        flags: [unit]
         target: auto
         threshold: 1%
         informational: true
+comment:
+  layout: "header, diff, flags, files"
+  require_changes: true

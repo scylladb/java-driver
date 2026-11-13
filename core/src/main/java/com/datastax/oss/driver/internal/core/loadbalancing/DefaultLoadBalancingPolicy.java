@@ -32,7 +32,7 @@ import com.datastax.oss.driver.internal.core.pool.ChannelPool;
 import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
-import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
+import com.datastax.oss.driver.internal.core.util.collection.RotatedQueryPlan;
 import com.datastax.oss.driver.shaded.guava.common.annotations.VisibleForTesting;
 import com.datastax.oss.driver.shaded.guava.common.collect.MapMaker;
 import edu.umd.cs.findbugs.annotations.NonNull;
@@ -167,19 +167,19 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     LOG.trace("[{}] Prioritizing {} local replicas", logPrefix, replicaCount);
 
     // Round-robin the remaining nodes
-    ArrayUtils.rotate(
-        currentNodes,
-        replicaCount,
-        currentNodes.length - replicaCount,
-        roundRobinAmount.getAndUpdate(INCREMENT));
-
-    QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
+    QueryPlan plan =
+        currentNodes.length == 0
+            ? QueryPlan.EMPTY
+            : new RotatedQueryPlan(
+                currentNodes, replicaCount, roundRobinAmount.getAndUpdate(INCREMENT));
     return maybeAddDcFailover(request, plan);
   }
 
   private int[] moveReplicasToFront(Object[] currentNodes, List<Node> allReplicas) {
     int replicaCount = 0, localRackReplicaCount = 0;
-    for (int i = 0; i < currentNodes.length; i++) {
+    // Stop once all replicas have been found
+    int allReplicasCount = allReplicas.size();
+    for (int i = 0; i < currentNodes.length && replicaCount < allReplicasCount; i++) {
       Node node = (Node) currentNodes[i];
       if (allReplicas.contains(node)) {
         if (Objects.equals(node.getRack(), getLocalRack())
@@ -300,7 +300,9 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   }
 
   protected boolean isUnhealthy(@NonNull Node node, @NonNull Session session, long now) {
-    return isBusy(node, session) && isResponseRateInsufficient(node, now);
+    // Check the response rate first: when it is sufficient, as it is at high request rates, this
+    // skips isBusy and its getInFlight call. Both checks are side-effect free.
+    return isResponseRateInsufficient(node, now) && isBusy(node, session);
   }
 
   protected boolean isBusy(@NonNull Node node, @NonNull Session session) {

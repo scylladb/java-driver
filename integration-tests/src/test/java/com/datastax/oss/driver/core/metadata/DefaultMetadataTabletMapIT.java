@@ -1,5 +1,6 @@
 package com.datastax.oss.driver.core.metadata;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
@@ -22,6 +23,9 @@ import com.datastax.oss.driver.api.testinfra.ccm.CustomCcmRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionRule;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
 import com.datastax.oss.driver.internal.core.protocol.TabletInfo;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -36,6 +40,7 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import org.awaitility.core.ConditionTimeoutException;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
@@ -178,10 +183,39 @@ public class DefaultMetadataTabletMapIT {
       buildStatement("DELETE FROM %s.%s WHERE pk = ? AND ck = ? IF EXISTS");
 
   @BeforeClass
-  public static void setup() {
+  public static void setup() throws IOException {
+    // The no-more-hints assertion requires stable tablet replicas and shards. Disable background
+    // migrations before creating the table; disabling also waits for ongoing transitions to finish.
+    setTabletBalancingEnabled(false);
     CqlSession session = SESSION_RULE.session();
     session.execute(CREATE_KEYSPACE_QUERY);
     session.execute(CREATE_TABLE_QUERY);
+  }
+
+  @AfterClass
+  public static void restoreTabletBalancing() throws IOException {
+    setTabletBalancingEnabled(true);
+  }
+
+  private static void setTabletBalancingEnabled(boolean enabled) throws IOException {
+    HttpURLConnection connection =
+        (HttpURLConnection)
+            new URL(
+                    "http://"
+                        + CCM_RULE.getCcmBridge().getNodeIpAddress(1)
+                        + ":10000/storage_service/tablets/balancing?enabled="
+                        + enabled)
+                .openConnection();
+    try {
+      connection.setRequestMethod("POST");
+      connection.setConnectTimeout(5000);
+      connection.setReadTimeout(30000);
+      assertThat(connection.getResponseCode())
+          .as("Setting tablet balancing to %s", enabled)
+          .isEqualTo(HttpURLConnection.HTTP_OK);
+    } finally {
+      connection.disconnect();
+    }
   }
 
   @Test

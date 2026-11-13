@@ -23,8 +23,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -39,6 +42,7 @@ import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
+import com.datastax.oss.driver.api.core.retry.RetryDecision;
 import com.datastax.oss.driver.api.core.retry.RetryPolicy;
 import com.datastax.oss.driver.api.core.retry.RetryVerdict;
 import com.datastax.oss.driver.api.core.servererrors.BootstrappingException;
@@ -50,6 +54,7 @@ import com.datastax.oss.driver.api.core.servererrors.UnavailableException;
 import com.datastax.oss.driver.api.core.servererrors.WriteTimeoutException;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
+import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.response.Error;
 import com.datastax.oss.protocol.internal.response.error.ReadTimeout;
@@ -60,6 +65,7 @@ import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +73,217 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 
 public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_contain_failure_while_building_retry_request() {
+    HeartbeatException requestFailure = mock(HeartbeatException.class);
+    RuntimeException setupFailure = new RuntimeException("mock failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    when(verdict.getRetryDecision()).thenReturn(RetryDecision.RETRY_NEXT);
+    when(verdict.getRetryRequest(any(Statement.class))).thenThrow(setupFailure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    harnessBuilder.withResponseFailure(node1, requestFailure);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      RequestTracker requestTracker = mock(RequestTracker.class);
+      when(harness.getContext().getRequestTracker()).thenReturn(requestTracker);
+      when(harness
+              .getContext()
+              .getRetryPolicy(anyString())
+              .onRequestAbortedVerdict(any(), eq(requestFailure), eq(0)))
+          .thenReturn(verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(setupFailure));
+      verify(nodeMetricUpdater1).incrementCounter(DefaultNodeMetric.ABORTED_REQUESTS, "default");
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(DefaultNodeMetric.RETRIES), anyString());
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(DefaultNodeMetric.RETRIES_ON_ABORTED), anyString());
+      verify(verdict).getRetryDecision();
+      verify(requestTracker, times(1))
+          .onNodeError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(requestFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              eq(node1),
+              anyString());
+      verify(requestTracker, never())
+          .onNodeError(
+              any(),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              any(),
+              anyString());
+      verify(requestTracker)
+          .onError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              isNull(),
+              anyString());
+      verifyNoMoreInteractions(requestTracker);
+    }
+  }
+
+  @Test
+  public void should_contain_failure_while_reading_retry_decision() {
+    HeartbeatException requestFailure = mock(HeartbeatException.class);
+    RuntimeException setupFailure = new RuntimeException("mock failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    when(verdict.getRetryDecision()).thenThrow(setupFailure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    harnessBuilder.withResponseFailure(node1, requestFailure);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      RequestTracker requestTracker = mock(RequestTracker.class);
+      when(harness.getContext().getRequestTracker()).thenReturn(requestTracker);
+      when(harness
+              .getContext()
+              .getRetryPolicy(anyString())
+              .onRequestAbortedVerdict(any(), eq(requestFailure), eq(0)))
+          .thenReturn(verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(setupFailure));
+      verify(verdict).getRetryDecision();
+      verify(requestTracker, times(1))
+          .onNodeError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(requestFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              eq(node1),
+              anyString());
+      verify(requestTracker, never())
+          .onNodeError(
+              any(),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              any(),
+              anyString());
+      verify(requestTracker)
+          .onError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(setupFailure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              isNull(),
+              anyString());
+      verifyNoMoreInteractions(requestTracker);
+    }
+  }
+
+  @Test
+  @UseDataProvider("failure")
+  public void should_preserve_tracker_notifications_for_fatal_retry_decision(
+      FailureScenario failureScenario) {
+    AssertionError failure = new AssertionError("fatal retry decision failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    when(verdict.getRetryDecision()).thenThrow(failure);
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    failureScenario.mockRequestError(harnessBuilder, node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      RequestTracker tracker = mock(RequestTracker.class);
+      when(harness.getContext().getRequestTracker()).thenReturn(tracker);
+      failureScenario.mockRetryPolicyVerdict(
+          harness.getContext().getRetryPolicy(anyString()), verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(failure));
+      // The response error boundary reports fatal decision failures once. Transport-abort
+      // callbacks have no such boundary and retain their pre-existing notification behavior.
+      int expectedNotifications =
+          failureScenario.errorMetric == DefaultNodeMetric.ABORTED_REQUESTS ? 0 : 1;
+      verify(tracker, times(expectedNotifications))
+          .onNodeError(
+              any(), any(), anyLong(), any(DriverExecutionProfile.class), any(), anyString());
+      if (expectedNotifications == 1) {
+        verify(tracker)
+            .onNodeError(
+                eq(IDEMPOTENT_STATEMENT),
+                eq(failure),
+                anyLong(),
+                any(DriverExecutionProfile.class),
+                eq(node1),
+                anyString());
+      }
+      verify(tracker)
+          .onError(
+              eq(IDEMPOTENT_STATEMENT),
+              eq(failure),
+              anyLong(),
+              any(DriverExecutionProfile.class),
+              isNull(),
+              anyString());
+      verifyNoMoreInteractions(tracker);
+    }
+  }
+
+  @Test
+  @UseDataProvider("serverErrorAndInvalidVerdict")
+  public void should_count_server_error_when_retry_verdict_setup_fails(
+      FailureScenario failureScenario, String failureMode) {
+    Throwable setupFailure =
+        failureMode.startsWith("fatal")
+            ? new AssertionError("fatal retry setup failure")
+            : new RuntimeException("mock decision failure");
+    RetryVerdict verdict = mock(RetryVerdict.class);
+    if (failureMode.equals("throw") || failureMode.equals("fatal-decision")) {
+      when(verdict.getRetryDecision()).thenThrow(setupFailure);
+    } else if (failureMode.equals("fatal-request")) {
+      when(verdict.getRetryDecision()).thenReturn(RetryDecision.RETRY_NEXT);
+      when(verdict.getRetryRequest(any(Statement.class))).thenThrow(setupFailure);
+    }
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    failureScenario.mockRequestError(harnessBuilder, node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      failureScenario.mockRetryPolicyVerdict(
+          harness.getContext().getRetryPolicy(anyString()),
+          failureMode.equals("null-verdict") ? null : verdict);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test")
+              .handle();
+
+      assertThatStage(result)
+          .isFailed(
+              error -> {
+                if (failureMode.equals("throw") || failureMode.startsWith("fatal")) {
+                  assertThat(error).isSameAs(setupFailure);
+                } else {
+                  assertThat(error).isInstanceOf(NullPointerException.class);
+                }
+              });
+      verify(nodeMetricUpdater1).incrementCounter(failureScenario.errorMetric, "default");
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(DefaultNodeMetric.RETRIES), anyString());
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(failureScenario.retryMetric), anyString());
+      verify(nodeMetricUpdater1, never())
+          .incrementCounter(eq(failureScenario.ignoreMetric), anyString());
+    }
+  }
 
   @Test
   @UseDataProvider("allIdempotenceConfigs")
@@ -593,6 +810,21 @@ public class CqlRequestHandlerRetryTest extends CqlRequestHandlerTestBase {
                 .thenReturn(verdict);
           }
         });
+  }
+
+  @DataProvider
+  public static Object[][] serverErrorAndInvalidVerdict() {
+    Object[][] serverErrors =
+        Arrays.stream(failure())
+            .filter(
+                scenario ->
+                    ((FailureScenario) scenario[0]).errorMetric
+                        != DefaultNodeMetric.ABORTED_REQUESTS)
+            .toArray(Object[][]::new);
+    return TestDataProviders.combine(
+        serverErrors,
+        TestDataProviders.fromList(
+            "throw", "null-decision", "null-verdict", "fatal-decision", "fatal-request"));
   }
 
   @DataProvider

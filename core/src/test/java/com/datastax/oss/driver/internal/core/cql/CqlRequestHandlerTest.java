@@ -21,19 +21,30 @@ import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
+import com.datastax.oss.driver.api.core.RequestThrottlingException;
 import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
+import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.ColumnDefinitions;
@@ -42,8 +53,14 @@ import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.Row;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.retry.RetryVerdict;
+import com.datastax.oss.driver.api.core.session.throttling.RequestThrottler;
+import com.datastax.oss.driver.api.core.session.throttling.Throttled;
 import com.datastax.oss.driver.api.core.tracker.RequestIdGenerator;
+import com.datastax.oss.driver.internal.core.channel.ResponseCallback;
 import com.datastax.oss.driver.internal.core.session.RepreparePayload;
+import com.datastax.oss.driver.internal.core.session.throttling.ConcurrencyLimitingRequestThrottler;
+import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import com.datastax.oss.driver.internal.core.util.concurrent.CapturingTimer.CapturedTimeout;
 import com.datastax.oss.protocol.internal.request.Prepare;
 import com.datastax.oss.protocol.internal.response.error.Unprepared;
@@ -51,19 +68,109 @@ import com.datastax.oss.protocol.internal.response.result.Prepared;
 import com.datastax.oss.protocol.internal.response.result.SetKeyspace;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import io.netty.util.Timer;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
+import io.netty.util.concurrent.ImmediateEventExecutor;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
+
+  @Test
+  public void should_fail_future_if_throttled_request_setup_throws() {
+    RuntimeException expected = new RuntimeException("mock query plan failure");
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness
+              .getContext()
+              .getLoadBalancingPolicyWrapper()
+              .newQueryPlan(any(), anyString(), any()))
+          .thenThrow(expected);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(expected));
+    }
+  }
+
+  @Test
+  public void should_release_delayed_request_slot_once_when_setup_fails() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RuntimeException failure = new RuntimeException("mock failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness
+              .getContext()
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_CONCURRENT_REQUESTS))
+          .thenReturn(1);
+      when(harness
+              .getContext()
+              .getConfig()
+              .getDefaultProfile()
+              .getInt(DefaultDriverOption.REQUEST_THROTTLER_MAX_QUEUE_SIZE))
+          .thenReturn(10);
+      ConcurrencyLimitingRequestThrottler throttler =
+          new ConcurrencyLimitingRequestThrottler(harness.getContext());
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+
+      Throttled blocker = mock(Throttled.class);
+      throttler.register(blocker);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(handler.handle()).isNotDone();
+      node1Behavior.verifyNoWrite();
+      assertThat(throttler.getQueueSize()).isEqualTo(1);
+
+      throttler.signalSuccess(blocker);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+
+      Throttled firstProbe = mock(Throttled.class);
+      Throttled secondProbe = mock(Throttled.class);
+      throttler.register(firstProbe);
+      throttler.register(secondProbe);
+      verify(firstProbe).onThrottleReady(false);
+      verify(secondProbe, never()).onThrottleReady(anyBoolean());
+      assertThat(throttler.getQueueSize()).isEqualTo(1);
+
+      throttler.signalSuccess(firstProbe);
+      verify(secondProbe).onThrottleReady(true);
+      throttler.signalSuccess(secondProbe);
+      assertThat(throttler.getQueueSize()).isZero();
+    }
+  }
 
   @Test
   public void should_complete_result_if_first_node_replies_immediately() {
@@ -99,6 +206,37 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
                 assertThat(executionInfo.getWarnings()).isEmpty();
               });
       node1Behavior.verifyPreAcquireNotCancelled();
+    }
+  }
+
+  @Test
+  public void should_try_next_node_if_channel_selection_fails() {
+    RuntimeException failure = new RuntimeException("mock failure");
+    try (RequestHandlerTestHarness harness =
+        RequestHandlerTestHarness.builder()
+            .withEmptyPool(node1)
+            .withResponse(node2, defaultFrameOf(singleRow()))
+            .build()) {
+      when(harness.getSession().getChannel(eq(node1), anyString(), any(), any()))
+          .thenThrow(failure);
+
+      CompletionStage<AsyncResultSet> result =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(result)
+          .isSuccess(
+              resultSet -> {
+                assertThat(resultSet.getExecutionInfo().getCoordinator()).isEqualTo(node2);
+                List<Map.Entry<Node, Throwable>> errors = resultSet.getExecutionInfo().getErrors();
+                assertThat(errors).hasSize(1);
+                assertThat(errors.get(0).getKey()).isEqualTo(node1);
+                assertThat(errors.get(0).getValue()).isSameAs(failure);
+              });
     }
   }
 
@@ -232,19 +370,525 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
   }
 
   @Test
-  public void should_cancel_pre_acquired_id_if_request_decoration_fails_before_write() {
+  public void should_complete_result_and_cleanup_if_immediate_request_setup_fails() {
     RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
     RuntimeException failure = new RuntimeException("mock failure");
     when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
     when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
     when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
 
     RequestHandlerTestHarness.Builder harnessBuilder =
         RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
     PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
 
     try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
-      // This only verifies stream-id cleanup; the other failure-path leaks are tracked in #980.
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_not_release_throttler_if_request_was_not_admitted() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestThrottlingException failure = new RequestThrottlingException("mock failure");
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleFailure(failure);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler, never()).signalSuccess(any());
+      verify(throttler, never()).signalError(any(), any());
+      verify(throttler, never()).signalTimeout(any());
+      verify(throttler, never()).signalCancel(any());
+    }
+  }
+
+  @Test
+  public void should_schedule_timeout_before_throttler_registration() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestThrottlingException failure = new RequestThrottlingException("mock failure");
+    AtomicReference<CapturedTimeout> timeoutSeenDuringRegistration = new AtomicReference<>();
+
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      doAnswer(
+              invocation -> {
+                timeoutSeenDuringRegistration.set(harness.nextScheduledTimeout());
+                invocation.getArgument(0, Throttled.class).onThrottleFailure(failure);
+                return null;
+              })
+          .when(throttler)
+          .register(any());
+
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThat(timeoutSeenDuringRegistration.get()).isNotNull();
+      assertThat(timeoutSeenDuringRegistration.get().isCancelled()).isTrue();
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+    }
+  }
+
+  @Test
+  public void should_defer_queued_timeout_release_until_registration_returns() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AtomicBoolean timeoutSignaled = new AtomicBoolean();
+    doAnswer(
+            invocation -> {
+              timeoutSignaled.set(true);
+              return null;
+            })
+        .when(throttler)
+        .signalTimeout(any());
+
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      doAnswer(
+              invocation -> {
+                CapturedTimeout timeout = harness.nextScheduledTimeout();
+                timeout.task().run(timeout);
+                assertThat(timeoutSignaled).isFalse();
+                return null;
+              })
+          .when(throttler)
+          .register(any());
+
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(handler.handle())
+          .isFailed(error -> assertThat(error).isInstanceOf(DriverTimeoutException.class));
+      assertThat(timeoutSignaled).isTrue();
+      verify(throttler).signalTimeout(handler);
+    }
+  }
+
+  @Test
+  public void should_release_permit_when_registration_throws_after_admission() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RuntimeException failure = new RuntimeException("mock failure");
+    AtomicReference<CqlRequestHandler> admittedHandler = new AtomicReference<>();
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      doAnswer(
+              invocation -> {
+                CqlRequestHandler handler = invocation.getArgument(0);
+                admittedHandler.set(handler);
+                handler.onThrottleReady(false);
+                node1Behavior.setWriteSuccess();
+                throw failure;
+              })
+          .when(throttler)
+          .register(any());
+
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThat(handler).isSameAs(admittedHandler.get());
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      node1Behavior.verifyWrite();
+      node1Behavior.verifyCancellation();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void
+      should_cancel_timeout_without_releasing_permit_when_registration_fails_before_admission() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RuntimeException failure = new RuntimeException("mock failure");
+    doAnswer(
+            invocation -> {
+              throw failure;
+            })
+        .when(throttler)
+        .register(any());
+
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler, never()).signalSuccess(any());
+      verify(throttler, never()).signalError(any(), any());
+      verify(throttler, never()).signalTimeout(any());
+      verify(throttler, never()).signalCancel(any());
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_registration_failure_after_cleanup() {
+    for (boolean admitted : new boolean[] {false, true}) {
+      RequestThrottler throttler = mock(RequestThrottler.class);
+      AssertionError failure = new AssertionError("fatal registration failure");
+      AtomicReference<CqlRequestHandler> registeredHandler = new AtomicReference<>();
+      RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+      PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+      try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+        when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+        doAnswer(
+                invocation -> {
+                  CqlRequestHandler handler = invocation.getArgument(0);
+                  registeredHandler.set(handler);
+                  if (admitted) {
+                    handler.onThrottleReady(false);
+                    node1Behavior.setWriteSuccess();
+                  }
+                  throw failure;
+                })
+            .when(throttler)
+            .register(any());
+
+        assertThatThrownBy(
+                () ->
+                    new CqlRequestHandler(
+                        UNDEFINED_IDEMPOTENCE_STATEMENT,
+                        harness.getSession(),
+                        harness.getContext(),
+                        "test"))
+            .isSameAs(failure);
+
+        CqlRequestHandler handler = registeredHandler.get();
+        assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+        assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+        if (admitted) {
+          node1Behavior.verifyWrite();
+          node1Behavior.verifyCancellation();
+          verify(throttler).signalError(handler, failure);
+        } else {
+          node1Behavior.verifyNoWrite();
+          verify(throttler, never()).signalError(any(), any());
+        }
+        verify(throttler, never()).signalSuccess(any());
+        verify(throttler, never()).signalTimeout(any());
+        verify(throttler, never()).signalCancel(any());
+      }
+    }
+  }
+
+  @Test
+  public void should_complete_result_and_cleanup_if_delayed_request_setup_fails() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AtomicReference<Throttled> registeredRequest = new AtomicReference<>();
+    RuntimeException failure = new RuntimeException("mock failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+    doAnswer(
+            invocation -> {
+              registeredRequest.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      registeredRequest.get().onThrottleReady(true);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_not_register_request_if_timeout_scheduling_fails() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    Timer timer = mock(Timer.class);
+    IllegalStateException failure = new IllegalStateException("mock failure");
+    when(timer.newTimeout(any(), anyLong(), any())).thenThrow(failure);
+
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      verify(throttler, never()).register(any());
+      verify(throttler, never()).signalSuccess(any());
+      verify(throttler, never()).signalError(any(), any());
+      verify(throttler, never()).signalTimeout(any());
+      verify(throttler, never()).signalCancel(any());
+    }
+  }
+
+  @Test
+  public void should_cleanup_if_request_setup_fails_after_write_retry() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RuntimeException writeFailure = new RuntimeException("mock write failure");
+    RuntimeException setupFailure = new RuntimeException("mock setup failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node1", "node2");
+    doReturn(UNDEFINED_IDEMPOTENCE_STATEMENT)
+        .doThrow(setupFailure)
+        .when(requestIdGenerator)
+        .getDecoratedStatement(any(), any());
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+      CompletionStage<AsyncResultSet> result = handler.handle();
+
+      node1Behavior.setWriteFailure(writeFailure);
+
+      assertThatStage(result).isFailed(error -> assertThat(error).isSameAs(setupFailure));
+      node2Behavior.verifyNoWrite();
+      node2Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, setupFailure);
+    }
+  }
+
+  @Test
+  public void should_signal_cancellation_when_admitted_before_cancellation_callback_runs() {
+    should_signal_cancellation_when_admitted_during_completion(false);
+  }
+
+  @Test
+  public void should_signal_cancellation_when_timeout_loses_completion_race() {
+    should_signal_cancellation_when_admitted_during_completion(true);
+  }
+
+  private void should_signal_cancellation_when_admitted_during_completion(boolean fireTimeout) {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+      CapturedTimeout timeout = harness.nextScheduledTimeout();
+      AtomicBoolean admissionCompleted = new AtomicBoolean();
+      // CompletableFuture runs this newer dependent before the handler's cancellation callback.
+      handler.result.whenComplete(
+          (ignored, error) -> {
+            if (fireTimeout) {
+              try {
+                timeout.task().run(timeout);
+              } catch (Exception e) {
+                throw new AssertionError(e);
+              }
+            }
+            handler.onThrottleReady(true);
+            admissionCompleted.set(true);
+          });
+
+      assertThat(handler.result.cancel(false)).isTrue();
+
+      assertThat(admissionCompleted.get()).isTrue();
+      verify(throttler).signalCancel(handler);
+      verify(throttler, never()).signalError(eq(handler), any());
+      verify(throttler, never()).signalTimeout(handler);
+      verify(throttler, never()).signalSuccess(handler);
+      assertThat(timeout.isCancelled()).isTrue();
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_channel_selection_failure_after_cleanup() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal channel selection failure");
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(harness.getSession().getChannel(eq(node1), anyString(), any(), any()))
+          .thenThrow(failure);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+      node1Behavior.verifyNoWrite();
+      node2Behavior.verifyNoWrite();
+      verify(harness.getSession(), never()).getChannel(eq(node2), anyString(), any(), any());
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_retry_channel_selection_failure_after_cleanup() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal retry channel selection failure");
+    HeartbeatException requestFailure = mock(HeartbeatException.class);
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    PoolBehavior node2Behavior = harnessBuilder.customBehavior(node2);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(harness.getSession().getChannel(eq(node1), anyString(), any(), any()))
+          .thenReturn(node1Behavior.getChannel())
+          .thenThrow(failure);
+      when(harness
+              .getContext()
+              .getRetryPolicy(anyString())
+              .onRequestAbortedVerdict(any(), eq(requestFailure), eq(0)))
+          .thenReturn(RetryVerdict.RETRY_SAME);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              IDEMPOTENT_STATEMENT, harness.getSession(), harness.getContext(), "test");
+      handler.onThrottleReady(false);
+      node1Behavior.setWriteSuccess();
+      ArgumentCaptor<ResponseCallback> callback = ArgumentCaptor.forClass(ResponseCallback.class);
+      verify(node1Behavior.getChannel()).write(any(), anyBoolean(), anyMap(), callback.capture());
+
+      assertThatThrownBy(() -> callback.getValue().onFailure(requestFailure)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+      node2Behavior.verifyNoWrite();
+      verify(harness.getSession(), never()).getChannel(eq(node2), anyString(), any(), any());
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_query_plan_failure_after_cleanup() {
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal query plan failure");
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      when(harness.getContext().getLoadBalancingPolicyWrapper().newQueryPlan(any(), any(), any()))
+          .thenThrow(failure);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_rethrow_fatal_request_setup_failure_after_cleanup() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal request setup failure");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      node1Behavior.verifyNoWrite();
+      node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_preserve_fatal_setup_failure_when_permit_release_also_fails() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    AssertionError failure = new AssertionError("fatal request setup failure");
+    AssertionError cleanupFailure = new AssertionError("fatal next callback failure");
+    AtomicReference<CqlRequestHandler> registeredHandler = new AtomicReference<>();
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+    doThrow(cleanupFailure).when(throttler).signalError(any(), eq(failure));
+    doAnswer(
+            invocation -> {
+              CqlRequestHandler handler = invocation.getArgument(0);
+              registeredHandler.set(handler);
+              handler.onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+
       assertThatThrownBy(
               () ->
                   new CqlRequestHandler(
@@ -254,8 +898,231 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
                       "test"))
           .isSameAs(failure);
 
+      CqlRequestHandler handler = registeredHandler.get();
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      assertThat(failure.getSuppressed()).containsExactly(cleanupFailure);
       node1Behavior.verifyNoWrite();
       node1Behavior.verifyPreAcquireCancelled();
+      assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+      verify(throttler).signalError(handler, failure);
+    }
+  }
+
+  @Test
+  public void should_cancel_submitted_request_if_write_listener_registration_fails() {
+    for (boolean notified : new boolean[] {false, true}) {
+      for (boolean fatal : new boolean[] {false, true}) {
+        Throwable failure =
+            fatal
+                ? new AssertionError("listener failure")
+                : new IllegalStateException("listener failure");
+        RequestThrottler throttler = mock(RequestThrottler.class);
+        RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+        PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+        AtomicReference<ResponseCallback> callback = new AtomicReference<>();
+        Future<Void> writeFuture = mock(Future.class);
+        doAnswer(
+                invocation -> {
+                  if (notified) {
+                    GenericFutureListener<Future<Void>> listener = invocation.getArgument(0);
+                    listener.operationComplete(
+                        ImmediateEventExecutor.INSTANCE.newSucceededFuture(null));
+                  }
+                  throw failure;
+                })
+            .when(writeFuture)
+            .addListener(any());
+        when(node1Behavior.getChannel().write(any(), anyBoolean(), anyMap(), any()))
+            .thenAnswer(
+                invocation -> {
+                  callback.set(invocation.getArgument(3));
+                  return writeFuture;
+                });
+        try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+          when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+          CqlRequestHandler handler =
+              new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test");
+
+          if (fatal) {
+            assertThatThrownBy(() -> handler.onThrottleReady(false)).isSameAs(failure);
+          } else {
+            handler.onThrottleReady(false);
+          }
+
+          assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+          verify(node1Behavior.getChannel(), atLeastOnce()).cancel(callback.get());
+          node1Behavior.verifyPreAcquireNotCancelled();
+          assertThat(harness.nextScheduledTimeout().isCancelled()).isTrue();
+          callback.get().onFailure(new IllegalStateException("late channel failure"));
+          verify(throttler).signalError(handler, failure);
+        }
+      }
+    }
+  }
+
+  @Test
+  public void should_log_listener_registration_failure_after_request_completed() {
+    for (String outcome : new String[] {"success", "timeout", "cancel"}) {
+      IllegalStateException failure = new IllegalStateException("late listener failure");
+      RequestThrottler throttler = mock(RequestThrottler.class);
+      RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+      PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+      AtomicReference<ResponseCallback> callback = new AtomicReference<>();
+      Future<Void> writeFuture = mock(Future.class);
+      when(node1Behavior.getChannel().write(any(), anyBoolean(), anyMap(), any()))
+          .thenAnswer(
+              invocation -> {
+                callback.set(invocation.getArgument(3));
+                return writeFuture;
+              });
+      LoggerTest.LoggerSetup logger =
+          LoggerTest.setupTestLogger(CqlRequestHandler.class, Level.WARN);
+      try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+        when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+        CqlRequestHandler handler =
+            new CqlRequestHandler(
+                UNDEFINED_IDEMPOTENCE_STATEMENT,
+                harness.getSession(),
+                harness.getContext(),
+                "test");
+        CapturedTimeout timeout = harness.nextScheduledTimeout();
+        doAnswer(
+                invocation -> {
+                  if (outcome.equals("success")) {
+                    callback.get().onResponse(defaultFrameOf(singleRow()));
+                  } else if (outcome.equals("timeout")) {
+                    timeout.task().run(timeout);
+                  } else {
+                    handler.result.cancel(false);
+                  }
+                  throw failure;
+                })
+            .when(writeFuture)
+            .addListener(any());
+
+        handler.onThrottleReady(false);
+
+        if (outcome.equals("success")) {
+          assertThatStage(handler.handle()).isSuccess();
+          verify(throttler).signalSuccess(handler);
+        } else if (outcome.equals("timeout")) {
+          assertThatStage(handler.handle())
+              .isFailed(error -> assertThat(error).isInstanceOf(DriverTimeoutException.class));
+          verify(throttler).signalTimeout(handler);
+        } else {
+          assertThat(handler.result.isCancelled()).isTrue();
+          verify(throttler).signalCancel(handler);
+        }
+        verify(throttler, never()).signalError(eq(handler), any());
+        verify(node1Behavior.getChannel(), atLeastOnce()).cancel(callback.get());
+        verify(logger.appender).doAppend(logger.loggingEventCaptor.capture());
+        assertThat(logger.loggingEventCaptor.getValue().getLevel()).isEqualTo(Level.WARN);
+        assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+            .contains("Request setup failed after the request had completed", failure.getMessage());
+      } finally {
+        logger.close();
+      }
+    }
+  }
+
+  @Test
+  public void should_log_throttler_exception_when_admitting_completed_request() {
+    should_log_throttler_failure_when_admitting_completed_request(
+        new IllegalStateException("throttler failure"));
+  }
+
+  @Test
+  public void should_log_throttler_error_when_admitting_completed_request() {
+    should_log_throttler_failure_when_admitting_completed_request(
+        new AssertionError("fatal throttler failure"));
+  }
+
+  private void should_log_throttler_failure_when_admitting_completed_request(Throwable failure) {
+    for (Throwable outcome :
+        new Throwable[] {
+          null,
+          new CancellationException("cancelled"),
+          new DriverTimeoutException("timed out"),
+          new IllegalStateException("request failure")
+        }) {
+      RequestThrottler throttler = mock(RequestThrottler.class);
+      doThrow(failure).when(throttler).signalSuccess(any());
+      doThrow(failure).when(throttler).signalCancel(any());
+      doThrow(failure).when(throttler).signalTimeout(any());
+      doThrow(failure).when(throttler).signalError(any(), any());
+      LoggerTest.LoggerSetup logger =
+          LoggerTest.setupTestLogger(CqlRequestHandler.class, Level.WARN);
+      try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+        when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+        CqlRequestHandler handler =
+            new CqlRequestHandler(
+                UNDEFINED_IDEMPOTENCE_STATEMENT,
+                harness.getSession(),
+                harness.getContext(),
+                "test");
+        // Run admission before the handler's original cancellation listener.
+        handler.result.whenComplete((ignored, error) -> handler.onThrottleReady(true));
+
+        if (outcome == null) {
+          assertThat(handler.result.complete(null)).isTrue();
+        } else {
+          assertThat(handler.result.completeExceptionally(outcome)).isTrue();
+        }
+
+        handler.onThrottleReady(true);
+        verify(logger.appender).doAppend(logger.loggingEventCaptor.capture());
+        assertThat(logger.loggingEventCaptor.getValue().getLevel()).isEqualTo(Level.WARN);
+        assertThat(logger.loggingEventCaptor.getValue().getFormattedMessage())
+            .contains(
+                "Uncaught exception", failure.getClass().getSimpleName(), failure.getMessage());
+        if (outcome == null) {
+          verify(throttler).signalSuccess(handler);
+        } else if (outcome instanceof CancellationException) {
+          verify(throttler).signalCancel(handler);
+        } else if (outcome instanceof DriverTimeoutException) {
+          verify(throttler).signalTimeout(handler);
+        } else {
+          verify(throttler).signalError(handler, outcome);
+        }
+      } finally {
+        logger.close();
+      }
+    }
+  }
+
+  @Test
+  public void should_release_cancelled_request_only_once() {
+    RequestIdGenerator requestIdGenerator = mock(RequestIdGenerator.class);
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    CancellationException failure = new CancellationException("mock cancellation");
+    when(requestIdGenerator.getSessionRequestId()).thenReturn("session");
+    when(requestIdGenerator.getNodeRequestId(any(), eq("session"))).thenReturn("node");
+    when(requestIdGenerator.getDecoratedStatement(any(), eq("node"))).thenThrow(failure);
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleReady(false);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+
+    RequestHandlerTestHarness.Builder harnessBuilder =
+        RequestHandlerTestHarness.builder().withRequestIdGenerator(requestIdGenerator);
+    harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      CqlRequestHandler handler =
+          new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test");
+
+      assertThat(handler.handle().toCompletableFuture()).isCancelled();
+      verify(throttler).signalCancel(handler);
+      verify(throttler, never()).signalError(eq(handler), any());
     }
   }
 
@@ -399,6 +1266,56 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
       // Should now re-prepare, re-execute and succeed.
       assertThatStage(resultSetFuture).isSuccess();
+    }
+  }
+
+  @Test
+  public void should_release_outer_request_if_reprepare_is_throttled() {
+    ByteBuffer mockId = Bytes.fromHexString("0xffff");
+    PreparedStatement preparedStatement = mock(PreparedStatement.class);
+    when(preparedStatement.getId()).thenReturn(mockId);
+    ColumnDefinitions columnDefinitions = mock(ColumnDefinitions.class);
+    when(columnDefinitions.size()).thenReturn(0);
+    when(preparedStatement.getResultSetDefinitions()).thenReturn(columnDefinitions);
+    BoundStatement boundStatement = mock(BoundStatement.class);
+    when(boundStatement.getPreparedStatement()).thenReturn(preparedStatement);
+    when(boundStatement.getValues()).thenReturn(Collections.emptyList());
+    when(boundStatement.getNowInSeconds()).thenReturn(Statement.NO_NOW_IN_SECONDS);
+
+    RequestThrottler throttler = mock(RequestThrottler.class);
+    RequestThrottlingException failure = new RequestThrottlingException("mock failure");
+    doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleReady(false);
+              return null;
+            })
+        .doAnswer(
+            invocation -> {
+              invocation.getArgument(0, Throttled.class).onThrottleFailure(failure);
+              return null;
+            })
+        .when(throttler)
+        .register(any());
+
+    RequestHandlerTestHarness.Builder harnessBuilder = RequestHandlerTestHarness.builder();
+    PoolBehavior node1Behavior = harnessBuilder.customBehavior(node1);
+
+    try (RequestHandlerTestHarness harness = harnessBuilder.build()) {
+      when(harness.getContext().getRequestThrottler()).thenReturn(throttler);
+      ConcurrentMap<ByteBuffer, RepreparePayload> repreparePayloads = new ConcurrentHashMap<>();
+      repreparePayloads.put(
+          mockId, new RepreparePayload(mockId, "mock query", null, Collections.emptyMap()));
+      when(harness.getSession().getRepreparePayloads()).thenReturn(repreparePayloads);
+
+      CqlRequestHandler handler =
+          new CqlRequestHandler(boundStatement, harness.getSession(), harness.getContext(), "test");
+      node1Behavior.setWriteSuccess();
+      node1Behavior.setResponseSuccess(
+          defaultFrameOf(new Unprepared("mock message", Bytes.getArray(mockId))));
+
+      assertThatStage(handler.handle()).isFailed(error -> assertThat(error).isSameAs(failure));
+      verify(throttler).signalError(handler, failure);
+      verify(throttler).signalError(any(), eq(failure));
     }
   }
 }
