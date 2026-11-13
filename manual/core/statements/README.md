@@ -79,10 +79,10 @@ consistency levels and page size. We recommended the configuration approach when
 can create execution profiles to capture common combinations of those options).
 
 The default consistency is `LOCAL_QUORUM`; the default serial consistency for the serial phase of
-conditional updates (LWT) is `LOCAL_SERIAL`. Ordinary requests therefore require a quorum in the local
-datacenter, and LWT serial coordination is scoped to that datacenter. These defaults apply to simple,
-bound and batch statements. Explicit statement settings or execution-profile configuration take
-precedence. Applications that need the previous defaults can configure
+conditional updates (LWT) is `LOCAL_SERIAL`. Ordinary requests therefore require a quorum in the
+local datacenter, and LWT serial coordination is scoped to that datacenter. These defaults apply to
+simple, bound and batch statements. Explicit statement settings or execution-profile configuration
+take precedence. Applications that need the previous defaults can configure
 `basic.request.consistency = LOCAL_ONE` and `basic.request.serial-consistency = SERIAL`.
 
 [Statement]:        https://docs.datastax.com/en/drivers/java/4.17/com/datastax/oss/driver/api/core/cql/Statement.html
