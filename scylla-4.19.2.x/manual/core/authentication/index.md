@@ -1,0 +1,121 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+
+# Authentication
+
+## Quick overview
+
+* `advanced.auth-provider` in the configuration.
+* disabled by default. Use plain-text credentials or write a custom provider.
+* can also be defined programmatically:
+  [CqlSession.builder().withAuthCredentials](https://java-driver.docs.scylladb.com/scylla-4.19.2.x/api/com/datastax/oss/driver/api/core/session/SessionBuilder.html#withAuthCredentials-java.lang.String-java.lang.String-) or
+  [CqlSession.builder().withAuthProvider](https://java-driver.docs.scylladb.com/scylla-4.19.2.x/api/com/datastax/oss/driver/api/core/session/SessionBuilder.html#withAuthProvider-com.datastax.oss.driver.api.core.auth.AuthProvider-).
+
+---
+
+Cassandra’s binary protocol supports [SASL](https://en.wikipedia.org/wiki/Simple_Authentication_and_Security_Layer)-based authentication. To use it, you must provide an
+*auth provider* that will authenticate with the server every time a new connection gets established.
+
+This can be done in two ways:
+
+## In the configuration
+
+Define an `auth-provider` section in the configuration:
+
+```default
+datastax-java-driver {
+  advanced.auth-provider {
+    class = ...
+  }
+}
+```
+
+The auth provider must be configured before opening a session, it cannot be changed at runtime.
+
+### Plain text
+
+`PlainTextAuthProvider` supports simple username/password authentication (intended to work with the
+server-side `PasswordAuthenticator`). The credentials can be changed at runtime, they will be used
+for new connection attempts once the configuration gets reloaded.
+
+```default
+datastax-java-driver {
+  advanced.auth-provider {
+    class = PlainTextAuthProvider
+    username = cassandra
+    password = cassandra
+  }
+}
+```
+
+### Custom
+
+You can also write your own provider; it must implement [AuthProvider](https://java-driver.docs.scylladb.com/scylla-4.19.2.x/api/com/datastax/oss/driver/api/core/auth/AuthProvider.html) and declare a public
+constructor with a [DriverContext](https://java-driver.docs.scylladb.com/scylla-4.19.2.x/api/com/datastax/oss/driver/api/core/context/DriverContext.html) argument.
+
+```default
+datastax-java-driver {
+  advanced.auth-provider {
+    class = com.mycompany.MyCustomAuthProvider
+    ... // any custom options your provider might use
+  }
+}
+```
+
+## Programmatically
+
+You can also pass an authenticator instance while building the session:
+
+```java
+CqlSession session =
+    CqlSession.builder()
+        .withAuthProvider(new MyCustomAuthProvider())
+        .build();
+```
+
+The driver also offers a simple, built-in plain text authentication provider:
+[ProgrammaticPlainTextAuthProvider](https://java-driver.docs.scylladb.com/scylla-4.19.2.x/api/com/datastax/oss/driver/api/core/auth/ProgrammaticPlainTextAuthProvider.html). The following is equivalent to using `PlainTextAuthProvider` in
+the configuration:
+
+```java
+AuthProvider authProvider = new ProgrammaticPlainTextAuthProvider("user", "pass");
+
+CqlSession session =
+    CqlSession.builder()
+        .withAuthProvider(authProvider)
+        .build();
+```
+
+For convenience, the credentials can be passed directly:
+
+```java
+CqlSession session =
+    CqlSession.builder()
+        .withAuthCredentials("user", "pass")
+        .build();
+```
+
+One downside of the driver’s built-in authentication providers is that the credentials are stored in
+clear text in memory; this means they are vulnerable to an attacker who is able to perform memory
+dumps. If this is not acceptable for you, consider writing your own [AuthProvider](https://java-driver.docs.scylladb.com/scylla-4.19.2.x/api/com/datastax/oss/driver/api/core/auth/AuthProvider.html) implementation;
+[PlainTextAuthProviderBase](https://java-driver.docs.scylladb.com/scylla-4.19.2.x/api/com/datastax/oss/driver/api/core/auth/PlainTextAuthProviderBase.html) is a good starting point.
+
+This base class supports standard SASL PLAIN authentication only. DSE proxy authentication and
+GSSAPI, including `BaseDseAuthenticator`, were removed; see the
+4.19.2.3 upgrade notes.
