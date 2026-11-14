@@ -51,19 +51,15 @@ Cluster cluster = Cluster.builder()
     .build();
 ```
 
-Native protocol v2 batches retain their protocol-defined serial consistency of `SERIAL`; selecting
-`LOCAL_SERIAL` for batches requires protocol v3 or newer.
+`BatchStatement` uses a native-protocol `BATCH` message. With protocol v2, that message retains its
+protocol-defined serial consistency of `SERIAL`; selecting `LOCAL_SERIAL` for `BatchStatement`
+requires protocol v3 or newer. A CQL-text `BEGIN BATCH ... APPLY BATCH` sent as a `SimpleStatement`
+uses a `QUERY` message instead and can carry `LOCAL_SERIAL` with protocol v2.
 
 Adapters with their own consistency setting must apply it to every statement, including paged
-scans. The `cassandra-stress` v3 adapter at [fc00ae4][stress] creates paging statements without
-applying its configured consistency levels. Those scans inherit the driver defaults; a tool-level
-flag alone does not override them. Before upgrading that consumer, update its paging adapter to
-propagate its configured levels and validate its default `LOCAL_ONE` setting and explicit overrides.
-A driver dependency update alone does not repair the omission.
+scans.
 
 [serial]: https://docs.scylladb.com/manual/stable/cql/consistency.html
-[stress]:
-  https://github.com/scylladb/cassandra-stress/commit/fc00ae4461db807eaf35660039d97ebd1e92f3b8
 
 ### Customizing execution
 
