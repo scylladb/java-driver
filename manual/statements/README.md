@@ -38,16 +38,32 @@ The default consistency is `LOCAL_QUORUM`; the default serial consistency for th
 conditional updates (LWT) is `LOCAL_SERIAL`. Ordinary requests require a local replica quorum, while
 LWT serial coordination is scoped to the local datacenter. These defaults apply to simple, bound and
 batch statements. Explicit statement settings override the cluster's `QueryOptions`. Applications
-that need the previous defaults can configure them explicitly:
+coordinating conditional writes across datacenters for global uniqueness or distributed locks must
+explicitly retain `SERIAL` for the serial phase; see the [serial consistency documentation][serial].
+Applications that need the previous defaults can configure them when building the cluster:
 
 ```java
-new QueryOptions()
-    .setConsistencyLevel(ConsistencyLevel.LOCAL_ONE)
-    .setSerialConsistencyLevel(ConsistencyLevel.SERIAL);
+Cluster cluster = Cluster.builder()
+    .addContactPoint("127.0.0.1")
+    .withQueryOptions(new QueryOptions()
+        .setConsistencyLevel(ConsistencyLevel.LOCAL_ONE)
+        .setSerialConsistencyLevel(ConsistencyLevel.SERIAL))
+    .build();
 ```
 
 Native protocol v2 batches retain their protocol-defined serial consistency of `SERIAL`; selecting
 `LOCAL_SERIAL` for batches requires protocol v3 or newer.
+
+Adapters with their own consistency setting must apply it to every statement, including paged
+scans. The `cassandra-stress` v3 adapter at [fc00ae4][stress] creates paging statements without
+applying its configured consistency levels. Those scans inherit the driver defaults; a tool-level
+flag alone does not override them. Before upgrading that consumer, update its paging adapter to
+propagate its configured levels and validate its default `LOCAL_ONE` setting and explicit overrides.
+A driver dependency update alone does not repair the omission.
+
+[serial]: https://docs.scylladb.com/manual/stable/cql/consistency.html
+[stress]:
+  https://github.com/scylladb/cassandra-stress/commit/fc00ae4461db807eaf35660039d97ebd1e92f3b8
 
 ### Customizing execution
 
