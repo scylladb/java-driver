@@ -30,13 +30,16 @@ apply to simple, bound and batch statements, both with the bundled configuration
 
 Ordinary requests now require a quorum of replicas in the local datacenter; requests that previously
 succeeded with one live local replica can fail when a local quorum is unavailable. The serial phase
-of LWT is coordinated within the local datacenter. Check availability requirements and the intended
-scope of LWT coordination before upgrading.
+of LWT is coordinated within the local datacenter. `LOCAL_SERIAL` guarantees linearizability only
+within that datacenter, so applications coordinating conditional writes across datacenters must not
+rely on it for global uniqueness or distributed locks. Such applications must explicitly retain
+`SERIAL` for the serial phase. Check availability requirements and the intended scope of LWT
+coordination before upgrading; see the [serial consistency documentation][serial-consistency].
 
 Explicit statement and execution-profile settings still take precedence. To retain the previous
 defaults, configure:
 
-```hocon
+```text
 datastax-java-driver.basic.request {
   consistency = LOCAL_ONE
   serial-consistency = SERIAL
@@ -57,6 +60,8 @@ repair that omission.
 
 [stress-scan-source]:
   https://github.com/scylladb/cassandra-stress/commit/fc00ae4461db807eaf35660039d97ebd1e92f3b8
+[serial-consistency]:
+  https://docs.scylladb.com/manual/stable/cql/consistency.html
 
 ### 4.19.3
 
