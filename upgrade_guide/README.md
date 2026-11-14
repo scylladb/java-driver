@@ -50,7 +50,7 @@ the previous defaults, configure `LOCAL_ONE` and `SERIAL` through
 With native protocol v2, `BatchStatement` uses a wire `BATCH` message with serial consistency fixed
 to `SERIAL`; selecting `LOCAL_SERIAL` for `BatchStatement` requires protocol v3 or newer. A CQL-text
 batch sent as a `SimpleStatement` uses a `QUERY` message and can carry `LOCAL_SERIAL` with protocol
-v2. Internal metadata queries retain their separately configured consistency.
+v2. Internal metadata queries remain fixed at `ONE`/`SERIAL`.
 
 ### 3.13.0
 
