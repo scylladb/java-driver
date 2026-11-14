@@ -135,10 +135,19 @@ public class QueryOptions {
    * explicitly have a serial consistency level, i.e. when {@link
    * Statement#getSerialConsistencyLevel} returns {@code null}.
    *
-   * @param serialConsistencyLevel the new serial consistency level to set as default.
+   * @param serialConsistencyLevel the new serial consistency level to set as default. It must be
+   *     {@link ConsistencyLevel#SERIAL} or {@link ConsistencyLevel#LOCAL_SERIAL}, as for {@link
+   *     Statement#setSerialConsistencyLevel}.
    * @return this {@code QueryOptions} instance.
+   * @throws NullPointerException if {@code serialConsistencyLevel} is {@code null}.
+   * @throws IllegalArgumentException if {@code serialConsistencyLevel} is not a serial level.
    */
   public QueryOptions setSerialConsistencyLevel(ConsistencyLevel serialConsistencyLevel) {
+    Preconditions.checkNotNull(serialConsistencyLevel, "serialConsistencyLevel cannot be null");
+    Preconditions.checkArgument(
+        serialConsistencyLevel.isSerial(),
+        "Supplied consistency level is not serial: %s",
+        serialConsistencyLevel);
     this.serialConsistency = serialConsistencyLevel;
     return this;
   }
@@ -620,7 +629,7 @@ public class QueryOptions {
     QueryOptions other = (QueryOptions) that;
 
     return (this.consistency.equals(other.consistency)
-            && this.serialConsistency.equals(other.serialConsistency)
+            && this.serialConsistency == other.serialConsistency
             && this.fetchSize == other.fetchSize
             && this.defaultIdempotence == other.defaultIdempotence
             && this.metadataEnabled == other.metadataEnabled
