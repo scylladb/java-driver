@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import com.datastax.dse.driver.api.core.graph.GraphStatement;
 import com.datastax.dse.driver.internal.core.graph.GraphSupportRemoved;
 import com.datastax.dse.driver.internal.core.graph.UnsupportedGraphRequestProcessor;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.session.Request;
@@ -89,7 +90,7 @@ public class RequestProcessorRegistryTest {
   public void should_use_custom_failure_when_session_is_closed() throws Exception {
     processors.add(0, customProcessor(GenericType.STRING, "unused"));
     assertThatThrownBy(() -> session(true).execute(graphStatement, GenericType.STRING))
-        .isInstanceOf(IllegalStateException.class)
+        .isInstanceOf(SessionClosedException.class)
         .hasMessage("Session is closed");
   }
 
