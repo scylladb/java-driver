@@ -1001,7 +1001,7 @@ public class DefaultDriverConfigReporter implements DriverConfigReporter {
     // and the built-in load balancing policies reject anything the ConsistencyLevelRegistry does
     // not
     // know, so what is left needs a custom registry — see the class javadoc.
-    n.put("consistency", config.getString(DefaultDriverOption.REQUEST_CONSISTENCY, "LOCAL_ONE"));
+    n.put("consistency", config.getString(DefaultDriverOption.REQUEST_CONSISTENCY, "LOCAL_QUORUM"));
     // Both consistency options are unvalidated strings, and both schema fields are closed enums —
     // but this one is optional, so it takes the omission route the required "consistency" above
     // cannot. Nothing checks basic.request.serial-consistency before the first conditional

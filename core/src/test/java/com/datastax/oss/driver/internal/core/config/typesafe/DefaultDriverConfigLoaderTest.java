@@ -195,7 +195,7 @@ public class DefaultDriverConfigLoaderTest {
         .isEqualTo(DefaultConsistencyLevel.ONE.name());
     // From reference.conf:
     assertThat(config.getString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY))
-        .isEqualTo(DefaultConsistencyLevel.SERIAL.name());
+        .isEqualTo(DefaultConsistencyLevel.LOCAL_SERIAL.name());
   }
 
   @Test
@@ -209,7 +209,7 @@ public class DefaultDriverConfigLoaderTest {
         .isEqualTo(Duration.ofSeconds(5));
     // From reference.conf:
     assertThat(config.getString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY))
-        .isEqualTo(DefaultConsistencyLevel.SERIAL.name());
+        .isEqualTo(DefaultConsistencyLevel.LOCAL_SERIAL.name());
   }
 
   @Test
@@ -225,7 +225,7 @@ public class DefaultDriverConfigLoaderTest {
           .isEqualTo(Duration.ofSeconds(5));
       // From reference.conf:
       assertThat(config.getString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY))
-          .isEqualTo(DefaultConsistencyLevel.SERIAL.name());
+          .isEqualTo(DefaultConsistencyLevel.LOCAL_SERIAL.name());
     } finally {
       System.clearProperty("config.file");
     }
@@ -309,7 +309,7 @@ public class DefaultDriverConfigLoaderTest {
     assertThat(config.getDuration(DefaultDriverOption.REQUEST_TIMEOUT))
         .isEqualTo(Duration.ofMillis(1));
     // Any option not in the string should be pulled from reference.conf
-    assertThat(config.getString(DefaultDriverOption.REQUEST_CONSISTENCY)).isEqualTo("LOCAL_ONE");
+    assertThat(config.getString(DefaultDriverOption.REQUEST_CONSISTENCY)).isEqualTo("LOCAL_QUORUM");
   }
 
   @Test

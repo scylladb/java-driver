@@ -469,10 +469,10 @@ public class DefaultDriverConfigReporterTest {
     assertThat(connectionNodeLocation.has("local-dc")).isFalse();
 
     JsonNode query = report.get("query").get("defaults");
-    assertThat(query.get("consistency").asText()).isEqualTo("LOCAL_ONE");
+    assertThat(query.get("consistency").asText()).isEqualTo("LOCAL_QUORUM");
     // Unlike the schema's "absent when unset" wording suggests, Java always has a serial level
     // configured: basic.request.serial-consistency is a required option with a shipped default.
-    assertThat(query.get("serial-consistency").asText()).isEqualTo("SERIAL");
+    assertThat(query.get("serial-consistency").asText()).isEqualTo("LOCAL_SERIAL");
     assertThat(query.get("idempotence").asBoolean()).isFalse();
     assertThat(query.get("client-timestamps").asBoolean()).isTrue();
     assertThat(query.get("request").get("timeout-ms").asLong()).isPositive();
@@ -2032,21 +2032,20 @@ public class DefaultDriverConfigReporterTest {
             report.get("control-plane").get("schema").get("agreement").get("timeout-ms").asLong())
         .isEqualTo(10_000);
     JsonNode defaults = report.get("query").get("defaults");
-    assertThat(defaults.get("consistency").asText()).isEqualTo("LOCAL_ONE");
+    assertThat(defaults.get("consistency").asText()).isEqualTo("LOCAL_QUORUM");
     assertThat(defaults.get("idempotence").asBoolean()).isFalse();
     assertConformsToSchema(report);
   }
 
   @Test
   public void should_report_both_serial_consistency_levels() throws Exception {
-    // Both members of the schema's enum survive the guard above; SERIAL is the shipped default and
-    // is asserted by the default-report test, so this pins the other one.
+    // Both members of the schema's enum survive the guard above; LOCAL_SERIAL is the shipped
+    // default, and callers can still explicitly select SERIAL.
     DefaultDriverConfigReporter r =
-        defaultsReporter(
-            map -> map.put(TypedDriverOption.REQUEST_SERIAL_CONSISTENCY, "LOCAL_SERIAL"));
+        defaultsReporter(map -> map.put(TypedDriverOption.REQUEST_SERIAL_CONSISTENCY, "SERIAL"));
     JsonNode report = report(r);
     assertThat(report.get("query").get("defaults").get("serial-consistency").asText())
-        .isEqualTo("LOCAL_SERIAL");
+        .isEqualTo("SERIAL");
     assertConformsToSchema(report);
   }
 

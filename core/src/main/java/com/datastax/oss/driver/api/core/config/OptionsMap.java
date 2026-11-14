@@ -260,12 +260,12 @@ public class OptionsMap implements Serializable {
 
     // Skip CONFIG_RELOAD_INTERVAL because the map-based config doesn't need periodic reloading
     map.put(TypedDriverOption.REQUEST_TIMEOUT, requestTimeout);
-    map.put(TypedDriverOption.REQUEST_CONSISTENCY, "LOCAL_ONE");
+    map.put(TypedDriverOption.REQUEST_CONSISTENCY, "LOCAL_QUORUM");
     map.put(TypedDriverOption.REQUEST_PAGE_SIZE, requestPageSize);
     map.put(
         TypedDriverOption.PREPARE_SKIP_CQL4_METADATA_RESOLVE_METHOD,
         CQL4SkipMetadataResolveMethod.SMART.toString());
-    map.put(TypedDriverOption.REQUEST_SERIAL_CONSISTENCY, "SERIAL");
+    map.put(TypedDriverOption.REQUEST_SERIAL_CONSISTENCY, "LOCAL_SERIAL");
     map.put(TypedDriverOption.REQUEST_DEFAULT_IDEMPOTENCE, false);
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_CLASS, "DefaultLoadBalancingPolicy");
     map.put(TypedDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);

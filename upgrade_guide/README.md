@@ -19,6 +19,44 @@ under the License.
 
 ## Upgrade guide
 
+### 4.19.4.1 (unreleased)
+
+#### Application consistency defaults are datacenter-local
+
+The default request consistency changes from `LOCAL_ONE` to `LOCAL_QUORUM`, and the default serial
+consistency for conditional updates (LWT) changes from `SERIAL` to `LOCAL_SERIAL`. These defaults
+apply to simple, bound and batch statements, both with the bundled configuration and with
+`OptionsMap.driverDefaults()`.
+
+Ordinary requests now require a quorum of replicas in the local datacenter; requests that previously
+succeeded with one live local replica can fail when a local quorum is unavailable. The serial phase
+of LWT is coordinated within the local datacenter. `LOCAL_SERIAL` guarantees linearizability only
+within that datacenter, so applications coordinating conditional writes across datacenters must not
+rely on it for global uniqueness or distributed locks. Such applications must explicitly retain
+`SERIAL` for the serial phase. Check availability requirements and the intended scope of LWT
+coordination before upgrading; see the [serial consistency documentation][serial-consistency].
+
+Explicit statement and execution-profile settings still take precedence. To retain the previous
+defaults, configure:
+
+```text
+datastax-java-driver.basic.request {
+  consistency = LOCAL_ONE
+  serial-consistency = SERIAL
+}
+```
+
+For map-based configuration, set `TypedDriverOption.REQUEST_CONSISTENCY` to `"LOCAL_ONE"` and
+`TypedDriverOption.REQUEST_SERIAL_CONSISTENCY` to `"SERIAL"` on the `OptionsMap`. Internal metadata,
+schema and control queries remain fixed at `ONE`/`SERIAL`. Tracing queries continue to use
+`advanced.request.trace.consistency` for their regular consistency.
+
+Adapters with their own consistency setting must propagate it to every statement, including paged
+scans.
+
+[serial-consistency]:
+  https://docs.scylladb.com/manual/stable/cql/consistency.html
+
 ### 4.19.3
 
 #### Ordering of points in DefaultPolygon
