@@ -28,6 +28,30 @@ Java Driver 4.x rather than between 3.x versions, see the
 [4.x migration guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/) instead.
 :::
 
+### 3.13.0.1 (unreleased)
+
+#### Application consistency defaults are datacenter-local
+
+The default request consistency in `QueryOptions` changes from `LOCAL_ONE` to `LOCAL_QUORUM`, and
+the default serial consistency for conditional updates (LWT) changes from `SERIAL` to
+`LOCAL_SERIAL`.
+Ordinary requests now require a local replica quorum; requests that previously succeeded with one
+live local replica can fail when a local quorum is unavailable.
+
+`LOCAL_SERIAL` guarantees linearizability only within the local datacenter. Applications
+coordinating conditional writes across datacenters for global uniqueness or distributed locks must
+retain `SERIAL` for the serial phase.
+
+Explicit statement and cluster `QueryOptions` settings retain their existing precedence. To select
+the previous defaults, configure `LOCAL_ONE` and `SERIAL` through
+`Cluster.builder().withQueryOptions(...)` before building the cluster; see the
+[statement configuration example](../manual/statements/).
+
+With native protocol v2, `BatchStatement` uses a wire `BATCH` message with serial consistency fixed
+to `SERIAL`; selecting `LOCAL_SERIAL` for `BatchStatement` requires protocol v3 or newer. A CQL-text
+batch sent as a `SimpleStatement` uses a `QUERY` message and can carry `LOCAL_SERIAL` with protocol
+v2. Internal metadata queries remain fixed at `ONE`/`SERIAL`.
+
 ### 3.13.0
 
 The driver requires Java 8 to build and run. Nothing changes for the ScyllaDB fork, which has

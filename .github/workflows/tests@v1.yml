@@ -249,7 +249,8 @@ jobs:
         id: run-integration-tests
         env:
           CASSANDRA_VERSION_RESOLVED: ${{ steps.cassandra-version.outputs.value }}
-        run: make test-integration-cassandra COVERAGE=true COVERAGE_LANE=cassandra-${{ matrix.cassandra-version }}
+        # CCM otherwise searches /usr/lib/jvm, outside setup-java's toolcache.
+        run: CUSTOM_JAVA_HOME="$JAVA_HOME" make test-integration-cassandra COVERAGE=true COVERAGE_LANE=cassandra-${{ matrix.cassandra-version }}
 
       - name: Collect coverage execution data
         if: ${{ !cancelled() }}

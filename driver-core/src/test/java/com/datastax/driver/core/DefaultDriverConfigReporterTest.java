@@ -287,8 +287,8 @@ public class DefaultDriverConfigReporterTest {
     // query.defaults.
     JsonNode defaults = query.path("defaults");
     assertThat(defaults.path("page").path("size").asInt()).isEqualTo(5000);
-    assertThat(defaults.path("consistency").asText()).isEqualTo("LOCAL_ONE");
-    assertThat(defaults.path("serial-consistency").asText()).isEqualTo("SERIAL");
+    assertThat(defaults.path("consistency").asText()).isEqualTo("LOCAL_QUORUM");
+    assertThat(defaults.path("serial-consistency").asText()).isEqualTo("LOCAL_SERIAL");
     assertThat(defaults.path("idempotence").asBoolean()).isFalse();
     assertThat(defaults.path("client-timestamps").asBoolean()).isTrue();
     assertThat(defaults.path("request").path("timeout-ms").asInt()).isEqualTo(12000);

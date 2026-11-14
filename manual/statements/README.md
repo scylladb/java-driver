@@ -34,6 +34,33 @@ To execute a query, you  create a [Statement] instance and pass it to [Session#e
   executed as a batch.
 
 
+The default consistency is `LOCAL_QUORUM`; the default serial consistency for the serial phase of
+conditional updates (LWT) is `LOCAL_SERIAL`. Ordinary requests require a local replica quorum, while
+LWT serial coordination is scoped to the local datacenter. These defaults apply to simple, bound and
+batch statements. Explicit statement settings override the cluster's `QueryOptions`. Applications
+coordinating conditional writes across datacenters for global uniqueness or distributed locks must
+explicitly retain `SERIAL` for the serial phase; see the [serial consistency documentation][serial].
+Applications that need the previous defaults can configure them when building the cluster:
+
+```java
+Cluster cluster = Cluster.builder()
+    .addContactPoint("127.0.0.1")
+    .withQueryOptions(new QueryOptions()
+        .setConsistencyLevel(ConsistencyLevel.LOCAL_ONE)
+        .setSerialConsistencyLevel(ConsistencyLevel.SERIAL))
+    .build();
+```
+
+`BatchStatement` uses a native-protocol `BATCH` message. With protocol v2, that message retains its
+protocol-defined serial consistency of `SERIAL`; selecting `LOCAL_SERIAL` for `BatchStatement`
+requires protocol v3 or newer. A CQL-text `BEGIN BATCH ... APPLY BATCH` sent as a `SimpleStatement`
+uses a `QUERY` message instead and can carry `LOCAL_SERIAL` with protocol v2.
+
+Adapters with their own consistency setting must apply it to every statement, including paged
+scans.
+
+[serial]: https://docs.scylladb.com/manual/stable/cql/consistency.html
+
 ### Customizing execution
 
 Before executing a statement, you might want to customize certain
