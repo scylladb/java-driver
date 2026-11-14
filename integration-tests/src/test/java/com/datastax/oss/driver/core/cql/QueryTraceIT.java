@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.DefaultConsistencyLevel;
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.QueryTrace;
@@ -98,12 +99,15 @@ public class QueryTraceIT {
     assertThat(queryTrace.getDurationMicros()).isPositive();
     assertThat(queryTrace.getCoordinatorAddress().getAddress()).isEqualTo(nodeAddress);
     if (expectPorts) {
+      // system_traces has RF 2, while this fixture has one node. Keep inspection reads at ONE.
       Row row =
           SESSION_RULE
               .session()
               .execute(
-                  "SELECT coordinator_port FROM system_traces.sessions WHERE session_id = "
-                      + queryTrace.getTracingId())
+                  SimpleStatement.newInstance(
+                          "SELECT coordinator_port FROM system_traces.sessions WHERE session_id = "
+                              + queryTrace.getTracingId())
+                      .setConsistencyLevel(DefaultConsistencyLevel.ONE))
               .one();
       assertThat(row).isNotNull();
       int expectedPort = row.getInt(0);
@@ -112,10 +116,10 @@ public class QueryTraceIT {
       assertThat(queryTrace.getCoordinatorAddress().getPort()).isEqualTo(0);
     }
     assertThat(queryTrace.getParameters())
-        .containsEntry("consistency_level", "LOCAL_ONE")
+        .containsEntry("consistency_level", "LOCAL_QUORUM")
         .containsEntry("page_size", "5000")
         .containsEntry("query", "SELECT release_version FROM system.local WHERE key='local'")
-        .containsEntry("serial_consistency_level", "SERIAL");
+        .containsEntry("serial_consistency_level", "LOCAL_SERIAL");
     assertThat(queryTrace.getStartedAt()).isPositive();
     // Don't want to get too deep into event testing because that could change across versions
     assertThat(queryTrace.getEvents()).isNotEmpty();
@@ -127,9 +131,11 @@ public class QueryTraceIT {
           SESSION_RULE
               .session()
               .execute(
-                  "SELECT source_port FROM system_traces.events WHERE session_id = "
-                      + queryTrace.getTracingId()
-                      + " LIMIT 1")
+                  SimpleStatement.newInstance(
+                          "SELECT source_port FROM system_traces.events WHERE session_id = "
+                              + queryTrace.getTracingId()
+                              + " LIMIT 1")
+                      .setConsistencyLevel(DefaultConsistencyLevel.ONE))
               .one();
       assertThat(row).isNotNull();
       int expectedPort = row.getInt(0);

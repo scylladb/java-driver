@@ -187,7 +187,7 @@ public class ProfileIT {
     SimpleMapper mapper = mapperBuilder.build();
     SimpleDao dao = mapper.simpleDao();
     // Default CL inherited from reference.conf
-    assertClForAllQueries(dao, ConsistencyLevel.LOCAL_ONE);
+    assertClForAllQueries(dao, ConsistencyLevel.LOCAL_QUORUM);
   }
 
   private void assertClForAllQueries(SimpleDao dao, ConsistencyLevel expectedLevel) {
@@ -229,7 +229,7 @@ public class ProfileIT {
             when(query(
                     "INSERT INTO ks.simple (pk,data) VALUES (:pk,:data)",
                     Lists.newArrayList(
-                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_ONE,
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_QUORUM,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ONE,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.TWO),
                     params,
@@ -247,7 +247,7 @@ public class ProfileIT {
             when(query(
                     "DELETE FROM ks.simple WHERE pk=:pk",
                     Lists.newArrayList(
-                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_ONE,
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_QUORUM,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ONE,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.TWO),
                     params,
@@ -266,7 +266,7 @@ public class ProfileIT {
             when(query(
                     "SELECT pk,data FROM ks.simple WHERE pk=:pk",
                     Lists.newArrayList(
-                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_ONE,
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_QUORUM,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ONE,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.TWO),
                     params,
@@ -285,7 +285,7 @@ public class ProfileIT {
             when(query(
                     "SELECT count(*) FROM ks.simple WHERE pk=:pk",
                     Lists.newArrayList(
-                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_ONE,
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_QUORUM,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ONE,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.TWO),
                     params,
@@ -306,7 +306,7 @@ public class ProfileIT {
             when(query(
                     "UPDATE ks.simple SET data=:data WHERE pk=:pk",
                     Lists.newArrayList(
-                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_ONE,
+                        com.datastax.oss.simulacron.common.codec.ConsistencyLevel.LOCAL_QUORUM,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.ONE,
                         com.datastax.oss.simulacron.common.codec.ConsistencyLevel.TWO),
                     params,

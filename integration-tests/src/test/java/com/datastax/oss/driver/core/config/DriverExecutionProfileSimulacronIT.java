@@ -135,13 +135,13 @@ public class DriverExecutionProfileSimulacronIT {
     DriverConfigLoader loader =
         SessionUtils.configLoaderBuilder()
             .startProfile("cl")
-            .withString(DefaultDriverOption.REQUEST_CONSISTENCY, "LOCAL_QUORUM")
-            .withString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY, "LOCAL_SERIAL")
+            .withString(DefaultDriverOption.REQUEST_CONSISTENCY, "LOCAL_ONE")
+            .withString(DefaultDriverOption.REQUEST_SERIAL_CONSISTENCY, "SERIAL")
             .build();
     try (CqlSession session = SessionUtils.newSession(SIMULACRON_RULE, loader)) {
       String query = "mockquery";
 
-      // Execute query without profile, should use default CLs (LOCAL_ONE, SERIAL).
+      // Execute query without profile, should use default CLs (LOCAL_QUORUM, LOCAL_SERIAL).
       session.execute(query);
 
       Optional<QueryLog> log =
@@ -153,8 +153,8 @@ public class DriverExecutionProfileSimulacronIT {
           .isPresent()
           .hasValueSatisfying(
               (l) -> {
-                assertThat(l.getConsistency().toString()).isEqualTo("LOCAL_ONE");
-                assertThat(l.getSerialConsistency().toString()).isEqualTo("SERIAL");
+                assertThat(l.getConsistency().toString()).isEqualTo("LOCAL_QUORUM");
+                assertThat(l.getSerialConsistency().toString()).isEqualTo("LOCAL_SERIAL");
               });
 
       SIMULACRON_RULE.cluster().clearLogs();
@@ -171,8 +171,8 @@ public class DriverExecutionProfileSimulacronIT {
           .isPresent()
           .hasValueSatisfying(
               (l) -> {
-                assertThat(l.getConsistency().toString()).isEqualTo("LOCAL_QUORUM");
-                assertThat(l.getSerialConsistency().toString()).isEqualTo("LOCAL_SERIAL");
+                assertThat(l.getConsistency().toString()).isEqualTo("LOCAL_ONE");
+                assertThat(l.getSerialConsistency().toString()).isEqualTo("SERIAL");
               });
     }
   }
