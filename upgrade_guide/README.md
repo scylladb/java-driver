@@ -51,15 +51,8 @@ For map-based configuration, set `TypedDriverOption.REQUEST_CONSISTENCY` to `"LO
 and tracing queries retain their separately configured consistency.
 
 Adapters with their own consistency setting must propagate it to every statement, including paged
-scans. For example, the `cassandra-stress` v4 adapter at [fc00ae4][stress-scan-source] creates
-paging statements without applying the tool's configured `cl` or `serial-cl` values. Those scans
-inherit the driver defaults; a tool-level flag alone does not override them. Before upgrading that
-consumer, update its paging adapter to set the configured consistency explicitly and validate both
-its default `LOCAL_ONE` setting and explicit overrides. A driver dependency update alone does not
-repair that omission.
+scans.
 
-[stress-scan-source]:
-  https://github.com/scylladb/cassandra-stress/commit/fc00ae4461db807eaf35660039d97ebd1e92f3b8
 [serial-consistency]:
   https://docs.scylladb.com/manual/stable/cql/consistency.html
 
