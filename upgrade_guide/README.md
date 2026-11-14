@@ -47,8 +47,9 @@ datastax-java-driver.basic.request {
 ```
 
 For map-based configuration, set `TypedDriverOption.REQUEST_CONSISTENCY` to `"LOCAL_ONE"` and
-`TypedDriverOption.REQUEST_SERIAL_CONSISTENCY` to `"SERIAL"` on the `OptionsMap`. Internal metadata
-and tracing queries retain their separately configured consistency.
+`TypedDriverOption.REQUEST_SERIAL_CONSISTENCY` to `"SERIAL"` on the `OptionsMap`. Internal metadata,
+schema and control queries remain fixed at `ONE`/`SERIAL`. Tracing queries continue to use
+`advanced.request.trace.consistency` for their regular consistency.
 
 Adapters with their own consistency setting must propagate it to every statement, including paged
 scans.
