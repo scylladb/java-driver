@@ -168,11 +168,12 @@ public class DefaultPreparedStatement implements PreparedStatement {
     String table = defs.getTable(0);
     if (table.endsWith(SCYLLA_CDC_LOG_SUFFIX)) {
       String baseTableName = table.substring(0, table.length() - SCYLLA_CDC_LOG_SUFFIX.length());
-      KeyspaceMetadata keyspaceMetadata = cluster.getMetadata().getKeyspace(keyspace);
+      KeyspaceMetadata keyspaceMetadata =
+          cluster.getMetadata().getKeyspace(Metadata.quote(keyspace));
       if (keyspaceMetadata == null) {
         return null;
       }
-      TableMetadata tableMetadata = keyspaceMetadata.getTable(baseTableName);
+      TableMetadata tableMetadata = keyspaceMetadata.getTable(Metadata.quote(baseTableName));
       if (tableMetadata != null && tableMetadata.options.isScyllaCDC()) {
         return Token.CDCToken.FACTORY;
       }

@@ -25,6 +25,7 @@ under the License.
 -->
 
 ### 3.13.0
+- [bug] #1178: Use the CDC partitioner for case-sensitive keyspace and table names
 - [bug] CASSJAVA-85: decode custom payload and warnings in correct order
 - [improvement] CASSJAVA-128: Update Netty to 4.1.138 and migrate to Java8
 
