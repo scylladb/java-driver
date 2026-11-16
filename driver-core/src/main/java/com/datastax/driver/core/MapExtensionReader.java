@@ -62,12 +62,22 @@ public class MapExtensionReader {
 
   private String parseString() throws UnsupportedEncodingException {
     int length = parseInt();
+    Preconditions.checkArgument(length >= 0, "Negative string length: %s", length);
+    Preconditions.checkArgument(
+        length <= rawData.remaining(),
+        "String length %s exceeds %s remaining bytes",
+        length,
+        rawData.remaining());
     byte[] rawString = new byte[length];
     rawData.get(rawString);
     return new String(rawString, "UTF-8");
   }
 
   private int parseInt() {
+    Preconditions.checkArgument(
+        rawData.remaining() >= Integer.BYTES,
+        "Expected 4 bytes for an integer, but only %s remain",
+        rawData.remaining());
     // Parse little-endian 32-bit integer.
     return rawData.getInt();
   }

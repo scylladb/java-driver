@@ -23,7 +23,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collections;
@@ -107,30 +106,26 @@ public class MapExtensionReaderTest {
     new MapExtensionReader(ints(-1)).parse();
   }
 
-  @Test(groups = "unit", expectedExceptions = BufferUnderflowException.class)
-  public void should_fail_on_empty_buffer() {
-    // Pins current behaviour (#1174): a malformed extension escapes as an unchecked exception
+  @Test(groups = "unit", expectedExceptions = IllegalArgumentException.class)
+  public void should_reject_empty_buffer() {
     new MapExtensionReader(ByteBuffer.allocate(0)).parse();
   }
 
-  @Test(groups = "unit", expectedExceptions = BufferUnderflowException.class)
-  public void should_fail_when_count_exceeds_entries() {
-    // Pins current behaviour (#1174): a malformed extension escapes as an unchecked exception
+  @Test(groups = "unit", expectedExceptions = IllegalArgumentException.class)
+  public void should_reject_count_exceeding_entries() {
     ByteBuffer raw = encode("k", "v");
     raw.order(ByteOrder.LITTLE_ENDIAN).putInt(0, 2);
 
     new MapExtensionReader(raw).parse();
   }
 
-  @Test(groups = "unit", expectedExceptions = BufferUnderflowException.class)
-  public void should_fail_when_string_is_truncated() {
-    // Pins current behaviour (#1174): a malformed extension escapes as an unchecked exception
+  @Test(groups = "unit", expectedExceptions = IllegalArgumentException.class)
+  public void should_reject_truncated_string() {
     new MapExtensionReader(ints(1, 10)).parse();
   }
 
-  @Test(groups = "unit", expectedExceptions = NegativeArraySizeException.class)
-  public void should_fail_on_negative_string_length() {
-    // Pins current behaviour (#1174): a negative string length is not validated like the count
+  @Test(groups = "unit", expectedExceptions = IllegalArgumentException.class)
+  public void should_reject_negative_string_length() {
     new MapExtensionReader(ints(1, -1)).parse();
   }
 
@@ -194,13 +189,51 @@ public class MapExtensionReaderTest {
     assertThat(options.getScyllaAlternatorTags()).isNull();
   }
 
-  @Test(groups = "unit", expectedExceptions = BufferUnderflowException.class)
-  public void should_fail_table_options_on_malformed_map_extension() {
-    // Pins current behaviour (#1174): the exception escapes the constructor, and callers then drop
-    // all table options (getOptions() == null)
+  @Test(groups = "unit")
+  public void should_skip_malformed_map_extension_in_table_options() {
     Map<String, ByteBuffer> extensions = ImmutableMap.of("cdc", ints(1, 10));
 
-    new TableOptionsMetadata(rowWithExtensions(extensions), false, VersionNumber.parse("3.0.0"));
+    TableOptionsMetadata options =
+        new TableOptionsMetadata(
+            rowWithExtensions(extensions), false, VersionNumber.parse("3.0.0"));
+
+    assertThat(options.getMapExtensions()).isEmpty();
+    assertThat(options.getExtensions()).isEqualTo(extensions);
+    assertThat(options.isScyllaCDC()).isFalse();
+    assertThat(options.getScyllaCDCOptions()).isNull();
+  }
+
+  @Test(groups = "unit")
+  public void should_keep_valid_map_extensions_when_one_is_malformed() {
+    Map<String, ByteBuffer> extensions =
+        ImmutableMap.of(
+            "cdc", ints(1, 10),
+            "scylla_tags", encode("owner", "team-a"));
+
+    TableOptionsMetadata options =
+        new TableOptionsMetadata(
+            rowWithExtensions(extensions), false, VersionNumber.parse("3.0.0"));
+
+    assertThat(options.getMapExtensions())
+        .isEqualTo(ImmutableMap.of("scylla_tags", ImmutableMap.of("owner", "team-a")));
+    assertThat(options.getExtensions()).isEqualTo(extensions);
+    assertThat(options.isScyllaCDC()).isFalse();
+    assertThat(options.getScyllaCDCOptions()).isNull();
+    assertThat(options.getScyllaAlternatorTags()).isEqualTo(ImmutableMap.of("owner", "team-a"));
+  }
+
+  @Test(groups = "unit")
+  public void should_skip_duplicate_key_map_extension_in_table_options() {
+    Map<String, ByteBuffer> extensions =
+        ImmutableMap.of("cdc", encode("enabled", "true", "enabled", "false"));
+
+    TableOptionsMetadata options =
+        new TableOptionsMetadata(
+            rowWithExtensions(extensions), false, VersionNumber.parse("3.0.0"));
+
+    assertThat(options.getMapExtensions()).isEmpty();
+    assertThat(options.getExtensions()).isEqualTo(extensions);
+    assertThat(options.isScyllaCDC()).isFalse();
   }
 
   private static Row rowWithExtensions(Map<String, ByteBuffer> extensions) {

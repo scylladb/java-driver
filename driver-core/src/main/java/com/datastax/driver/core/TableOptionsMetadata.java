@@ -27,8 +27,12 @@ import com.datastax.driver.core.utils.MoreObjects;
 import com.google.common.collect.ImmutableMap;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TableOptionsMetadata {
+
+  private static final Logger logger = LoggerFactory.getLogger(TableOptionsMetadata.class);
 
   private static final String COMMENT = "comment";
   private static final String READ_REPAIR_CHANCE = "read_repair_chance";
@@ -205,8 +209,12 @@ public class TableOptionsMetadata {
     for (String mapExtension : MAP_EXTENSIONS) {
       ByteBuffer rawExtensionInfo = this.extensions.get(mapExtension);
       if (rawExtensionInfo != null) {
-        Map<String, String> extensionInfo = new MapExtensionReader(rawExtensionInfo).parse();
-        mapExtensionsBuilder.put(mapExtension, extensionInfo);
+        try {
+          Map<String, String> extensionInfo = new MapExtensionReader(rawExtensionInfo).parse();
+          mapExtensionsBuilder.put(mapExtension, extensionInfo);
+        } catch (RuntimeException e) {
+          logger.warn("Skipping malformed '{}' table extension", mapExtension, e);
+        }
       }
     }
     this.mapExtensions = mapExtensionsBuilder.build();
