@@ -98,21 +98,17 @@ public class PreparedStatementCDCPartitionerTest {
   }
 
   @Test(groups = "unit")
-  public void should_not_use_cdc_partitioner_for_case_sensitive_keyspace() throws Exception {
+  public void should_use_cdc_partitioner_for_case_sensitive_keyspace() throws Exception {
     addTable("MyKs", "tbl", true);
 
-    // Pins current behaviour (#1178): partitioner() passes the case-sensitive keyspace name
-    // unquoted to Metadata.getKeyspace, which lowercases it, so routing falls back to Murmur3
-    assertThat(partitioner(defs("MyKs", "tbl_scylla_cdc_log"))).isNull();
+    assertThat(partitioner(defs("MyKs", "tbl_scylla_cdc_log"))).isSameAs(Token.CDCToken.FACTORY);
   }
 
   @Test(groups = "unit")
-  public void should_not_use_cdc_partitioner_for_case_sensitive_base_table() throws Exception {
+  public void should_use_cdc_partitioner_for_case_sensitive_base_table() throws Exception {
     addTable("ks", "MyTbl", true);
 
-    // Pins current behaviour (#1178): partitioner() passes the case-sensitive base table name
-    // unquoted to KeyspaceMetadata.getTable, which lowercases it, so routing falls back to Murmur3
-    assertThat(partitioner(defs("ks", "MyTbl_scylla_cdc_log"))).isNull();
+    assertThat(partitioner(defs("ks", "MyTbl_scylla_cdc_log"))).isSameAs(Token.CDCToken.FACTORY);
   }
 
   private void addTable(String keyspace, String table, boolean cdcEnabled) throws Exception {
