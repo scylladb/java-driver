@@ -88,6 +88,38 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
     assertThat(frame.message).isInstanceOf(AuthSuccess.class);
   }
 
+  @Test
+  public void should_decode_protocol_v3_frame() {
+    addDecoder(1024);
+    ByteBuf input = payload(VALID_PAYLOAD, 42);
+    input.setByte(0, 0x83);
+
+    channel.writeInbound(input);
+
+    assertThat(decoded).hasSize(1);
+    assertResponse(0, 42);
+    assertThat(((Frame) decoded.get(0)).protocolVersion).isEqualTo(3);
+    assertThat(input.refCnt()).isZero();
+  }
+
+  @Test
+  public void should_wait_for_fragmented_first_response() {
+    addDecoder(1024);
+    ByteBuf input = payload(VALID_PAYLOAD, 42);
+    // Eight bytes stop just before the end of a V3+ frame header.
+    channel.writeInbound(input.readRetainedSlice(8));
+    assertThat(decoded).isEmpty();
+
+    channel.writeInbound(input.readRetainedSlice(1));
+    assertThat(decoded).isEmpty();
+
+    channel.writeInbound(input);
+
+    assertThat(decoded).hasSize(1);
+    assertResponse(0, 42);
+    assertThat(input.refCnt()).isZero();
+  }
+
   /**
    * Checks that an exception carrying the stream id is thrown when decoding fails in the {@link
    * LengthFieldBasedFrameDecoder} code.

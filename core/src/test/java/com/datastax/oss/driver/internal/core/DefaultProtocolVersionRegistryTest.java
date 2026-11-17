@@ -49,6 +49,16 @@ public class DefaultProtocolVersionRegistryTest {
   }
 
   @Test
+  public void should_reject_obsolete_protocol_version_names() {
+    assertThatThrownBy(() -> registry.fromName("V1"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Unknown protocol version name: V1");
+    assertThatThrownBy(() -> registry.fromName("V2"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Unknown protocol version name: V2");
+  }
+
+  @Test
   public void should_fail_to_find_version_by_name_different_case() {
     assertThatThrownBy(() -> registry.fromName("v4")).isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> registry.fromName("DSE_V1"))
