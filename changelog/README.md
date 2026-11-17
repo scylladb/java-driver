@@ -24,6 +24,9 @@ under the License.
   3.x versions get published.
 -->
 
+### 3.13.0.1
+- [bug] #1192: Ignore out-of-range SCYLLA_NR_SHARDS and SCYLLA_SHARD instead of failing pool init
+
 ### 3.13.0
 - [bug] CASSJAVA-85: decode custom payload and warnings in correct order
 - [improvement] CASSJAVA-128: Update Netty to 4.1.138 and migrate to Java8

@@ -17,9 +17,13 @@ package com.datastax.driver.core;
 
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Keeps the information the driver maintains on data layout of a given node. */
 public class ShardingInfo {
+  private static final Logger logger = LoggerFactory.getLogger(ShardingInfo.class);
+
   private static final String SCYLLA_SHARD_PARAM_KEY = "SCYLLA_SHARD";
   private static final String SCYLLA_NR_SHARDS_PARAM_KEY = "SCYLLA_NR_SHARDS";
   private static final String SCYLLA_PARTITIONER = "SCYLLA_PARTITIONER";
@@ -95,6 +99,15 @@ public class ShardingInfo {
         || shardingIgnoreMSB == null
         || !partitioner.equals("org.apache.cassandra.dht.Murmur3Partitioner")
         || !shardingAlgorithm.equals("biased-token-round-robin")) {
+      return null;
+    }
+    // A correct server never sends these. Accepting them makes pool init divide by zero,
+    // allocate a negative array, or index past the per-shard arrays. Drop shard awareness.
+    if (shardsCount < 1 || shardId < 0 || shardId >= shardsCount) {
+      logger.warn(
+          "Ignoring out-of-range shard parameters: SCYLLA_SHARD={} SCYLLA_NR_SHARDS={}",
+          shardId,
+          shardsCount);
       return null;
     }
     if (shardAwarePort == null) {

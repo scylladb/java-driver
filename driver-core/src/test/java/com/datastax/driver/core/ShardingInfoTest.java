@@ -217,14 +217,29 @@ public class ShardingInfoTest {
   }
 
   @Test(groups = "unit")
-  public void should_accept_out_of_range_shard_values() {
-    // Pins current behaviour (#1192): shard count and shard id are not range-checked
+  public void should_return_null_for_out_of_range_shard_values() {
     Map<String, List<String>> params = validParams();
     params.put("SCYLLA_NR_SHARDS", Collections.singletonList("0"));
-    assertThat(ShardingInfo.parseShardingInfo(params).shardingInfo.getShardsCount()).isEqualTo(0);
+    assertThat(ShardingInfo.parseShardingInfo(params)).isNull();
+
+    params = validParams();
+    params.put("SCYLLA_NR_SHARDS", Collections.singletonList("-1"));
+    assertThat(ShardingInfo.parseShardingInfo(params)).isNull();
 
     params = validParams();
     params.put("SCYLLA_SHARD", Collections.singletonList("12"));
-    assertThat(ShardingInfo.parseShardingInfo(params).shardId).isEqualTo(12);
+    assertThat(ShardingInfo.parseShardingInfo(params)).isNull();
+
+    params = validParams();
+    params.put("SCYLLA_SHARD", Collections.singletonList("-1"));
+    assertThat(ShardingInfo.parseShardingInfo(params)).isNull();
+
+    params = validParams();
+    params.put("SCYLLA_SHARD", Collections.singletonList("0"));
+    assertThat(ShardingInfo.parseShardingInfo(params).shardId).isEqualTo(0);
+
+    params = validParams();
+    params.put("SCYLLA_SHARD", Collections.singletonList("11"));
+    assertThat(ShardingInfo.parseShardingInfo(params).shardId).isEqualTo(11);
   }
 }
