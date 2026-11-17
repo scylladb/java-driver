@@ -106,17 +106,21 @@ public class FrameDecoderTest extends ChannelHandlerTestBase {
   public void should_wait_for_fragmented_first_response() {
     addDecoder(1024);
     ByteBuf input = payload(VALID_PAYLOAD, 42);
-    // Eight bytes stop just before the end of a V3+ frame header.
-    channel.writeInbound(input.readRetainedSlice(8));
-    assertThat(decoded).isEmpty();
+    try {
+      // Eight bytes stop just before the end of a V3+ frame header.
+      channel.writeInbound(input.readRetainedSlice(8));
+      assertThat(decoded).isEmpty();
 
-    channel.writeInbound(input.readRetainedSlice(1));
-    assertThat(decoded).isEmpty();
+      channel.writeInbound(input.readRetainedSlice(1));
+      assertThat(decoded).isEmpty();
 
-    channel.writeInbound(input);
+      channel.writeInbound(input.readRetainedSlice(input.readableBytes()));
 
-    assertThat(decoded).hasSize(1);
-    assertResponse(0, 42);
+      assertThat(decoded).hasSize(1);
+      assertResponse(0, 42);
+    } finally {
+      input.release();
+    }
     assertThat(input.refCnt()).isZero();
   }
 
