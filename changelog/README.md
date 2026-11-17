@@ -28,6 +28,7 @@ under the License.
 - [bug] #1192: Ignore out-of-range SCYLLA_NR_SHARDS and SCYLLA_SHARD instead of failing pool init
 
 ### 3.13.0
+- [bug] #1174: Skip malformed Scylla map extensions without dropping table options
 - [bug] CASSJAVA-85: decode custom payload and warnings in correct order
 - [improvement] CASSJAVA-128: Update Netty to 4.1.138 and migrate to Java8
 
