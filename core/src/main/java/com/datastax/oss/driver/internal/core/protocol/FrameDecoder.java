@@ -18,17 +18,13 @@
 package com.datastax.oss.driver.internal.core.protocol;
 
 import com.datastax.oss.driver.api.core.connection.FrameTooLongException;
-import com.datastax.oss.protocol.internal.Frame;
 import com.datastax.oss.protocol.internal.FrameCodec;
-import com.datastax.oss.protocol.internal.ProtocolConstants;
 import com.datastax.oss.protocol.internal.ProtocolFeatures;
-import com.datastax.oss.protocol.internal.response.Error;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.TooLongFrameException;
 import java.nio.ByteOrder;
-import java.util.Collections;
 import net.jcip.annotations.NotThreadSafe;
 
 /**
@@ -45,7 +41,6 @@ public class FrameDecoder extends LengthFieldBasedFrameDecoder {
   private final FrameCodec<ByteBuf> frameCodec;
   private final ProtocolFeatures protocolFeatures;
   private final int maxFrameLengthInBytes;
-  private boolean isFirstResponse;
   private int frameStreamId;
   private boolean oversizedFrameHeaderRead;
 
@@ -66,38 +61,6 @@ public class FrameDecoder extends LengthFieldBasedFrameDecoder {
       return null;
     }
     int startIndex = in.readerIndex();
-    if (isFirstResponse) {
-      isFirstResponse = false;
-
-      // Must read at least the protocol v1/v2 header (see below)
-      if (in.readableBytes() < 8) {
-        return null;
-      }
-      // Special case for obsolete protocol versions (< v3): the length field is at a different
-      // position, so we can't delegate to super.decode() which would read the wrong length.
-      int protocolVersion = (int) in.getByte(startIndex) & 0b0111_1111;
-      if (protocolVersion < 3) {
-        int streamId = in.getByte(startIndex + 2);
-        int length = in.getInt(startIndex + 4);
-        // We don't need a full-blown decoder, just to signal the protocol error. So discard the
-        // incoming data and spoof a server-side protocol error.
-        if (in.readableBytes() < 8 + length) {
-          return null; // keep reading until we can discard the whole message at once
-        } else {
-          in.readerIndex(startIndex + 8 + length);
-        }
-        return Frame.forResponse(
-            protocolVersion,
-            streamId,
-            null,
-            Frame.NO_PAYLOAD,
-            Collections.emptyList(),
-            new Error(
-                ProtocolConstants.ErrorCode.PROTOCOL_ERROR,
-                "Invalid or unsupported protocol version"));
-      }
-    }
-
     ByteBuf buffer;
     oversizedFrameHeaderRead = false;
     try {
