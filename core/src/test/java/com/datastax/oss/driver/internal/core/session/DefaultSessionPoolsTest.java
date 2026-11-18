@@ -736,7 +736,7 @@ public class DefaultSessionPoolsTest {
   }
 
   @Test
-  public void should_close_all_pools_when_closing() {
+  public void should_close_all_pools_when_closing() throws InterruptedException {
     ChannelPool pool1 = mockPool(node1);
     ChannelPool pool2 = mockPool(node2);
     ChannelPool pool3 = mockPool(node3);
@@ -758,19 +758,30 @@ public class DefaultSessionPoolsTest {
     assertThatStage(initFuture).isSuccess();
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
-    // While open, execute() reaches the fake processor, which returns a completed result.
-    assertThatStage(
-            ((DefaultSession) session)
-                .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC))
-        .isSuccess(result -> assertThat(result).isNotNull());
-
-    // Keep shutdown in progress so execute() is tested while the session is closing.
     CompletableFuture<Void> pool1CloseFuture = new CompletableFuture<>();
-    when(pool1.closeAsync()).thenReturn(pool1CloseFuture);
-
-    assertThat(((DefaultSession) session).isClosing()).isFalse();
-    CompletionStage<Void> closeFuture = session.closeAsync();
+    CompletableFuture<Void> releaseAdminAction = new CompletableFuture<>();
+    CompletionStage<Void> closeFuture = null;
     try {
+      // While open, execute() reaches the fake processor, which returns a completed result.
+      assertThatStage(
+              ((DefaultSession) session)
+                  .execute(SimpleStatement.newInstance("mock query"), Statement.ASYNC))
+          .isSuccess(result -> assertThat(result).isNotNull());
+
+      // Keep shutdown in progress so execute() is tested while the session is closing.
+      when(pool1.closeAsync()).thenReturn(pool1CloseFuture);
+
+      EventExecutor adminExecutor = nettyOptions.adminEventExecutorGroup().next();
+      CountDownLatch adminActionStarted = new CountDownLatch(1);
+      adminExecutor.execute(
+          () -> {
+            adminActionStarted.countDown();
+            releaseAdminAction.join();
+          });
+
+      assertThat(adminActionStarted.await(5, TimeUnit.SECONDS)).isTrue();
+      assertThat(((DefaultSession) session).isClosing()).isFalse();
+      closeFuture = session.closeAsync();
       assertThat(((DefaultSession) session).isClosing()).isTrue();
       assertThatStage(closeFuture).isNotDone();
 
@@ -781,7 +792,14 @@ public class DefaultSessionPoolsTest {
       assertThatStage(executeFuture)
           .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
     } finally {
-      pool1CloseFuture.complete(null);
+      try {
+        if (closeFuture == null) {
+          closeFuture = session.closeAsync();
+        }
+      } finally {
+        pool1CloseFuture.complete(null);
+        releaseAdminAction.complete(null);
+      }
     }
 
     assertThatStage(closeFuture).isSuccess();
@@ -818,23 +836,29 @@ public class DefaultSessionPoolsTest {
     assertThatStage(initFuture).isSuccess();
     Session session = CompletableFutures.getCompleted(initFuture.toCompletableFuture());
 
-    EventExecutor adminExecutor = nettyOptions.adminEventExecutorGroup().next();
-    CountDownLatch adminActionStarted = new CountDownLatch(1);
     CompletableFuture<Void> releaseAdminAction = new CompletableFuture<>();
-    adminExecutor.execute(
-        () -> {
-          adminActionStarted.countDown();
-          releaseAdminAction.join();
-        });
-
-    CompletionStage<Void> closeFuture;
+    CompletionStage<Void> closeFuture = null;
     try {
+      EventExecutor adminExecutor = nettyOptions.adminEventExecutorGroup().next();
+      CountDownLatch adminActionStarted = new CountDownLatch(1);
+      adminExecutor.execute(
+          () -> {
+            adminActionStarted.countDown();
+            releaseAdminAction.join();
+          });
+
       assertThat(adminActionStarted.await(5, TimeUnit.SECONDS)).isTrue();
       assertThat(((DefaultSession) session).isClosing()).isFalse();
       closeFuture = session.forceCloseAsync();
       assertThat(((DefaultSession) session).isClosing()).isTrue();
     } finally {
-      releaseAdminAction.complete(null);
+      try {
+        if (closeFuture == null) {
+          closeFuture = session.forceCloseAsync();
+        }
+      } finally {
+        releaseAdminAction.complete(null);
+      }
     }
 
     assertThatStage(closeFuture).isSuccess();
