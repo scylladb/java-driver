@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.connection.ClosedConnectionException;
 import com.datastax.oss.driver.api.testinfra.session.SessionUtils;
@@ -92,18 +93,16 @@ public class ShutdownIT {
                         (ignoredResult, error) -> {
                           semaphore.release();
                           // Four things can happen:
-                          // - DefaultSession.execute() detects that it's closed and fails the
-                          //   request immediately
+                          // - DefaultSession.execute() detects shutdown and fails immediately
+                          //   with SessionClosedException
                           // - the request was in flight and gets aborted when its channel is
                           //   force-closed => ClosedConnectionException
-                          // - the request races with the shutdown: it gets past execute() but by
-                          //   the time it tries to acquire a channel the pool was closed
-                          //   => NoNodeAvailableException
+                          // - a query plan is empty after shutdown starts
+                          //   => SessionClosedException
                           // - the request races with the channel closing: it acquires a channel,
                           //   but by the time it tries to write on it is closing
                           //   => AllNodesFailedException wrapping IllegalStateException
-                          if (error instanceof IllegalStateException
-                              && "Session is closed".equals(error.getMessage())) {
+                          if (error instanceof SessionClosedException) {
                             gotSessionClosedError.countDown();
                           } else if (error instanceof AllNodesFailedException) {
                             AllNodesFailedException anfe = (AllNodesFailedException) error;
