@@ -84,6 +84,7 @@ import com.datastax.oss.driver.internal.core.session.BuiltInRequestProcessors;
 import com.datastax.oss.driver.internal.core.session.PoolManager;
 import com.datastax.oss.driver.internal.core.session.RequestProcessor;
 import com.datastax.oss.driver.internal.core.session.RequestProcessorRegistry;
+import com.datastax.oss.driver.internal.core.session.SessionRegistry;
 import com.datastax.oss.driver.internal.core.ssl.JdkSslHandlerFactory;
 import com.datastax.oss.driver.internal.core.ssl.SslHandlerFactory;
 import com.datastax.oss.driver.internal.core.tracker.MultiplexingRequestTracker;
@@ -235,6 +236,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final LazyReference<List<LifecycleListener>> lifecycleListenersRef =
       new LazyReference<>("lifecycleListeners", this::buildLifecycleListeners, cycleDetector);
 
+  private static SessionRegistry sessionRegistry;
   private final DriverConfig config;
   private final DriverConfigLoader configLoader;
   private final ChannelPoolFactory channelPoolFactory = new ChannelPoolFactory();
@@ -336,6 +338,14 @@ public class DefaultDriverContext implements InternalDriverContext {
             .withNodeFilters(nodeFilters)
             .withClassLoader(classLoader)
             .build());
+  }
+
+  public SessionRegistry getSessionRegistry() {
+    return sessionRegistry;
+  }
+
+  public static void setSessionRegistry(SessionRegistry registry) {
+    sessionRegistry = registry;
   }
 
   /**
