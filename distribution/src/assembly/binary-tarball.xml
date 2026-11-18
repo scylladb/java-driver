@@ -170,6 +170,9 @@
       </includes>
     </fileSet>
     <fileSet>
+      <directory>../licenses</directory>
+    </fileSet>
+    <fileSet>
       <directory>../changelog</directory>
     </fileSet>
     <fileSet>
