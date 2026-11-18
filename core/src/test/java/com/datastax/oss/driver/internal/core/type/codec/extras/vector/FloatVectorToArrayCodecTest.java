@@ -145,7 +145,7 @@ public class FloatVectorToArrayCodecTest extends CodecTestBase<float[]> {
 
   @Test
   public void should_accept_matching_vector_type_only() {
-    // The codec is registered only for the exact vector type and dimensions.
+    // The codec accepts only vectors with matching element type and dimensions.
     assertThat(codec.accepts(FLOAT_VECTOR)).isTrue();
     assertThat(codec.accepts(new DefaultVectorType(DataTypes.FLOAT, DIMENSIONS - 1))).isFalse();
     assertThat(codec.accepts(new DefaultVectorType(DataTypes.FLOAT, DIMENSIONS + 1))).isFalse();
