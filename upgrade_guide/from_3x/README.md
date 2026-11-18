@@ -44,7 +44,7 @@ both major versions are published under `com.scylladb`.
 |---|---|
 | `scylla-driver-core` | `java-driver-core`. The query builder is no longer part of it — see [Query builder](#query-builder) |
 | `scylla-driver-mapping` | `java-driver-mapper-runtime`, plus the `java-driver-mapper-processor` annotation processor at compile time ([setup](../../manual/mapper/config/)) |
-| `scylla-driver-extras` | no counterpart. It held only codecs: the JDK 8 date/time ones are now native to core (see [CQL to Java type mappings](#cql-to-java-type-mappings)), and the rest are covered by [custom codecs](../../manual/core/custom_codecs/) |
+| `scylla-driver-extras` | nothing to add. It held only codecs: the JDK 8 date/time ones are now native to core (see [CQL to Java type mappings](#cql-to-java-type-mappings)), and most of the rest ship in core as `ExtraTypeCodecs`: enums, Jackson JSON, arrays, `Optional`, `LocalDateTime`, `ZonedDateTime` and epoch-millis timestamps (see [alternative codecs](../../manual/core/custom_codecs/#using-alternative-codecs-provided-by-the-driver)). `ZoneIdCodec`, `SimpleDateCodec`, the JSR-353 JSON codec, the Guava `Optional` codec and the Joda codecs have no replacement; write a [custom codec](../../manual/core/custom_codecs/) for them |
 
 Note that parts of the manual are inherited from the upstream Apache Cassandra® driver and show
 `org.apache.cassandra` as the group id. For this fork, use `com.scylladb`.
@@ -53,7 +53,8 @@ Java Driver 3.x is deprecated and in maintenance mode; it receives critical bug 
 
 ### Runtime requirements
 
-The driver now requires **Java 8 or above**. It does not depend on Guava anymore (we still use it
+Driver 4.19.2.0 and later require **Java 11 or above**; 4.19.0.x is the last line that runs on Java 8.
+The driver does not depend on Guava anymore (we still use it
 internally but it's shaded).
 
 We have dropped support for legacy protocol versions v1 and v2. As a result, the driver is
@@ -116,7 +117,7 @@ The driver JAR contains a `reference.conf` file that defines the options with th
 ```
 datastax-java-driver {
   basic.request {
-    timeout = 2 seconds
+    timeout = 11 seconds
     consistency = LOCAL_ONE
     page-size = 5000
   }
