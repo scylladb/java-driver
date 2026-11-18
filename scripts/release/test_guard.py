@@ -33,6 +33,15 @@ def with_central_version(pom, version):
     return updated
 
 
+def without_central_version(pom):
+    updated, count = re.subn(
+        r"(<artifactId>central-publishing-maven-plugin</artifactId>\s*)<version>[^<]*</version>\s*",
+        lambda match: match[1], pom)
+    if count != 1:
+        raise AssertionError(f"expected one central-publishing version pin, found {count}")
+    return updated
+
+
 
 class ReleaseTests(unittest.TestCase):
     def test_repository_defaults(self):
@@ -744,6 +753,10 @@ class ReleaseTests(unittest.TestCase):
                 ("central 0.8.0", with_central_version(pom, "0.8.0"), "update Central publishing"),
                 ("central 0.10.0", with_central_version(pom, "0.10.0"),
                  "update Central publishing"),
+                ("central version removed", without_central_version(pom),
+                 "pin Central publishing"),
+                ("central version empty", with_central_version(pom, ""),
+                 "pin Central publishing"),
             ):
                 (root / "pom.xml").write_text(text)
                 with self.subTest(case=case), self.assertRaisesRegex(guard.Unsafe, message):

@@ -455,7 +455,9 @@ def check_policy(root):
             if autopublish not in ("${release.autopublish}", "false"):
                 raise Unsafe("Central upload must remain unpublished until bundle verification")
             version = plugin.findtext("m:version", namespaces=ns)
-            if version and (
+            if not version:
+                raise Unsafe("pin Central publishing before releasing this target")
+            if (
                 not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
                 or tuple(map(int, version.split("."))) < (0, 11, 0)
             ):
