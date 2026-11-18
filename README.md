@@ -1,4 +1,4 @@
-# Java Driver for Scylla and Apache Cassandra®
+# Scylla Java Driver
 
 [![Maven Central](https://img.shields.io/maven-central/v/com.scylladb/java-driver-core)](https://central.sonatype.com/artifact/com.scylladb/java-driver-core)
 [![Codecov](https://codecov.io/gh/scylladb/java-driver/branch/scylla-4.x/graph/badge.svg)](https://codecov.io/gh/scylladb/java-driver)
