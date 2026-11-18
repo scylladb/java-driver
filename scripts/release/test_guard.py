@@ -744,6 +744,8 @@ class ReleaseTests(unittest.TestCase):
                 ("central 0.8.0", with_central_version(pom, "0.8.0"), "update Central publishing"),
                 ("central 0.10.0", with_central_version(pom, "0.10.0"),
                  "update Central publishing"),
+                ("central non-numeric", with_central_version(pom, "${central.version}"),
+                 "update Central publishing"),
             ):
                 (root / "pom.xml").write_text(text)
                 with self.subTest(case=case), self.assertRaisesRegex(guard.Unsafe, message):
