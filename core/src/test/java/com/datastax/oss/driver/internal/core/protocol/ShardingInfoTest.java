@@ -41,8 +41,11 @@ public class ShardingInfoTest {
     assertThat(copy.getShardingAlgorithm()).isEqualTo(original.getShardingAlgorithm());
     assertThat(copy.getShardAwarePort()).isEqualTo(original.getShardAwarePort());
     assertThat(copy.getShardAwarePortSsl()).isEqualTo(original.getShardAwarePortSsl());
-    Murmur3Token token = new Murmur3Token(-4069959284402364209L);
-    assertThat(copy.shardId(token)).isEqualTo(original.shardId(token));
+    // shardingIgnoreMSB has no getter, so check it through shardId: token 0 maps to shard 0 with
+    // the fixture's ignore-MSB of 12, but to shard 6 if the field were lost (defaulting to 0).
+    Murmur3Token token = new Murmur3Token(0L);
+    assertThat(original.shardId(token)).isEqualTo(0);
+    assertThat(copy.shardId(token)).isEqualTo(0);
   }
 
   private static Map<String, List<String>> validParams() {
