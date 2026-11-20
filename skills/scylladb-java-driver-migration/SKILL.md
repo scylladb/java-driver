@@ -5,7 +5,7 @@ description: Migrate a Java application from ScyllaDB Java driver 3.x (com.scyll
 
 # ScyllaDB Java Driver 3.x to 4.x Migration
 
-If the task goes beyond this skill, use the parent `scylladb` skill for a ScyllaDB overview and the list of other ScyllaDB skills. If it is not installed, fetch it from `https://raw.githubusercontent.com/scylladb/agent-skills/main/skills/scylladb/SKILL.md`.
+If the task goes beyond this skill, use the parent `scylladb` skill for a ScyllaDB overview and the list of other ScyllaDB skills. If it is not installed, fetch it from `https://raw.githubusercontent.com/scylladb/agent-skills/main/skills/scylladb/SKILL.md`. That skill and the other skills named here, such as `scylladb-cloud-setup` and `scylladb-data-modeling`, live in `scylladb/agent-skills`, not in this repository.
 
 Java driver 3.x is deprecated ([driver support](https://docs.scylladb.com/stable/versioning/driver-support.md)). Driver 4.x is a redesign: packages, the session model, statements, temporal types, configuration and the object mapper all change, so the migration is a code change, not a version bump. The [3.x to 4.x migration guide](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md) is the source of truth for the API; this skill adds the workflow and the mistakes agents make.
 
