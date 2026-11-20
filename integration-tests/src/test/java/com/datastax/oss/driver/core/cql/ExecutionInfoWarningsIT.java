@@ -33,6 +33,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
@@ -67,6 +68,9 @@ import org.slf4j.LoggerFactory;
 public class ExecutionInfoWarningsIT {
 
   private static final String KEY = "test";
+
+  // Scylla sends the oversized-batch warning to the client since scylladb/scylladb#10196.
+  private static final Version SCYLLA_BATCH_SIZE_WARNING_VERSION = Version.parse("2027.1.0");
 
   private CustomCcmRule ccmRule =
       new CustomCcmRule.Builder()
@@ -204,7 +208,7 @@ public class ExecutionInfoWarningsIT {
     ExecutionInfo executionInfo = result.getExecutionInfo();
     assertThat(executionInfo).isNotNull();
     List<String> warnings = executionInfo.getWarnings();
-    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA) && !scyllaSendsBatchSizeWarning()) {
       assertThat(warnings).isEmpty();
       verify(appender, after(100).times(0)).doAppend(loggingEventCaptor.capture());
       return;
@@ -216,6 +220,23 @@ public class ExecutionInfoWarningsIT {
         loggingEventCaptor.getAllValues().stream()
             .map(ILoggingEvent::getFormattedMessage)
             .collect(Collectors.toList());
+    if (CcmBridge.isDistributionOf(BackendType.SCYLLA)) {
+      // Scylla words the warning differently from Cassandra
+      String warning = warnings.get(0);
+      assertThat(warning)
+          .contains(String.format("%s.test", sessionRule.keyspace().asCql(true)))
+          .contains("is of size")
+          .containsPattern("exceeding specified .*threshold");
+      assertThat(logMessages)
+          .anySatisfy(
+              logMessage ->
+                  assertThat(logMessage)
+                      .startsWith("Query '")
+                      .contains(
+                          query.substring(0, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_QUERY_LENGTH))
+                      .endsWith("' generated server side warning(s): " + warning));
+      return;
+    }
     assertThat(logMessages)
         .anySatisfy(
             logMessage ->
@@ -231,5 +252,12 @@ public class ExecutionInfoWarningsIT {
                     .contains(String.format("%s.test", sessionRule.keyspace().asCql(true)))
                     .contains("is of size")
                     .containsPattern("exceeding specified .*threshold"));
+  }
+
+  private static boolean scyllaSendsBatchSizeWarning() {
+    // nextStable() so that a master build such as 2027.1.0~dev counts
+    return CcmBridge.getScyllaVersion()
+        .map(version -> version.nextStable().compareTo(SCYLLA_BATCH_SIZE_WARNING_VERSION) >= 0)
+        .orElse(false);
   }
 }
