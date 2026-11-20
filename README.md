@@ -60,6 +60,13 @@ remain unchanged, and the new API will look very familiar to 2.x and 3.x users.
 
 See the [upgrade guide](upgrade_guide/) for details.
 
+To migrate a 3.x application with an AI coding agent, install the
+[3.x to 4.x migration skill](skills/scylladb-java-driver-migration/):
+
+```
+npx skills add scylladb/java-driver --skill scylladb-java-driver-migration
+```
+
 ## Useful links
 
 * [Manual](manual/)
