@@ -21,7 +21,6 @@ import com.datastax.oss.driver.api.core.ProtocolVersion;
 import com.datastax.oss.driver.api.core.type.VectorType;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.type.codec.FloatCodec;
-import com.datastax.oss.driver.shaded.guava.common.base.Preconditions;
 import com.datastax.oss.driver.shaded.guava.common.base.Splitter;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -87,8 +86,12 @@ public class FloatVectorToArrayCodec extends AbstractVectorToArrayCodec<float[]>
   @Nullable
   @Override
   public float[] parse(@Nullable String str) {
-    Preconditions.checkArgument(str != null, "Cannot create float array from null string");
-    Preconditions.checkArgument(!str.isEmpty(), "Cannot create float array from empty string");
+    if (str == null || str.isEmpty() || str.equalsIgnoreCase("NULL")) {
+      return null;
+    }
+    if (!str.startsWith("[") || !str.endsWith("]")) {
+      throw new IllegalArgumentException("Vector literal must be enclosed in brackets: " + str);
+    }
 
     FloatCodec codec = new FloatCodec();
     float[] rv = this.newInstance();
