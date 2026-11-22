@@ -200,37 +200,27 @@ public class FloatVectorToArrayCodecTest extends CodecTestBase<float[]> {
   }
 
   @Test
-  public void should_throw_when_parsing_null_string() {
-    assertThatThrownBy(() -> parse(null))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Cannot create float array from null string");
+  public void should_return_null_when_parsing_null_string() {
+    assertThat(parse(null)).isNull();
   }
 
   @Test
-  public void should_throw_when_parsing_empty_string() {
-    assertThatThrownBy(() -> parse(""))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Cannot create float array from empty string");
+  public void should_return_null_when_parsing_empty_string() {
+    assertThat(parse("")).isNull();
   }
 
-  /**
-   * {@code TypeCodec#parse} requires null, the empty string and "NULL" to be accepted and says not
-   * to throw at all; this codec throws on all three, and format(null) emits exactly the "NULL" it
-   * cannot read back. Filed as scylladb/java-driver#1113.
-   */
   @Test
-  public void should_throw_when_parsing_the_null_literal() {
-    assertThatThrownBy(() -> parse("NULL")).isInstanceOf(IllegalArgumentException.class);
+  public void should_return_null_when_parsing_the_null_literal() {
+    assertThat(parse("NULL")).isNull();
+    assertThat(parse("null")).isNull();
+    assertThat(parse(format(null))).isNull();
   }
 
-  /**
-   * Worse than the throws above: parse() strips the first and last character without checking that
-   * the literal is bracketed, so an unbracketed one is silently mangled into valid-looking floats.
-   * Also #1113.
-   */
   @Test
-  public void should_mangle_an_unbracketed_literal() {
-    assertThat(parse("1.0, 2.5")).isEqualTo(new float[] {0.0f, 2.0f});
+  public void should_reject_an_unbracketed_literal() {
+    assertThatThrownBy(() -> parse("1.0, 2.5")).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> parse("[1.0, 2.5")).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> parse("1.0, 2.5]")).isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
