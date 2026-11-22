@@ -972,7 +972,8 @@ public class CCMBridge implements CCMAccess {
     return sw.toString();
   }
 
-  private String execute(String command, Object... args) {
+  // Package-private so a unit test can record the ccm command without launching a process.
+  String execute(String command, Object... args) {
     return execute(this.ccmDir, command, args);
   }
 

@@ -20,14 +20,16 @@ package com.datastax.driver.core;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.testng.annotations.Test;
 
 public class CCMBridgeUpdateConfTest {
 
-  private Map<String, Object> sample() {
+  private static Map<String, Object> sample() {
     Map<String, Object> m = new LinkedHashMap<String, Object>();
     m.put("start_rpc", false);
     m.put("storage_port", 7000);
@@ -66,5 +68,67 @@ public class CCMBridgeUpdateConfTest {
             CCMBridge.buildUpdateConfArgs(
                 Collections.<String, Object>emptyMap(), VersionNumber.parse("3.0.0")))
         .isEmpty();
+  }
+
+  @Test(groups = "unit")
+  public void should_invoke_updateConfig_once_with_all_translated_entries() {
+    assertOneUpdateConf(
+        "3.11.0",
+        "start_rpc:false storage_port:7000 read_request_timeout_in_ms:5000"
+            + " enable_user_defined_functions:true key_cache_size_in_kb:10"
+            + " client_encryption_options.enabled:true");
+    assertOneUpdateConf(
+        "4.1.0",
+        "start_rpc:false storage_port:7000 read_request_timeout:5000ms"
+            + " user_defined_functions_enabled:true key_cache_size:10KiB"
+            + " client_encryption_options.enabled:true");
+  }
+
+  @Test(groups = "unit")
+  public void should_not_invoke_updateConfig_when_the_map_is_empty() {
+    RecordingBridge bridge = new RecordingBridge(VersionNumber.parse("3.11.0"));
+    try {
+      bridge.updateConfig(Collections.<String, Object>emptyMap());
+      assertThat(bridge.commands).isEmpty();
+    } finally {
+      bridge.getCcmDir().delete();
+    }
+  }
+
+  private static void assertOneUpdateConf(String version, String translatedEntries) {
+    RecordingBridge bridge = new RecordingBridge(VersionNumber.parse(version));
+    try {
+      bridge.updateConfig(sample());
+      assertThat(bridge.commands).hasSize(1);
+      assertThat(bridge.commands.get(0)).contains("updateconf " + translatedEntries);
+    } finally {
+      bridge.getCcmDir().delete();
+    }
+  }
+
+  /** Records ccm commands from {@link CCMBridge#updateConfig} without starting ccm. */
+  private static final class RecordingBridge extends CCMBridge {
+    final List<String> commands = new ArrayList<String>();
+
+    RecordingBridge(VersionNumber version) {
+      super(
+          "updateconf-unit",
+          version,
+          null,
+          null,
+          "127.0.0.",
+          7000,
+          9160,
+          9042,
+          new int[] {7199},
+          null,
+          new int[] {1});
+    }
+
+    @Override
+    String execute(String command, Object... args) {
+      commands.add(String.format(command, args));
+      return "";
+    }
   }
 }
