@@ -657,13 +657,15 @@ support paths, including runtime resources with a nested `src/test` directory.
 Production, build/packaging and unknown paths remain visible. Authors, titles and broad `chore`
 or `dependencies` labels do not decide exclusion.
 
-The workflow confirms its target is a PR before checkout or dependency setup. It checks out
-trusted launch tooling at `github.sha`, never PR code. Supplemental checks validate complete,
-nonempty file metadata, including rename origins, and compare revisions, counts and file
-snapshots around classification. The final check verifies the actual logical omission label,
-including case variants. A production-origin rename stays visible. Failed or skipped
-classification attempts omission-label removal only for a confirmed PR, even if setup failed.
-Cleanup can fail during outages; before/after reads do not provide atomicity or race freedom.
+The workflow confirms its target is a PR before checkout or dependency setup. It uses the default
+self-checkout of trusted launch tooling at `github.sha`, never PR code. Omitting an explicit `ref`
+avoids the checkout fork guard rejecting a merged PR's SHA when it equals the trusted event SHA.
+Supplemental checks validate complete, nonempty file metadata, including rename origins, and
+compare revisions, counts and file snapshots around classification. The final check verifies the
+actual logical omission label, including case variants. A production-origin rename stays visible.
+Failed or skipped classification attempts omission-label removal only for a confirmed PR, even if
+setup failed. Cleanup can fail during outages; before/after reads do not provide atomicity or race
+freedom.
 
 Updates, base edits and closed/merged PR events recheck classification. Manual dispatch from
 the default `scylla-4.x` branch accepts the `pull-request` input for already merged PRs.

@@ -72,7 +72,8 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         id: checkout
         with:
-          ref: ${{ github.sha }}
+          # Default checkout uses the trusted event ref/SHA. An explicit SHA can
+          # trip the fork guard when a merged PR's merge SHA equals github.sha.
           persist-credentials: false
       - run: npm ci --ignore-scripts --prefix .github
         id: install

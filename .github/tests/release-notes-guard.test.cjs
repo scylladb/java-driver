@@ -579,7 +579,6 @@ test('workflow adapters preserve input and verified snapshot wiring', async () =
   const invalid = await adapter(f, '', {PR_NUMBER: '01'});
   assert.match(invalid.error.message, /canonical positive safe PR number/);
   assert.equal(steps.at(-1).if, 'always()');
-  assert.equal(steps.find((step) => step.id === 'checkout').with.ref, '${{ github.sha }}');
   assert.equal(steps.find((step) => step.id === 'checkout').with['persist-credentials'], false);
   assert.equal(
     steps.find((step) => step.id === 'install').run,
@@ -598,14 +597,12 @@ test('workflow adapters preserve input and verified snapshot wiring', async () =
   for (const script of scripts) assert.ok(!script.includes('${{'));
 });
 
-test('merged-PR backfills load event tooling rather than the old PR base or head', () => {
-  const expression = steps
-    .find((step) => step.id === 'checkout')
-    .with.ref.replace(/^\$\{\{\s*|\s*\}\}$/g, '');
-  const checkoutRef = new Function('github', `return ${expression}`);
-  for (const event of [{pull_request: {head: {sha: 'untrusted'}, base: {sha: 'old-base'}}}, {}]) {
-    assert.equal(checkoutRef({sha: 'trusted-default-event', event}), 'trusted-default-event');
-  }
+test('fork PR events and backfills use the trusted default checkout without opting out of safety', () => {
+  const checkout = steps.find((step) => step.id === 'checkout');
+  // A customized ref runs checkout's fork guard, which rejects github.sha when
+  // it also appears as merge_commit_sha in a merged fork PR's closed event.
+  // Default self-checkout uses the trusted event ref/SHA without that ambiguity.
+  assert.deepEqual(checkout.with, {'persist-credentials': false});
 });
 
 test('dispatch rejects untrusted refs without setup or label writes', async () => {
