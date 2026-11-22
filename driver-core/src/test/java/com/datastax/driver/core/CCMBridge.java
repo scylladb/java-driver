@@ -786,19 +786,31 @@ public class CCMBridge implements CCMAccess {
 
   @Override
   public void updateConfig(Map<String, Object> configs) {
-    VersionNumber cassandraVersion = getCassandraVersion();
-    for (Map.Entry<String, Object> entry : configs.entrySet()) {
+    String updateString = buildUpdateConfArgs(configs, getCassandraVersion());
+    if (updateString.isEmpty()) {
+      return;
+    }
+    // A single ccm invocation for all entries: each call rewrites the yaml of every node.
+    execute(CCM_COMMAND + " updateconf %s", updateString);
+  }
 
+  /**
+   * Translates each entry for the given Cassandra version and joins them into one argument list.
+   */
+  static String buildUpdateConfArgs(Map<String, Object> configs, VersionNumber cassandraVersion) {
+    StringBuilder confStr = new StringBuilder();
+    for (Map.Entry<String, Object> entry : configs.entrySet()) {
       String originalKey = entry.getKey();
       Object originalValue = entry.getValue();
-
-      String updateString =
-          String.join(
-              ":",
-              getConfigKey(originalKey, originalValue, cassandraVersion),
-              getConfigValue(originalKey, originalValue, cassandraVersion));
-      execute(CCM_COMMAND + " updateconf %s", updateString);
+      if (confStr.length() > 0) {
+        confStr.append(' ');
+      }
+      confStr
+          .append(getConfigKey(originalKey, originalValue, cassandraVersion))
+          .append(':')
+          .append(getConfigValue(originalKey, originalValue, cassandraVersion));
     }
+    return confStr.toString();
   }
 
   private static String IN_MS_STR = "_in_ms";
@@ -960,7 +972,8 @@ public class CCMBridge implements CCMAccess {
     return sw.toString();
   }
 
-  private String execute(String command, Object... args) {
+  // Package-private so a unit test can record the ccm command without launching a process.
+  String execute(String command, Object... args) {
     return execute(this.ccmDir, command, args);
   }
 
