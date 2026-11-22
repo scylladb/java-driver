@@ -66,6 +66,10 @@ public abstract class AbstractVectorToArrayCodec<ArrayT> implements TypeCodec<Ar
       return null;
     }
     int length = Array.getLength(array);
+    if (length != cqlType.getDimensions()) {
+      throw new IllegalArgumentException(
+          "Expected " + cqlType.getDimensions() + " vector elements, got " + length);
+    }
     int totalSize = length * sizeOfComponentType();
     ByteBuffer output = ByteBuffer.allocate(totalSize);
     for (int i = 0; i < length; i++) {

@@ -109,32 +109,16 @@ public class FloatVectorToArrayCodecTest extends CodecTestBase<float[]> {
         .isInstanceOf(BufferUnderflowException.class);
   }
 
-  /**
-   * encode() sizes its output from the array it is handed, while decode() always reads exactly
-   * {@code cqlType.getDimensions()} elements, so neither direction validates the length. {@code
-   * VectorCodec} rejects both, which is why this is filed as scylladb/java-driver#1115 rather than
-   * recorded as intended behaviour.
-   */
   @Test
-  public void should_truncate_an_array_longer_than_the_declared_dimensions() {
-    ByteBuffer encoded = codec.encode(new float[] {1.0f, 2.5f, 9.0f}, ProtocolVersion.DEFAULT);
-
-    // Three floats went out, even though the codec declares two dimensions
-    assertThat(encoded.remaining()).isEqualTo(3 * Float.BYTES);
-    // ... and the third silently disappears on the way back
-    assertThat(codec.decode(encoded, ProtocolVersion.DEFAULT)).isEqualTo(VECTOR);
+  public void should_reject_an_array_longer_than_the_declared_dimensions() {
+    assertThatThrownBy(() -> codec.encode(new float[] {1.0f, 2.5f, 9.0f}, ProtocolVersion.DEFAULT))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
-  /** The other half of #1115: a short array is written as-is and only fails on the way back. */
   @Test
-  public void should_under_write_an_array_shorter_than_the_declared_dimensions() {
-    ByteBuffer encoded = codec.encode(new float[] {1.0f}, ProtocolVersion.DEFAULT);
-
-    // One float went out for a vector<float, 2>, with no complaint ...
-    assertThat(encoded.remaining()).isEqualTo(Float.BYTES);
-    // ... and it is unreadable by the codec that wrote it
-    assertThatThrownBy(() -> codec.decode(encoded, ProtocolVersion.DEFAULT))
-        .isInstanceOf(BufferUnderflowException.class);
+  public void should_reject_an_array_shorter_than_the_declared_dimensions() {
+    assertThatThrownBy(() -> codec.encode(new float[] {1.0f}, ProtocolVersion.DEFAULT))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -161,8 +145,7 @@ public class FloatVectorToArrayCodecTest extends CodecTestBase<float[]> {
 
   @Test
   public void should_accept_matching_vector_type_only() {
-    // Dimension-exact, which is what keeps the registry from handing this codec a column whose
-    // width does not match -- see should_truncate_an_array_longer_than_the_declared_dimensions
+    // The codec accepts only vectors with matching element type and dimensions.
     assertThat(codec.accepts(FLOAT_VECTOR)).isTrue();
     assertThat(codec.accepts(new DefaultVectorType(DataTypes.FLOAT, DIMENSIONS - 1))).isFalse();
     assertThat(codec.accepts(new DefaultVectorType(DataTypes.FLOAT, DIMENSIONS + 1))).isFalse();
