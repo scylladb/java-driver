@@ -83,12 +83,20 @@ public abstract class AbstractVectorToArrayCodec<ArrayT> implements TypeCodec<Ar
   @Override
   public ArrayT decode(@Nullable ByteBuffer bytes, @NonNull ProtocolVersion protocolVersion) {
     if (bytes == null || bytes.remaining() == 0) {
-      throw new IllegalArgumentException(
-          "Input ByteBuffer must not be null and must have non-zero remaining bytes");
+      return null;
     }
     ByteBuffer input = bytes.duplicate();
     int length = this.cqlType.getDimensions();
     int elementSize = sizeOfComponentType();
+    if (elementSize > 0 && input.remaining() < (long) length * elementSize) {
+      throw new IllegalArgumentException(
+          "Not enough bytes to decode "
+              + length
+              + " vector elements: expected "
+              + ((long) length * elementSize)
+              + ", got "
+              + input.remaining());
+    }
     ArrayT array = newInstance();
     for (int i = 0; i < length; i++) {
       // Null elements can happen on the decode path, but we cannot tolerate them
