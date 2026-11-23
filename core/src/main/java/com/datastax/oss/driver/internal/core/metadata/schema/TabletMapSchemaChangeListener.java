@@ -35,7 +35,7 @@ public class TabletMapSchemaChangeListener extends SchemaChangeListenerBase {
     if (!manager.getMetadata().getTabletMap().isPresent()) {
       return;
     }
-    manager.getMetadata().getTabletMap().get().removeByTable(table.getName());
+    manager.getMetadata().getTabletMap().get().removeByTable(table.getKeyspace(), table.getName());
   }
 
   @Override
@@ -43,6 +43,10 @@ public class TabletMapSchemaChangeListener extends SchemaChangeListenerBase {
     if (!manager.getMetadata().getTabletMap().isPresent()) {
       return;
     }
-    manager.getMetadata().getTabletMap().get().removeByTable(previous.getName());
+    manager
+        .getMetadata()
+        .getTabletMap()
+        .get()
+        .removeByTable(previous.getKeyspace(), previous.getName());
   }
 }

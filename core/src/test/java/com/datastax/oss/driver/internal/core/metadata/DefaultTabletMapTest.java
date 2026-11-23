@@ -156,12 +156,35 @@ public class DefaultTabletMapTest {
   }
 
   /**
-   * removeByTable matches on the table name alone, so a table dropped in one keyspace also evicts
-   * same-named tables in every other keyspace. The cost is an unnecessary refetch, not incorrect
-   * routing; filed as scylladb/java-driver#1116 and pinned here until it is fixed.
+   * Same-named tables in other keyspaces must survive: an ALTER or DROP of ks.tab is not a reason
+   * to refetch the tablets of ks2.tab (scylladb/java-driver#1116).
    */
   @Test
-  public void should_remove_tablets_by_table_name_across_keyspaces() {
+  public void should_remove_tablets_by_table_only_in_its_keyspace() {
+    TabletMap tabletMap = DefaultTabletMap.emptyMap();
+    tabletMap.addTablet(KS, TABLE, tablet(0, 10));
+    tabletMap.addTablet(KS2, TABLE, tablet(0, 10));
+    tabletMap.addTablet(KS, TABLE2, tablet(0, 10));
+
+    tabletMap.removeByTable(KS, TABLE);
+
+    assertThat(tabletMap.getMapping()).containsOnlyKeys(key(KS2, TABLE), key(KS, TABLE2));
+  }
+
+  @Test
+  public void should_do_nothing_when_removing_an_unknown_table() {
+    TabletMap tabletMap = DefaultTabletMap.emptyMap();
+    tabletMap.addTablet(KS, TABLE, tablet(0, 10));
+
+    tabletMap.removeByTable(KS2, TABLE);
+
+    assertThat(tabletMap.getMapping()).containsOnlyKeys(key(KS, TABLE));
+  }
+
+  /** The deprecated single-argument overload keeps its old, name-only behaviour. */
+  @Test
+  @SuppressWarnings("deprecation")
+  public void should_remove_tablets_by_table_name_across_keyspaces_with_deprecated_overload() {
     TabletMap tabletMap = DefaultTabletMap.emptyMap();
     tabletMap.addTablet(KS, TABLE, tablet(0, 10));
     tabletMap.addTablet(KS2, TABLE, tablet(0, 10));

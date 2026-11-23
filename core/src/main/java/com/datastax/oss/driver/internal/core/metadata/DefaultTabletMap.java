@@ -145,10 +145,16 @@ public class DefaultTabletMap implements TabletMap {
   }
 
   @Override
+  @Deprecated
   public void removeByTable(CqlIdentifier table) {
     mapping
         .keySet()
         .removeIf(keyspaceTableNamePair -> keyspaceTableNamePair.getTableName().equals(table));
+  }
+
+  @Override
+  public void removeByTable(CqlIdentifier keyspace, CqlIdentifier table) {
+    mapping.remove(new KeyspaceTableNamePair(keyspace, table));
   }
 
   /**
