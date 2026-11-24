@@ -117,6 +117,8 @@ UserDao dao = mapper.userDao();
   qualified table name (`ks.users`) in such queries, or add the factory parameter. The placeholders
   in such a query also take their keyspace from the factory: add a `@DaoKeyspace` parameter, or
   `${qualifiedTableId}` is the bare table name and works only if the session has a default keyspace.
+  If an accessor queries several tables, keep their qualified names, or split it into one DAO per
+  table.
 - Port 3.x `@Accessor` query strings as they are, except the markers: replace each anonymous `?`
   with a named marker that matches the parameter name, for example `WHERE id = :userId` for
   `findById(UUID userId)`. 4.x binds `@Query` parameters by name, so a `?` works only when the

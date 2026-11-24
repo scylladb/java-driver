@@ -90,8 +90,9 @@ For Kotlin `@Entity`, `@Dao`, or `@Mapper` sources, Java annotation processing d
 [kapt](https://kotlinlang.org/docs/kapt.html) instead: a `kapt` execution of `kotlin-maven-plugin`
 with the processor in its `annotationProcessorPaths`, or the Gradle `kotlin-kapt` plugin with
 `kapt("com.scylladb:java-driver-mapper-processor:$driverVersion")`, at the same version as the other
-`java-driver-*` artifacts. Kapt turns off javac annotation processing, so move the project's other
-`annotationProcessor` entries to `kapt` as well.
+`java-driver-*` artifacts. Kapt turns off javac annotation processing. Move other processors that
+work under kapt to `kapt`; keep javac-only ones, such as Lombok, on `annotationProcessor` and set
+`kapt { keepJavacAnnotationProcessors = true }`.
 
 ### Right: Gradle
 

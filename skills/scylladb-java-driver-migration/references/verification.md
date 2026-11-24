@@ -96,7 +96,7 @@ for (Node node : session.getMetadata().getNodes().values()) {
   `null`, and that the request has a keyspace: `getKeyspace()`, `getRoutingKeyspace()`, or the
   session's. For tables that use tablets, also check that `getRoutingTable()` is not `null`, or the
   driver cannot route to the tablet's replicas. Prefer prepared statements on hot paths: a bound
-  statement has a routing key, keyspace, and table.
+  statement whose query binds every partition key column has a routing key, keyspace, and table.
 - `getShardingInfo()` is `null` before the node's pool is created, so run the check after the first
   query. `shards=none` after that means the driver got no sharding information from the node.
 
