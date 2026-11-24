@@ -46,7 +46,7 @@ Follow these steps in order. After each step, and in steps 5 to 7 after each cla
 8. **Remove 3.x**: close and delete the `Cluster`, then remove the 3.x artifacts. See [Remove the Old Artifacts](references/coordinates-and-build.md#remove-the-old-artifacts).
 9. **Verify** with the tests and against a running ScyllaDB node. See [verification](references/verification.md).
 
-Steps 5 to 7 go one class at a time, and they are one unit for that class: move it from the 3.x `Session` to the `CqlSession` and port its statements, types, and mapper usage together, then build and test. Classes not yet ported keep using 3.x.
+Steps 5 to 7 go one class at a time, and they are one unit for that class: move it from the 3.x `Session` to the `CqlSession` and port its statements, types, and mapper usage together, then build and test. Classes not yet ported keep using 3.x. If classes pass 3.x types to each other, such as a DAO that returns a `ResultSet` or `Row` to its caller, port them together as one unit.
 
 ## Rules
 

@@ -71,7 +71,9 @@ The mapper processor goes in the compiler plugin, not in `<dependencies>`:
 </plugin>
 ```
 
-If the project already lists other processors there, such as Lombok, add this one next to them. Listing `annotationProcessorPaths` turns off processor discovery on the classpath.
+If the project already lists other processors there, such as Lombok, add this one next to them. Listing `annotationProcessorPaths` turns off processor discovery on the classpath. It needs `maven-compiler-plugin` 3.5 or later; with an older pinned version the processor does not run and `UserMapperBuilder` is never generated.
+
+For Kotlin `@Entity`, `@Dao`, or `@Mapper` sources, Java annotation processing does not run. Use [kapt](https://kotlinlang.org/docs/kapt.html) instead: a `kapt` execution of `kotlin-maven-plugin` with the processor in its `annotationProcessorPaths`, or the Gradle `kotlin-kapt` plugin with `kapt("com.scylladb:java-driver-mapper-processor:4.19.4.0")`.
 
 ### Right: Gradle
 
@@ -115,6 +117,15 @@ dependencies {
 From step 3 to step 8 both drivers are on the classpath. They need different major versions of `io.dropwizard.metrics:metrics-core`: 3.x needs 3.2.x, 4.19.4.0 brings 4.2.x. Gradle always resolves the newer one; Maven resolves the one from the driver declared first. With metrics-core 4.x, a 3.x `Cluster` with JMX reporting on, the 3.x default, fails at startup with `NoClassDefFoundError: com/codahale/metrics/JmxReporter`.
 
 Add `withoutJMXReporting()` to the 3.x `Cluster.builder()` (or `withoutMetrics()`, if the application does not read 3.x metrics) and keep it until step 8 deletes the `Cluster`. With its default settings, where metrics are off, a 4.x session starts with either metrics-core version.
+
+`withoutJMXReporting()` removes the 3.x driver's MBeans. If monitoring or tests read them, tell the user. To keep them, add `io.dropwizard.metrics:metrics-jmx` and start a reporter, as the 3.x [Metrics 4 compatibility](https://java-driver.docs.scylladb.com/scylla-3.11.5.x/manual/metrics/index.md#metrics-4-compatibility) section shows:
+
+```java
+JmxReporter.forRegistry(cluster.getMetrics().getRegistry())
+    .inDomain(cluster.getClusterName() + "-metrics")
+    .build()
+    .start();
+```
 
 ## Remove the Old Artifacts
 

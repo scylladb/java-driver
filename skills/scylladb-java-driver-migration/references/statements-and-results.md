@@ -10,7 +10,7 @@ Every 4.x statement setter returns a new statement. The most common migration bu
 
 ```java
 SimpleStatement stmt = SimpleStatement.newInstance("SELECT * FROM users WHERE id = ?", id);
-stmt.setConsistencyLevel(DefaultConsistencyLevel.LOCAL_QUORUM); // result ignored: still LOCAL_ONE
+stmt.setConsistencyLevel(DefaultConsistencyLevel.QUORUM);       // result ignored: the profile default applies
 session.execute(stmt);
 
 BoundStatement bound = ps.bind();
@@ -22,7 +22,7 @@ session.execute(bound);
 
 ```java
 SimpleStatement stmt = SimpleStatement.newInstance("SELECT * FROM users WHERE id = ?", id)
-    .setConsistencyLevel(DefaultConsistencyLevel.LOCAL_QUORUM);
+    .setConsistencyLevel(DefaultConsistencyLevel.QUORUM);
 
 BoundStatement bound = ps.bind().setUuid("id", id);
 // or, to set many values without creating an object per call:
@@ -37,7 +37,7 @@ After porting, search the code for setter and batch `add` calls used as statemen
 | --- | --- |
 | `new SimpleStatement(q, values...)` | `SimpleStatement.newInstance(q, values...)` |
 | `new BoundStatement(ps)` | `ps.bind()` |
-| `new BatchStatement()` / `new BatchStatement(BatchStatement.Type.UNLOGGED)` | `BatchStatement.builder(DefaultBatchType.LOGGED)` / `BatchStatement.builder(DefaultBatchType.UNLOGGED)`, then `.addStatement(s)` and `.build()`. A 3.x batch was idempotent when all its statements were; a 4.x batch ignores its statements and takes `basic.request.default-idempotence` (default `false`) unless you call `.setIdempotent(true)` on it. A non-idempotent batch is not retried after a write timeout or request error, nor run speculatively. |
+| `new BatchStatement()` / `new BatchStatement(BatchStatement.Type.UNLOGGED)` | `BatchStatement.builder(DefaultBatchType.LOGGED)` / `BatchStatement.builder(DefaultBatchType.UNLOGGED)`, then `.addStatement(s)` and `.build()`. A 3.x batch was idempotent when all its statements were; a 4.x batch ignores its statements and takes `basic.request.default-idempotence` (default `false`) unless you call `.setIdempotent(true)` on it. If the configuration sets `default-idempotence = true`, call `.setIdempotent(false)` on any batch with a non-idempotent statement, such as a counter update. A non-idempotent batch is not retried after a write timeout or request error, nor run speculatively. |
 | `batch.add(s)` | `batch = batch.add(s)`. It returns a new batch, like every setter. |
 | `stmt.setFetchSize(n)` | `stmt.setPageSize(n)` |
 | `stmt.setReadTimeoutMillis(ms)` | `stmt.setTimeout(Duration.ofMillis(ms))`, which covers the whole request; see the timeout rule in SKILL.md. |

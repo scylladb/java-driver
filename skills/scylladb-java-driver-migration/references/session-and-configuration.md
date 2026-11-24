@@ -36,7 +36,7 @@ try (CqlSession session = CqlSession.builder()
 - Always set the local datacenter. Port the value the 3.x code set; if it set none, ask the user which datacenter is local rather than leaving it to inference. Only 4.19.0.9 and 4.19.2.0 or later infer it; other 4.x versions throw from `build()` without it.
 - The default policy is already token-aware, and on ScyllaDB also shard-aware and tablet-aware. Delete the `TokenAwarePolicy` and `DCAwareRoundRobinPolicy` wrapping; do not port it as a custom policy.
 - `build()` connects right away. There is no separate `init()` or `connect()`.
-- Create one `CqlSession` per application and share it, as with `Cluster` in 3.x. Close it on shutdown. During the migration it runs next to the 3.x `Cluster` until step 8 in SKILL.md removes 3.x.
+- Create one `CqlSession` per cluster and share it, as with `Cluster` in 3.x. An application that talks to two clusters keeps two sessions. 3.x code that called `cluster.connect("ks")` for several keyspaces either keeps one session per keyspace or qualifies the table names (`ks.table`) and shares one session. Close each session on shutdown. During the migration it runs next to the 3.x `Cluster` until step 8 in SKILL.md removes 3.x.
 
 ## Builder Calls Mapped to 4.x
 

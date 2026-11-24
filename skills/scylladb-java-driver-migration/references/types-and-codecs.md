@@ -22,7 +22,7 @@ session.execute("INSERT INTO events (id, ts) VALUES (?, ?)", id, Instant.now());
 // If the rest of the application still needs Date, convert at the driver boundary only.
 // Date.from() and toInstant() throw on null; 3.x getTimestamp() and setTimestamp() did not.
 Instant read = row.getInstant("ts");
-Date ts = read == null ? null : Date.from(read);
+Date date = read == null ? null : Date.from(read);
 session.execute("INSERT INTO events (id, ts) VALUES (?, ?)", id, date == null ? null : date.toInstant());
 ```
 
@@ -81,7 +81,7 @@ Most extras codecs have a ready replacement in `com.datastax.oss.driver.api.core
 | `jdk8.ZonedDateTimeCodec` (`tuple<timestamp, varchar>`) | `ExtraTypeCodecs.ZONED_TIMESTAMP_PERSISTED` |
 | `jdk8.OptionalCodec` | `ExtraTypeCodecs.optionalOf(innerCodec)` |
 | `enums.EnumNameCodec` / `EnumOrdinalCodec` | `ExtraTypeCodecs.enumNamesOf(MyEnum.class)` / `enumOrdinalsOf(MyEnum.class)` |
-| `json.JacksonJsonCodec` | `ExtraTypeCodecs.json(MyPojo.class)` |
+| `json.JacksonJsonCodec` | `ExtraTypeCodecs.json(MyPojo.class)`, or `ExtraTypeCodecs.json(MyPojo.class, objectMapper)` if the 3.x codec got a configured `ObjectMapper`; keep that mapper so the stored JSON format does not change |
 | `arrays.IntArrayCodec`, `LongArrayCodec`, `FloatArrayCodec`, `DoubleArrayCodec` | `ExtraTypeCodecs.INT_LIST_TO_ARRAY`, `LONG_LIST_TO_ARRAY`, `FLOAT_LIST_TO_ARRAY`, `DOUBLE_LIST_TO_ARRAY` |
 | `arrays.ObjectArrayCodec` | `ExtraTypeCodecs.listToArrayOf(elementCodec)` |
 | `date.SimpleTimestampCodec` (`timestamp` as epoch millis) | `ExtraTypeCodecs.TIMESTAMP_MILLIS_UTC` |
