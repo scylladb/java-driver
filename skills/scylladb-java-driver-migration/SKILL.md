@@ -37,9 +37,11 @@ For adjacent topics, use the sibling skill instead:
 ## Migration Workflow
 
 Follow these steps in order. After each step, and in steps 5 to 7 after each class, build and run
-the project's tests, and fix failures before you move on. The 3.x and 4.x packages differ
-(`com.datastax.driver.core` and `com.datastax.oss.driver.api.core`), so both drivers stay on the
-classpath from step 3 until step 8, and each class uses one of them.
+the project's tests, and fix failures before you move on. If the build already fails because the 3.x
+dependency was replaced with 4.x, restore the 3.x dependency first, so that the build passes before
+you start. The 3.x and 4.x packages differ (`com.datastax.driver.core` and
+`com.datastax.oss.driver.api.core`), so both drivers stay on the classpath from step 3 until step 8,
+and each class uses one of them.
 
 1. **Inventory.** Find every 3.x usage before you edit anything, and show the user the counts. The
    skill refers to these three commands by name:

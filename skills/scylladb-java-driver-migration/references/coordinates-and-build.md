@@ -88,16 +88,19 @@ Listing `annotationProcessorPaths` turns off processor discovery on the classpat
 For Kotlin `@Entity`, `@Dao`, or `@Mapper` sources, Java annotation processing does not run. Use
 [kapt](https://kotlinlang.org/docs/kapt.html) instead: a `kapt` execution of `kotlin-maven-plugin`
 with the processor in its `annotationProcessorPaths`, or the Gradle `kotlin-kapt` plugin with
-`kapt("com.scylladb:java-driver-mapper-processor:4.19.4.0")`.
+`kapt("com.scylladb:java-driver-mapper-processor:$driverVersion")`, at the same version as the other
+`java-driver-*` artifacts.
 
 ### Right: Gradle
 
 ```groovy
+def driverVersion = "4.19.4.0" // a 4.19.0.x version on Java 8; see Java Version
+
 dependencies {
-    implementation("com.scylladb:java-driver-core:4.19.4.0")
-    implementation("com.scylladb:java-driver-query-builder:4.19.4.0")   // only with QueryBuilder
-    implementation("com.scylladb:java-driver-mapper-runtime:4.19.4.0")  // only with the mapper
-    annotationProcessor("com.scylladb:java-driver-mapper-processor:4.19.4.0") // only with the mapper
+    implementation("com.scylladb:java-driver-core:$driverVersion")
+    implementation("com.scylladb:java-driver-query-builder:$driverVersion")   // only with QueryBuilder
+    implementation("com.scylladb:java-driver-mapper-runtime:$driverVersion")  // only with the mapper
+    annotationProcessor("com.scylladb:java-driver-mapper-processor:$driverVersion") // only with the mapper
 }
 ```
 
@@ -125,7 +128,8 @@ application's classpath.
 4.19.2.0 and later depend on `slf4j-api` 2.x; 4.19.0.x uses 1.7, so skip this section there.
 SLF4J 1.7 bindings are ignored, so the driver logs nothing and the application prints
 `No SLF4J providers were found` at startup. If the project has a 1.7-era binding, move it to its
-SLF4J 2 version:
+SLF4J 2 version. If the project also declares `org.slf4j:slf4j-api` 1.7 directly, Maven keeps that
+version over the driver's, so move the direct `slf4j-api` to 2.0.x as well:
 
 | 1.7 binding | SLF4J 2 binding |
 | --- | --- |

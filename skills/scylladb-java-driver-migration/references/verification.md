@@ -92,8 +92,9 @@ for (Node node : session.getMetadata().getNodes().values()) {
 - Shard-aware routing needs a routing key on each request. A bound statement from a prepared
   statement computes one from its partition key; a `SimpleStatement` or a
   `session.execute(String, ...)` call has none, so the driver cannot pick a replica or shard for it.
-  For the application's main queries, check that `stmt.getRoutingKey()` is not `null`, and prefer
-  prepared statements on hot paths.
+  For the application's main queries, check that `getRoutingKey()` or `getRoutingToken()` is not
+  `null`, and that the request has a keyspace: `getKeyspace()`, `getRoutingKeyspace()`, or the
+  session's. Prefer prepared statements on hot paths.
 - `getShardingInfo()` is `null` before the node's pool is created, so run the check after the first
   query. `shards=none` after that means the driver got no sharding information from the node.
 
