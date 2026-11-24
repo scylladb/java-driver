@@ -95,21 +95,24 @@ public class TabletMapSchemaChangeListenerTest {
   @Test
   public void should_evict_table_when_it_is_dropped() {
     givenTabletMap();
+    when(table.getKeyspace()).thenReturn(KS);
     when(table.getName()).thenReturn(TABLE);
 
     listener.onTableDropped(table);
 
-    verify(tabletMap).removeByTable(TABLE);
+    verify(tabletMap).removeByTable(KS, TABLE);
+    verifyNoMoreInteractions(tabletMap);
   }
 
   @Test
   public void should_evict_previous_table_when_it_is_updated() {
     givenTabletMap();
+    when(previousTable.getKeyspace()).thenReturn(PREVIOUS_KS);
     when(previousTable.getName()).thenReturn(PREVIOUS_TABLE);
 
     listener.onTableUpdated(table, previousTable);
 
-    verify(tabletMap).removeByTable(PREVIOUS_TABLE);
+    verify(tabletMap).removeByTable(PREVIOUS_KS, PREVIOUS_TABLE);
     verifyNoMoreInteractions(tabletMap);
   }
 

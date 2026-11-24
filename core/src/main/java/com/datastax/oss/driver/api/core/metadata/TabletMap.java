@@ -50,9 +50,23 @@ public interface TabletMap {
   public void removeByKeyspace(CqlIdentifier keyspace);
 
   /**
-   * Removes all mappings for a given table.
+   * Removes all mappings for tables with the given name, in every keyspace.
    *
    * @param table table to remove
+   * @deprecated this matches on the table name alone, so it also evicts same-named tables in other
+   *     keyspaces. Use {@link #removeByTable(CqlIdentifier, CqlIdentifier)} instead.
    */
+  @Deprecated
   public void removeByTable(CqlIdentifier table);
+
+  /**
+   * Removes all mappings for a given table. Tables with the same name in other keyspaces are left
+   * untouched.
+   *
+   * @param keyspace keyspace of the table to remove
+   * @param table table to remove
+   */
+  public default void removeByTable(CqlIdentifier keyspace, CqlIdentifier table) {
+    getMapping().remove(new KeyspaceTableNamePair(keyspace, table));
+  }
 }
