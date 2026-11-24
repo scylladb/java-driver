@@ -1,10 +1,15 @@
 # Statements, Results, and Async Code
 
-How to port 3.x statement, result set, async, and exception code to 4.x. See [Statements](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#statements) and [Dual result set APIs](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#dual-result-set-apis) in the migration guide.
+How to port 3.x statement, result set, async, and exception code to 4.x. See
+[Statements](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#statements)
+and [Dual result set
+APIs](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#dual-result-set-apis)
+in the migration guide.
 
 ## Statements Are Immutable
 
-Every 4.x statement setter returns a new statement. The most common migration bug is a setter call whose result is dropped. It compiles, and the option is silently lost.
+Every 4.x statement setter returns a new statement. The most common migration bug is a setter call
+whose result is dropped. It compiles, and the option is silently lost.
 
 ### Wrong
 
@@ -29,7 +34,8 @@ BoundStatement bound = ps.bind().setUuid("id", id);
 BoundStatement bound2 = ps.boundStatementBuilder().setUuid("id", id).setString("name", name).build();
 ```
 
-After porting, search the code for setter and batch `add` calls used as statements on their own line (`^\s*\w+\.(set\w+|add|addAll)\(.*\);`) and check each one on a driver statement.
+After porting, search the code for setter and batch `add` calls used as statements on their own line
+(`^\s*\w+\.(set\w+|add|addAll)\(.*\);`) and check each one on a driver statement.
 
 ## Renamed Calls
 
@@ -49,13 +55,19 @@ After porting, search the code for setter and batch `add` calls used as statemen
 | `rs.getExecutionInfo().getQueryTrace()` | Same name; it blocks. Use `getQueryTraceAsync()` in async code. |
 | `rs.fetchMoreResults()` | Removed. Background prefetch exists only in the async API (see below). |
 
-`session.execute(String query, Object... values)`, `ResultSet.one()`, `all()`, iteration, `getAvailableWithoutFetching()` and `isFullyFetched()` keep their 3.x behavior. Call `wasApplied()` before consuming the rows: after `rs.one()` on a single-row LWT result it throws `IllegalStateException`.
+`session.execute(String query, Object... values)`, `ResultSet.one()`, `all()`, iteration,
+`getAvailableWithoutFetching()` and `isFullyFetched()` keep their 3.x behavior. Call `wasApplied()`
+before consuming the rows: after `rs.one()` on a single-row LWT result it throws
+`IllegalStateException`.
 
-Prepared statements are cached on the client in 4.x: calling `session.prepare(q)` twice returns the same instance. 3.x code that kept its own `ConcurrentHashMap<String, PreparedStatement>` still works; do not remove it during the migration.
+Prepared statements are cached on the client in 4.x: calling `session.prepare(q)` twice returns the
+same instance. 3.x code that kept its own `ConcurrentHashMap<String, PreparedStatement>` still
+works; do not remove it during the migration.
 
 ## Async Execution
 
-3.x returned Guava `ListenableFuture` (`ResultSetFuture`). 4.x returns `CompletionStage`, and the async result type is `AsyncResultSet`, which holds one page only.
+3.x returned Guava `ListenableFuture` (`ResultSetFuture`). 4.x returns `CompletionStage`, and the
+async result type is `AsyncResultSet`, which holds one page only.
 
 ### 3.x
 
@@ -67,7 +79,8 @@ Futures.addCallback(future, new FutureCallback<ResultSet>() {
 }, executor);
 ```
 
-Iterating a 3.x `ResultSet` inside a callback could block the I/O thread when it reached the end of a page.
+Iterating a 3.x `ResultSet` inside a callback could block the I/O thread when it reached the end of
+a page.
 
 ### 4.x
 
@@ -85,8 +98,10 @@ private CompletionStage<Void> processPages(AsyncResultSet rs) {
 ```
 
 - Do not iterate `AsyncResultSet` as if it held every row: `currentPage()` is one page.
-- Do not call blocking methods (`session.execute`, `join`, `get`) inside a `thenApply` or `thenCompose` callback; they run on the driver's I/O threads.
-- To block on a result at the edge of the application, use `stage.toCompletableFuture().join()`, which replaces 3.x `getUninterruptibly()`.
+- Do not call blocking methods (`session.execute`, `join`, `get`) inside a `thenApply` or
+  `thenCompose` callback; they run on the driver's I/O threads.
+- To block on a result at the edge of the application, use `stage.toCompletableFuture().join()`,
+  which replaces 3.x `getUninterruptibly()`.
 - `session.prepareAsync(q)` returns `CompletionStage<PreparedStatement>`.
 
 ## Exceptions
@@ -99,11 +114,14 @@ private CompletionStage<Void> processPages(AsyncResultSet rs) {
 | `AuthenticationException` | `com.datastax.oss.driver.api.core.auth.AuthenticationException`, no longer a `DriverException`. At startup `build()` throws `AllNodesFailedException` with it in `getAllErrors()`, where 3.x `connect()` threw it directly. |
 | `DriverException` | `com.datastax.oss.driver.api.core.DriverException` |
 
-Failed `CompletionStage`s wrap the cause in `CompletionException` when joined. Unwrap it before matching on the driver exception type.
+Failed `CompletionStage`s wrap the cause in `CompletionException` when joined. Unwrap it before
+matching on the driver exception type.
 
 ## Query Builder
 
-Built queries are no longer executable; call `.build()` to get a `SimpleStatement`, or `.asCql()` for a string. See [Query builder](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#query-builder).
+Built queries are no longer executable; call `.build()` to get a `SimpleStatement`, or `.asCql()`
+for a string. See [Query
+builder](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#query-builder).
 
 ```java
 // 3.x

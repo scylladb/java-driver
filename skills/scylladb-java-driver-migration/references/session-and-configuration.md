@@ -1,6 +1,10 @@
 # Session and Configuration
 
-How to rewrite 3.x `Cluster` and `Session` setup for 4.x. In 4.x one `CqlSession` replaces both, and most options move from builder calls to `application.conf`. See [Session](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#session) and [Configuration](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#configuration) in the migration guide.
+How to rewrite 3.x `Cluster` and `Session` setup for 4.x. In 4.x one `CqlSession` replaces both, and
+most options move from builder calls to `application.conf`. See
+[Session](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#session) and
+[Configuration](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#configuration)
+in the migration guide.
 
 ## Basic Setup
 
@@ -33,14 +37,25 @@ try (CqlSession session = CqlSession.builder()
 }
 ```
 
-- Always set the local datacenter. Port the value the 3.x code set; if it set none, ask the user which datacenter is local rather than leaving it to inference. Only 4.19.0.9 and 4.19.2.0 or later infer it; other 4.x versions throw from `build()` without it.
-- The default policy is already token-aware, and on ScyllaDB also shard-aware and tablet-aware. Delete the `TokenAwarePolicy` and `DCAwareRoundRobinPolicy` wrapping; do not port it as a custom policy.
+- Always set the local datacenter. Port the value the 3.x code set; if it set none, ask the user
+  which datacenter is local rather than leaving it to inference. Only 4.19.0.9 and 4.19.2.0 or later
+  infer it; other 4.x versions throw from `build()` without it.
+- The default policy is already token-aware, and on ScyllaDB also shard-aware and tablet-aware.
+  Delete the `TokenAwarePolicy` and `DCAwareRoundRobinPolicy` wrapping; do not port it as a custom
+  policy.
 - `build()` connects right away. There is no separate `init()` or `connect()`.
-- Create one `CqlSession` per cluster and share it, as with `Cluster` in 3.x. An application that talks to two clusters keeps two sessions. 3.x code that called `cluster.connect("ks")` for several keyspaces either keeps one session per keyspace or qualifies the table names (`ks.table`) and shares one session. Close each session on shutdown. During the migration it runs next to the 3.x `Cluster` until step 8 in SKILL.md removes 3.x.
+- Create one `CqlSession` per cluster and share it, as with `Cluster` in 3.x. An application that
+  talks to two clusters keeps two sessions. 3.x code that called `cluster.connect("ks")` for several
+  keyspaces either keeps one session per keyspace or qualifies the table names (`ks.table`) and
+  shares one session. Close each session on shutdown. During the migration it runs next to the 3.x
+  `Cluster` until step 8 in SKILL.md removes 3.x.
 
 ## Builder Calls Mapped to 4.x
 
-The table configures the new `CqlSession`; leave the 3.x `Cluster` builder as it is until step 8. Options without a builder method go in `application.conf` on the classpath, under `datastax-java-driver { ... }`. Put them there rather than in code, so they can be changed without a rebuild.
+The table configures the new `CqlSession`; leave the 3.x `Cluster` builder as it is until step 8.
+Options without a builder method go in `application.conf` on the classpath, under
+`datastax-java-driver { ... }`. Put them there rather than in code, so they can be changed without a
+rebuild.
 
 | 3.x | 4.x |
 | --- | --- |
@@ -74,7 +89,8 @@ The table configures the new `CqlSession`; leave the 3.x `Cluster` builder as it
 | `withoutJMXReporting()`, `withoutMetrics()` | Nothing; 4.x metrics are off by default. Keep them on the 3.x `Cluster` until step 8 deletes it; see [Both Drivers Side by Side](coordinates-and-build.md#both-drivers-side-by-side). |
 | `cluster.register(...)` with a `Host.StateListener` or `SchemaChangeListener` | `addNodeStateListener(...)`, `addSchemaChangeListener(...)` on the builder, once per listener. `withNodeStateListener` and `withSchemaChangeListener` replace any listener set before, so with several listeners only the last one would fire. |
 
-Speculative executions: in 3.x, `n` counts the extra executions. In 4.x, `max-executions` includes the first one, so add 1.
+Speculative executions: in 3.x, `n` counts the extra executions. In 4.x, `max-executions` includes
+the first one, so add 1.
 
 ## Example `application.conf`
 
@@ -91,12 +107,26 @@ datastax-java-driver {
 }
 ```
 
-To keep options in code instead, pass a loader built with `DriverConfigLoader.programmaticBuilder()` to `CqlSession.builder().withConfigLoader(...)`. Each `DefaultDriverOption` constant names one of the keys above, for example `DefaultDriverOption.LOAD_BALANCING_LOCAL_RACK`.
+To keep options in code instead, pass a loader built with `DriverConfigLoader.programmaticBuilder()`
+to `CqlSession.builder().withConfigLoader(...)`. Each `DefaultDriverOption` constant names one of
+the keys above, for example `DefaultDriverOption.LOAD_BALANCING_LOCAL_RACK`.
 
 ## Connection Pool
 
-On ScyllaDB the 4.x driver opens connections per shard. `advanced.connection.pool.local.size` is a total per node, and the driver rounds it up so that every shard gets at least one connection. The default, `1`, therefore means one connection per shard. Do not port 3.x `PoolingOptions` values. Keep the defaults unless the user has measured a need, and see `scylladb-cloud-setup` for pool sizing. 3.x queued a request when every connection was busy (`setMaxQueueSize`, default 256, for up to `setPoolTimeoutMillis`, default 5 s); 4.x has no queue, tries the next node, then fails with `AllNodesFailedException`. If the application relied on that queue, tell the user. The closest 4.x option is `advanced.throttler.class = ConcurrencyLimitingRequestThrottler` with `max-concurrent-requests` and `max-queue-size`, but it limits the whole session rather than each node, counts queued time against `basic.request.timeout`, and fails with `RequestThrottlingException` when its queue is full.
+On ScyllaDB the 4.x driver opens connections per shard. `advanced.connection.pool.local.size` is a
+total per node, and the driver rounds it up so that every shard gets at least one connection. The
+default, `1`, therefore means one connection per shard. Do not port 3.x `PoolingOptions` values.
+Keep the defaults unless the user has measured a need, and see `scylladb-cloud-setup` for pool
+sizing. 3.x queued a request when every connection was busy (`setMaxQueueSize`, default 256, for up
+to `setPoolTimeoutMillis`, default 5 s); 4.x has no queue, tries the next node, then fails with
+`AllNodesFailedException`. If the application relied on that queue, tell the user. The closest 4.x
+option is `advanced.throttler.class = ConcurrencyLimitingRequestThrottler` with
+`max-concurrent-requests` and `max-queue-size`, but it limits the whole session rather than each
+node, counts queued time against `basic.request.timeout`, and fails with
+`RequestThrottlingException` when its queue is full.
 
 ## Metadata
 
-`session.getMetadata()` returns an immutable snapshot. Code that kept a 3.x `Metadata` reference and expected it to update must call `getMetadata()` again. See [Metadata](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#metadata).
+`session.getMetadata()` returns an immutable snapshot. Code that kept a 3.x `Metadata` reference and
+expected it to update must call `getMetadata()` again. See
+[Metadata](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#metadata).

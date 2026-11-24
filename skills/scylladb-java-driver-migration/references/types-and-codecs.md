@@ -1,10 +1,15 @@
 # Types and Codecs
 
-How to port row access, temporal types, UDTs, and custom codecs to 4.x. See [CQL to Java type mappings](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#cql-to-java-type-mappings) in the migration guide.
+How to port row access, temporal types, UDTs, and custom codecs to 4.x. See [CQL to Java type
+mappings](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#cql-to-java-type-mappings)
+in the migration guide.
 
 ## Temporal Types
 
-4.x maps `timestamp`, `date`, and `time` to `java.time` types, as listed in [CQL to Java type mappings](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#cql-to-java-type-mappings), and has no codec for `java.util.Date`. `duration` moves from `com.datastax.driver.core.Duration` to `com.datastax.oss.driver.api.core.data.CqlDuration`.
+4.x maps `timestamp`, `date`, and `time` to `java.time` types, as listed in [CQL to Java type
+mappings](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#cql-to-java-type-mappings),
+and has no codec for `java.util.Date`. `duration` moves from `com.datastax.driver.core.Duration` to
+`com.datastax.oss.driver.api.core.data.CqlDuration`.
 
 ### Wrong
 
@@ -26,11 +31,16 @@ Date date = read == null ? null : Date.from(read);
 session.execute("INSERT INTO events (id, ts) VALUES (?, ?)", id, date == null ? null : date.toInstant());
 ```
 
-Positional values passed to `execute(String, Object...)` or `SimpleStatement.newInstance` are checked only at runtime. After porting, grep for `new Date(`, `java.util.Date`, and `.getTime()` near driver calls.
+Positional values passed to `execute(String, Object...)` or `SimpleStatement.newInstance` are
+checked only at runtime. After porting, grep for `new Date(`, `java.util.Date`, and `.getTime()`
+near driver calls.
 
 ## Getter and Setter Renames
 
-The temporal getters follow the types above, as listed in [CQL to Java type mappings](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#cql-to-java-type-mappings). The guide does not list the other renames below. They apply to `Row`, `BoundStatement`, `UdtValue`, and `TupleValue`, and setters follow the same names (`setBigInteger`, `setUuid`, and so on).
+The temporal getters follow the types above, as listed in [CQL to Java type
+mappings](https://java-driver.docs.scylladb.com/stable/upgrade_guide/from_3x/index.md#cql-to-java-type-mappings).
+The guide does not list the other renames below. They apply to `Row`, `BoundStatement`, `UdtValue`,
+and `TupleValue`, and setters follow the same names (`setBigInteger`, `setUuid`, and so on).
 
 | 3.x | 4.x |
 | --- | --- |
@@ -42,7 +52,10 @@ The temporal getters follow the types above, as listed in [CQL to Java type mapp
 | `getUDTValue` | `getUdtValue` |
 | `getBool` | `getBoolean` (`getBool` still exists as an alias) |
 
-`getString`, `getInt`, `getLong`, `getDouble`, `getFloat`, `getList(name, Class)`, `getSet`, `getMap`, `getTupleValue`, and `isNull` keep their names. `getObject` does too, but returns the 4.x types: a `timestamp` comes back as `Instant`, so a `(Date)` cast compiles and throws `ClassCastException`.
+`getString`, `getInt`, `getLong`, `getDouble`, `getFloat`, `getList(name, Class)`, `getSet`,
+`getMap`, `getTupleValue`, and `isNull` keep their names. `getObject` does too, but returns the 4.x
+types: a `timestamp` comes back as `Instant`, so a `(Date)` cast compiles and throws
+`ClassCastException`.
 
 ## Utility Classes
 
@@ -55,7 +68,9 @@ The temporal getters follow the types above, as listed in [CQL to Java type mapp
 
 ## Custom Codecs
 
-In 4.x `TypeCodec` is an interface with `getJavaType()`, `getCqlType()`, `encode`, `decode`, `format`, and `parse`. 3.x codecs that extend the abstract class must be rewritten; the logic usually carries over.
+In 4.x `TypeCodec` is an interface with `getJavaType()`, `getCqlType()`, `encode`, `decode`,
+`format`, and `parse`. 3.x codecs that extend the abstract class must be rewritten; the logic
+usually carries over.
 
 Registration:
 
@@ -72,7 +87,9 @@ CqlSession session = CqlSession.builder().addTypeCodecs(new MyCodec()).build();
 
 ## `scylla-driver-extras` Codecs
 
-Most extras codecs have a ready replacement in `com.datastax.oss.driver.api.core.type.codec.ExtraTypeCodecs`, in `java-driver-core`. Register them as shown above.
+Most extras codecs have a ready replacement in
+`com.datastax.oss.driver.api.core.type.codec.ExtraTypeCodecs`, in `java-driver-core`. Register them
+as shown above.
 
 | 3.x extras codec | 4.x |
 | --- | --- |
@@ -87,4 +104,6 @@ Most extras codecs have a ready replacement in `com.datastax.oss.driver.api.core
 | `date.SimpleTimestampCodec` (`timestamp` as epoch millis) | `ExtraTypeCodecs.TIMESTAMP_MILLIS_UTC` |
 | `jdk8.ZoneIdCodec`, `date.SimpleDateCodec`, `json.Jsr353JsonCodec`, `guava.OptionalCodec`, all `joda.*` codecs | No replacement. Write a custom codec, or convert at the call site. |
 
-Enum and JSON codecs are the ones most often registered in 3.x code. If they are missing in 4.x, reads and writes of those columns fail with `CodecNotFoundException` at runtime, not at compile time.
+Enum and JSON codecs are the ones most often registered in 3.x code. If they are missing in 4.x,
+reads and writes of those columns fail with `CodecNotFoundException` at runtime, not at compile
+time.
