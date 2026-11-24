@@ -113,10 +113,10 @@ UserDao dao = mapper.userDao();
   keyspace, and named markers (`:ids`) that match the method's parameter names. The table comes from
   the entity the method returns. A `@Query` that returns no entity (`ResultSet`, `long`, `boolean`)
   takes it from a `@DaoTable` parameter of the `@DaoFactory` method; without one, creating the DAO
-  fails with `Cannot substitute ${tableId} ... the DAO wasn't built with a table`. Keep the table
-  name in such queries, or add the factory parameter. Such a query also takes its keyspace from the
-  factory: add a `@DaoKeyspace` parameter, or `${qualifiedTableId}` is the bare table name and works
-  only if the session has a default keyspace.
+  fails with `Cannot substitute ${tableId} ... the DAO wasn't built with a table`. Keep the
+  qualified table name (`ks.users`) in such queries, or add the factory parameter. The placeholders
+  in such a query also take their keyspace from the factory: add a `@DaoKeyspace` parameter, or
+  `${qualifiedTableId}` is the bare table name and works only if the session has a default keyspace.
 - Port 3.x `@Accessor` query strings as they are, except the markers: replace each anonymous `?`
   with a named marker that matches the parameter name, for example `WHERE id = :userId` for
   `findById(UUID userId)`. 4.x binds `@Query` parameters by name, so a `?` works only when the

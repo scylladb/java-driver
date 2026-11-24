@@ -81,7 +81,8 @@ The mapper processor goes in the compiler plugin, not in `<dependencies>`:
 ```
 
 If the project already lists other processors there, such as Lombok, add this one next to them.
-Listing `annotationProcessorPaths` turns off processor discovery on the classpath. It needs
+Listing `annotationProcessorPaths` turns off processor discovery on the classpath, so a processor
+that so far ran only from `<dependencies>`, such as Lombok, must be added to the list too. It needs
 `maven-compiler-plugin` 3.5 or later; with an older pinned version the processor does not run and
 `UserMapperBuilder` is never generated.
 
@@ -89,7 +90,8 @@ For Kotlin `@Entity`, `@Dao`, or `@Mapper` sources, Java annotation processing d
 [kapt](https://kotlinlang.org/docs/kapt.html) instead: a `kapt` execution of `kotlin-maven-plugin`
 with the processor in its `annotationProcessorPaths`, or the Gradle `kotlin-kapt` plugin with
 `kapt("com.scylladb:java-driver-mapper-processor:$driverVersion")`, at the same version as the other
-`java-driver-*` artifacts.
+`java-driver-*` artifacts. Kapt turns off javac annotation processing, so move the project's other
+`annotationProcessor` entries to `kapt` as well.
 
 ### Right: Gradle
 
