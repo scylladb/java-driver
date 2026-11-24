@@ -19,6 +19,7 @@ package com.datastax.oss.driver.api.querybuilder.relation;
 
 import static com.datastax.oss.driver.api.querybuilder.Assertions.assertThat;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.add;
+import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.bindMarker;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.currentDate;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.currentTime;
 import static com.datastax.oss.driver.api.querybuilder.QueryBuilder.currentTimeUuid;
@@ -68,6 +69,13 @@ public class TermTest {
         .hasCql("a*b%(c*d)");
     assertThat(remainder(multiply(raw("a"), raw("b")), remainder(raw("c"), raw("d"))))
         .hasCql("a*b%(c%d)");
+    // a "-" followed by an operand starting with "-" would render "--", which the CQL
+    // lexer reads as the start of a comment; the negated operand gets parenthesized.
+    assertThat(subtract(raw("a"), negate(raw("b")))).hasCql("a-(-b)");
+    assertThat(subtract(bindMarker(), negate(bindMarker()))).hasCql("?-(-?)");
+    assertThat(subtract(literal(5), literal(-1))).hasCql("5-(-1)");
+    assertThat(negate(negate(raw("a")))).hasCql("-(-a)");
+    assertThat(negate(literal(-1))).hasCql("-(-1)");
   }
 
   @Test
