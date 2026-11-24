@@ -30,7 +30,6 @@ import com.datastax.oss.driver.internal.core.type.codec.CodecTestBase;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import org.junit.Before;
 import org.junit.Test;
@@ -68,25 +67,14 @@ public class FloatVectorToArrayCodecTest extends CodecTestBase<float[]> {
     assertThat(decode(VECTOR_HEX)).isEqualTo(VECTOR);
   }
 
-  /**
-   * A contract violation, not a design choice: {@code TypeCodec#decode} requires null and empty
-   * buffers to be handled gracefully with no exception, {@code VectorCodec} returns null and the
-   * ancestor {@code AbstractPrimitiveListToArrayCodec} returns an empty array. Every CQL NULL
-   * vector cell therefore throws out of {@code row.get(...)}. Filed as scylladb/java-driver#1114,
-   * pinned here until it is fixed.
-   */
   @Test
-  public void should_throw_when_decoding_null_buffer() {
-    assertThatThrownBy(() -> codec.decode(null, ProtocolVersion.DEFAULT))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("must not be null and must have non-zero remaining bytes");
+  public void should_return_null_when_decoding_null_buffer() {
+    assertThat(codec.decode(null, ProtocolVersion.DEFAULT)).isNull();
   }
 
   @Test
-  public void should_throw_when_decoding_empty_buffer() {
-    assertThatThrownBy(() -> codec.decode(ByteBuffer.allocate(0), ProtocolVersion.DEFAULT))
-        .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("must not be null and must have non-zero remaining bytes");
+  public void should_return_null_when_decoding_empty_buffer() {
+    assertThat(codec.decode(ByteBuffer.allocate(0), ProtocolVersion.DEFAULT)).isNull();
   }
 
   @Test
@@ -99,14 +87,12 @@ public class FloatVectorToArrayCodecTest extends CodecTestBase<float[]> {
     assertThat(bytes.remaining()).isEqualTo(DIMENSIONS * 4);
   }
 
-  /**
-   * The decode loop trusts the declared dimensions; a short buffer underflows rather than fails.
-   */
   @Test
-  public void should_underflow_when_buffer_holds_fewer_elements_than_dimensions() {
+  public void should_reject_buffer_with_fewer_elements_than_dimensions() {
     assertThatThrownBy(
             () -> codec.decode(Bytes.fromHexString("0x3f800000"), ProtocolVersion.DEFAULT))
-        .isInstanceOf(BufferUnderflowException.class);
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Not enough bytes");
   }
 
   @Test
