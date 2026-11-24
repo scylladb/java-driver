@@ -86,13 +86,8 @@ that so far ran only from `<dependencies>`, such as Lombok, must be added to the
 `maven-compiler-plugin` 3.5 or later; with an older pinned version the processor does not run and
 `UserMapperBuilder` is never generated.
 
-For Kotlin `@Entity`, `@Dao`, or `@Mapper` sources, Java annotation processing does not run. Use
-[kapt](https://kotlinlang.org/docs/kapt.html) instead: a `kapt` execution of `kotlin-maven-plugin`
-with the processor in its `annotationProcessorPaths`, or the Gradle `kotlin-kapt` plugin with
-`kapt("com.scylladb:java-driver-mapper-processor:$driverVersion")`, at the same version as the other
-`java-driver-*` artifacts. Kapt turns off javac annotation processing. Move other processors that
-work under kapt to `kapt`; keep javac-only ones, such as Lombok, on `annotationProcessor` and set
-`kapt { keepJavacAnnotationProcessors = true }`.
+For Kotlin `@Entity`, `@Dao`, or `@Mapper` sources, set up kapt as the manual's [Kotlin
+page](https://java-driver.docs.scylladb.com/stable/manual/mapper/config/kotlin/index.md) shows.
 
 ### Right: Gradle
 
