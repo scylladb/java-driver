@@ -178,6 +178,39 @@ public class RequestLogFormatterTest {
   }
 
   @Test
+  public void should_format_bound_statement_with_null_values() {
+    PreparedStatement preparedStatement =
+        mockPreparedStatement(
+            "UPDATE foo SET v=? WHERE k=?",
+            ImmutableMap.of("v", DataTypes.BLOB, "k", DataTypes.INT));
+    BoundStatement statement = preparedStatement.bind().setToNull("v").setInt("k", 0);
+    assertThat(
+            formatRequest(statement, Integer.MAX_VALUE, true, Integer.MAX_VALUE, Integer.MAX_VALUE))
+        .isEqualTo("[2 values] UPDATE foo SET v=? WHERE k=? [v=NULL, k=0]");
+  }
+
+  @Test
+  public void should_format_simple_statement_with_null_values() {
+    SimpleStatement positional =
+        SimpleStatement.builder("UPDATE foo SET v=? WHERE k=?")
+            .addPositionalValue(null)
+            .addPositionalValue(0)
+            .build();
+    assertThat(
+            formatRequest(
+                positional, Integer.MAX_VALUE, true, Integer.MAX_VALUE, Integer.MAX_VALUE))
+        .isEqualTo("[2 values] UPDATE foo SET v=? WHERE k=? [v0=NULL, v1=0]");
+
+    SimpleStatement named =
+        SimpleStatement.builder("UPDATE foo SET v=:v WHERE k=:k")
+            .addNamedValue("v", null)
+            .addNamedValue("k", 0)
+            .build();
+    assertThat(formatRequest(named, Integer.MAX_VALUE, true, Integer.MAX_VALUE, Integer.MAX_VALUE))
+        .isEqualTo("[2 values] UPDATE foo SET v=:v WHERE k=:k [v=NULL, k=0]");
+  }
+
+  @Test
   public void should_format_batch_statement() {
     SimpleStatement statement1 =
         SimpleStatement.builder("UPDATE foo SET v=? WHERE k=?")

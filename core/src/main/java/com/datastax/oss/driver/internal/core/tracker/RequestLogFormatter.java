@@ -243,6 +243,10 @@ public class RequestLogFormatter {
   }
 
   protected void appendValue(ByteBuffer raw, DataType type, int maxLength, StringBuilder builder) {
+    if (raw == null) {
+      append("NULL", maxLength, builder);
+      return;
+    }
     TypeCodec<Object> codec = context.getCodecRegistry().codecFor(type);
     if (type.equals(DataTypes.BLOB)) {
       // For very large buffers, apply the limit before converting into a string
@@ -263,6 +267,10 @@ public class RequestLogFormatter {
   }
 
   protected void appendValue(Object value, int maxLength, StringBuilder builder) {
+    if (value == null) {
+      append("NULL", maxLength, builder);
+      return;
+    }
     TypeCodec<Object> codec = context.getCodecRegistry().codecFor(value);
     if (value instanceof ByteBuffer) {
       // For very large buffers, apply the limit before converting into a string
