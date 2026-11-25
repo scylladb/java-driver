@@ -101,6 +101,48 @@ The [reference configuration](../../configuration/reference/) documents every op
 4. **Reconnect** — if the control connection is recreated the driver performs a full re-read of the
    route table before refreshing node metadata.
 
+### TLS with node-IP certificates
+
+Client routes select `tls_port` instead of `port` when an SSL engine factory is configured. TLS
+must also be enabled on the initial contact point, which bypasses route translation.
+
+Some ScyllaDB Cloud node certificates contain only each node's broadcast RPC IP in their subject
+alternative names. The driver dials the private endpoint instead. The default SSL engine factory
+validates the certificate against that endpoint's resolved address (or its reverse-DNS name), so
+hostname validation can fail even when the certificate is signed by the cluster's CA. The initial
+contact point has no known node ID yet, so the driver cannot safely substitute a node IP for this
+check by default.
+
+For this certificate layout, explicitly disable hostname validation while retaining the cluster
+CA truststore:
+
+```
+datastax-java-driver {
+  basic.contact-points = [ "private-endpoint.example.com:9142" ]
+  basic.load-balancing-policy.local-datacenter = "datacenter1"
+
+  advanced.client-routes {
+    endpoints = [
+      { connection-id = "12345678-1234-1234-1234-123456789012",
+        connection-addr = "private-endpoint.example.com" }
+    ]
+  }
+
+  advanced.ssl-engine-factory {
+    class = DefaultSslEngineFactory
+    truststore-path = /path/to/client.truststore
+    truststore-password = password123
+    hostname-validation = false
+  }
+}
+```
+
+Use the TLS discovery port supplied for the private connection in `basic.contact-points`; `9142`
+above is illustrative. Disabling hostname validation retains certificate-chain verification
+against the configured truststore, but no longer proves that the connection reached the intended
+node. Keep hostname validation enabled when certificates cover the private endpoint. See
+[SSL](../../ssl/) for truststore setup and hostname-validation details.
+
 ### DNS resolution
 
 DNS is resolved at connection time (not at route discovery time). The driver delegates to
