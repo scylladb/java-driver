@@ -20,6 +20,7 @@ package com.datastax.oss.driver.api.querybuilder.schema;
 import static com.datastax.oss.driver.api.querybuilder.Assertions.assertThat;
 import static com.datastax.oss.driver.api.querybuilder.SchemaBuilder.createIndex;
 
+import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import org.junit.Test;
 
@@ -143,5 +144,23 @@ public class CreateIndexTest {
                 .withSASIOptions(ImmutableMap.of("mode", "CONTAINS", "tokenization_locale", "en")))
         .hasCql(
             "CREATE CUSTOM INDEX ON x (y) USING 'org.apache.cassandra.index.sasi.SASIIndex' WITH OPTIONS={'mode':'CONTAINS','tokenization_locale':'en'}");
+  }
+
+  @Test
+  public void should_quote_case_sensitive_column_name() {
+    assertThat(createIndex("idx").onTable("tbl").andColumn("\"MyCol\""))
+        .hasCql("CREATE INDEX idx ON tbl (\"MyCol\")");
+  }
+
+  @Test
+  public void should_quote_case_sensitive_column_name_with_index_type() {
+    assertThat(createIndex("idx").onTable("tbl").andColumnKeys("\"MyCol\""))
+        .hasCql("CREATE INDEX idx ON tbl (KEYS(\"MyCol\"))");
+  }
+
+  @Test
+  public void should_quote_column_name_that_needs_quoting() {
+    assertThat(createIndex().onTable("tbl").andColumn(CqlIdentifier.fromInternal("my col")))
+        .hasCql("CREATE INDEX ON tbl (\"my col\")");
   }
 }
