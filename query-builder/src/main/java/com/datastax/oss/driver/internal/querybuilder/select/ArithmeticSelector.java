@@ -40,13 +40,25 @@ public abstract class ArithmeticSelector implements Selector {
 
   protected static void appendAndMaybeParenthesize(
       int myPrecedence, @NonNull Selector child, @NonNull StringBuilder builder) {
+    StringBuilder childBuilder = new StringBuilder();
+    child.appendTo(childBuilder);
     boolean parenthesize =
         (child instanceof ArithmeticSelector)
             && (((ArithmeticSelector) child).operator.getPrecedenceLeft() < myPrecedence);
+    if (!parenthesize
+        && builder.length() > 0
+        && builder.charAt(builder.length() - 1) == '-'
+        && childBuilder.length() > 0
+        && childBuilder.charAt(0) == '-') {
+      // A "-" operator directly followed by an operand starting with "-" would render
+      // "--", which the CQL lexer reads as the start of a comment; parenthesize the
+      // operand to keep the whole statement intact.
+      parenthesize = true;
+    }
     if (parenthesize) {
       builder.append('(');
     }
-    child.appendTo(builder);
+    builder.append(childBuilder);
     if (parenthesize) {
       builder.append(')');
     }

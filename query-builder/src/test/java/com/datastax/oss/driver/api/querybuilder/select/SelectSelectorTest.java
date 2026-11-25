@@ -93,6 +93,16 @@ public class SelectSelectorTest {
                 .divide(
                     literal(1), Selector.multiply(Selector.column("bar"), Selector.column("baz"))))
         .hasCql("SELECT 1/(bar*baz) FROM foo");
+    // a "-" followed by an operand starting with "-" would render "--", which the CQL
+    // lexer reads as the start of a comment; the negated operand gets parenthesized.
+    assertThat(
+            selectFrom("foo")
+                .subtract(Selector.column("bar"), Selector.negate(Selector.column("baz"))))
+        .hasCql("SELECT bar-(-baz) FROM foo");
+    assertThat(selectFrom("foo").negate(Selector.negate(Selector.column("bar"))))
+        .hasCql("SELECT -(-bar) FROM foo");
+    assertThat(selectFrom("foo").subtract(literal(5), literal(-1)))
+        .hasCql("SELECT 5-(-1) FROM foo");
   }
 
   @Test
