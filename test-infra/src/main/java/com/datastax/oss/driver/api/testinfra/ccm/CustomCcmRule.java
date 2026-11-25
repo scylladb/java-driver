@@ -17,7 +17,10 @@
  */
 package com.datastax.oss.driver.api.testinfra.ccm;
 
+import com.datastax.oss.driver.api.testinfra.session.SessionTracker;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.runner.Description;
+import org.junit.runners.model.Statement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +40,24 @@ public class CustomCcmRule extends BaseCcmRule {
 
   CustomCcmRule(CcmBridge ccmBridge) {
     super(ccmBridge);
+  }
+
+  @Override
+  public Statement apply(Statement base, Description description) {
+    final Statement statement = super.apply(base, description);
+    return new Statement() {
+      final Statement original = statement;
+
+      @Override
+      public void evaluate() throws Throwable {
+        try {
+          SessionTracker.testStarted(description.getClassName(), description.getMethodName());
+          original.evaluate();
+        } finally {
+          SessionTracker.testEnded(description.getClassName(), description.getMethodName());
+        }
+      }
+    };
   }
 
   @Override
