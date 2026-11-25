@@ -106,8 +106,9 @@ DAO that returns a `ResultSet` or `Row` to its caller, port them together as one
   replacement; ask the user before adding them.
 - **Keep the mapper's column names.** The 4.x mapper defaults to snake case (`firstName` maps to
   `first_name`); 3.x mapped `firstName` to `firstname`. Without `@NamingStrategy`, creating the DAO
-  fails at startup with `has missing columns: [first_name]`. See
-  [object-mapper](references/object-mapper.md).
+  fails at startup with `has missing columns: [first_name]`, or, if the table also has a
+  `first_name` column, silently uses it. A clean startup does not prove the mapping is unchanged.
+  See [object-mapper](references/object-mapper.md).
 - **Do not drop ScyllaDB features in translation.** Keep rack awareness, shard-aware port settings,
   and LWT routing; each has a 4.x configuration key in
   [session-and-configuration](references/session-and-configuration.md).

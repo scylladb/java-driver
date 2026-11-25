@@ -28,13 +28,15 @@ file covers what changes.
 
 ## Two Behavior Changes
 
-Both compile cleanly. The first fails at startup; the second silently changes the data written.
+Both compile cleanly. The first fails at startup or silently uses another column; the second
+silently changes the data written.
 
 **Column names.** 3.x mapped a property to its name in lowercase: `firstName` to `firstname`.
 The 4.x default is `SNAKE_CASE_INSENSITIVE`: `firstName` to `first_name`. The mapper checks each
 entity against its table when it creates a DAO, so a missed annotation fails with
-`The CQL ks.table: ks.users has missing columns: [first_name]`. To keep the 3.x mapping, annotate
-every entity:
+`The CQL ks.table: ks.users has missing columns: [first_name]`. If the table has both `firstname`
+and `first_name`, the check passes and the DAO reads and writes `first_name`, so a clean startup
+does not prove the mapping is unchanged. To keep the 3.x mapping, annotate every entity:
 
 ```java
 @NamingStrategy(convention = NamingConvention.CASE_INSENSITIVE)
