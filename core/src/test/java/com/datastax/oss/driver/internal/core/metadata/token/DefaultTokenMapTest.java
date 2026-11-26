@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DefaultProtocolVersion;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.token.Token;
 import com.datastax.oss.driver.api.core.metadata.token.TokenRange;
@@ -37,6 +38,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -357,6 +359,57 @@ public class DefaultTokenMapTest {
         .hasSize(2)
         .containsEntry(KS1, REPLICATE_ON_BOTH_DCS)
         .containsEntry(KS2, REPLICATE_ON_BOTH_DCS);
+  }
+
+  @Test
+  public void should_prefer_up_node_when_token_is_duplicated() {
+    // Given
+    DefaultNode ghost = mockNode(DC1, RACK1, ImmutableSet.of(TOKEN2));
+    DefaultNode node1 = mockNode(DC1, RACK1, ImmutableSet.of(TOKEN1));
+    DefaultNode node2 = mockNode(DC1, RACK1, ImmutableSet.of(TOKEN2));
+    when(ghost.getState()).thenReturn(NodeState.UNKNOWN);
+    when(node2.getState()).thenReturn(NodeState.UP);
+    List<KeyspaceMetadata> keyspaces = ImmutableList.of(mockKeyspace(KS1, REPLICATE_ON_DC1));
+
+    for (List<Node> nodes :
+        ImmutableList.of(
+            ImmutableList.<Node>of(ghost, node1, node2),
+            ImmutableList.<Node>of(node2, node1, ghost))) {
+      // When
+      DefaultTokenMap tokenMap =
+          DefaultTokenMap.build(
+              nodes, keyspaces, TOKEN_FACTORY, replicationStrategyFactory, "test");
+
+      // Then
+      assertThat(tokenMap.getTokenRanges()).containsExactly(RANGE12, range(TOKEN2, TOKEN1));
+      assertThat(tokenMap.getTokenRanges(node2)).containsExactly(RANGE12);
+      assertThat(tokenMap.getTokenRanges(ghost)).isEmpty();
+      assertThat(tokenMap.getReplicasList(KS1, RANGE12)).containsExactly(node2);
+    }
+  }
+
+  @Test
+  public void should_pick_lowest_host_id_when_duplicated_token_nodes_are_not_up() {
+    // Given
+    DefaultNode node1 = mockNode(DC1, RACK1, ImmutableSet.of(TOKEN1));
+    DefaultNode node2 = mockNode(DC1, RACK1, ImmutableSet.of(TOKEN1));
+    when(node1.getHostId()).thenReturn(new UUID(0, 1));
+    when(node2.getHostId()).thenReturn(new UUID(0, 2));
+    List<KeyspaceMetadata> keyspaces = ImmutableList.of(mockKeyspace(KS1, REPLICATE_ON_DC1));
+
+    for (List<Node> nodes :
+        ImmutableList.of(
+            ImmutableList.<Node>of(node1, node2), ImmutableList.<Node>of(node2, node1))) {
+      // When
+      DefaultTokenMap tokenMap =
+          DefaultTokenMap.build(
+              nodes, keyspaces, TOKEN_FACTORY, replicationStrategyFactory, "test");
+
+      // Then
+      assertThat(tokenMap.getTokenRanges(node1)).containsExactly(FULL_RING);
+      assertThat(tokenMap.getTokenRanges(node2)).isEmpty();
+      assertThat(tokenMap.getReplicasList(KS1, FULL_RING)).containsExactly(node1);
+    }
   }
 
   private DefaultNode mockNode(String dc, String rack, Set<String> tokens) {

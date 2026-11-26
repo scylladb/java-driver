@@ -25,6 +25,7 @@ package com.datastax.oss.driver.internal.core.metadata.token;
 
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.metadata.Node;
+import com.datastax.oss.driver.api.core.metadata.NodeState;
 import com.datastax.oss.driver.api.core.metadata.TokenMap;
 import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.token.Partitioner;
@@ -43,11 +44,14 @@ import edu.umd.cs.findbugs.annotations.Nullable;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.UUID;
 import net.jcip.annotations.Immutable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +68,7 @@ public class DefaultTokenMap implements TokenMap {
       @NonNull ReplicationStrategyFactory replicationStrategyFactory,
       @NonNull String logPrefix) {
 
-    TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes, tokenFactory);
+    TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes, tokenFactory, logPrefix);
     Map<Token, Node> tokenToPrimary = tmp.tokenToPrimary;
     List<Token> ring = tmp.ring;
     LOG.debug("[{}] Rebuilt ring ({} tokens)", logPrefix, ring.size());
@@ -251,7 +255,7 @@ public class DefaultTokenMap implements TokenMap {
       } else {
         LOG.debug("[{}] Computing new keyspace-level data for {}", logPrefix, config);
         if (tokenToPrimary == null) {
-          TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes, tokenFactory);
+          TokenToPrimaryAndRing tmp = buildTokenToPrimaryAndRing(nodes, tokenFactory, logPrefix);
           tokenToPrimary = tmp.tokenToPrimary;
           ring = tmp.ring;
         }
@@ -277,18 +281,57 @@ public class DefaultTokenMap implements TokenMap {
   }
 
   private static TokenToPrimaryAndRing buildTokenToPrimaryAndRing(
-      Collection<Node> nodes, TokenFactory tokenFactory) {
-    ImmutableMap.Builder<Token, Node> tokenToPrimaryBuilder = ImmutableMap.builder();
+      Collection<Node> nodes, TokenFactory tokenFactory, String logPrefix) {
+    Map<Token, Node> tokenToPrimary = new HashMap<>();
     SortedSet<Token> sortedTokens = new TreeSet<>();
+    Token firstDuplicate = null;
+    Node firstKept = null;
+    Node firstIgnored = null;
+    int duplicates = 0;
     for (Node node : nodes) {
       for (String tokenString : ((DefaultNode) node).getRawTokens()) {
         Token token = tokenFactory.parse(tokenString);
         sortedTokens.add(token);
-        tokenToPrimaryBuilder.put(token, node);
+        Node previous = tokenToPrimary.put(token, node);
+        if (previous != null && previous != node) {
+          Node kept = choosePrimary(previous, node);
+          tokenToPrimary.put(token, kept);
+          if (duplicates++ == 0) {
+            firstDuplicate = token;
+            firstKept = kept;
+            firstIgnored = (kept == node) ? previous : node;
+          }
+        }
       }
     }
+    if (duplicates > 0) {
+      LOG.warn(
+          "[{}] Found {} duplicate token(s) while building the token map, "
+              + "check for stale entries in system.peers. "
+              + "First one: token {} is owned by both {} and {}, using the former",
+          logPrefix,
+          duplicates,
+          firstDuplicate,
+          firstKept,
+          firstIgnored);
+    }
     return new TokenToPrimaryAndRing(
-        tokenToPrimaryBuilder.build(), ImmutableList.copyOf(sortedTokens));
+        ImmutableMap.copyOf(tokenToPrimary), ImmutableList.copyOf(sortedTokens));
+  }
+
+  /**
+   * Picks the primary replica for a token reported by two nodes: the one that is up, otherwise the
+   * one with the lowest host id, so that the result does not depend on iteration order.
+   */
+  private static Node choosePrimary(Node first, Node second) {
+    boolean firstUp = first.getState() == NodeState.UP;
+    boolean secondUp = second.getState() == NodeState.UP;
+    if (firstUp != secondUp) {
+      return firstUp ? first : second;
+    }
+    UUID firstId = Objects.requireNonNull(first.getHostId());
+    UUID secondId = Objects.requireNonNull(second.getHostId());
+    return firstId.compareTo(secondId) <= 0 ? first : second;
   }
 
   static class TokenToPrimaryAndRing {
