@@ -680,9 +680,10 @@ public class ChannelPool implements AsyncAutoCloseable {
 
     private void onChannelCloseStarted(DriverChannel channel) {
       assert adminExecutor.inEventLoop();
-      if (!isClosing) {
+      // If the channel is not in the live set anymore, we removed it ourselves (shrink) and it has
+      // already been reported as closed.
+      if (!isClosing && channels[channel.getShardId()].remove(channel)) {
         LOG.debug("[{}] Channel {} started graceful shutdown", logPrefix, channel);
-        channels[channel.getShardId()].remove(channel);
         closingChannels.add(channel);
         eventBus.fire(ChannelEvent.channelClosed(node));
         reconnection.start();
@@ -740,6 +741,8 @@ public class ChannelPool implements AsyncAutoCloseable {
             }
             for (DriverChannel channel : toRemove) {
               channels[channel.getShardId()].remove(channel);
+              // Track it until it's fully closed, so that closing the pool also closes it
+              closingChannels.add(channel);
               channel.close();
               eventBus.fire(ChannelEvent.channelClosed(node));
             }

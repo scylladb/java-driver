@@ -26,6 +26,7 @@ package com.datastax.oss.driver.internal.core.pool;
 import static com.datastax.oss.driver.Assertions.assertThat;
 import static com.datastax.oss.driver.Assertions.assertThatStage;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -37,6 +38,8 @@ import com.datastax.oss.driver.internal.core.channel.ChannelEvent;
 import com.datastax.oss.driver.internal.core.channel.DriverChannel;
 import com.datastax.oss.driver.internal.core.channel.MockChannelFactoryHelper;
 import com.datastax.oss.driver.internal.core.config.ConfigChangeEvent;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelPromise;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -78,6 +81,52 @@ public class ChannelPoolResizeTest extends ChannelPoolTestBase {
     inOrder.verify(eventBus, VERIFY_TIMEOUT.times(2)).fire(ChannelEvent.channelClosed(node));
 
     await().untilAsserted(() -> assertThat(pool.channels[0]).containsOnly(channel3, channel4));
+
+    factoryHelper.verifyNoMoreCalls();
+  }
+
+  @Test
+  public void should_close_once_when_shrinking_busy_channels() throws Exception {
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_REMOTE_SIZE)).thenReturn(2);
+    when(defaultProfile.getInt(DefaultDriverOption.CONNECTION_POOL_LOCAL_SIZE)).thenReturn(1);
+
+    DriverChannel channel1 = newMockDriverChannel(1);
+    DriverChannel channel2 = newMockDriverChannel(2);
+    // A channel with pending requests starts its graceful shutdown as soon as it is asked to close
+    for (DriverChannel channel : new DriverChannel[] {channel1, channel2}) {
+      ChannelPromise closeStartedFuture = (ChannelPromise) channel.closeStartedFuture();
+      ChannelFuture closeFuture = channel.closeFuture();
+      when(channel.close())
+          .thenAnswer(
+              invocation -> {
+                closeStartedFuture.trySuccess();
+                return closeFuture;
+              });
+    }
+    MockChannelFactoryHelper factoryHelper =
+        MockChannelFactoryHelper.builder(channelFactory)
+            .success(node, channel1)
+            .success(node, channel2)
+            .build();
+
+    CompletionStage<ChannelPool> poolFuture =
+        ChannelPool.init(node, null, NodeDistance.REMOTE, context, "test");
+
+    factoryHelper.waitForCalls(node, 2);
+    assertThatStage(poolFuture).isSuccess();
+    ChannelPool pool = poolFuture.toCompletableFuture().get();
+    assertThat(pool.channels[0]).containsOnly(channel1, channel2);
+
+    pool.resize(NodeDistance.LOCAL);
+
+    verify(eventBus, after(500).times(1)).fire(ChannelEvent.channelClosed(node));
+    verify(eventBus, never()).fire(ChannelEvent.reconnectionStarted(node));
+    assertThat(pool.size()).isEqualTo(1);
+
+    // The channel that is still draining must be force-closed with the pool
+    pool.forceCloseAsync();
+    verify(channel1, VERIFY_TIMEOUT).forceClose();
+    verify(channel2, VERIFY_TIMEOUT).forceClose();
 
     factoryHelper.verifyNoMoreCalls();
   }
