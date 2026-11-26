@@ -201,7 +201,9 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       // Shuffle only replicas that are in the local rack
       shuffleHead(currentNodes, localRackReplicaCount);
       // Shuffles only replicas that are not in local rack
-      shuffleInRange(currentNodes, localRackReplicaCount, replicaCount - 1);
+      if (replicaCount - localRackReplicaCount > 1) {
+        shuffleInRange(currentNodes, localRackReplicaCount, replicaCount - 1);
+      }
     } else {
       shuffleHead(currentNodes, replicaCount);
     }

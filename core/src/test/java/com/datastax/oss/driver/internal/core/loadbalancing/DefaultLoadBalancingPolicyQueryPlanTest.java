@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.BDDMockito.willAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.times;
 import com.datastax.oss.driver.api.core.RequestRoutingType;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.internal.core.pool.ChannelPool;
+import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
@@ -505,6 +507,52 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     then(defaultPolicy).should(times(2)).shuffleInRange(any(), anyInt(), anyInt());
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
+  }
+
+  @Test
+  public void should_not_fail_when_all_replicas_are_in_local_rack() {
+    // Given
+    givenReplicasWithRealRangeShuffle(ImmutableList.of(node1, node3));
+    given(node1.getRack()).willReturn("rack1");
+    given(node3.getRack()).willReturn("rack1");
+
+    // When
+    Queue<Node> plan = defaultPolicy.newQueryPlan(request, session);
+
+    // Then
+    assertThat(plan).containsExactly(node1, node3, node2, node4, node5);
+    then(defaultPolicy).should(never()).shuffleInRange(any(), anyInt(), anyInt());
+  }
+
+  @Test
+  public void should_not_fail_when_a_single_replica_is_outside_local_rack() {
+    // Given
+    givenReplicasWithRealRangeShuffle(ImmutableList.of(node1, node3, node5));
+    given(node1.getRack()).willReturn("rack1");
+    given(node3.getRack()).willReturn("rack1");
+    given(node5.getRack()).willReturn("rack2");
+
+    // When
+    Queue<Node> plan = defaultPolicy.newQueryPlan(request, session);
+
+    // Then
+    assertThat(plan).containsExactly(node1, node3, node5, node2, node4);
+  }
+
+  private void givenReplicasWithRealRangeShuffle(ImmutableList<Node> replicas) {
+    given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
+    given(request.getRoutingKey()).willReturn(ROUTING_KEY);
+    given(tokenMap.getReplicasList(KEYSPACE, null, ROUTING_KEY)).willReturn(replicas);
+    given(defaultPolicy.getLocalRack()).willReturn("rack1");
+    // The spied policy stubs shuffles out, restore the range shuffle to check its bounds
+    willAnswer(
+            invocation -> {
+              ArrayUtils.shuffleInRange(
+                  invocation.getArgument(0), invocation.getArgument(1), invocation.getArgument(2));
+              return null;
+            })
+        .given(defaultPolicy)
+        .shuffleInRange(any(), anyInt(), anyInt());
   }
 
   @Override
