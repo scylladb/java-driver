@@ -48,6 +48,10 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
 
   protected final ConcurrentMap<MetricT, Metric> metrics = new ConcurrentHashMap<>();
 
+  // The ids the metrics were registered under. They must not be recomputed at removal time, because
+  // node metric ids depend on the node's endpoint, which can change.
+  private final ConcurrentMap<MetricT, MetricId> registeredIds = new ConcurrentHashMap<>();
+
   protected final ConcurrentMap<MetricT, Reservoir> reservoirs = new ConcurrentHashMap<>();
 
   protected DropwizardMetricUpdater(
@@ -93,15 +97,21 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
 
   @Override
   public void clearMetrics() {
-    for (MetricT metric : metrics.keySet()) {
-      MetricId id = getMetricId(metric);
+    for (MetricId id : registeredIds.values()) {
       registry.remove(id.getName());
     }
+    registeredIds.clear();
     metrics.clear();
     reservoirs.clear();
   }
 
   protected abstract MetricId getMetricId(MetricT metric);
+
+  private MetricId newRegistrationId(MetricT metric) {
+    MetricId id = getMetricId(metric);
+    registeredIds.put(metric, id);
+    return id;
+  }
 
   protected void initializeGauge(
       MetricT metric, DriverExecutionProfile profile, Supplier<Number> supplier) {
@@ -109,7 +119,7 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
       metrics.computeIfAbsent(
           metric,
           m -> {
-            MetricId id = getMetricId(m);
+            MetricId id = newRegistrationId(m);
             return registry.gauge(id.getName(), () -> supplier::get);
           });
     }
@@ -139,7 +149,7 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               return registry.counter(id.getName());
             });
   }
@@ -149,7 +159,7 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               return registry.meter(id.getName());
             });
   }
@@ -159,7 +169,7 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               return registry.histogram(id.getName());
             });
   }
@@ -169,7 +179,7 @@ public abstract class DropwizardMetricUpdater<MetricT> extends AbstractMetricUpd
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               Reservoir reservoir = reservoirs.get(metric);
               Timer timer = reservoir == null ? new Timer() : new Timer(reservoir);
               return registry.timer(id.getName(), () -> timer);

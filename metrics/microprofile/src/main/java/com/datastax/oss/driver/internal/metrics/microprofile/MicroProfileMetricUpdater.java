@@ -47,6 +47,10 @@ public abstract class MicroProfileMetricUpdater<MetricT> extends AbstractMetricU
 
   protected final ConcurrentMap<MetricT, Metric> metrics = new ConcurrentHashMap<>();
 
+  // The ids the metrics were registered under. They must not be recomputed at removal time, because
+  // node metric ids depend on the node's endpoint, which can change.
+  private final ConcurrentMap<MetricT, MetricId> registeredIds = new ConcurrentHashMap<>();
+
   protected MicroProfileMetricUpdater(
       InternalDriverContext context, Set<MetricT> enabledMetrics, MetricRegistry registry) {
     super(context, enabledMetrics);
@@ -84,15 +88,21 @@ public abstract class MicroProfileMetricUpdater<MetricT> extends AbstractMetricU
 
   @Override
   public void clearMetrics() {
-    for (MetricT metric : metrics.keySet()) {
-      MetricId id = getMetricId(metric);
+    for (MetricId id : registeredIds.values()) {
       Tag[] tags = MicroProfileTags.toMicroProfileTags(id.getTags());
       registry.remove(new MetricID(id.getName(), tags));
     }
+    registeredIds.clear();
     metrics.clear();
   }
 
   protected abstract MetricId getMetricId(MetricT metric);
+
+  private MetricId newRegistrationId(MetricT metric) {
+    MetricId id = getMetricId(metric);
+    registeredIds.put(metric, id);
+    return id;
+  }
 
   protected void initializeGauge(
       MetricT metric, DriverExecutionProfile profile, Gauge<Number> supplier) {
@@ -100,7 +110,7 @@ public abstract class MicroProfileMetricUpdater<MetricT> extends AbstractMetricU
       metrics.computeIfAbsent(
           metric,
           m -> {
-            MetricId id = getMetricId(m);
+            MetricId id = newRegistrationId(m);
             String name = id.getName();
             Tag[] tags = MicroProfileTags.toMicroProfileTags(id.getTags());
             Metadata metadata =
@@ -127,7 +137,7 @@ public abstract class MicroProfileMetricUpdater<MetricT> extends AbstractMetricU
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               Tag[] tags = MicroProfileTags.toMicroProfileTags(id.getTags());
               return registry.counter(id.getName(), tags);
             });
@@ -138,7 +148,7 @@ public abstract class MicroProfileMetricUpdater<MetricT> extends AbstractMetricU
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               Tag[] tags = MicroProfileTags.toMicroProfileTags(id.getTags());
               return registry.meter(id.getName(), tags);
             });
@@ -149,7 +159,7 @@ public abstract class MicroProfileMetricUpdater<MetricT> extends AbstractMetricU
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               Tag[] tags = MicroProfileTags.toMicroProfileTags(id.getTags());
               return registry.histogram(id.getName(), tags);
             });
@@ -160,7 +170,7 @@ public abstract class MicroProfileMetricUpdater<MetricT> extends AbstractMetricU
         metrics.computeIfAbsent(
             metric,
             m -> {
-              MetricId id = getMetricId(m);
+              MetricId id = newRegistrationId(m);
               Tag[] tags = MicroProfileTags.toMicroProfileTags(id.getTags());
               return registry.timer(id.getName(), tags);
             });
