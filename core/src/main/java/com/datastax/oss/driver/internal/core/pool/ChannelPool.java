@@ -105,7 +105,7 @@ public class ChannelPool implements AsyncAutoCloseable {
   }
 
   // This is read concurrently, but only mutated on adminExecutor (by methods in SingleThreaded)
-  @VisibleForTesting ChannelSet[] channels;
+  @VisibleForTesting volatile ChannelSet[] channels;
 
   private final Node node;
   private final CqlIdentifier initialKeyspaceName;
@@ -179,7 +179,10 @@ public class ChannelPool implements AsyncAutoCloseable {
     if (!singleThreaded.initialized) {
       return null;
     }
-    if (singleThreaded.shardingInfo == null) {
+    // Both fields are replaced if the node's shard count changes, so read each of them only once
+    ShardingInfo shardingInfo = singleThreaded.shardingInfo;
+    ChannelSet[] channels = this.channels;
+    if (shardingInfo == null) {
       return channels[0].next();
     }
 
@@ -194,8 +197,11 @@ public class ChannelPool implements AsyncAutoCloseable {
     if (shardId == -1) {
       shardId =
           routingKey != null
-              ? singleThreaded.shardingInfo.shardId(routingKey)
+              ? shardingInfo.shardId(routingKey)
               : ThreadLocalRandom.current().nextInt(channels.length);
+    }
+    if (shardId >= channels.length) {
+      shardId = ThreadLocalRandom.current().nextInt(channels.length);
     }
 
     if (channels[shardId].size() > 0) {
@@ -377,15 +383,55 @@ public class ChannelPool implements AsyncAutoCloseable {
     private void initialize(DriverChannel c) {
       shardingInfo = c.getShardingInfo();
       ((DefaultNode) node).setShardingInfo(shardingInfo);
-      int wanted = getConfiguredSize(distance);
-      int shardsCount = shardingInfo == null ? 1 : shardingInfo.getShardsCount();
-      wantedCount = wanted / shardsCount + (wanted % shardsCount > 0 ? 1 : 0);
-      channels = new ChannelSet[shardsCount];
-      for (int i = 0; i < channels.length; ++i) {
-        channels[i] = new ChannelSet();
-      }
+      createChannelSets();
       addChannel(c);
       initialized = true;
+    }
+
+    private void createChannelSets() {
+      int wanted = getConfiguredSize(distance);
+      int shardsCount = getShardsCount(shardingInfo);
+      wantedCount = wanted / shardsCount + (wanted % shardsCount > 0 ? 1 : 0);
+      ChannelSet[] newChannels = new ChannelSet[shardsCount];
+      for (int i = 0; i < newChannels.length; ++i) {
+        newChannels[i] = new ChannelSet();
+      }
+      channels = newChannels;
+    }
+
+    private int getShardsCount(ShardingInfo info) {
+      return info == null ? 1 : info.getShardsCount();
+    }
+
+    /**
+     * Rebuilds the pool when the node reports a new shard count, which happens if it was restarted
+     * with a different one. The channels of the previous layout are closed.
+     */
+    private void reshard(ShardingInfo newShardingInfo) {
+      assert adminExecutor.inEventLoop();
+      LOG.info(
+          "[{}] Shard count changed ({} => {}), rebuilding the pool",
+          logPrefix,
+          channels.length,
+          getShardsCount(newShardingInfo));
+      ChannelSet[] oldChannels = channels;
+      shardingInfo = newShardingInfo;
+      ((DefaultNode) node).setShardingInfo(newShardingInfo);
+      createChannelSets();
+      for (ChannelSet set : oldChannels) {
+        for (DriverChannel channel : set) {
+          closingChannels.add(channel);
+          channel.close();
+          eventBus.fire(ChannelEvent.channelClosed(node));
+        }
+      }
+    }
+
+    /** Removes a channel from the live set, if it is still there. */
+    private boolean removeChannel(DriverChannel channel) {
+      int shardId = channel.getShardId();
+      // The shard may not exist anymore if the pool was rebuilt since the channel was added
+      return shardId < channels.length && channels[shardId].remove(channel);
     }
 
     private CompletionStage<Boolean> reconnect() {
@@ -635,6 +681,9 @@ public class ChannelPool implements AsyncAutoCloseable {
               }
             }
             LOG.debug("[{}] New channel added {}", logPrefix, channel);
+            if (getShardsCount(channel.getShardingInfo()) != channels.length) {
+              reshard(channel.getShardingInfo());
+            }
             if (channels[channel.getShardId()].size() < wantedCount) {
               addChannel(channel);
             } else {
@@ -680,9 +729,10 @@ public class ChannelPool implements AsyncAutoCloseable {
 
     private void onChannelCloseStarted(DriverChannel channel) {
       assert adminExecutor.inEventLoop();
-      if (!isClosing) {
+      // A channel already in the closing set was closed by reshard(), which has reported it
+      if (!isClosing && !closingChannels.contains(channel)) {
         LOG.debug("[{}] Channel {} started graceful shutdown", logPrefix, channel);
-        channels[channel.getShardId()].remove(channel);
+        removeChannel(channel);
         closingChannels.add(channel);
         eventBus.fire(ChannelEvent.channelClosed(node));
         reconnection.start();
@@ -694,7 +744,7 @@ public class ChannelPool implements AsyncAutoCloseable {
       if (!isClosing) {
         // Either it was closed abruptly and was still in the live set, or it was an orderly
         // shutdown and it had moved to the closing set.
-        if (channels[channel.getShardId()].remove(channel)) {
+        if (removeChannel(channel)) {
           LOG.debug("[{}] Lost channel {}", logPrefix, channel);
           eventBus.fire(ChannelEvent.channelClosed(node));
           reconnection.start();
@@ -709,7 +759,7 @@ public class ChannelPool implements AsyncAutoCloseable {
       assert adminExecutor.inEventLoop();
       distance = newDistance;
       int newChannelCount = getConfiguredSize(newDistance);
-      int shardsCount = shardingInfo == null ? 1 : shardingInfo.getShardsCount();
+      int shardsCount = getShardsCount(shardingInfo);
       newChannelCount = newChannelCount / shardsCount + (newChannelCount % shardsCount > 0 ? 1 : 0);
       if (newChannelCount > wantedCount) {
         LOG.debug("[{}] Growing ({} => {} channels)", logPrefix, wantedCount, newChannelCount);
