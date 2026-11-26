@@ -47,7 +47,9 @@ class CanonicalNodeListBuilder {
   }
 
   List<Node> build() {
-    return canonicalLists.computeIfAbsent(elements, ImmutableList::copyOf);
+    List<Node> snapshot = ImmutableList.copyOf(elements);
+    List<Node> canonical = canonicalLists.putIfAbsent(snapshot, snapshot);
+    return canonical == null ? snapshot : canonical;
   }
 
   void clear() {
