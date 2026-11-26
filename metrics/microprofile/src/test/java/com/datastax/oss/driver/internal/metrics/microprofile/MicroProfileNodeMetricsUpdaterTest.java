@@ -31,12 +31,15 @@ import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.metrics.DefaultNodeMetric;
 import com.datastax.oss.driver.api.core.metrics.NodeMetric;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metrics.AbstractMetricUpdater;
+import com.datastax.oss.driver.internal.core.metrics.DefaultMetricIdGenerator;
 import com.datastax.oss.driver.internal.core.util.LoggerTest;
 import com.tngtech.java.junit.dataprovider.DataProvider;
 import com.tngtech.java.junit.dataprovider.DataProviderRunner;
 import com.tngtech.java.junit.dataprovider.UseDataProvider;
 import io.smallrye.metrics.MetricsRegistryImpl;
+import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
@@ -46,6 +49,41 @@ import org.junit.runner.RunWith;
 
 @RunWith(DataProviderRunner.class)
 public class MicroProfileNodeMetricsUpdaterTest {
+
+  @Test
+  public void should_remove_metrics_registered_before_endpoint_change() {
+    // given
+    Node node = mock(Node.class);
+    InternalDriverContext context = mock(InternalDriverContext.class);
+    DriverExecutionProfile profile = mock(DriverExecutionProfile.class);
+    DriverConfig config = mock(DriverConfig.class);
+    Set<NodeMetric> enabledMetrics = Collections.singleton(DefaultNodeMetric.UNSENT_REQUESTS);
+    when(context.getSessionName()).thenReturn("s0");
+    when(context.getConfig()).thenReturn(config);
+    when(config.getDefaultProfile()).thenReturn(profile);
+    when(profile.getDuration(DefaultDriverOption.METRICS_NODE_EXPIRE_AFTER))
+        .thenReturn(AbstractMetricUpdater.MIN_EXPIRE_AFTER);
+    when(profile.getString(DefaultDriverOption.METRICS_ID_GENERATOR_PREFIX, "")).thenReturn("");
+    DefaultMetricIdGenerator idGenerator = new DefaultMetricIdGenerator(context);
+    when(context.getMetricIdGenerator()).thenReturn(idGenerator);
+    MetricsRegistryImpl registry = new MetricsRegistryImpl();
+
+    when(node.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.1", 9042)));
+    MicroProfileNodeMetricUpdater oldUpdater =
+        new MicroProfileNodeMetricUpdater(node, context, enabledMetrics, registry);
+
+    // when (same order as DefaultNode.setEndPoint)
+    when(node.getEndPoint())
+        .thenReturn(new DefaultEndPoint(new InetSocketAddress("127.0.0.2", 9042)));
+    new MicroProfileNodeMetricUpdater(node, context, enabledMetrics, registry);
+    oldUpdater.clearMetrics();
+
+    // then
+    assertThat(registry.getMetricIDs())
+        .extracting(id -> id.getName())
+        .containsExactly("s0.nodes.127_0_0_2:9042.errors.request.unsent");
+  }
 
   @Test
   public void should_log_warning_when_provided_eviction_time_setting_is_too_low() {
