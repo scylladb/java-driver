@@ -121,16 +121,20 @@ public class MicroProfileMetricsFactory implements MetricsFactory {
   }
 
   protected void processNodeStateEvent(NodeStateEvent event) {
+    NodeMetricUpdater updater = event.node.getMetricUpdater();
+    if (!(updater instanceof MicroProfileNodeMetricUpdater)) {
+      // Contact points have no registered node metrics to expire.
+      return;
+    }
+    MicroProfileNodeMetricUpdater microProfileUpdater = (MicroProfileNodeMetricUpdater) updater;
     if (event.newState == NodeState.DOWN
         || event.newState == NodeState.FORCED_DOWN
         || event.newState == null) {
       // node is DOWN or REMOVED
-      ((MicroProfileNodeMetricUpdater) event.node.getMetricUpdater())
-          .startMetricsExpirationTimeout();
+      microProfileUpdater.startMetricsExpirationTimeout();
     } else if (event.newState == NodeState.UP || event.newState == NodeState.UNKNOWN) {
       // node is UP or ADDED
-      ((MicroProfileNodeMetricUpdater) event.node.getMetricUpdater())
-          .cancelMetricsExpirationTimeout();
+      microProfileUpdater.cancelMetricsExpirationTimeout();
     }
   }
 }
