@@ -33,6 +33,7 @@ import com.datastax.oss.driver.api.core.cql.BatchType;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.internal.core.util.LoggerTest;
+import java.time.Duration;
 import org.junit.Test;
 
 public class DefaultBatchStatementTest {
@@ -339,5 +340,16 @@ public class DefaultBatchStatementTest {
     BatchStatement batch7 = batch6.setRequestRoutingType(null);
     assertThat(batch7.getRequestRoutingType()).isNotNull();
     assertThat(batch7.getRequestRoutingType()).isEqualByComparingTo(RequestRoutingType.REGULAR);
+  }
+
+  @Test
+  public void should_return_timeout_that_was_set() {
+    Duration timeout = Duration.ofSeconds(42);
+    BatchStatement batch = BatchStatement.newInstance(BatchType.LOGGED).setTimeout(timeout);
+    assertThat(batch.getTimeout()).isEqualTo(timeout);
+    assertThat(batch.setIdempotent(true).getTimeout()).isEqualTo(timeout);
+    assertThat(BatchStatement.builder(batch).build().getTimeout()).isEqualTo(timeout);
+    assertThat(BatchStatement.builder(BatchType.LOGGED).setTimeout(timeout).build().getTimeout())
+        .isEqualTo(timeout);
   }
 }
