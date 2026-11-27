@@ -189,7 +189,8 @@ public class BoundStatementBuilder extends StatementBuilder<BoundStatementBuilde
     return new DefaultBoundStatement(
         preparedStatement,
         variableDefinitions,
-        values,
+        // Copy: the builder may be reused after this call
+        values.clone(),
         executionProfileName,
         executionProfile,
         routingKeyspace,
