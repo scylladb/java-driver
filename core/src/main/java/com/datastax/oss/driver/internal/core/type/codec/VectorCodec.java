@@ -103,12 +103,11 @@ public class VectorCodec<SubtypeT> implements TypeCodec<CqlVector<SubtypeT>> {
       if (valueBuff == null) {
         throw new NullPointerException("Vector elements cannot encode to CQL NULL");
       }
-      int elementSize = valueBuff.limit();
+      int elementSize = valueBuff.remaining();
       if (isVarSized) {
         allValueBuffsSize += VIntCoding.computeVIntSize(elementSize);
       }
       allValueBuffsSize += elementSize;
-      valueBuff.rewind();
       valueBuffs[i] = valueBuff;
     }
     // if too many elements, throw

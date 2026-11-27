@@ -106,6 +106,20 @@ public class VectorCodecTest {
     };
   }
 
+  @Test
+  public void should_encode_only_remaining_bytes_of_element_buffers() {
+    byte[] array = {1, 2, 3, 4, 5};
+    ByteBuffer element = ByteBuffer.wrap(array, 2, 2);
+    TypeCodec<CqlVector<ByteBuffer>> codec = TypeCodecs.vectorOf(1, TypeCodecs.BLOB);
+
+    ByteBuffer encoded =
+        codec.encode(CqlVector.newInstance(Arrays.asList(element)), ProtocolVersion.DEFAULT);
+
+    assertThat(encoded).isEqualTo(Bytes.fromHexString("0x020304"));
+    assertThat(element.position()).isEqualTo(2);
+    assertThat(element.limit()).isEqualTo(4);
+  }
+
   @UseDataProvider("dataProvider")
   @Test
   public void should_encode(TestDataContainer testData) {
