@@ -21,6 +21,7 @@ import static com.datastax.oss.driver.api.querybuilder.Assertions.assertThat;
 import static com.datastax.oss.driver.api.querybuilder.SchemaBuilder.alterTable;
 
 import com.datastax.oss.driver.api.core.type.DataTypes;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import org.junit.Test;
 
 public class AlterTableTest {
@@ -101,6 +102,18 @@ public class AlterTableTest {
   public void should_generate_alter_table_with_options() {
     assertThat(alterTable("bar").withComment("Hello").withCDC(true))
         .hasCql("ALTER TABLE bar WITH comment='Hello' AND cdc=true");
+  }
+
+  @Test
+  public void should_escape_single_quotes_in_option_values() {
+    assertThat(alterTable("bar").withComment("it's"))
+        .hasCql("ALTER TABLE bar WITH comment='it''s'");
+  }
+
+  @Test
+  public void should_escape_single_quotes_in_map_option_keys_and_values() {
+    assertThat(alterTable("bar").withOption("compression", ImmutableMap.of("a'b", "c'd")))
+        .hasCql("ALTER TABLE bar WITH compression={'a''b':'c''d'}");
   }
 
   @Test

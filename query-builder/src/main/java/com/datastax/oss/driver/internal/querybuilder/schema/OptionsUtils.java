@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.internal.querybuilder.schema;
 
+import com.datastax.oss.driver.internal.core.util.Strings;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import java.util.Map;
 
@@ -41,7 +42,7 @@ public class OptionsUtils {
   private static String extractOptionValue(@NonNull Object option) {
     StringBuilder optionValue = new StringBuilder();
     if (option instanceof String) {
-      optionValue.append("'").append((String) option).append("'");
+      optionValue.append(Strings.quote((String) option));
     } else if (option instanceof Map) {
       @SuppressWarnings("unchecked")
       Map<String, Object> optionMap = (Map<String, Object>) option;
@@ -54,9 +55,8 @@ public class OptionsUtils {
           optionValue.append(",");
         }
         optionValue
-            .append("'")
-            .append(subOption.getKey())
-            .append("':")
+            .append(Strings.quote(subOption.getKey()))
+            .append(":")
             .append(extractOptionValue(subOption.getValue()));
       }
       optionValue.append("}");
