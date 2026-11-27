@@ -550,9 +550,11 @@ public interface OngoingAssignment {
   }
 
   /**
-   * Removes a single entry to a map column, as in {@code SET m=m-{?:?}}.
+   * Removes a single entry from a map column, as in {@code SET m=m-{?}}.
    *
-   * <p>The terms must be of the same type as the column's keys and values respectively.
+   * <p>The key term must be of the same type as the column's keys. CQL removes map entries by key
+   * only, so the value term is ignored: it is not part of the generated query, and a bind marker
+   * passed as the value does not create a variable.
    *
    * <p>This is a shortcut for {@link #set(Assignment) set(Assignment.removeMapEntry(columnId, key,
    * value)}.

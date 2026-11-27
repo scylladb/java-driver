@@ -200,6 +200,6 @@ public class UpdateFluentAssignmentTest {
                 .removeMapEntry("m", literal(1), literal("foo"))
                 .whereColumn("k")
                 .isEqualTo(bindMarker()))
-        .hasCql("UPDATE foo SET m=m-{1:'foo'} WHERE k=?");
+        .hasCql("UPDATE foo SET m=m-{1} WHERE k=?");
   }
 }
