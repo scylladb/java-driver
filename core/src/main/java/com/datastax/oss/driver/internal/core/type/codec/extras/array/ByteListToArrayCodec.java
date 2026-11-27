@@ -27,7 +27,7 @@ import java.util.Objects;
 import net.jcip.annotations.Immutable;
 
 /**
- * A codec that maps the CQL type {@code list<byte>} to the Java type {@code byte[]}.
+ * A codec that maps the CQL type {@code list<tinyint>} to the Java type {@code byte[]}.
  *
  * <p>Note that this codec is not suitable for reading CQL blobs as byte arrays; you should use
  * {@link SimpleBlobCodec} for that.
@@ -41,7 +41,7 @@ import net.jcip.annotations.Immutable;
 public class ByteListToArrayCodec extends AbstractPrimitiveListToArrayCodec<byte[]> {
 
   public ByteListToArrayCodec() {
-    super(DataTypes.listOf(DataTypes.SMALLINT), GenericType.of(byte[].class));
+    super(DataTypes.listOf(DataTypes.TINYINT), GenericType.of(byte[].class));
   }
 
   @Override

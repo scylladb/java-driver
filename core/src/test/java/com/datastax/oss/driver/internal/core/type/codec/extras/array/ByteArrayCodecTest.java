@@ -19,6 +19,7 @@ package com.datastax.oss.driver.internal.core.type.codec.extras.array;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.api.core.type.codec.ExtraTypeCodecs;
 import com.datastax.oss.driver.api.core.type.reflect.GenericType;
 import com.datastax.oss.driver.internal.core.type.codec.CodecTestBase;
@@ -30,6 +31,11 @@ public class ByteArrayCodecTest extends CodecTestBase<byte[]> {
   @Before
   public void setup() {
     codec = ExtraTypeCodecs.BYTE_LIST_TO_ARRAY;
+  }
+
+  @Test
+  public void should_map_cql_list_of_tinyint() {
+    assertThat(codec.getCqlType()).isEqualTo(DataTypes.listOf(DataTypes.TINYINT));
   }
 
   @Test
