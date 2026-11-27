@@ -698,7 +698,7 @@ public class DefaultBatchStatement implements BatchStatement, RequestRoutingType
   @Nullable
   @Override
   public Duration getTimeout() {
-    return null;
+    return timeout;
   }
 
   @NonNull
