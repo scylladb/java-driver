@@ -152,7 +152,7 @@ public class UpdateIdempotenceTest {
                 .removeMapEntry("m", literal(1), literal("bar"))
                 .whereColumn("k")
                 .isEqualTo(bindMarker()))
-        .hasCql("UPDATE foo SET m=m-{1:'bar'} WHERE k=?")
+        .hasCql("UPDATE foo SET m=m-{1} WHERE k=?")
         .isIdempotent();
   }
 

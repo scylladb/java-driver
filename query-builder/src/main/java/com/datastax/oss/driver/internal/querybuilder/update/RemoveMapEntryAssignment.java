@@ -27,6 +27,7 @@ public class RemoveMapEntryAssignment extends CollectionElementAssignment {
 
   public RemoveMapEntryAssignment(
       @NonNull CqlIdentifier columnId, @NonNull Term key, @NonNull Term value) {
-    super(columnId, Operator.REMOVE, key, value, '{', '}');
+    // Map subtraction takes a set of keys, so the value is not part of the generated CQL.
+    super(columnId, Operator.REMOVE, null, key, '{', '}');
   }
 }
