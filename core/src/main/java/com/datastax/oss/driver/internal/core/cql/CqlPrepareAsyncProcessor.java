@@ -162,15 +162,13 @@ public class CqlPrepareAsyncProcessor
                 .whenComplete(
                     (preparedStatement, error) -> {
                       if (error != null) {
-                        cache.invalidate(request); // Make sure failure isn't cached indefinitely
-                        mine.completeExceptionally(error);
+                        invalidateAndCompleteExceptionally(request, mine, error);
                       } else {
                         mine.complete(preparedStatement);
                       }
                     });
           } catch (RuntimeException e) {
-            cache.invalidate(request); // Make sure failure isn't cached indefinitely
-            mine.completeExceptionally(e);
+            invalidateAndCompleteExceptionally(request, mine, e);
           }
         }
       }
@@ -185,6 +183,12 @@ public class CqlPrepareAsyncProcessor
     } catch (ExecutionException e) {
       return CompletableFutures.failedFuture(e.getCause());
     }
+  }
+
+  private void invalidateAndCompleteExceptionally(
+      PrepareRequest request, CompletableFuture<PreparedStatement> future, Throwable error) {
+    cache.invalidate(request);
+    future.completeExceptionally(error);
   }
 
   @Override

@@ -34,8 +34,7 @@ public class SessionClosedException extends DriverException {
     this(message, null);
   }
 
-  private SessionClosedException(
-      @NonNull String message, @Nullable ExecutionInfo executionInfo) {
+  private SessionClosedException(@NonNull String message, @Nullable ExecutionInfo executionInfo) {
     super(message, executionInfo, null, true);
   }
 
