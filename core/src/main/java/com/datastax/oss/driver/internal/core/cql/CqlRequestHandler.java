@@ -25,13 +25,13 @@ package com.datastax.oss.driver.internal.core.cql;
 
 import static com.datastax.oss.driver.api.core.DriverTimeoutException.UNAVAILABLE;
 
-import com.datastax.oss.driver.api.core.AllNodesFailedException;
 import com.datastax.oss.driver.api.core.CqlIdentifier;
 import com.datastax.oss.driver.api.core.DriverException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.DriverTimeoutException.NodeDiagnostics;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.connection.FrameTooLongException;
@@ -299,9 +299,7 @@ public class CqlRequestHandler implements Throttled {
         // signaling a throttler that does not own it yet.
         setFinalErrorWithoutThrottlerRelease(
             initialStatement,
-            "cannot be started once stopped".equals(e.getMessage())
-                ? new IllegalStateException("Session is closed")
-                : e,
+            CqlTimerUtils.isStoppedTimerException(e) ? new SessionClosedException() : e,
             null,
             -1);
       }
@@ -465,7 +463,7 @@ public class CqlRequestHandler implements Throttled {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
         // We're the last execution so fail the result
-        setFinalError(statement, AllNodesFailedException.fromErrors(this.errors), null, -1);
+        setFinalError(statement, session.queryPlanExhaustedError(this.errors), null, -1);
       }
     } else {
       boolean writeSubmitted = false;
@@ -963,7 +961,7 @@ public class CqlRequestHandler implements Throttled {
       } catch (IllegalStateException e) {
         // If we're racing with session shutdown, the timer might be stopped already. We don't want
         // to schedule more executions anyway, so swallow the error.
-        if (!"cannot be started once stopped".equals(e.getMessage())) {
+        if (!CqlTimerUtils.isStoppedTimerException(e)) {
           Loggers.warnWithException(
               LOG, "[{}] Error while scheduling speculative execution", logPrefix, e);
         }

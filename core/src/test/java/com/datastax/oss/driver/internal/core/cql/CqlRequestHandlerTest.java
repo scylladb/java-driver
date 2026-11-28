@@ -42,6 +42,7 @@ import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.NoNodeAvailableException;
 import com.datastax.oss.driver.api.core.NodeUnavailableException;
 import com.datastax.oss.driver.api.core.RequestThrottlingException;
+import com.datastax.oss.driver.api.core.SessionClosedException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.connection.HeartbeatException;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
@@ -256,6 +257,78 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
       assertThatStage(resultSetFuture)
           .isFailed(error -> assertThat(error).isInstanceOf(NoNodeAvailableException.class));
+    }
+  }
+
+  // scylladb/java-driver#846: post-shutdown branch (closeFuture already completed).
+  @Test
+  public void should_fail_with_session_closed_when_query_plan_empty_and_session_is_closed() {
+    // no withResponse/withEmptyPool calls => empty query plan
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getSession().isClosed()).thenReturn(true);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(
+              error -> {
+                assertThat(error).isInstanceOf(SessionClosedException.class);
+                assertThat(error).hasMessage("Session is closed");
+              });
+    }
+  }
+
+  // scylladb/java-driver#846: shutdown-in-progress branch (closeAsync called, closeFuture not yet
+  // done).
+  @Test
+  public void should_fail_with_session_closed_when_query_plan_empty_and_session_is_closing() {
+    // no withResponse/withEmptyPool calls => empty query plan
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      when(harness.getSession().isClosing()).thenReturn(true);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(
+              error -> {
+                assertThat(error).isInstanceOf(SessionClosedException.class);
+                assertThat(error).hasMessage("Session is closed");
+              });
+    }
+  }
+
+  @Test
+  public void should_preserve_node_errors_when_session_is_closing() {
+    try (RequestHandlerTestHarness harness =
+        RequestHandlerTestHarness.builder().withEmptyPool(node1).build()) {
+      when(harness.getSession().isClosing()).thenReturn(true);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(
+              error -> {
+                assertThat(error).isInstanceOf(AllNodesFailedException.class);
+                assertThat(((AllNodesFailedException) error).getAllErrors()).hasSize(1);
+              });
     }
   }
 
@@ -1083,6 +1156,47 @@ public class CqlRequestHandlerTest extends CqlRequestHandlerTestBase {
 
       assertThatStage(resultSetFuture)
           .isFailed(t -> assertThat(t).isInstanceOf(DriverTimeoutException.class));
+    }
+  }
+
+  @Test
+  public void should_fail_with_session_closed_if_request_timer_is_stopped() {
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      Timer timer = mock(Timer.class);
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+      when(timer.newTimeout(any(), anyLong(), any()))
+          .thenThrow(new IllegalStateException("cannot be started once stopped"));
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture)
+          .isFailed(error -> assertThat(error).isInstanceOf(SessionClosedException.class));
+    }
+  }
+
+  @Test
+  public void should_propagate_other_request_timer_errors() {
+    try (RequestHandlerTestHarness harness = RequestHandlerTestHarness.builder().build()) {
+      Timer timer = mock(Timer.class);
+      IllegalStateException timerFailure = new IllegalStateException("other timer failure");
+      when(harness.getContext().getNettyOptions().getTimer()).thenReturn(timer);
+      when(timer.newTimeout(any(), anyLong(), any())).thenThrow(timerFailure);
+
+      CompletionStage<AsyncResultSet> resultSetFuture =
+          new CqlRequestHandler(
+                  UNDEFINED_IDEMPOTENCE_STATEMENT,
+                  harness.getSession(),
+                  harness.getContext(),
+                  "test")
+              .handle();
+
+      assertThatStage(resultSetFuture).isFailed(error -> assertThat(error).isSameAs(timerFailure));
     }
   }
 

@@ -156,17 +156,20 @@ public class CqlPrepareAsyncProcessor
         CompletableFuture<PreparedStatement> mine = new CompletableFuture<>();
         result = cache.get(request, () -> mine);
         if (result == mine) {
-          new CqlPrepareHandler(request, session, context, sessionLogPrefix)
-              .handle()
-              .whenComplete(
-                  (preparedStatement, error) -> {
-                    if (error != null) {
-                      mine.completeExceptionally(error);
-                      cache.invalidate(request); // Make sure failure isn't cached indefinitely
-                    } else {
-                      mine.complete(preparedStatement);
-                    }
-                  });
+          try {
+            new CqlPrepareHandler(request, session, context, sessionLogPrefix)
+                .handle()
+                .whenComplete(
+                    (preparedStatement, error) -> {
+                      if (error != null) {
+                        invalidateAndCompleteExceptionally(request, mine, error);
+                      } else {
+                        mine.complete(preparedStatement);
+                      }
+                    });
+          } catch (RuntimeException e) {
+            invalidateAndCompleteExceptionally(request, mine, e);
+          }
         }
       }
       // If the future is already completed, return it directly to maintain a strong reference
@@ -180,6 +183,12 @@ public class CqlPrepareAsyncProcessor
     } catch (ExecutionException e) {
       return CompletableFutures.failedFuture(e.getCause());
     }
+  }
+
+  private void invalidateAndCompleteExceptionally(
+      PrepareRequest request, CompletableFuture<PreparedStatement> future, Throwable error) {
+    cache.invalidate(request);
+    future.completeExceptionally(error);
   }
 
   @Override
